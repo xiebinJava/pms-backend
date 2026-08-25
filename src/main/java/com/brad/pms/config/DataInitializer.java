@@ -2,6 +2,7 @@ package com.brad.pms.config;
 
 import com.brad.pms.entity.*;
 import com.brad.pms.mapper.*;
+import com.brad.pms.service.NodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -26,6 +27,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ProjectTaskMapper taskMapper;
     private final ProjectMilestoneMapper milestoneMapper;
     private final ProjectCommentMapper commentMapper;
+    private final NodeService nodeService;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
@@ -53,6 +55,7 @@ public class DataInitializer implements CommandLineRunner {
         p1.setProgress(35);
         p1.setCode("PRJ-000001");
         projectMapper.insert(p1);
+        nodeService.initDefault(p1.getId());
 
         ProjectDO p2 = new ProjectDO();
         p2.setName("电商中台重构");
@@ -65,6 +68,7 @@ public class DataInitializer implements CommandLineRunner {
         p2.setProgress(0);
         p2.setCode("PRJ-000002");
         projectMapper.insert(p2);
+        nodeService.initDefault(p2.getId());
 
         member(p1.getId(), admin.getId(), 0);
         member(p1.getId(), zhang.getId(), 1);

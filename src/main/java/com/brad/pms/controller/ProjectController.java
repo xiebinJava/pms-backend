@@ -34,6 +34,11 @@ public class ProjectController {
         return ResponseResult.success();
     }
 
+    @GetMapping("/stats")
+    public ResponseResult<java.util.Map<String, Object>> stats() {
+        return ResponseResult.success(projectService.stats());
+    }
+
     @PostMapping("/page")
     public ResponseResult<PageResult<ProjectDTO>> page(@RequestBody ProjectPageQry qry) {
         return ResponseResult.success(projectService.page(qry));

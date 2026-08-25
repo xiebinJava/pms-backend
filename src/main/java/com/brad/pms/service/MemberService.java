@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 @Service
@@ -62,5 +64,36 @@ public class MemberService {
             throw BusinessException.error("项目负责人不可移除");
         }
         memberMapper.deleteById(memberId);
+    }
+
+    public void replace(Long projectId, Long ownerId, List<Long> userIds) {
+        List<Long> selected = userIds == null ? Collections.emptyList() : userIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (ownerId != null && !selected.contains(ownerId)) selected.add(ownerId);
+
+        List<ProjectMemberDO> existing = memberMapper.selectList(
+                new LambdaQueryWrapper<ProjectMemberDO>().eq(ProjectMemberDO::getProjectId, projectId));
+        existing.stream()
+                .filter(member -> !selected.contains(member.getUserId()))
+                .forEach(member -> memberMapper.deleteById(member.getId()));
+
+        for (Long userId : selected) {
+            ProjectMemberDO member = existing.stream()
+                    .filter(item -> Objects.equals(item.getUserId(), userId))
+                    .findFirst()
+                    .orElse(null);
+            if (member == null) {
+                member = new ProjectMemberDO();
+                member.setProjectId(projectId);
+                member.setUserId(userId);
+                member.setRole(Objects.equals(userId, ownerId) ? 0 : 2);
+                memberMapper.insert(member);
+            } else if (Objects.equals(userId, ownerId) && !Objects.equals(member.getRole(), 0)) {
+                member.setRole(0);
+                memberMapper.updateById(member);
+            }
+        }
     }
 }

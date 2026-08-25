@@ -35,6 +35,14 @@ CREATE TABLE IF NOT EXISTS project_member (
     UNIQUE (project_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS project_follower (
+    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    project_id BIGINT      NOT NULL,
+    user_id    BIGINT      NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS project_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     project_id  BIGINT       NOT NULL,
@@ -73,8 +81,24 @@ CREATE TABLE IF NOT EXISTS project_comment (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS project_node (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    project_id  BIGINT       NOT NULL,
+    node_key    VARCHAR(50)  NOT NULL,
+    name        VARCHAR(100) NOT NULL,
+    description VARCHAR(1000),
+    deliverable VARCHAR(1000),
+    roles       VARCHAR(500),
+    status      TINYINT      NOT NULL DEFAULT 0 COMMENT '0待开始 1进行中 2已完成',
+    sort        INT          NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_task_project ON project_task (project_id);
 CREATE INDEX idx_task_status ON project_task (project_id, status);
 CREATE INDEX idx_member_project ON project_member (project_id);
+CREATE INDEX idx_follower_project ON project_follower (project_id);
 CREATE INDEX idx_milestone_project ON project_milestone (project_id);
 CREATE INDEX idx_comment_project ON project_comment (project_id);
+CREATE INDEX idx_node_project ON project_node (project_id, sort);

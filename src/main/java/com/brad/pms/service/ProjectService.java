@@ -16,6 +16,7 @@ import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectMilestoneMapper;
+import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.security.UserContext;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +35,11 @@ public class ProjectService {
     private final ProjectMemberMapper memberMapper;
     private final ProjectTaskMapper taskMapper;
     private final ProjectMilestoneMapper milestoneMapper;
+    private final ProjectNodeMapper nodeMapper;
     private final MemberService memberService;
+    private final NodeService nodeService;
     private final UserService userService;
+    private final FollowerService followerService;
 
     @Transactional
     public ProjectDTO create(ProjectCreateCmd cmd) {
@@ -54,6 +58,9 @@ public class ProjectService {
         project.setCode("PRJ-" + String.format("%06d", project.getId()));
         projectMapper.updateById(project);
 
+        // 初始化项目管理节点（完成当前节点自动解锁下一个）
+        nodeService.initDefault(project.getId());
+
         // 负责人自动成为项目成员
         memberService.add(project.getId(), ownerId, 0);
         return detail(project.getId());
@@ -69,6 +76,12 @@ public class ProjectService {
         project.setStartDate(cmd.getStartDate());
         project.setEndDate(cmd.getEndDate());
         projectMapper.updateById(project);
+        if (cmd.getMemberIds() != null) {
+            memberService.replace(id, project.getOwnerId(), cmd.getMemberIds());
+        }
+        if (cmd.getFollowerIds() != null) {
+            followerService.replace(id, cmd.getFollowerIds());
+        }
         return detail(id);
     }
 
@@ -79,6 +92,8 @@ public class ProjectService {
         memberMapper.delete(new LambdaQueryWrapper<ProjectMemberDO>().eq(ProjectMemberDO::getProjectId, id));
         taskMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectTaskDO>().eq(com.brad.pms.entity.ProjectTaskDO::getProjectId, id));
         milestoneMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectMilestoneDO>().eq(com.brad.pms.entity.ProjectMilestoneDO::getProjectId, id));
+        nodeMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectNodeDO>().eq(com.brad.pms.entity.ProjectNodeDO::getProjectId, id));
+        followerService.replace(id, Collections.emptyList());
     }
 
     public PageResult<ProjectDTO> page(ProjectPageQry qry) {
@@ -94,6 +109,25 @@ public class ProjectService {
     public ProjectDTO detail(Long id) {
         ProjectDO project = requireProject(id);
         return enrich(Collections.singletonList(project)).get(0);
+    }
+
+    public Map<String, Object> stats() {
+        List<ProjectDO> all = projectMapper.selectList(null);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", all.size());
+        result.put("planning", countByStatus(all, 0));
+        result.put("active", countByStatus(all, 1));
+        result.put("completed", countByStatus(all, 2));
+        result.put("archived", countByStatus(all, 3));
+        double avgProgress = all.stream()
+                .mapToInt(p -> p.getProgress() == null ? 0 : p.getProgress())
+                .average().orElse(0);
+        result.put("avgProgress", Math.round(avgProgress));
+        return result;
+    }
+
+    private long countByStatus(List<ProjectDO> list, int status) {
+        return list.stream().filter(p -> p.getStatus() != null && p.getStatus() == status).count();
     }
 
     private ProjectDO requireProject(Long id) {
