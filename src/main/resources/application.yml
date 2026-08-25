@@ -1,0 +1,34 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: pms-backend
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:pms;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+
+pms:
+  jwt:
+    # 生产环境务必通过环境变量/配置文件覆盖
+    secret: ${PMS_JWT_SECRET:pms-open-source-dev-secret-please-override-in-production-2026}
+    expire-hours: 168
