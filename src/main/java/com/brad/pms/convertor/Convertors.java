@@ -32,7 +32,8 @@ public final class Convertors {
         return list.stream().map(Convertors::toUser).collect(Collectors.toList());
     }
 
-    public static ProjectDTO toProject(ProjectDO do_, UserDO owner, int memberCount, int taskCount, int doneTaskCount) {
+    public static ProjectDTO toProject(ProjectDO do_, UserDO owner, UserDO createdBy, UserDO projectManager,
+                                       int memberCount, int taskCount, int doneTaskCount) {
         ProjectDTO dto = new ProjectDTO();
         dto.setId(do_.getId());
         dto.setCode(do_.getCode());
@@ -42,6 +43,12 @@ public final class Convertors {
         dto.setPriority(do_.getPriority());
         dto.setOwnerId(do_.getOwnerId());
         dto.setOwnerName(owner == null ? null : owner.getNickname());
+        dto.setCreatedBy(do_.getCreatedBy());
+        dto.setCreatedByName(createdBy == null ? null : createdBy.getNickname());
+        dto.setCreatedByAvatar(createdBy == null ? null : createdBy.getAvatar());
+        dto.setProjectManagerId(do_.getProjectManagerId());
+        dto.setProjectManagerName(projectManager == null ? null : projectManager.getNickname());
+        dto.setProjectManagerAvatar(projectManager == null ? null : projectManager.getAvatar());
         dto.setStartDate(do_.getStartDate());
         dto.setEndDate(do_.getEndDate());
         dto.setProgress(do_.getProgress() == null ? 0 : do_.getProgress());
@@ -70,9 +77,11 @@ public final class Convertors {
         ProjectTaskDTO dto = new ProjectTaskDTO();
         dto.setId(do_.getId());
         dto.setProjectId(do_.getProjectId());
+        dto.setNodeId(do_.getNodeId());
         dto.setParentId(do_.getParentId());
         dto.setTitle(do_.getTitle());
         dto.setDescription(do_.getDescription());
+        dto.setDeliverable(do_.getDeliverable());
         dto.setStatus(do_.getStatus());
         dto.setPriority(do_.getPriority());
         dto.setAssigneeId(do_.getAssigneeId());

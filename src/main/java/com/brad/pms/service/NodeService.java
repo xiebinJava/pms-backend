@@ -1,17 +1,24 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.brad.pms.common.enums.NodeStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.entity.ProjectDO;
+import com.brad.pms.entity.ProjectLifecycleLogDO;
+import com.brad.pms.entity.ProjectMemberDO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectMapper;
+import com.brad.pms.mapper.ProjectMemberMapper;
+import com.brad.pms.mapper.ProjectLifecycleLogMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 /**
@@ -23,6 +30,10 @@ public class NodeService {
 
     private final ProjectNodeMapper nodeMapper;
     private final ProjectMapper projectMapper;
+    private final ProjectMemberMapper memberMapper;
+    private final UserService userService;
+    private final ProjectPermissionService permissionService;
+    private final ProjectLifecycleLogMapper lifecycleLogMapper;
 
     /**
      * 项目默认节点（参考项目管理全景图：9 个阶段节点）
@@ -75,10 +86,39 @@ public class NodeService {
     }
 
     public List<ProjectNodeDTO> list(Long projectId) {
-        return nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
+        ProjectDO project = permissionService.requireProject(projectId);
+        List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
                         .eq(ProjectNodeDO::getProjectId, projectId)
-                        .orderByAsc(ProjectNodeDO::getSort))
-                .stream().map(this::toDTO).collect(Collectors.toList());
+                        .orderByAsc(ProjectNodeDO::getSort));
+        java.util.Map<Long, UserDO> owners = userService.listByIds(nodes.stream()
+                        .map(ProjectNodeDO::getOwnerId)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList()))
+                .stream().collect(Collectors.toMap(UserDO::getId, user -> user));
+        return nodes.stream().map(node -> toDTO(node, owners.get(node.getOwnerId()), project)).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public ProjectNodeDTO updateOwner(Long projectId, Long nodeId, Long ownerId) {
+        ProjectDO project = permissionService.requireManageableProject(projectId, "分配节点负责人");
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        if (NodeStatus.isReadOnly(node.getStatus())) {
+            throw BusinessException.forbidden("节点已锁定，回滚后才可以分配节点负责人");
+        }
+        if (ownerId != null) {
+            Integer memberCount = memberMapper.selectCount(new LambdaQueryWrapper<ProjectMemberDO>()
+                    .eq(ProjectMemberDO::getProjectId, projectId)
+                    .eq(ProjectMemberDO::getUserId, ownerId));
+            if (memberCount == null || memberCount == 0) {
+                throw BusinessException.error("节点负责人必须是项目成员");
+            }
+        }
+        node.setOwnerId(ownerId);
+        nodeMapper.updateById(node);
+        UserDO owner = ownerId == null ? null : userService.listByIds(java.util.Collections.singletonList(ownerId))
+                .stream().findFirst().orElse(null);
+        return toDTO(node, owner, project);
     }
 
     /**
@@ -86,30 +126,25 @@ public class NodeService {
      */
     @Transactional
     public List<ProjectNodeDTO> complete(Long projectId, Long nodeId) {
-        ProjectNodeDO node = nodeMapper.selectById(nodeId);
-        if (node == null || !node.getProjectId().equals(projectId)) {
-            throw BusinessException.error("节点不存在");
+        ProjectDO project = permissionService.requireProject(projectId);
+        ProjectNodeDO node = permissionService.requireCompletableNode(projectId, nodeId);
+        validateKickoffProfile(projectId, node);
+        if (node.getOwnerId() == null) {
+            throw BusinessException.error("请先分配节点负责人");
         }
-        if (node.getStatus() == 2) {
-            throw BusinessException.error("该节点已完成");
-        }
-        if (node.getStatus() != 1) {
-            throw BusinessException.error("当前节点尚未解锁");
-        }
-        node.setStatus(2);
+        node.setStatus(NodeStatus.COMPLETED.getCode());
         nodeMapper.updateById(node);
 
         ProjectNodeDO next = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getStatus, 0)
+                .eq(ProjectNodeDO::getStatus, NodeStatus.NOT_STARTED.getCode())
                 .orderByAsc(ProjectNodeDO::getSort)
                 .last("LIMIT 1"));
         if (next != null) {
-            next.setStatus(1);
+            next.setStatus(NodeStatus.IN_PROGRESS.getCode());
             nodeMapper.updateById(next);
             refreshProgress(projectId);
         } else {
-            ProjectDO project = projectMapper.selectById(projectId);
             if (project != null) {
                 project.setStatus(2);
                 project.setProgress(100);
@@ -119,31 +154,73 @@ public class NodeService {
         return list(projectId);
     }
 
+    private void validateKickoffProfile(Long projectId, ProjectNodeDO node) {
+        if (!"kickoff".equals(node.getNodeKey())) {
+            return;
+        }
+
+        ProjectDO project = projectMapper.selectById(projectId);
+        if (project == null) {
+            throw BusinessException.error("项目不存在");
+        }
+
+        List<String> missing = new ArrayList<>();
+        if (project.getDescription() == null || project.getDescription().trim().isEmpty()) {
+            missing.add("项目描述");
+        }
+        if (project.getPriority() == null) {
+            missing.add("优先级");
+        }
+        if (project.getProjectManagerId() == null) {
+            missing.add("项目经理");
+        }
+        if (project.getStartDate() == null || project.getEndDate() == null) {
+            missing.add("项目排期");
+        }
+
+        long memberCount = memberMapper.selectCount(new LambdaQueryWrapper<ProjectMemberDO>()
+                .eq(ProjectMemberDO::getProjectId, projectId));
+        if (memberCount == 0) {
+            missing.add("项目成员");
+        }
+
+        if (!missing.isEmpty()) {
+            throw BusinessException.error("请先完善" + String.join("、", missing));
+        }
+    }
+
     /**
      * 回滚到指定节点：指定节点设为进行中，之前节点标记完成，之后节点恢复待开始。
      */
     @Transactional
-    public List<ProjectNodeDTO> rollback(Long projectId, Long nodeId) {
-        ProjectNodeDO target = nodeMapper.selectById(nodeId);
-        if (target == null || !target.getProjectId().equals(projectId)) {
-            throw BusinessException.error("节点不存在");
-        }
+    public List<ProjectNodeDTO> rollback(Long projectId, Long nodeId, String reason) {
+        ProjectDO project = permissionService.requireProject(projectId);
+        ProjectNodeDO target = permissionService.requireRollbackableNode(projectId, nodeId);
         List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId)
                 .orderByAsc(ProjectNodeDO::getSort));
         for (ProjectNodeDO node : nodes) {
-            int nextStatus = node.getSort() < target.getSort() ? 2
-                    : node.getId().equals(target.getId()) ? 1 : 0;
+            int nextStatus = node.getSort() < target.getSort() ? NodeStatus.COMPLETED.getCode()
+                    : node.getId().equals(target.getId()) ? NodeStatus.IN_PROGRESS.getCode()
+                    : NodeStatus.NOT_STARTED.getCode();
             if (!Integer.valueOf(nextStatus).equals(node.getStatus())) {
                 node.setStatus(nextStatus);
                 nodeMapper.updateById(node);
             }
         }
 
-        ProjectDO project = projectMapper.selectById(projectId);
         if (project != null) {
+            int fromStatus = project.getStatus() == null ? 1 : project.getStatus();
             project.setStatus(1);
             projectMapper.updateById(project);
+            ProjectLifecycleLogDO log = new ProjectLifecycleLogDO();
+            log.setProjectId(projectId);
+            log.setAction("ROLLBACK_NODE");
+            log.setReason(reason);
+            log.setFromStatus(fromStatus);
+            log.setToStatus(1);
+            log.setOperatorId(com.brad.pms.security.UserContext.userId());
+            lifecycleLogMapper.insert(log);
         }
         refreshProgress(projectId);
         return list(projectId);
@@ -151,20 +228,20 @@ public class NodeService {
 
     private void refreshProgress(Long projectId) {
         ProjectDO project = projectMapper.selectById(projectId);
-        if (project == null || project.getStatus() == 2) {
+        if (project == null || project.getStatus() == 2 || project.getStatus() == 3) {
             return;
         }
         Integer total = nodeMapper.selectCount(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId));
         Integer done = nodeMapper.selectCount(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getStatus, 2));
+                .eq(ProjectNodeDO::getStatus, NodeStatus.COMPLETED.getCode()));
         int progress = total == null || total == 0 ? 0 : (int) Math.round(done * 100.0 / total);
         project.setProgress(progress);
         projectMapper.updateById(project);
     }
 
-    private ProjectNodeDTO toDTO(ProjectNodeDO node) {
+    private ProjectNodeDTO toDTO(ProjectNodeDO node, UserDO owner, ProjectDO project) {
         ProjectNodeDTO dto = new ProjectNodeDTO();
         dto.setId(node.getId());
         dto.setProjectId(node.getProjectId());
@@ -173,9 +250,13 @@ public class NodeService {
         dto.setDescription(node.getDescription());
         dto.setDeliverable(node.getDeliverable());
         dto.setRoles(node.getRoles());
+        dto.setOwnerId(node.getOwnerId());
+        dto.setOwnerName(owner == null ? null : owner.getNickname());
+        dto.setOwnerAvatar(owner == null ? null : owner.getAvatar());
         dto.setStatus(node.getStatus());
         dto.setSort(node.getSort());
         dto.setCreatedAt(node.getCreatedAt());
+        dto.setPermissions(permissionService.nodePermissions(project, node));
         return dto;
     }
 }

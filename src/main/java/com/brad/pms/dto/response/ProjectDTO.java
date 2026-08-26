@@ -16,6 +16,12 @@ public class ProjectDTO {
     private Integer priority;
     private Long ownerId;
     private String ownerName;
+    private Long createdBy;
+    private String createdByName;
+    private String createdByAvatar;
+    private Long projectManagerId;
+    private String projectManagerName;
+    private String projectManagerAvatar;
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer progress;
@@ -24,4 +30,5 @@ public class ProjectDTO {
     private Integer memberCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private ProjectPermissionsDTO permissions;
 }

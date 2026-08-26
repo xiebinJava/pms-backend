@@ -15,7 +15,7 @@ public class ProjectCreateCmd {
     private String description;
 
     @NotNull(message = "状态不能为空")
-    private Integer status = 0;
+    private Integer status = 1;
 
     private Integer priority = 1;
 

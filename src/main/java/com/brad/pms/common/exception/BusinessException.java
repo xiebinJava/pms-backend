@@ -27,8 +27,13 @@ public class BusinessException extends RuntimeException {
         return new BusinessException(401, message);
     }
 
+    public static BusinessException forbidden(String message) {
+        return new BusinessException(403, message);
+    }
+
     public static class ResponseCode {
         public static final int ERROR = 500;
         public static final int UNAUTHORIZED = 401;
+        public static final int FORBIDDEN = 403;
     }
 }

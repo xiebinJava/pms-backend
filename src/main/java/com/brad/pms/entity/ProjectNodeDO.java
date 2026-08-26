@@ -24,6 +24,8 @@ public class ProjectNodeDO {
 
     private String roles;
 
+    private Long ownerId;
+
     private Integer status;
 
     private Integer sort;

@@ -1,6 +1,7 @@
 package com.brad.pms.config;
 
 import com.brad.pms.entity.*;
+import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.mapper.*;
 import com.brad.pms.service.NodeService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 种子数据：首次启动自动创建默认管理员账号与演示数据
@@ -50,12 +52,14 @@ public class DataInitializer implements CommandLineRunner {
         p1.setStatus(1);
         p1.setPriority(2);
         p1.setOwnerId(admin.getId());
+        p1.setCreatedBy(admin.getId());
         p1.setStartDate(LocalDate.now().minusDays(20));
         p1.setEndDate(LocalDate.now().plusDays(80));
         p1.setProgress(35);
         p1.setCode("PRJ-000001");
         projectMapper.insert(p1);
         nodeService.initDefault(p1.getId());
+        List<ProjectNodeDTO> p1Nodes = nodeService.list(p1.getId());
 
         ProjectDO p2 = new ProjectDO();
         p2.setName("电商中台重构");
@@ -63,6 +67,7 @@ public class DataInitializer implements CommandLineRunner {
         p2.setStatus(0);
         p2.setPriority(1);
         p2.setOwnerId(zhang.getId());
+        p2.setCreatedBy(zhang.getId());
         p2.setStartDate(LocalDate.now().plusDays(10));
         p2.setEndDate(LocalDate.now().plusDays(120));
         p2.setProgress(0);
@@ -93,12 +98,12 @@ public class DataInitializer implements CommandLineRunner {
         m2.setStatus(0);
         milestoneMapper.insert(m2);
 
-        task(p1.getId(), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 2, 2, zhang.getId(), m1.getId(), 1);
-        task(p1.getId(), "搭建前端工程骨架", "Vite + Vue3 + ant-design-vue + UnoCSS", 2, 2, li.getId(), m1.getId(), 2);
-        task(p1.getId(), "实现项目 CRUD 接口", "含分页、搜索与负责人", 2, 1, zhang.getId(), m1.getId(), 3);
-        task(p1.getId(), "实现任务看板", "支持拖拽切换状态", 1, 2, li.getId(), m1.getId(), 4);
-        task(p1.getId(), "里程碑管理", "列表与状态流转", 0, 1, wang.getId(), m1.getId(), 5);
-        task(p1.getId(), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), m2.getId(), 6);
+        task(p1.getId(), nodeId(p1Nodes, "kickoff"), "立项材料评审", "确认目标、范围与资源授权", 2, 2, admin.getId(), null, 1);
+        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, zhang.getId(), null, 2);
+        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, wang.getId(), null, 3);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, zhang.getId(), m1.getId(), 4);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, li.getId(), m1.getId(), 5);
+        task(p1.getId(), nodeId(p1Nodes, "knowledge"), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), m2.getId(), 6);
 
         ProjectCommentDO c1 = new ProjectCommentDO();
         c1.setProjectId(p1.getId());
@@ -125,10 +130,19 @@ public class DataInitializer implements CommandLineRunner {
         memberMapper.insert(m);
     }
 
-    private void task(Long projectId, String title, String desc, int status, int priority,
+    private Long nodeId(List<ProjectNodeDTO> nodes, String nodeKey) {
+        return nodes.stream()
+                .filter(node -> nodeKey.equals(node.getNodeKey()))
+                .map(ProjectNodeDTO::getId)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private void task(Long projectId, Long nodeId, String title, String desc, int status, int priority,
                       Long assigneeId, Long milestoneId, int sort) {
         ProjectTaskDO t = new ProjectTaskDO();
         t.setProjectId(projectId);
+        t.setNodeId(nodeId);
         t.setTitle(title);
         t.setDescription(desc);
         t.setStatus(status);

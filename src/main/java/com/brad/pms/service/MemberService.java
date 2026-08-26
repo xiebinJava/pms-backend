@@ -22,6 +22,7 @@ public class MemberService {
 
     private final ProjectMemberMapper memberMapper;
     private final UserService userService;
+    private final ProjectPermissionService permissionService;
 
     public List<ProjectMemberDTO> list(Long projectId) {
         List<ProjectMemberDO> members = memberMapper.selectList(
@@ -37,6 +38,7 @@ public class MemberService {
     }
 
     public ProjectMemberDO add(Long projectId, Long userId, int role) {
+        permissionService.requireManageableProject(projectId, "维护项目成员");
         if (userId == null) {
             throw BusinessException.error("用户不能为空");
         }
@@ -56,6 +58,7 @@ public class MemberService {
     }
 
     public void remove(Long projectId, Long memberId) {
+        permissionService.requireManageableProject(projectId, "维护项目成员");
         ProjectMemberDO member = memberMapper.selectById(memberId);
         if (member == null || !member.getProjectId().equals(projectId)) {
             throw BusinessException.error("成员不存在");
@@ -67,6 +70,7 @@ public class MemberService {
     }
 
     public void replace(Long projectId, Long ownerId, List<Long> userIds) {
+        permissionService.requireManageableProject(projectId, "维护项目成员");
         List<Long> selected = userIds == null ? Collections.emptyList() : userIds.stream()
                 .filter(Objects::nonNull)
                 .distinct()

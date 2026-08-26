@@ -20,6 +20,8 @@ public class ProjectUpdateCmd {
 
     private Long ownerId;
 
+    private Long projectManagerId;
+
     private LocalDate startDate;
 
     private LocalDate endDate;

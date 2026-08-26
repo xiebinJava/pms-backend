@@ -20,8 +20,9 @@ public class TaskController {
     private final TaskService taskService;
 
     @GetMapping("/projects/{projectId}/tasks")
-    public ResponseResult<List<ProjectTaskDTO>> list(@PathVariable Long projectId) {
-        return ResponseResult.success(taskService.listByProject(projectId));
+    public ResponseResult<List<ProjectTaskDTO>> list(@PathVariable Long projectId,
+                                                     @RequestParam(required = false) Long nodeId) {
+        return ResponseResult.success(taskService.listByProject(projectId, nodeId));
     }
 
     @PostMapping("/projects/{projectId}/tasks")

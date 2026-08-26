@@ -5,6 +5,7 @@ import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.ProjectCreateCmd;
 import com.brad.pms.dto.request.ProjectPageQry;
 import com.brad.pms.dto.request.ProjectUpdateCmd;
+import com.brad.pms.dto.request.ProjectLifecycleCmd;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.service.ProjectService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,18 @@ public class ProjectController {
     public ResponseResult<Void> delete(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseResult.success();
+    }
+
+    @PostMapping("/{id}/terminate")
+    public ResponseResult<ProjectDTO> terminate(@PathVariable Long id,
+                                                @Validated @RequestBody ProjectLifecycleCmd cmd) {
+        return ResponseResult.success(projectService.terminate(id, cmd.getReason()));
+    }
+
+    @PostMapping("/{id}/restore")
+    public ResponseResult<ProjectDTO> restore(@PathVariable Long id,
+                                              @Validated @RequestBody ProjectLifecycleCmd cmd) {
+        return ResponseResult.success(projectService.restore(id, cmd.getReason()));
     }
 
     @GetMapping("/stats")

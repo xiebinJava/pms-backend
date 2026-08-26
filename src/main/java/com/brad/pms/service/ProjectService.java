@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.common.enums.ProjectStatus;
 import com.brad.pms.common.page.PageResult;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.ProjectCreateCmd;
@@ -11,14 +12,18 @@ import com.brad.pms.dto.request.ProjectPageQry;
 import com.brad.pms.dto.request.ProjectUpdateCmd;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.entity.ProjectDO;
+import com.brad.pms.entity.ProjectLifecycleLogDO;
 import com.brad.pms.entity.ProjectMemberDO;
+import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
+import com.brad.pms.mapper.ProjectLifecycleLogMapper;
 import com.brad.pms.mapper.ProjectMilestoneMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.security.ProjectPermissionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,16 +45,21 @@ public class ProjectService {
     private final NodeService nodeService;
     private final UserService userService;
     private final FollowerService followerService;
+    private final ProjectPermissionService permissionService;
+    private final ProjectLifecycleLogMapper lifecycleLogMapper;
 
     @Transactional
     public ProjectDTO create(ProjectCreateCmd cmd) {
-        Long ownerId = cmd.getOwnerId() == null ? UserContext.userId() : cmd.getOwnerId();
+        Long creatorId = UserContext.userId();
         ProjectDO project = new ProjectDO();
         project.setName(cmd.getName());
         project.setDescription(cmd.getDescription());
-        project.setStatus(cmd.getStatus());
+        // 新建项目统一从“进行中”开始，项目经理在首节点确认后再落库。
+        project.setStatus(ProjectStatus.ACTIVE.getCode());
         project.setPriority(cmd.getPriority());
-        project.setOwnerId(ownerId);
+        // owner_id 为历史兼容字段，真实项目创建人统一取当前登录用户。
+        project.setOwnerId(creatorId);
+        project.setCreatedBy(creatorId);
         project.setStartDate(cmd.getStartDate());
         project.setEndDate(cmd.getEndDate());
         project.setProgress(0);
@@ -61,24 +71,28 @@ public class ProjectService {
         // 初始化项目管理节点（完成当前节点自动解锁下一个）
         nodeService.initDefault(project.getId());
 
-        // 负责人自动成为项目成员
-        memberService.add(project.getId(), ownerId, 0);
+        // 创建人自动成为项目成员，项目经理在首节点确认后再设置。
+        memberService.add(project.getId(), creatorId, 0);
         return detail(project.getId());
     }
 
+    @Transactional
     public ProjectDTO update(Long id, ProjectUpdateCmd cmd) {
-        ProjectDO project = requireProject(id);
+        ProjectDO project = permissionService.requireManageableProject(id, "编辑项目");
         project.setName(cmd.getName());
         project.setDescription(cmd.getDescription());
-        if (cmd.getStatus() != null) project.setStatus(cmd.getStatus());
         if (cmd.getPriority() != null) project.setPriority(cmd.getPriority());
-        if (cmd.getOwnerId() != null) project.setOwnerId(cmd.getOwnerId());
         project.setStartDate(cmd.getStartDate());
         project.setEndDate(cmd.getEndDate());
-        projectMapper.updateById(project);
         if (cmd.getMemberIds() != null) {
-            memberService.replace(id, project.getOwnerId(), cmd.getMemberIds());
+            memberService.replace(id, project.getCreatedBy() == null ? project.getOwnerId() : project.getCreatedBy(),
+                    cmd.getMemberIds());
         }
+        if (cmd.getProjectManagerId() != null) {
+            permissionService.requireProjectMember(id, cmd.getProjectManagerId());
+            project.setProjectManagerId(cmd.getProjectManagerId());
+        }
+        projectMapper.updateById(project);
         if (cmd.getFollowerIds() != null) {
             followerService.replace(id, cmd.getFollowerIds());
         }
@@ -87,13 +101,61 @@ public class ProjectService {
 
     @Transactional
     public void delete(Long id) {
-        requireProject(id);
+        permissionService.requireManageableProject(id, "删除项目");
+        // 关注人服务也会校验项目状态，必须在删除项目主记录前清理。
+        followerService.replace(id, Collections.emptyList());
         projectMapper.deleteById(id);
         memberMapper.delete(new LambdaQueryWrapper<ProjectMemberDO>().eq(ProjectMemberDO::getProjectId, id));
         taskMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectTaskDO>().eq(com.brad.pms.entity.ProjectTaskDO::getProjectId, id));
         milestoneMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectMilestoneDO>().eq(com.brad.pms.entity.ProjectMilestoneDO::getProjectId, id));
         nodeMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectNodeDO>().eq(com.brad.pms.entity.ProjectNodeDO::getProjectId, id));
-        followerService.replace(id, Collections.emptyList());
+    }
+
+    @Transactional
+    public ProjectDTO terminate(Long id, String reason) {
+        ProjectDO project = permissionService.requireProject(id);
+        if (!ProjectPermissionPolicy.canTerminateProject(project, UserContext.userId())) {
+            throw BusinessException.forbidden("仅进行中的项目可以终止，且仅项目创建人或项目经理可以操作");
+        }
+        int fromStatus = ProjectStatus.normalize(project.getStatus());
+        project.setStatus(ProjectStatus.TERMINATED.getCode());
+        projectMapper.updateById(project);
+
+        ProjectNodeDO current = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
+                .eq(ProjectNodeDO::getProjectId, id)
+                .eq(ProjectNodeDO::getStatus, 1)
+                .orderByAsc(ProjectNodeDO::getSort)
+                .last("LIMIT 1"));
+        if (current != null) {
+            current.setStatus(3);
+            nodeMapper.updateById(current);
+        }
+        recordLifecycle(id, "TERMINATE", reason, fromStatus, ProjectStatus.TERMINATED.getCode());
+        return detail(id);
+    }
+
+    @Transactional
+    public ProjectDTO restore(Long id, String reason) {
+        ProjectDO project = permissionService.requireProject(id);
+        Long userId = UserContext.userId();
+        if (!Objects.equals(project.getStatus(), ProjectStatus.TERMINATED.getCode())
+                || !ProjectPermissionPolicy.isProjectManagerOrCreator(project, userId)) {
+            throw BusinessException.forbidden("仅项目创建人或项目经理可以恢复已终止项目");
+        }
+        project.setStatus(ProjectStatus.ACTIVE.getCode());
+        projectMapper.updateById(project);
+
+        ProjectNodeDO terminated = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
+                .eq(ProjectNodeDO::getProjectId, id)
+                .eq(ProjectNodeDO::getStatus, 3)
+                .orderByAsc(ProjectNodeDO::getSort)
+                .last("LIMIT 1"));
+        if (terminated != null) {
+            terminated.setStatus(1);
+            nodeMapper.updateById(terminated);
+        }
+        recordLifecycle(id, "RESTORE", reason, ProjectStatus.TERMINATED.getCode(), ProjectStatus.ACTIVE.getCode());
+        return detail(id);
     }
 
     public PageResult<ProjectDTO> page(ProjectPageQry qry) {
@@ -115,10 +177,9 @@ public class ProjectService {
         List<ProjectDO> all = projectMapper.selectList(null);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", all.size());
-        result.put("planning", countByStatus(all, 0));
-        result.put("active", countByStatus(all, 1));
-        result.put("completed", countByStatus(all, 2));
-        result.put("archived", countByStatus(all, 3));
+        result.put("active", countByStatus(all, ProjectStatus.ACTIVE.getCode()));
+        result.put("completed", countByStatus(all, ProjectStatus.COMPLETED.getCode()));
+        result.put("terminated", countByStatus(all, ProjectStatus.TERMINATED.getCode()));
         double avgProgress = all.stream()
                 .mapToInt(p -> p.getProgress() == null ? 0 : p.getProgress())
                 .average().orElse(0);
@@ -131,18 +192,17 @@ public class ProjectService {
     }
 
     private ProjectDO requireProject(Long id) {
-        ProjectDO project = projectMapper.selectById(id);
-        if (project == null) {
-            throw BusinessException.error("项目不存在");
-        }
-        return project;
+        return permissionService.requireProject(id);
     }
 
     private List<ProjectDTO> enrich(List<ProjectDO> projects) {
         if (projects.isEmpty()) return Collections.emptyList();
 
         List<Long> projectIds = projects.stream().map(ProjectDO::getId).collect(Collectors.toList());
-        Set<Long> userIds = projects.stream().map(ProjectDO::getOwnerId).collect(Collectors.toSet());
+        Set<Long> userIds = projects.stream().map(ProjectDO::getOwnerId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        projects.stream().map(ProjectDO::getCreatedBy).filter(Objects::nonNull).forEach(userIds::add);
+        projects.stream().map(ProjectDO::getProjectManagerId).filter(Objects::nonNull).forEach(userIds::add);
         userIds.add(UserContext.userId());
 
         // 成员数
@@ -165,15 +225,30 @@ public class ProjectService {
         Map<Long, UserDO> userMap = loadUsers(userIds);
 
         return projects.stream().map(p -> {
+            p.setStatus(ProjectStatus.normalize(p.getStatus()));
             Long pid = p.getId();
             Map<Integer, Long> stats = taskCountMap.getOrDefault(pid, Collections.emptyMap());
             int total = stats.values().stream().mapToInt(Long::intValue).sum();
             int done = stats.getOrDefault(2, 0L).intValue();
             int progress = total == 0 ? (p.getProgress() == null ? 0 : p.getProgress())
                     : (int) Math.round(done * 100.0 / total);
-            return Convertors.toProject(p, userMap.get(p.getOwnerId()),
+            ProjectDTO dto = Convertors.toProject(p, userMap.get(p.getOwnerId()), userMap.get(p.getCreatedBy()),
+                    userMap.get(p.getProjectManagerId()),
                     memberCountMap.getOrDefault(pid, 0L).intValue(), total, done);
+            dto.setPermissions(permissionService.projectPermissions(p));
+            return dto;
         }).collect(Collectors.toList());
+    }
+
+    private void recordLifecycle(Long projectId, String action, String reason, int fromStatus, int toStatus) {
+        ProjectLifecycleLogDO log = new ProjectLifecycleLogDO();
+        log.setProjectId(projectId);
+        log.setAction(action);
+        log.setReason(reason);
+        log.setFromStatus(fromStatus);
+        log.setToStatus(toStatus);
+        log.setOperatorId(UserContext.userId());
+        lifecycleLogMapper.insert(log);
     }
 
     private Map<Long, UserDO> loadUsers(Set<Long> userIds) {

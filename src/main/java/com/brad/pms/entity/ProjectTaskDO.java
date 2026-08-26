@@ -15,11 +15,15 @@ public class ProjectTaskDO {
 
     private Long projectId;
 
+    private Long nodeId;
+
     private Long parentId;
 
     private String title;
 
     private String description;
+
+    private String deliverable;
 
     private Integer status;
 

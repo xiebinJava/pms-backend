@@ -15,13 +15,14 @@ CREATE TABLE IF NOT EXISTS project (
     code        VARCHAR(50)  NOT NULL,
     name        VARCHAR(100) NOT NULL,
     description VARCHAR(1000),
-    status      TINYINT      NOT NULL DEFAULT 0 COMMENT '0未开始 1进行中 2已完成 3已归档',
+    status      TINYINT      NOT NULL DEFAULT 1 COMMENT '1进行中 2已完成 3已终止',
     priority    TINYINT      NOT NULL DEFAULT 1 COMMENT '0低 1中 2高 3紧急',
     owner_id    BIGINT       NOT NULL,
     start_date  DATE,
     end_date    DATE,
     progress    TINYINT      NOT NULL DEFAULT 0 COMMENT '0-100',
     created_by  BIGINT,
+    project_manager_id BIGINT,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -46,9 +47,11 @@ CREATE TABLE IF NOT EXISTS project_follower (
 CREATE TABLE IF NOT EXISTS project_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     project_id  BIGINT       NOT NULL,
+    node_id     BIGINT,
     parent_id   BIGINT,
     title       VARCHAR(200) NOT NULL,
     description VARCHAR(2000),
+    deliverable VARCHAR(2000),
     status      TINYINT      NOT NULL DEFAULT 0 COMMENT '0待办 1进行中 2已完成',
     priority    TINYINT      NOT NULL DEFAULT 1,
     assignee_id BIGINT,
@@ -89,16 +92,31 @@ CREATE TABLE IF NOT EXISTS project_node (
     description VARCHAR(1000),
     deliverable VARCHAR(1000),
     roles       VARCHAR(500),
-    status      TINYINT      NOT NULL DEFAULT 0 COMMENT '0待开始 1进行中 2已完成',
+    owner_id    BIGINT,
+    status      TINYINT      NOT NULL DEFAULT 0 COMMENT '0未开始 1进行中 2已完成 3已终止',
     sort        INT          NOT NULL DEFAULT 0,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_task_project ON project_task (project_id);
+CREATE INDEX idx_task_node ON project_task (project_id, node_id);
 CREATE INDEX idx_task_status ON project_task (project_id, status);
 CREATE INDEX idx_member_project ON project_member (project_id);
 CREATE INDEX idx_follower_project ON project_follower (project_id);
 CREATE INDEX idx_milestone_project ON project_milestone (project_id);
 CREATE INDEX idx_comment_project ON project_comment (project_id);
 CREATE INDEX idx_node_project ON project_node (project_id, sort);
+
+CREATE TABLE IF NOT EXISTS project_lifecycle_log (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    project_id  BIGINT       NOT NULL,
+    action      VARCHAR(30)  NOT NULL,
+    reason      VARCHAR(500) NOT NULL,
+    from_status TINYINT,
+    to_status   TINYINT,
+    operator_id BIGINT       NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_lifecycle_project ON project_lifecycle_log (project_id, created_at);

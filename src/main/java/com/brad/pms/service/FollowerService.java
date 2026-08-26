@@ -18,6 +18,7 @@ public class FollowerService {
 
     private final ProjectFollowerMapper followerMapper;
     private final UserService userService;
+    private final ProjectPermissionService permissionService;
 
     public List<Long> listUserIds(Long projectId) {
         return followerMapper.selectList(new LambdaQueryWrapper<ProjectFollowerDO>()
@@ -38,6 +39,7 @@ public class FollowerService {
 
     @Transactional
     public void replace(Long projectId, List<Long> userIds) {
+        permissionService.requireManageableProject(projectId, "维护项目关注人");
         List<Long> selected = userIds == null ? Collections.emptyList() : userIds.stream()
                 .filter(Objects::nonNull)
                 .distinct()

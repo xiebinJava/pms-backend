@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: pms-backend
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   datasource:
     driver-class-name: org.h2.Driver
     url: jdbc:h2:mem:pms;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
@@ -28,6 +32,7 @@ mybatis-plus:
     banner: false
 
 pms:
+  upload-dir: ${PMS_UPLOAD_DIR:./uploads}
   jwt:
     # 生产环境务必通过环境变量/配置文件覆盖
     secret: ${PMS_JWT_SECRET:pms-open-source-dev-secret-please-override-in-production-2026}

@@ -14,7 +14,11 @@ public class ProjectNodeDTO {
     private String description;
     private String deliverable;
     private String roles;
+    private Long ownerId;
+    private String ownerName;
+    private String ownerAvatar;
     private Integer status;
     private Integer sort;
     private LocalDateTime createdAt;
+    private NodePermissionsDTO permissions;
 }
