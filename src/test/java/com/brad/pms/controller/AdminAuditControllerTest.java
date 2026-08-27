@@ -19,4 +19,12 @@ class AdminAuditControllerTest {
         String sql = query.getSqlSegment();
         assertThat(sql).contains("action", "resource_type", "resource_id", "operator_id", "created_at");
     }
+
+    @Test
+    void auditQueryDoesNotEmbedAFixedLimitSoServerPagingCanApply() {
+        QueryWrapper<OperationLogDO> query = AdminAuditController.buildQuery(
+                null, null, null, null, null, null);
+
+        assertThat(query.getSqlSegment()).doesNotContain("LIMIT 200");
+    }
 }

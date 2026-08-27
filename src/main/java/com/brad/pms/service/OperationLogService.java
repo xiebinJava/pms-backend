@@ -6,6 +6,7 @@ import com.brad.pms.security.UserContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,6 +21,7 @@ public class OperationLogService {
         log.setAction(action);
         log.setResourceType(resourceType);
         log.setResourceId(resourceId);
+        log.setRequestId(MDC.get("requestId"));
         log.setBeforeJson(safeJson(before));
         log.setAfterJson(safeJson(after));
         operationLogMapper.insert(log);

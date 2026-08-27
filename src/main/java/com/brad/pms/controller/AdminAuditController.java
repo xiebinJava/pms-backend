@@ -1,6 +1,9 @@
 package com.brad.pms.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.brad.pms.common.page.PageResult;
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.entity.OperationLogDO;
 import com.brad.pms.mapper.OperationLogMapper;
@@ -25,15 +28,22 @@ public class AdminAuditController {
 
     @GetMapping
     @RequirePermission(PermissionCode.AUDIT_READ)
-    public ResponseResult<List<OperationLogDO>> list(@RequestParam(required = false) String action,
+    public ResponseResult<PageResult<OperationLogDO>> list(@RequestParam(required = false) String action,
                                                      @RequestParam(required = false) String resourceType,
                                                      @RequestParam(required = false) Long resourceId,
                                                      @RequestParam(required = false) Long operatorId,
                                                      @RequestParam(required = false) String from,
-                                                     @RequestParam(required = false) String to) {
+                                                     @RequestParam(required = false) String to,
+                                                     @RequestParam(defaultValue = "1") long currPage,
+                                                     @RequestParam(defaultValue = "20") long pageSize) {
         LocalDateTime fromAt = parseDateTime(from);
         LocalDateTime toAt = parseDateTime(to);
-        return ResponseResult.success(operationLogMapper.selectList(buildQuery(action, resourceType, resourceId, operatorId, fromAt, toAt)));
+        long safePage = Math.max(currPage, 1);
+        long safeSize = Math.min(Math.max(pageSize, 1), 100);
+        IPage<OperationLogDO> page = operationLogMapper.selectPage(
+                new Page<>(safePage, safeSize),
+                buildQuery(action, resourceType, resourceId, operatorId, fromAt, toAt));
+        return ResponseResult.success(PageResult.of(page.getTotal(), page.getCurrent(), page.getSize(), page.getRecords()));
     }
 
     static QueryWrapper<OperationLogDO> buildQuery(String action, String resourceType,
@@ -46,8 +56,7 @@ public class AdminAuditController {
                 .eq(operatorId != null, "operator_id", operatorId)
                 .ge(from != null, "created_at", from)
                 .le(to != null, "created_at", to)
-                .orderByDesc("created_at")
-                .last("LIMIT 200");
+                .orderByDesc("created_at");
     }
 
     private static LocalDateTime parseDateTime(String value) {
