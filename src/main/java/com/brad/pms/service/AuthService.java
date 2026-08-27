@@ -8,8 +8,10 @@ import com.brad.pms.dto.request.LoginRequest;
 import com.brad.pms.dto.response.LoginResponse;
 import com.brad.pms.dto.response.UserDTO;
 import com.brad.pms.entity.AuthSessionDO;
+import com.brad.pms.entity.LoginLogDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.AuthSessionMapper;
+import com.brad.pms.mapper.LoginLogMapper;
 import com.brad.pms.mapper.UserMapper;
 import com.brad.pms.security.JwtTokenProvider;
 import com.brad.pms.security.LoginUser;
@@ -34,6 +36,7 @@ public class AuthService {
 
     private final UserMapper userMapper;
     private final AuthSessionMapper authSessionMapper;
+    private final LoginLogMapper loginLogMapper;
     private final JwtTokenProvider tokenProvider;
     private final AuthorizationService authorizationService;
 
@@ -52,21 +55,27 @@ public class AuthService {
         return login(request, null, null);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public LoginResponse login(LoginRequest request, String ip, String userAgent) {
         String normalized = EnterpriseDataMigration.normalizeUsername(request.getUsername());
         UserDO user = userMapper.findByUsernameNormalized(normalized);
-        if (user == null) throw BusinessException.unauthorized("用户名或密码错误");
+        if (user == null) {
+            recordLoginAttempt(null, normalized, "FAILURE", "INVALID_CREDENTIALS", ip, userAgent);
+            throw BusinessException.unauthorized("用户名或密码错误");
+        }
         LocalDateTime now = LocalDateTime.now();
         if (UserStatus.DISABLED.name().equals(user.getStatus())) {
+            recordLoginAttempt(user, normalized, "FAILURE", "ACCOUNT_DISABLED", ip, userAgent);
             throw BusinessException.unauthorized("账号已停用");
         }
         if (UserStatus.LOCKED.name().equals(user.getStatus())
                 && user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
+            recordLoginAttempt(user, normalized, "FAILURE", "ACCOUNT_LOCKED", ip, userAgent);
             throw BusinessException.unauthorized("账号已暂时锁定，请稍后重试");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             registerFailure(user, now);
+            recordLoginAttempt(user, normalized, "FAILURE", "INVALID_CREDENTIALS", ip, userAgent);
             throw BusinessException.unauthorized("用户名或密码错误");
         }
 
@@ -84,6 +93,7 @@ public class AuthService {
         session.setIp(ip);
         session.setUserAgent(userAgent == null ? null : userAgent.substring(0, Math.min(userAgent.length(), 500)));
         authSessionMapper.insert(session);
+        recordLoginAttempt(user, normalized, "SUCCESS", "LOGIN_SUCCESS", ip, userAgent);
 
         LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname(), user.getSystemRole(),
                 user.getNameZh(), Convertors.userDisplayName(user), session.getId());
@@ -137,6 +147,23 @@ public class AuthService {
             user.setLockedUntil(now.plusMinutes(lockMinutes));
         }
         userMapper.updateById(user);
+    }
+
+    private void recordLoginAttempt(UserDO user, String loginName, String result, String reason,
+                                    String ip, String userAgent) {
+        LoginLogDO log = new LoginLogDO();
+        log.setUserId(user == null ? null : user.getId());
+        log.setLoginName(truncate(loginName, 80));
+        log.setResult(result);
+        log.setReason(reason);
+        log.setIp(truncate(ip, 64));
+        log.setUserAgent(truncate(userAgent, 500));
+        loginLogMapper.insert(log);
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) return null;
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     private String randomToken() {

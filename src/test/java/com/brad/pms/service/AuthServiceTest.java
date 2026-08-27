@@ -3,8 +3,10 @@ package com.brad.pms.service;
 import com.brad.pms.dto.request.LoginRequest;
 import com.brad.pms.dto.response.LoginResponse;
 import com.brad.pms.entity.AuthSessionDO;
+import com.brad.pms.entity.LoginLogDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.AuthSessionMapper;
+import com.brad.pms.mapper.LoginLogMapper;
 import com.brad.pms.mapper.UserMapper;
 import com.brad.pms.security.JwtTokenProvider;
 import com.brad.pms.security.AuthorizationService;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.*;
 class AuthServiceTest {
     @Mock UserMapper userMapper;
     @Mock AuthSessionMapper sessionMapper;
+    @Mock LoginLogMapper loginLogMapper;
     @Mock JwtTokenProvider tokenProvider;
     @Mock AuthorizationService authorizationService;
     private AuthService authService;
@@ -39,7 +42,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userMapper, sessionMapper, tokenProvider, authorizationService);
+        authService = new AuthService(userMapper, sessionMapper, loginLogMapper, tokenProvider, authorizationService);
         when(authorizationService.effectivePermissionCodes(anyLong())).thenReturn(java.util.List.of("admin:user:read"));
         ReflectionTestUtils.setField(authService, "maxFailedLogins", 5);
         ReflectionTestUtils.setField(authService, "lockMinutes", 15L);
@@ -59,6 +62,7 @@ class AuthServiceTest {
             invocation.getArgument(0, AuthSessionDO.class).setId(99L);
             return 1;
         });
+        when(loginLogMapper.insert(any(LoginLogDO.class))).thenReturn(1);
         when(tokenProvider.createToken(any())).thenReturn("access");
     }
 
@@ -86,5 +90,55 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.refresh("refresh"))
                 .hasMessage("账号不可用");
+    }
+
+    @Test
+    void invalidPasswordPersistsFailureAuditWithoutCredentials() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("Brad.Xie");
+        request.setPassword("WrongPassword1!");
+
+        assertThatThrownBy(() -> authService.login(request, "10.0.0.8", "test-agent"))
+                .hasMessage("用户名或密码错误");
+
+        assertThat(user.getFailedLoginCount()).isEqualTo(1);
+        verify(loginLogMapper).insert(argThat(log ->
+                "FAILURE".equals(log.getResult())
+                        && Long.valueOf(7L).equals(log.getUserId())
+                        && "brad.xie".equals(log.getLoginName())
+                        && "INVALID_CREDENTIALS".equals(log.getReason())
+                        && "10.0.0.8".equals(log.getIp())
+                        && "test-agent".equals(log.getUserAgent())));
+    }
+
+    @Test
+    void successfulLoginPersistsSuccessAudit() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("Brad.Xie");
+        request.setPassword("CorrectPassword1!");
+
+        authService.login(request, "10.0.0.8", "test-agent");
+
+        verify(loginLogMapper).insert(argThat(log ->
+                "SUCCESS".equals(log.getResult())
+                        && Long.valueOf(7L).equals(log.getUserId())
+                        && "LOGIN_SUCCESS".equals(log.getReason())));
+    }
+
+    @Test
+    void unknownUsernameStillWritesGenericFailureAudit() {
+        when(userMapper.findByUsernameNormalized("unknown.user")).thenReturn(null);
+        LoginRequest request = new LoginRequest();
+        request.setUsername("Unknown.User");
+        request.setPassword("WrongPassword1!");
+
+        assertThatThrownBy(() -> authService.login(request, "10.0.0.9", "test-agent"))
+                .hasMessage("用户名或密码错误");
+
+        verify(loginLogMapper).insert(argThat(log ->
+                "FAILURE".equals(log.getResult())
+                        && log.getUserId() == null
+                        && "unknown.user".equals(log.getLoginName())
+                        && "INVALID_CREDENTIALS".equals(log.getReason())));
     }
 }
