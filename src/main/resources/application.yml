@@ -7,8 +7,7 @@ spring:
   application:
     name: pms-backend
   profiles:
-    # Persistent local/enterprise runs use the existing OceanBase instance.
-    # Automated tests explicitly activate the H2 profile from test resources.
+    # All local and enterprise runtime runs use OceanBase.
     default: oceanbase
   servlet:
     multipart:

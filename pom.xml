@@ -39,16 +39,17 @@
             <version>${mybatis-plus.version}</version>
         </dependency>
 
-        <!-- MySQL / H2 -->
+        <!-- OceanBase MySQL-compatible runtime driver -->
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Embedded database is test-only; production runs use OceanBase. -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>runtime</scope>
+            <scope>test</scope>
         </dependency>
 
         <!-- JWT -->

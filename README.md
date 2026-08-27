@@ -7,7 +7,7 @@
 - Java 17 + Maven
 - Spring Boot 2.7.5
 - MyBatis-Plus 3.4.1（分页插件 + 公共字段自动填充）
-- OceanBase（MySQL 兼容模式）/ MySQL 8 / H2（仅自动化测试）
+- OceanBase（MySQL 兼容模式）
 - JWT（jjwt）轻量登录鉴权，无第三方权限平台依赖
 - Lombok
 
@@ -44,21 +44,10 @@ mvn package -DskipTests && java -jar target/pms-backend-0.1.0.jar
 
 启动后访问 `http://localhost:8080/api`。OceanBase profile 不在运行时启用 Flyway（OceanBase 4.x 对外报告 MySQL 5.7，而 Flyway Community 不支持该版本）；首次部署或升级请先执行仓库中的迁移脚本，再启动应用。
 
-自动化测试显式使用 H2：
+自动化测试使用独立的嵌入式测试数据库，不会改变 OceanBase 数据：
 
 ```bash
 mvn test
-```
-
-### 使用 MySQL
-
-```sql
-CREATE DATABASE pms DEFAULT CHARACTER SET utf8mb4;
-```
-
-```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=mysql \
-  -Dspring-boot.run.arguments="--MYSQL_HOST=localhost --MYSQL_PORT=3306 --MYSQL_DB=pms --MYSQL_USER=root --MYSQL_PASSWORD=root"
 ```
 
 ### 使用 OceanBase
@@ -75,7 +64,7 @@ export OCEANBASE_PASSWORD=<业务密码>
 mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 ```
 
-当前本地 PMS 数据已迁移至 `brad_pms`。后续如需迁移其他 H2 实例，先保持源实例运行并导出快照，再按 `docs/superpowers/specs/2026-08-26-oceanbase-migration-design.md` 执行预检、导入和验收；导入器支持企业版身份、组织和 RBAC 表。
+当前本地 PMS 数据已迁移至 `brad_pms`。导入器中的 H2 快照处理仅用于一次性历史迁移，不参与应用运行。
 
 ## 开发账号与生产初始化
 
@@ -84,7 +73,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 | admin | admin123 |
 | zhangsan / lisi / wangwu | admin123 |
 
-上表仅在测试 H2 环境用于种子数据。生产或持久化 MySQL/OceanBase 环境不要使用共享默认密码；空库首次启动前请注入
+上表仅在自动化测试配置用于种子数据。OceanBase 环境不要使用共享默认密码；空库首次启动前请注入
 `PMS_BOOTSTRAP_ADMIN_USERNAME`、`PMS_BOOTSTRAP_ADMIN_NAME_ZH` 和至少 12 位的
 `PMS_BOOTSTRAP_ADMIN_PASSWORD`。管理员随后通过邀请或 Excel/CSV 导入员工。
 

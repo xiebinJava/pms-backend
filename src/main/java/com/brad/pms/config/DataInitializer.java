@@ -63,7 +63,7 @@ public class DataInitializer implements CommandLineRunner {
             return;
         }
 
-        log.info("初始化本地演示数据（登录名：admin，密码：admin123，仅限默认 H2 配置）");
+        log.info("初始化测试演示数据（登录名：admin，密码：admin123，仅限测试配置）");
 
         UserDO admin = user("admin", "admin123", "管理员", "admin@pms.com");
         admin.setSystemRole(SystemRole.ADMINISTRATOR.getCode());

@@ -26,8 +26,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new AuthInterceptor(tokenProvider, userMapper, authSessionMapper, authorizationService))
-                .addPathPatterns("/**")
-                .excludePathPatterns("/h2-console/**");
+                .addPathPatterns("/**");
     }
 
     @Override

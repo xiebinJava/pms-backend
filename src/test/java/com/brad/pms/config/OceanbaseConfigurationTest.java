@@ -25,6 +25,6 @@ class OceanbaseConfigurationTest {
                 .isEqualTo("${OCEANBASE_USER}");
         assertThat(source.getProperty("spring.datasource.password"))
                 .isEqualTo("${OCEANBASE_PASSWORD}");
-        assertThat(source.getProperty("spring.h2.console.enabled")).isEqualTo(false);
+        assertThat(source.getProperty("spring.h2.console.enabled")).isNull();
     }
 }
