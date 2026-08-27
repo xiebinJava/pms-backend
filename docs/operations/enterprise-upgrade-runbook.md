@@ -24,13 +24,15 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 ## 3. 迁移步骤
 
 1. 停止应用写入，完成全量备份并记录备份校验值。
-2. 在目标库执行只读预检：
+   2. 在目标库执行只读预检：
 
    ```bash
    ./scripts/enterprise-preflight.sh
    ```
 
    预检会检查英文登录名唯一性、组织/角色/项目引用完整性和组织路径。出现 `FAIL` 时先修复数据，不要跳过。
+
+   预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
 3. 使用应用同版本启动迁移。Flyway 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql` 顺序执行；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
 
@@ -67,6 +69,14 @@ export PMS_BOOTSTRAP_ADMIN_PASSWORD='至少 12 位的随机密码'
 ```bash
 export PMS_PASSWORD_RESET_EXPOSE_TOKEN=false
 ```
+
+生产环境还应显式设置允许访问前端的来源，多个来源用逗号分隔：
+
+```bash
+export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
+```
+
+`PMS_JWT_SECRET` 至少需要 32 字节随机值；缺失或过短时后端会拒绝启动。
 
 关闭后必须提供 `PasswordResetNotifier` Spring Bean，将重置链接投递到企业邮箱、飞书或企业微信；当前仓库只提供通知扩展点，不内置 SMTP 凭据。
 
