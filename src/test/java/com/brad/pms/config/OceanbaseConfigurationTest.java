@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 
 import java.util.List;
 
@@ -26,5 +27,18 @@ class OceanbaseConfigurationTest {
         assertThat(source.getProperty("spring.datasource.password"))
                 .isEqualTo("${OCEANBASE_PASSWORD}");
         assertThat(source.getProperty("spring.h2.console.enabled")).isNull();
+    }
+
+    @Test
+    void defaultRuntimeUsesOceanbaseAndRequiresExplicitJwtSecret() throws Exception {
+        List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
+                "application", new FileSystemResource("src/main/resources/application.yml"));
+        PropertySource<?> source = sources.get(0);
+
+        assertThat(source.getProperty("spring.profiles.default")).isEqualTo("oceanbase");
+        assertThat(source.getProperty("spring.sql.init.mode")).isEqualTo("never");
+        assertThat(source.getProperty("pms.jwt.secret")).isEqualTo("${PMS_JWT_SECRET:}");
+        assertThat(source.getProperty("pms.security.cors.allowed-origins"))
+                .isEqualTo("${PMS_CORS_ALLOWED_ORIGINS:http://localhost:57979,http://127.0.0.1:57979}");
     }
 }
