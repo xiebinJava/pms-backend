@@ -138,13 +138,15 @@ public class EnterpriseImportService {
     }
 
     private void commitUsers(List<Map<String, String>> rows) {
-        Set<String> existing = userMapper.selectList(null).stream().map(u -> EnterpriseDataMigration.normalizeUsername(u.getUsername())).collect(Collectors.toSet());
+        Map<String, UserDO> usersByUsername = userMapper.selectList(null).stream()
+                .filter(user -> user.getUsername() != null)
+                .collect(Collectors.toMap(user -> EnterpriseDataMigration.normalizeUsername(user.getUsername()), user -> user));
         Map<String, OrgUnitDO> orgs = orgUnitMapper.selectList(null).stream().collect(Collectors.toMap(OrgUnitDO::getCode, o -> o));
         Map<String, PositionDO> positions = positionMapper.selectList(null).stream().collect(Collectors.toMap(PositionDO::getCode, p -> p));
         for (Map<String, String> row : rows) {
             String username = row.get("英文名");
             String normalized = EnterpriseDataMigration.normalizeUsername(username);
-            if (!existing.add(normalized)) throw BusinessException.error("英文名已存在: " + username);
+            if (usersByUsername.containsKey(normalized)) throw BusinessException.error("英文名已存在: " + username);
             UserDO user = new UserDO();
             user.setUsername(username);
             user.setUsernameNormalized(normalized);
@@ -156,6 +158,11 @@ public class EnterpriseImportService {
             user.setStatus(UserStatus.PENDING_ACTIVATION.name());
             user.setFailedLoginCount(0);
             userMapper.insert(user);
+            usersByUsername.put(normalized, user);
+        }
+        for (Map<String, String> row : rows) {
+            String normalized = EnterpriseDataMigration.normalizeUsername(row.get("英文名"));
+            UserDO user = usersByUsername.get(normalized);
             OrgUnitDO org = orgs.get(row.get("主组织编码"));
             if (org == null) throw BusinessException.error("主组织不存在: " + row.get("主组织编码"));
             UserPositionDO position = new UserPositionDO();
@@ -163,6 +170,13 @@ public class EnterpriseImportService {
             position.setOrgUnitId(org.getId());
             PositionDO pos = positions.get(row.get("岗位编码"));
             position.setPositionId(pos == null ? null : pos.getId());
+            String managerUsername = EnterpriseDataMigration.normalizeUsername(row.get("直属上级英文名"));
+            if (managerUsername != null && !managerUsername.isBlank()) {
+                UserDO manager = usersByUsername.get(managerUsername);
+                if (manager == null) throw BusinessException.error("直属上级不存在: " + row.get("直属上级英文名"));
+                if (Objects.equals(manager.getId(), user.getId())) throw BusinessException.error("直属上级不能是本人: " + row.get("英文名"));
+                position.setManagerUserId(manager.getId());
+            }
             position.setAssignmentType("PRIMARY");
             position.setIsPrimary(true);
             position.setStartDate(LocalDate.now());
@@ -255,6 +269,9 @@ public class EnterpriseImportService {
                     .collect(Collectors.toMap(OrgUnitDO::getCode, org -> org));
             Set<String> roleCodes = roleMapper.selectList(null).stream().map(RoleDO::getCode).collect(Collectors.toSet());
             Set<String> positionCodes = positionMapper.selectList(null).stream().map(PositionDO::getCode).collect(Collectors.toSet());
+            Set<String> allUsernames = new HashSet<>(existing);
+            rows.stream().map(row -> EnterpriseDataMigration.normalizeUsername(row.get("英文名")))
+                    .filter(Objects::nonNull).forEach(allUsernames::add);
             for (int i = 0; i < rows.size(); i++) {
                 Map<String, String> row = rows.get(i);
                 String username = EnterpriseDataMigration.normalizeUsername(row.get("英文名"));
@@ -265,6 +282,8 @@ public class EnterpriseImportService {
                 if (positionCode != null && !positionCode.isBlank() && !positionCodes.contains(positionCode)) errors.add(new ImportRowErrorDTO(i + 2, "岗位编码", "岗位不存在"));
                 String roleCode = row.get("角色编码");
                 if (roleCode != null && !roleCode.isBlank() && !roleCodes.contains(roleCode)) errors.add(new ImportRowErrorDTO(i + 2, "角色编码", "角色不存在"));
+                String manager = EnterpriseDataMigration.normalizeUsername(row.get("直属上级英文名"));
+                if (manager != null && !manager.isBlank() && !allUsernames.contains(manager)) errors.add(new ImportRowErrorDTO(i + 2, "直属上级英文名", "直属上级不存在"));
             }
         }
         return errors;

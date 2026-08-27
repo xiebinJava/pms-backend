@@ -8,6 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.mapper.UserMapper;
+import com.brad.pms.mapper.UserPositionMapper;
 
 import java.nio.charset.StandardCharsets;
 
@@ -18,6 +20,12 @@ class EnterpriseImportServiceTest {
 
     @Autowired
     private EnterpriseImportService importService;
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private UserPositionMapper userPositionMapper;
 
     @org.junit.jupiter.api.BeforeEach
     void setUserContext() {
@@ -51,5 +59,19 @@ class EnterpriseImportServiceTest {
                 "file", "users-phone.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
 
         assertThat(preview.getErrors()).noneMatch(error -> "邮箱/手机号".equals(error.getField()));
+    }
+
+    @Test
+    void commitPersistsManagerRelationshipAfterAllUsersAreCreated() {
+        String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
+                + "测试丁,Import.ManagerChild,manager-child@example.com,,HQ,EMPLOYEE,MEMBER,ADMIN\n";
+
+        ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
+                "file", "users-manager.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(preview.getErrors()).isEmpty();
+        importService.commit(preview.getJobId());
+        Long userId = userMapper.findByUsernameNormalized("import.managerchild").getId();
+        assertThat(userPositionMapper.findActiveByUserId(userId)).anyMatch(position -> Long.valueOf(1L).equals(position.getManagerUserId()));
     }
 }
