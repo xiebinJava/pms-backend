@@ -144,14 +144,14 @@
 
 | 前缀 | 能力 |
 | --- | --- |
-| `/auth` | 首次初始化、登录、刷新、退出、邀请激活、重置密码。 |
+| `/auth` | 登录、刷新、退出、邀请激活、重置密码；首次管理员通过部署环境变量初始化。 |
 | `/admin/users` | 人员分页、邀请、状态变更、任职、角色、导入。 |
-| `/admin/org-units` | 组织树、详情、新增、更新、移动、停用、迁移预检。 |
-| `/admin/roles`、`/admin/permissions` | 角色、权限树、数据范围、授权关系。 |
-| `/admin/audit-logs` | 审计日志分页和详情。 |
+| `/admin/org` | 组织树、新增、移动、停用；权限点为 `admin:org:*`。 |
+| `/admin/roles` | 角色、权限点、数据范围配置；权限点作为角色编辑的一部分维护。 |
+| `/admin/audit` | 审计日志查询（当前返回最近 200 条，支持动作筛选）。 |
 | `/projects` | 保留现有资源路径，内部增加组织数据范围过滤与 `org_unit_id` 写入。 |
 
-所有 `/admin/**` 接口均以权限编码保护；`/auth/setup` 只允许系统未初始化时且使用运行时引导密钥调用一次。
+所有 `/admin/**` 接口均以权限编码保护；首次管理员不开放公开 setup 接口，而是在持久化 profile 首次启动时读取 `PMS_BOOTSTRAP_ADMIN_USERNAME`、`PMS_BOOTSTRAP_ADMIN_NAME_ZH` 和 `PMS_BOOTSTRAP_ADMIN_PASSWORD`。
 
 ## 6. 迁移、回滚与安全
 
