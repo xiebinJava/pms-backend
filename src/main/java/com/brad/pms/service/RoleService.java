@@ -37,6 +37,7 @@ public class RoleService {
     @Transactional
     public RoleDTO create(RoleSaveCmd cmd) {
         if (cmd.getCode() == null || !cmd.getCode().matches("^[A-Z][A-Z0-9_:-]{1,59}$")) throw BusinessException.error("角色编码格式不正确");
+        if (cmd.getName() == null || cmd.getName().isBlank()) throw BusinessException.error("角色名称不能为空");
         if (roleMapper.findByCode(cmd.getCode()) != null) throw BusinessException.error("角色编码已存在");
         RoleDO role = new RoleDO();
         role.setCode(cmd.getCode());
@@ -53,6 +54,7 @@ public class RoleService {
     @Transactional
     public RoleDTO update(Long id, RoleSaveCmd cmd) {
         RoleDO role = require(id);
+        if (cmd.getName() == null || cmd.getName().isBlank()) throw BusinessException.error("角色名称不能为空");
         if (Boolean.TRUE.equals(role.getBuiltin())) {
             if (Boolean.FALSE.equals(cmd.getEnabled())) throw BusinessException.forbidden("内置角色不能停用");
             // Built-in role permissions and data scopes are migration-owned. This
