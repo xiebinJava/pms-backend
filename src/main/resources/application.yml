@@ -6,32 +6,25 @@ server:
 spring:
   application:
     name: pms-backend
+  profiles:
+    # Persistent local/enterprise runs use the existing OceanBase instance.
+    # Automated tests explicitly activate the H2 profile from test resources.
+    default: oceanbase
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:pms;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
-    username: sa
-    password:
   sql:
     init:
-      # Flyway owns schema initialization for every profile, including the
-      # embedded H2 demo/test database.
+      # Flyway owns schema initialization for every profile.
       mode: never
-      schema-locations: classpath:schema.sql
   flyway:
     enabled: true
     baseline-on-migrate: true
-    # V1 mirrors the pre-Flyway schema.sql baseline. New enterprise tables
-    # are introduced by V2 and later migrations.
+    # V1 mirrors the pre-Flyway schema.sql baseline. Enterprise tables are
+    # introduced by V2 and later migrations.
     baseline-version: 1
     locations: classpath:db/migration
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 
 mybatis-plus:
   configuration:

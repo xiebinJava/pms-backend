@@ -3,6 +3,7 @@ package com.brad.pms.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -29,6 +30,10 @@ public class ProjectNodeDO {
     private Integer status;
 
     private Integer sort;
+
+    private LocalDate startDate;
+
+    private LocalDate endDate;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

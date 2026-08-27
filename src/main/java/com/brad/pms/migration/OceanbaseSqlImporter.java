@@ -27,8 +27,16 @@ import java.util.regex.Pattern;
  */
 public final class OceanbaseSqlImporter {
 
+    /**
+     * Every table that can be present in an enterprise H2 snapshot.  Keeping
+     * the allow-list explicit prevents an accidental import of an unrelated
+     * table while still allowing the V2 identity/RBAC data to move with the
+     * legacy project data.
+     */
     public static final List<String> BUSINESS_TABLES = List.of(
+            "flyway_schema_history",
             "sys_user",
+            "sys_company_profile",
             "project",
             "project_member",
             "project_follower",
@@ -36,7 +44,22 @@ public final class OceanbaseSqlImporter {
             "project_milestone",
             "project_comment",
             "project_node",
-            "project_lifecycle_log"
+            "project_lifecycle_log",
+            "sys_org_unit_type",
+            "sys_org_unit",
+            "sys_position",
+            "sys_user_position",
+            "sys_role",
+            "sys_permission",
+            "sys_role_permission",
+            "sys_user_role",
+            "sys_role_org_scope",
+            "sys_invitation",
+            "sys_auth_session",
+            "sys_password_reset_token",
+            "sys_login_log",
+            "sys_operation_log",
+            "sys_import_job"
     );
 
     private static final Pattern DOUBLE_QUOTED_IDENTIFIER = Pattern.compile("\\\"([^\\\"]+)\\\"");
@@ -339,7 +362,7 @@ public final class OceanbaseSqlImporter {
         try (Connection connection = DriverManager.getConnection(
                 jdbcUrl(options.host(), options.port(), options.database()), options.user(), options.password())) {
             ensureEmpty(connection);
-            executeSchema(connection, options.schema());
+            executeSchema(connection, options.schema(), options.migrations());
             List<String> statements = normalizedDataStatements(options.snapshot());
             connection.setAutoCommit(false);
             try (Statement statement = connection.createStatement()) {
@@ -360,8 +383,10 @@ public final class OceanbaseSqlImporter {
             boolean mismatch = false;
             for (Map.Entry<String, Long> entry : expected.entrySet()) {
                 long actual = countRows(connection, entry.getKey());
-                System.out.println(entry.getKey() + " expected=" + entry.getValue() + " actual=" + actual);
-                mismatch |= actual != entry.getValue();
+                boolean migrationHistory = "flyway_schema_history".equals(entry.getKey());
+                System.out.println(entry.getKey() + " " + (migrationHistory ? "expectedAtLeast=" : "expected=")
+                        + entry.getValue() + " actual=" + actual);
+                mismatch |= migrationHistory ? actual < entry.getValue() : actual != entry.getValue();
             }
             long brokenReferences = brokenReferenceCount(connection);
             System.out.println("broken_references=" + brokenReferences);
@@ -390,11 +415,27 @@ public final class OceanbaseSqlImporter {
         }
     }
 
-    private static void executeSchema(Connection connection, Path schema) throws Exception {
+    private static void executeSchema(Connection connection, Path schema, List<Path> migrations) throws Exception {
         try (Statement statement = connection.createStatement()) {
             for (String sql : splitStatements(Files.readString(schema, StandardCharsets.UTF_8))) {
                 if (!sql.isBlank()) statement.execute(sql);
             }
+            for (Path migration : migrations) {
+                for (String sql : splitStatements(Files.readString(migration, StandardCharsets.UTF_8))) {
+                    if (!sql.isBlank()) statement.execute(sql);
+                }
+            }
+            // The snapshot contains Flyway's history rows.  Create the
+            // standard table before those rows are imported so the next app
+            // startup sees the imported migration history as already applied
+            // and stays idempotent.
+            statement.execute("CREATE TABLE IF NOT EXISTS flyway_schema_history ("
+                    + "installed_rank INT NOT NULL, version VARCHAR(50), "
+                    + "description VARCHAR(200) NOT NULL, type VARCHAR(20) NOT NULL, "
+                    + "script VARCHAR(1000) NOT NULL, checksum INT, "
+                    + "installed_by VARCHAR(100) NOT NULL, installed_on TIMESTAMP NOT NULL, "
+                    + "execution_time INT NOT NULL, success BOOLEAN NOT NULL, "
+                    + "PRIMARY KEY (installed_rank))");
         }
     }
 
@@ -436,16 +477,19 @@ public final class OceanbaseSqlImporter {
         return broken;
     }
 
-    private record Options(String mode, Path snapshot, Path schema, String host, String port,
+    private record Options(String mode, Path snapshot, Path schema, List<Path> migrations, String host, String port,
                            String database, String user, String password) {
         private static Options parse(String[] args) {
             Map<String, String> values = new LinkedHashMap<>();
+            List<String> migrationValues = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 if (!arg.startsWith("--") || i + 1 >= args.length) {
                     throw new IllegalArgumentException("arguments must use --name value");
                 }
-                values.put(arg.substring(2), args[++i]);
+                String value = args[++i];
+                values.put(arg.substring(2), value);
+                if ("--migration".equals(arg)) migrationValues.add(value);
             }
             String mode = values.getOrDefault("mode", "import");
             Path snapshot = values.containsKey("snapshot") ? requirePath(values, "snapshot") : null;
@@ -454,6 +498,9 @@ public final class OceanbaseSqlImporter {
                 throw new IllegalArgumentException("missing --snapshot");
             }
             Path schema = Path.of(values.getOrDefault("schema", "src/main/resources/schema.sql"));
+            List<Path> migrations = migrationValues.stream()
+                    .map(value -> requirePathValue(value, "migration"))
+                    .toList();
             String host = validateIdentifier(env("OCEANBASE_HOST", "127.0.0.1"), "OCEANBASE_HOST");
             String port = validateIdentifier(env("OCEANBASE_PORT", "2881"), "OCEANBASE_PORT");
             String database = validateIdentifier(env("OCEANBASE_DATABASE", "brad_pms"), "OCEANBASE_DATABASE");
@@ -466,11 +513,15 @@ public final class OceanbaseSqlImporter {
                 user = requireEnv("OCEANBASE_USER");
                 password = requireEnv("OCEANBASE_PASSWORD");
             }
-            return new Options(mode, snapshot, schema, host, port, database, user, password);
+            return new Options(mode, snapshot, schema, migrations, host, port, database, user, password);
         }
 
         private static Path requirePath(Map<String, String> values, String name) {
             String value = values.get(name);
+            return requirePathValue(value, name);
+        }
+
+        private static Path requirePathValue(String value, String name) {
             if (value == null || value.isBlank()) throw new IllegalArgumentException("missing --" + name);
             Path path = Path.of(value);
             if (!Files.isRegularFile(path)) throw new IllegalArgumentException("file does not exist: " + path);

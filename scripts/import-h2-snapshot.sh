@@ -29,4 +29,6 @@ exec java -cp "target/classes:$(< "$CLASSPATH_DIR/runtime.classpath")" \
   com.brad.pms.migration.OceanbaseSqlImporter \
   --mode import \
   --snapshot "$SNAPSHOT_PATH" \
-  --schema "$PROJECT_DIR/src/main/resources/schema.sql"
+  --schema "$PROJECT_DIR/src/main/resources/schema.sql" \
+  --migration "$PROJECT_DIR/src/main/resources/db/migration/V2__enterprise_identity_org_rbac.sql" \
+  --migration "$PROJECT_DIR/src/main/resources/db/migration/V3__project_node_schedule.sql"

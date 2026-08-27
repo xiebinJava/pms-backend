@@ -48,6 +48,20 @@ class OceanbaseSqlImporterTest {
     }
 
     @Test
+    void countsEnterpriseSnapshotTablesIncludingFlywayHistory() throws Exception {
+        Path snapshot = Files.createTempFile("pms-enterprise-snapshot", ".sql");
+        Files.writeString(snapshot,
+                "INSERT INTO sys_user VALUES (1, 'brad.xie'), (2, 'terry.li');\n"
+                        + "INSERT INTO sys_org_unit VALUES (1, NULL, 1, 'HQ', '公司总部');\n"
+                        + "INSERT INTO flyway_schema_history VALUES (-1, NULL, '<< Flyway Schema History table created >>');\n");
+
+        assertThat(OceanbaseSqlImporter.expectedRowCounts(snapshot))
+                .containsEntry("sys_user", 2L)
+                .containsEntry("sys_org_unit", 1L)
+                .containsEntry("flyway_schema_history", 1L);
+    }
+
+    @Test
     void skipsH2SessionAndDdlStatementsWhenImportingData() {
         List<String> skipped = List.of(
                 "SET DB_CLOSE_DELAY -1",

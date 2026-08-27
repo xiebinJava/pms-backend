@@ -9,6 +9,11 @@ spring:
       # Flyway owns the persistent schema; do not replay schema.sql on every
       # OceanBase startup.
       mode: never
+  flyway:
+    # OceanBase 4.x reports MySQL 5.7 metadata. Flyway Community refuses
+    # MySQL 5.7 at runtime, so OceanBase schema changes are applied by the
+    # repository migration scripts before deployment instead of at startup.
+    enabled: false
   h2:
     console:
       enabled: false

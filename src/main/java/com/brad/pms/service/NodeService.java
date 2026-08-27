@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.common.enums.NodeStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.response.ProjectNodeDTO;
+import com.brad.pms.dto.request.NodeScheduleUpdateCmd;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectLifecycleLogDO;
 import com.brad.pms.entity.ProjectMemberDO;
@@ -117,6 +118,25 @@ public class NodeService {
         node.setOwnerId(ownerId);
         nodeMapper.updateById(node);
         UserDO owner = ownerId == null ? null : userService.listByIds(java.util.Collections.singletonList(ownerId))
+                .stream().findFirst().orElse(null);
+        return toDTO(node, owner, project);
+    }
+
+    @Transactional
+    public ProjectNodeDTO updateSchedule(Long projectId, Long nodeId, NodeScheduleUpdateCmd cmd) {
+        ProjectDO project = permissionService.requireManageableProject(projectId, "编辑节点排期");
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        if (NodeStatus.isReadOnly(node.getStatus())) {
+            throw BusinessException.forbidden("节点已锁定，回滚后才可以编辑节点排期");
+        }
+        if (cmd.getStartDate() != null && cmd.getEndDate() != null
+                && cmd.getStartDate().isAfter(cmd.getEndDate())) {
+            throw BusinessException.error("节点排期开始日期不能晚于结束日期");
+        }
+        node.setStartDate(cmd.getStartDate());
+        node.setEndDate(cmd.getEndDate());
+        nodeMapper.updateById(node);
+        UserDO owner = node.getOwnerId() == null ? null : userService.listByIds(java.util.Collections.singletonList(node.getOwnerId()))
                 .stream().findFirst().orElse(null);
         return toDTO(node, owner, project);
     }
@@ -255,6 +275,8 @@ public class NodeService {
         dto.setOwnerAvatar(owner == null ? null : owner.getAvatar());
         dto.setStatus(node.getStatus());
         dto.setSort(node.getSort());
+        dto.setStartDate(node.getStartDate());
+        dto.setEndDate(node.getEndDate());
         dto.setCreatedAt(node.getCreatedAt());
         dto.setPermissions(permissionService.nodePermissions(project, node));
         return dto;

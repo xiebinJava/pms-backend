@@ -2,6 +2,7 @@ package com.brad.pms.dto.response;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -19,6 +20,8 @@ public class ProjectNodeDTO {
     private String ownerAvatar;
     private Integer status;
     private Integer sort;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private LocalDateTime createdAt;
     private NodePermissionsDTO permissions;
 }

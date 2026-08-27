@@ -7,7 +7,7 @@
 - Java 17 + Maven
 - Spring Boot 2.7.5
 - MyBatis-Plus 3.4.1（分页插件 + 公共字段自动填充）
-- OceanBase（MySQL 兼容模式）/ MySQL 8 / H2（开发环境内存库，开箱即用）
+- OceanBase（MySQL 兼容模式）/ MySQL 8 / H2（仅自动化测试）
 - JWT（jjwt）轻量登录鉴权，无第三方权限平台依赖
 - Lombok
 
@@ -28,15 +28,27 @@ com.brad.pms
 
 ## 快速启动
 
-默认使用 **H2 内存库**，无需任何外部依赖：
+默认使用本机 **OceanBase**（MySQL 兼容模式）。请先准备 `brad_pms` 数据库并注入连接账号：
 
 ```bash
+export OCEANBASE_HOST=127.0.0.1
+export OCEANBASE_PORT=2881
+export OCEANBASE_DATABASE=brad_pms
+export OCEANBASE_USER=<业务账号>
+export OCEANBASE_PASSWORD=<业务密码>
+
 mvn spring-boot:run
 # 或
 mvn package -DskipTests && java -jar target/pms-backend-0.1.0.jar
 ```
 
-启动后访问 `http://localhost:8080/api`，H2 控制台：`http://localhost:8080/api/h2-console`。
+启动后访问 `http://localhost:8080/api`。OceanBase profile 不在运行时启用 Flyway（OceanBase 4.x 对外报告 MySQL 5.7，而 Flyway Community 不支持该版本）；首次部署或升级请先执行仓库中的迁移脚本，再启动应用。
+
+自动化测试显式使用 H2：
+
+```bash
+mvn test
+```
 
 ### 使用 MySQL
 
@@ -63,7 +75,7 @@ export OCEANBASE_PASSWORD=<业务密码>
 mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 ```
 
-OceanBase profile 通过 Flyway 自动执行版本化迁移，不会删除或覆盖已有业务数据。迁移当前 H2 内存数据请先保持 H2 后端运行，导出快照后再执行迁移脚本；详细规则见 `docs/superpowers/specs/2026-08-26-oceanbase-migration-design.md`。
+当前本地 PMS 数据已迁移至 `brad_pms`。后续如需迁移其他 H2 实例，先保持源实例运行并导出快照，再按 `docs/superpowers/specs/2026-08-26-oceanbase-migration-design.md` 执行预检、导入和验收；导入器支持企业版身份、组织和 RBAC 表。
 
 ## 开发账号与生产初始化
 
@@ -72,7 +84,7 @@ OceanBase profile 通过 Flyway 自动执行版本化迁移，不会删除或覆
 | admin | admin123 |
 | zhangsan / lisi / wangwu | admin123 |
 
-上表仅在 H2 开发/演示环境用于种子数据。生产或持久化 MySQL/OceanBase 环境不要使用共享默认密码；空库首次启动前请注入
+上表仅在测试 H2 环境用于种子数据。生产或持久化 MySQL/OceanBase 环境不要使用共享默认密码；空库首次启动前请注入
 `PMS_BOOTSTRAP_ADMIN_USERNAME`、`PMS_BOOTSTRAP_ADMIN_NAME_ZH` 和至少 12 位的
 `PMS_BOOTSTRAP_ADMIN_PASSWORD`。管理员随后通过邀请或 Excel/CSV 导入员工。
 
