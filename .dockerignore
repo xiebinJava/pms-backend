@@ -1,0 +1,7 @@
+.git
+.run
+target
+*.log
+.env*
+docs
+src/test

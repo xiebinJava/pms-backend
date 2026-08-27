@@ -1,0 +1,65 @@
+services:
+  oceanbase:
+    image: oceanbase/oceanbase-ce:4.3.5.1
+    environment:
+      MODE: mini
+      OB_TENANT_PASSWORD: ${OCEANBASE_PASSWORD:?set OCEANBASE_PASSWORD}
+    ports:
+      - "2881:2881"
+    volumes:
+      - oceanbase-data:/home/admin/oceanbase/store
+    healthcheck:
+      test: ["CMD-SHELL", "obclient -h127.0.0.1 -P2881 -uroot@sys -p$${OB_TENANT_PASSWORD} -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  schema-init:
+    image: mysql:8.4
+    depends_on:
+      oceanbase:
+        condition: service_healthy
+    environment:
+      OCEANBASE_HOST: oceanbase
+      OCEANBASE_PORT: 2881
+      OCEANBASE_DATABASE: brad_pms
+      OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}
+      OCEANBASE_PASSWORD: ${OCEANBASE_PASSWORD:?set OCEANBASE_PASSWORD}
+    volumes:
+      - ./docker/oceanbase-init.sh:/usr/local/bin/oceanbase-init.sh:ro
+      - ./src/main/resources/schema.sql:/sql/schema.sql:ro
+      - ./src/main/resources/db/migration/V2__enterprise_identity_org_rbac.sql:/sql/V2__enterprise_identity_org_rbac.sql:ro
+      - ./src/main/resources/db/migration/V3__project_node_schedule.sql:/sql/V3__project_node_schedule.sql:ro
+      - ./src/main/resources/db/migration/V4__authentication_audit_indexes.sql:/sql/V4__authentication_audit_indexes.sql:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/oceanbase-init.sh"]
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      schema-init:
+        condition: service_completed_successfully
+    environment:
+      OCEANBASE_HOST: oceanbase
+      OCEANBASE_PORT: 2881
+      OCEANBASE_DATABASE: brad_pms
+      OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}
+      OCEANBASE_PASSWORD: ${OCEANBASE_PASSWORD:?set OCEANBASE_PASSWORD}
+      PMS_JWT_SECRET: ${PMS_JWT_SECRET:?set a random PMS_JWT_SECRET of at least 32 bytes}
+      PMS_CORS_ALLOWED_ORIGINS: ${PMS_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ../pms-front
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  oceanbase-data:

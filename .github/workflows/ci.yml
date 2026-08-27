@@ -1,0 +1,30 @@
+name: backend-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run backend tests
+        run: mvn -q test
+      - name: Check runtime configuration does not enable H2
+        run: |
+          if git grep -n 'h2:' -- src/main/resources; then
+            echo 'H2 must remain test-only' >&2
+            exit 1
+          fi
+      - name: Check repository for private key material
+        run: |
+          if git grep -nE 'AKIA[0-9A-Z]{16}|-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----'; then
+            echo 'credential material detected in repository' >&2
+            exit 1
+          fi

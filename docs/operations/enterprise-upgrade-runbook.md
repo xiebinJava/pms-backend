@@ -103,3 +103,17 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 - [ ] 登录大小写不敏感、邀请激活、密码重置通知验证通过
 - [ ] 组织拖拽/停用、主归属 + 兼职归属、RBAC 数据范围验证通过
 - [ ] Excel/CSV 预览、错误下载、提交与失败回滚验证通过
+
+## 8. 容器化与健康检查
+
+开源试用可从 `docker-compose.example.yml` 启动 OceanBase、后端和前端。示例仅适用于新建
+空库：`schema-init` 会执行 `schema.sql` 及 V2–V4 企业迁移，并写入一次性标记；已有生产库
+必须使用本手册的备份、预检和升级流程。
+
+后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
+`{"status":"UP","database":"UP"}`，数据库不可用返回 HTTP 503 与 `DOWN`。响应不包含
+连接串、SQL、密码或令牌。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
+可用于串联一次请求的前后端日志。
+
+发布前的完整代码、迁移、安全、浏览器冒烟与回滚清单见
+[`release-checklist.md`](release-checklist.md)。
