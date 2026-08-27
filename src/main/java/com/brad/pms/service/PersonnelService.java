@@ -43,7 +43,8 @@ public class PersonnelService {
 
     @Transactional
     public void changePrimaryPosition(Long userId, UserPositionCmd cmd) {
-        UserDO user = requireUser(userId);
+        UserDO user = userMapper.selectForUpdate(userId);
+        if (user == null) throw BusinessException.error("用户不存在");
         OrgUnitDO org = requireOrg(cmd.getOrgUnitId());
         if (cmd.getManagerUserId() != null) requireUser(cmd.getManagerUserId());
         if (cmd.getPositionId() != null && positionMapper.selectById(cmd.getPositionId()) == null) throw BusinessException.error("岗位不存在");
@@ -64,6 +65,9 @@ public class PersonnelService {
     public void addPartTimePosition(Long userId, UserPositionCmd cmd) {
         requireUser(userId);
         OrgUnitDO org = requireOrg(cmd.getOrgUnitId());
+        if (userPositionMapper.findActiveByUserAndOrg(userId, org.getId()) != null) {
+            throw BusinessException.error("该员工已经归属此组织");
+        }
         UserPositionDO next = buildPosition(userId, org.getId(), cmd, AssignmentType.PART_TIME.name(), false);
         userPositionMapper.insert(next);
         operationLogService.record("USER_PART_TIME_POSITION_ADDED", "USER", userId, null, Map.of("orgUnitId", org.getId()));

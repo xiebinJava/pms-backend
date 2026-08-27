@@ -15,6 +15,10 @@ public interface UserMapper extends BaseMapper<UserDO> {
     @Select("SELECT * FROM sys_user WHERE username_normalized = #{usernameNormalized} LIMIT 1")
     UserDO findByUsernameNormalized(@Param("usernameNormalized") String usernameNormalized);
 
+    /** Serializes concurrent primary-affiliation changes for one employee. */
+    @Select("SELECT * FROM sys_user WHERE id = #{id} FOR UPDATE")
+    UserDO selectForUpdate(@Param("id") Long id);
+
     @Select("SELECT * FROM sys_user WHERE nickname LIKE CONCAT('%', #{keyword}, '%') OR name_zh LIKE CONCAT('%', #{keyword}, '%') OR username LIKE CONCAT('%', #{keyword}, '%') LIMIT 20")
     List<UserDO> search(@Param("keyword") String keyword);
 }

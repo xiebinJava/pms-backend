@@ -14,6 +14,6 @@ public interface OrgUnitMapper extends BaseMapper<OrgUnitDO> {
     @Select("SELECT * FROM sys_org_unit WHERE status = 'ACTIVE' ORDER BY path, sort, id")
     List<OrgUnitDO> findActiveTree();
 
-    @Select("SELECT id FROM sys_org_unit WHERE status = 'ACTIVE' AND (path = CONCAT(#{path}, '%') OR id = #{rootId})")
+    @Select("SELECT id FROM sys_org_unit WHERE status = 'ACTIVE' AND (path LIKE CONCAT(#{path}, '%') OR id = #{rootId})")
     List<Long> findDescendantIds(@Param("path") String path, @Param("rootId") Long rootId);
 }

@@ -17,6 +17,9 @@ public interface UserPositionMapper extends BaseMapper<UserPositionDO> {
     @Select("SELECT * FROM sys_user_position WHERE user_id = #{userId} AND is_primary = TRUE AND status = 'ACTIVE' LIMIT 1")
     UserPositionDO findActivePrimary(@Param("userId") Long userId);
 
+    @Select("SELECT * FROM sys_user_position WHERE user_id = #{userId} AND org_unit_id = #{orgUnitId} AND status = 'ACTIVE' LIMIT 1")
+    UserPositionDO findActiveByUserAndOrg(@Param("userId") Long userId, @Param("orgUnitId") Long orgUnitId);
+
     @Select("SELECT COUNT(*) FROM sys_user_position WHERE user_id = #{userId} AND is_primary = TRUE AND status = 'ACTIVE'")
     int countActivePrimary(@Param("userId") Long userId);
 }
