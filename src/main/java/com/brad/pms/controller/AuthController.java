@@ -14,12 +14,15 @@ import com.brad.pms.service.AuthService;
 import com.brad.pms.service.InvitationService;
 import com.brad.pms.service.PasswordResetService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/auth")
@@ -36,7 +39,7 @@ public class AuthController {
                                                HttpServletRequest httpRequest,
                                                HttpServletResponse httpResponse) {
         LoginResponse response = authService.login(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
-        setRefreshCookie(httpResponse, response.getRefreshToken());
+        setRefreshCookie(httpResponse, response.getRefreshToken(), httpRequest.isSecure());
         return ResponseResult.success(response);
     }
 
@@ -55,7 +58,7 @@ public class AuthController {
             }
         }
         LoginResponse response = authService.refresh(token);
-        setRefreshCookie(httpResponse, response.getRefreshToken());
+        setRefreshCookie(httpResponse, response.getRefreshToken(), httpRequest.isSecure());
         return ResponseResult.success(response);
     }
 
@@ -90,12 +93,15 @@ public class AuthController {
         return ResponseResult.success();
     }
 
-    private void setRefreshCookie(HttpServletResponse response, String token) {
+    private void setRefreshCookie(HttpServletResponse response, String token, boolean secure) {
         if (token == null) return;
-        Cookie cookie = new Cookie("pms_refresh_token", token);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/api/auth");
-        cookie.setMaxAge(30 * 24 * 3600);
-        response.addCookie(cookie);
+        ResponseCookie cookie = ResponseCookie.from("pms_refresh_token", token)
+                .httpOnly(true)
+                .secure(secure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(Duration.ofDays(30))
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }
