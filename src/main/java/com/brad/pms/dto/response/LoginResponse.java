@@ -1,12 +1,17 @@
 package com.brad.pms.dto.response;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
-@AllArgsConstructor
-public class LoginResponse {
-
+public class LoginResponse extends SessionResponse {
     private String token;
-    private UserDTO user;
+
+    public LoginResponse(String accessToken, String refreshToken, UserDTO user) {
+        super(accessToken, refreshToken, user);
+        this.token = accessToken;
+    }
+
+    public LoginResponse(String token, UserDTO user) {
+        this(token, null, user);
+    }
 }

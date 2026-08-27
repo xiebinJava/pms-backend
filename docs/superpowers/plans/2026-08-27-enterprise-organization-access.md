@@ -29,14 +29,15 @@
 **Files:**
 - Modify: `pom.xml`
 - Modify: `src/main/resources/application.yml`
-- Create: `src/main/resources/db/migration/V1__enterprise_identity_org_rbac.sql`
+- Create: `src/main/resources/db/migration/V1__baseline_project_schema.sql`
+- Create: `src/main/resources/db/migration/V2__enterprise_identity_org_rbac.sql`
 - Create: `src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java`
 - Modify: `src/main/resources/schema.sql`
 
 **Interfaces:**
-- Flyway owns enterprise schema upgrades using `flyway_schema_history`; existing databases are baselined at version `0` before `V1` runs.
-- `V1__enterprise_identity_org_rbac.sql` creates all tables and indexes in the approved design without deleting existing data.
-- Fresh H2 startup still initializes the existing project tables before Flyway adds enterprise tables.
+- Flyway owns schema upgrades using `flyway_schema_history`; the legacy project schema is version `1`, and enterprise identity/organization/RBAC tables are version `2`.
+- Existing non-empty databases are baselined at version `1` before `V2` runs; fresh databases apply `V1` and then `V2` without deleting existing data.
+- SQL initialization is disabled for persistent profiles so `schema.sql` is never replayed over an existing database.
 
 - [ ] **Step 1: Add a failing schema-contract test**
 
@@ -62,18 +63,18 @@ Expected: FAIL because the enterprise tables and columns do not exist.
 
 - [ ] **Step 3: Add Flyway and migration configuration**
 
-Add `org.flywaydb:flyway-core`, `org.apache.poi:poi-ooxml`, and `org.apache.commons:commons-csv` to `pom.xml`. Configure Flyway to baseline existing schemas at `0` and run `classpath:db/migration`; preserve the current `schema.sql` initialization for the old project tables.
+Add `org.flywaydb:flyway-core`, `org.apache.poi:poi-ooxml`, and `org.apache.commons:commons-csv` to `pom.xml`. Configure Flyway to baseline existing schemas at `1` and run `classpath:db/migration`; keep the legacy `schema.sql` content copied into `V1__baseline_project_schema.sql` for fresh databases.
 
 ```yaml
 spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-    baseline-version: 0
+    baseline-version: 1
     locations: classpath:db/migration
 ```
 
-- [ ] **Step 4: Write the V1 migration with safe indexes and status checks**
+- [ ] **Step 4: Write the V2 enterprise migration with safe indexes and status checks**
 
 Create every table named in the specification. Use `VARCHAR` status values for portability, `TIMESTAMP` audit fields, `UNIQUE (username_normalized)`, `UNIQUE (code)` on organization and position dictionaries, and indexes such as:
 
@@ -89,7 +90,7 @@ Use `ALTER TABLE ... ADD COLUMN` only through an idempotent Java compatibility g
 
 - [ ] **Step 5: Make fresh and existing schema initialization deterministic**
 
-Remove enterprise DDL from `schema.sql` and leave existing project table creation there. Ensure the migration test starts H2 with Flyway enabled and verifies a second application context start does not duplicate indexes or seed rows.
+Keep `schema.sql` as a legacy reference only; Flyway owns initialization in all profiles. Ensure the migration test starts H2 with Flyway enabled and verifies a second application context start does not duplicate indexes or seed rows.
 
 - [ ] **Step 6: Run migration verification**
 
@@ -100,7 +101,7 @@ Expected: PASS with all enterprise tables, `sys_user.username_normalized`, `sys_
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pom.xml src/main/resources/application.yml src/main/resources/schema.sql src/main/resources/db/migration/V1__enterprise_identity_org_rbac.sql src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java
+git add pom.xml src/main/resources/application.yml src/main/resources/application-mysql.yml src/main/resources/application-oceanbase.yml src/main/resources/db/migration/V1__baseline_project_schema.sql src/main/resources/db/migration/V2__enterprise_identity_org_rbac.sql src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java
 git commit -m "feat: add enterprise organization schema"
 ```
 

@@ -12,6 +12,7 @@ public class ProjectMemberDTO {
     private Long userId;
     private String username;
     private String nickname;
+    private String displayName;
     private String avatar;
     private Integer role;
     private LocalDateTime createdAt;

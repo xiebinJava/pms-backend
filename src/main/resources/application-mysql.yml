@@ -6,8 +6,9 @@ spring:
     password: ${MYSQL_PASSWORD:root}
   sql:
     init:
-      mode: always
-      schema-locations: classpath:schema.sql
+      # Flyway owns the persistent schema; do not replay schema.sql on every
+      # MySQL startup (its legacy indexes are intentionally not destructive).
+      mode: never
 
 mybatis-plus:
   configuration:

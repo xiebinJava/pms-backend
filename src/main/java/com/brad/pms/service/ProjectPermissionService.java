@@ -15,6 +15,7 @@ import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.security.ProjectPermissionPolicy;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.security.DataScopeResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,10 +31,25 @@ public class ProjectPermissionService {
     private final ProjectMapper projectMapper;
     private final ProjectMemberMapper memberMapper;
     private final ProjectNodeMapper nodeMapper;
+    private final DataScopeResolver dataScopeResolver;
 
     public ProjectDO requireProject(Long projectId) {
         ProjectDO project = projectMapper.selectById(projectId);
         if (project == null) throw BusinessException.error("项目不存在");
+        Long currentUserId = UserContext.userIdOrNull();
+        if (currentUserId != null && !UserContext.isAdministrator()
+                && !Objects.equals(project.getCreatedBy(), currentUserId)
+                && !Objects.equals(project.getOwnerId(), currentUserId)
+                && !Objects.equals(project.getProjectManagerId(), currentUserId)) {
+            boolean member = memberMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.ProjectMemberDO>()
+                    .eq(com.brad.pms.entity.ProjectMemberDO::getProjectId, projectId)
+                    .eq(com.brad.pms.entity.ProjectMemberDO::getUserId, currentUserId)) > 0;
+            java.util.List<Long> allowed = dataScopeResolver.resolveOrgUnitIds(UserContext.get(), "project:read");
+            boolean allCompany = dataScopeResolver.hasAllCompanyScope(UserContext.get(), "project:read");
+            if (!member && !allCompany && (project.getOrgUnitId() == null || !allowed.contains(project.getOrgUnitId()))) {
+                throw BusinessException.forbidden("无权查看此项目");
+            }
+        }
         return project;
     }
 

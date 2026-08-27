@@ -24,4 +24,6 @@ public class ProjectCreateCmd {
     private LocalDate startDate;
 
     private LocalDate endDate;
+
+    private Long orgUnitId;
 }

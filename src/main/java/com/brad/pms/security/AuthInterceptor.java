@@ -1,8 +1,11 @@
 package com.brad.pms.security;
 
 import com.brad.pms.entity.UserDO;
+import com.brad.pms.entity.AuthSessionDO;
+import com.brad.pms.common.enums.UserStatus;
+import com.brad.pms.mapper.AuthSessionMapper;
+import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.mapper.UserMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -14,13 +17,23 @@ import javax.servlet.http.HttpServletResponse;
  * 登录鉴权拦截器：解析 Authorization: Bearer <token>，写入 UserContext
  */
 @Slf4j
-@RequiredArgsConstructor
 public class AuthInterceptor implements HandlerInterceptor {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider tokenProvider;
     private final UserMapper userMapper;
+    private final AuthSessionMapper authSessionMapper;
+    private final AuthorizationService authorizationService;
+
+    public AuthInterceptor(JwtTokenProvider tokenProvider, UserMapper userMapper,
+                           AuthSessionMapper authSessionMapper,
+                           AuthorizationService authorizationService) {
+        this.tokenProvider = tokenProvider;
+        this.userMapper = userMapper;
+        this.authSessionMapper = authSessionMapper;
+        this.authorizationService = authorizationService;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -42,12 +55,37 @@ public class AuthInterceptor implements HandlerInterceptor {
                     writeUnauthorized(response, "用户不存在");
                     return false;
                 }
+                if (!UserStatus.ACTIVE.name().equals(persistedUser.getStatus())) {
+                    writeUnauthorized(response, "账号不可用");
+                    return false;
+                }
+                if (loginUser.getSessionId() == null) {
+                    writeUnauthorized(response, "登录会话已失效，请重新登录");
+                    return false;
+                }
+                AuthSessionDO session = authSessionMapper.selectById(loginUser.getSessionId());
+                if (session == null || session.getUserId() == null
+                        || !session.getUserId().equals(persistedUser.getId())
+                        || session.getRevokedAt() != null
+                        || session.getExpiresAt() == null
+                        || !session.getExpiresAt().isAfter(java.time.LocalDateTime.now())) {
+                    writeUnauthorized(response, "登录会话已失效，请重新登录");
+                    return false;
+                }
                 // 每次请求从数据库刷新系统角色，确保管理员权限变更即时生效，兼容旧令牌。
                 loginUser.setUsername(persistedUser.getUsername());
                 loginUser.setNickname(persistedUser.getNickname());
                 loginUser.setSystemRole(persistedUser.getSystemRole());
+                loginUser.setNameZh(persistedUser.getNameZh());
+                loginUser.setDisplayName(com.brad.pms.convertor.Convertors.userDisplayName(persistedUser));
                 UserContext.set(loginUser);
+                RequirePermission required = method.getMethodAnnotation(RequirePermission.class);
+                if (required == null) required = method.getBeanType().getAnnotation(RequirePermission.class);
+                if (required != null) authorizationService.require(required.value());
                 return true;
+            } catch (BusinessException e) {
+                writeError(response, e.getCode(), e.getMessage());
+                return false;
             } catch (Exception e) {
                 log.debug("token 解析失败: {}", e.getMessage());
             }
@@ -57,9 +95,14 @@ public class AuthInterceptor implements HandlerInterceptor {
     }
 
     private void writeUnauthorized(HttpServletResponse response, String message) throws Exception {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        writeError(response, HttpServletResponse.SC_UNAUTHORIZED, message);
+    }
+
+    private void writeError(HttpServletResponse response, int code, String message) throws Exception {
+        response.setStatus(code);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"code\":401,\"msg\":\"" + message + "\",\"data\":null}");
+        String safeMessage = message == null ? "请求失败" : message.replace("\\", "\\\\").replace("\"", "\\\"");
+        response.getWriter().write("{\"code\":" + code + ",\"msg\":\"" + safeMessage + "\",\"data\":null}");
     }
 
     @Override

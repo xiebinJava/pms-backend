@@ -27,6 +27,9 @@ public class ProjectDO {
 
     private Long projectManagerId;
 
+    /** Primary organization responsible for the project. */
+    private Long orgUnitId;
+
     private LocalDate startDate;
 
     private LocalDate endDate;

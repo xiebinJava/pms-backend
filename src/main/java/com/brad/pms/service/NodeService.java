@@ -251,7 +251,7 @@ public class NodeService {
         dto.setDeliverable(node.getDeliverable());
         dto.setRoles(node.getRoles());
         dto.setOwnerId(node.getOwnerId());
-        dto.setOwnerName(owner == null ? null : owner.getNickname());
+        dto.setOwnerName(com.brad.pms.convertor.Convertors.userDisplayName(owner));
         dto.setOwnerAvatar(owner == null ? null : owner.getAvatar());
         dto.setStatus(node.getStatus());
         dto.setSort(node.getSort());

@@ -22,8 +22,11 @@ import com.brad.pms.mapper.ProjectLifecycleLogMapper;
 import com.brad.pms.mapper.ProjectMilestoneMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.UserPositionMapper;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.security.ProjectPermissionPolicy;
+import com.brad.pms.security.DataScopeResolver;
+import com.brad.pms.security.LoginUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +50,8 @@ public class ProjectService {
     private final FollowerService followerService;
     private final ProjectPermissionService permissionService;
     private final ProjectLifecycleLogMapper lifecycleLogMapper;
+    private final UserPositionMapper userPositionMapper;
+    private final DataScopeResolver dataScopeResolver;
 
     @Transactional
     public ProjectDTO create(ProjectCreateCmd cmd) {
@@ -60,6 +65,12 @@ public class ProjectService {
         // owner_id 为历史兼容字段，真实项目创建人统一取当前登录用户。
         project.setOwnerId(creatorId);
         project.setCreatedBy(creatorId);
+        Long orgUnitId = cmd.getOrgUnitId();
+        if (orgUnitId == null) {
+            var primary = userPositionMapper.findActivePrimary(creatorId);
+            orgUnitId = primary == null ? null : primary.getOrgUnitId();
+        }
+        project.setOrgUnitId(orgUnitId);
         project.setStartDate(cmd.getStartDate());
         project.setEndDate(cmd.getEndDate());
         project.setProgress(0);
@@ -82,6 +93,7 @@ public class ProjectService {
         project.setName(cmd.getName());
         project.setDescription(cmd.getDescription());
         if (cmd.getPriority() != null) project.setPriority(cmd.getPriority());
+        if (cmd.getOrgUnitId() != null) project.setOrgUnitId(cmd.getOrgUnitId());
         project.setStartDate(cmd.getStartDate());
         project.setEndDate(cmd.getEndDate());
         if (cmd.getMemberIds() != null) {
@@ -159,6 +171,21 @@ public class ProjectService {
         LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
                 .like(StringUtils.hasText(qry.getKeyword()), ProjectDO::getName, qry.getKeyword())
                 .orderByDesc(ProjectDO::getUpdatedAt);
+        LoginUser current = UserContext.get();
+        if (current != null && !UserContext.isAdministrator()) {
+            List<Long> allowedOrgIds = dataScopeResolver.resolveOrgUnitIds(current, "project:read");
+            boolean allCompany = dataScopeResolver.hasAllCompanyScope(current, "project:read");
+            List<Long> memberProjectIds = memberMapper.selectList(new LambdaQueryWrapper<ProjectMemberDO>()
+                    .eq(ProjectMemberDO::getUserId, current.getId())).stream()
+                    .map(ProjectMemberDO::getProjectId).distinct().collect(Collectors.toList());
+            if (allCompany) {
+                // no organization filter
+            } else if (allowedOrgIds.isEmpty() && memberProjectIds.isEmpty()) wrapper.eq(ProjectDO::getId, -1L);
+            else if (!allowedOrgIds.isEmpty() && !memberProjectIds.isEmpty()) {
+                wrapper.and(w -> w.in(ProjectDO::getOrgUnitId, allowedOrgIds).or().in(ProjectDO::getId, memberProjectIds));
+            } else if (!allowedOrgIds.isEmpty()) wrapper.in(ProjectDO::getOrgUnitId, allowedOrgIds);
+            else wrapper.in(ProjectDO::getId, memberProjectIds);
+        }
         if (qry.getStatus() != null) {
             int status = ProjectStatus.normalize(qry.getStatus());
             if (status == ProjectStatus.ACTIVE.getCode()) {

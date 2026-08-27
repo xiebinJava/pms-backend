@@ -6,8 +6,9 @@ spring:
     password: ${OCEANBASE_PASSWORD}
   sql:
     init:
-      mode: always
-      schema-locations: classpath:schema.sql
+      # Flyway owns the persistent schema; do not replay schema.sql on every
+      # OceanBase startup.
+      mode: never
   h2:
     console:
       enabled: false

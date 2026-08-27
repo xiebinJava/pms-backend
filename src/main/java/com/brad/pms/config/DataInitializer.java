@@ -8,6 +8,8 @@ import com.brad.pms.service.NodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,11 +18,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 种子数据：首次启动自动创建默认管理员账号与演示数据
- * 默认账号：admin / admin123
+ * Local demo seed data. Persistent deployments use explicit bootstrap
+ * credentials and never receive a shared default password.
  */
 @Slf4j
 @Component
+@Order(1)
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
@@ -31,16 +34,36 @@ public class DataInitializer implements CommandLineRunner {
     private final ProjectMilestoneMapper milestoneMapper;
     private final ProjectCommentMapper commentMapper;
     private final NodeService nodeService;
+    private final EnterpriseDataMigration enterpriseDataMigration;
+    private final Environment environment;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @Override
     @Transactional
     public void run(String... args) {
-        if (userMapper.selectCount(null) != null && userMapper.selectCount(null) > 0) {
+        Integer userCount = userMapper.selectCount(null);
+        if (userCount != null && userCount > 0) {
+            enterpriseDataMigration.backfillUsersAndProjects();
             return;
         }
-        log.info("初始化种子数据：admin / admin123");
+
+        if (isPersistentProfile()) {
+            String username = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_USERNAME");
+            String nameZh = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_NAME_ZH");
+            String password = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_PASSWORD");
+            if (password.length() < 12) {
+                throw new IllegalStateException("PMS_BOOTSTRAP_ADMIN_PASSWORD 至少需要 12 位");
+            }
+            UserDO bootstrap = user(username, password, nameZh, username + "@localhost");
+            bootstrap.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
+            userMapper.updateById(bootstrap);
+            enterpriseDataMigration.backfillUsersAndProjects();
+            log.info("已创建企业初始管理员: {}", username);
+            return;
+        }
+
+        log.info("初始化本地演示数据（登录名：admin，密码：admin123，仅限默认 H2 配置）");
 
         UserDO admin = user("admin", "admin123", "管理员", "admin@pms.com");
         admin.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
@@ -113,16 +136,39 @@ public class DataInitializer implements CommandLineRunner {
         c1.setContent("欢迎加入开源项目管理平台，开发过程中有任何问题随时在评论区讨论。");
         c1.setUserId(admin.getId());
         commentMapper.insert(c1);
+
+        enterpriseDataMigration.backfillUsersAndProjects();
     }
 
     private UserDO user(String username, String rawPassword, String nickname, String email) {
         UserDO user = new UserDO();
         user.setUsername(username);
+        user.setUsernameNormalized(EnterpriseDataMigration.normalizeUsername(username));
         user.setPassword(encoder.encode(rawPassword));
+        user.setNameZh(nickname);
         user.setNickname(nickname);
         user.setEmail(email);
+        user.setStatus("ACTIVE");
+        user.setFailedLoginCount(0);
+        user.setPasswordChangedAt(java.time.LocalDateTime.now());
         userMapper.insert(user);
         return user;
+    }
+
+    private boolean isPersistentProfile() {
+        return java.util.Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "mysql".equalsIgnoreCase(profile)
+                        || "oceanbase".equalsIgnoreCase(profile)
+                        || "prod".equalsIgnoreCase(profile)
+                        || "production".equalsIgnoreCase(profile));
+    }
+
+    private String requiredBootstrap(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("首次启动企业环境时必须设置 " + key);
+        }
+        return value.trim();
     }
 
     private void member(Long projectId, Long userId, int role) {

@@ -29,4 +29,6 @@ public class ProjectUpdateCmd {
     private List<Long> memberIds;
 
     private List<Long> followerIds;
+
+    private Long orgUnitId;
 }

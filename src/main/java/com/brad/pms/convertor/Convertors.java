@@ -21,12 +21,23 @@ public final class Convertors {
         UserDTO dto = new UserDTO();
         dto.setId(do_.getId());
         dto.setUsername(do_.getUsername());
-        dto.setNickname(do_.getNickname());
+        dto.setNameZh(do_.getNameZh());
+        dto.setDisplayName(userDisplayName(do_));
+        dto.setNickname(userDisplayName(do_));
         dto.setEmail(do_.getEmail());
+        dto.setPhone(do_.getPhone());
         dto.setAvatar(do_.getAvatar());
         dto.setSystemRole(do_.getSystemRole());
+        dto.setStatus(do_.getStatus());
         dto.setCreatedAt(do_.getCreatedAt());
         return dto;
+    }
+
+    public static String userDisplayName(UserDO user) {
+        if (user == null) return null;
+        String nameZh = user.getNameZh() == null || user.getNameZh().isBlank() ? user.getNickname() : user.getNameZh();
+        if (nameZh == null || nameZh.isBlank()) return user.getUsername();
+        return nameZh + "（" + user.getUsername() + "）";
     }
 
     public static List<UserDTO> toUsers(List<UserDO> list) {
@@ -43,13 +54,14 @@ public final class Convertors {
         dto.setStatus(do_.getStatus());
         dto.setPriority(do_.getPriority());
         dto.setOwnerId(do_.getOwnerId());
-        dto.setOwnerName(owner == null ? null : owner.getNickname());
+        dto.setOwnerName(userDisplayName(owner));
         dto.setCreatedBy(do_.getCreatedBy());
-        dto.setCreatedByName(createdBy == null ? null : createdBy.getNickname());
+        dto.setCreatedByName(userDisplayName(createdBy));
         dto.setCreatedByAvatar(createdBy == null ? null : createdBy.getAvatar());
         dto.setProjectManagerId(do_.getProjectManagerId());
-        dto.setProjectManagerName(projectManager == null ? null : projectManager.getNickname());
+        dto.setProjectManagerName(userDisplayName(projectManager));
         dto.setProjectManagerAvatar(projectManager == null ? null : projectManager.getAvatar());
+        dto.setOrgUnitId(do_.getOrgUnitId());
         dto.setStartDate(do_.getStartDate());
         dto.setEndDate(do_.getEndDate());
         dto.setProgress(do_.getProgress() == null ? 0 : do_.getProgress());
@@ -67,7 +79,8 @@ public final class Convertors {
         dto.setProjectId(do_.getProjectId());
         dto.setUserId(do_.getUserId());
         dto.setUsername(user == null ? null : user.getUsername());
-        dto.setNickname(user == null ? null : user.getNickname());
+        dto.setNickname(userDisplayName(user));
+        dto.setDisplayName(userDisplayName(user));
         dto.setAvatar(user == null ? null : user.getAvatar());
         dto.setRole(do_.getRole());
         dto.setCreatedAt(do_.getCreatedAt());
@@ -86,7 +99,7 @@ public final class Convertors {
         dto.setStatus(do_.getStatus());
         dto.setPriority(do_.getPriority());
         dto.setAssigneeId(do_.getAssigneeId());
-        dto.setAssigneeName(assignee == null ? null : assignee.getNickname());
+        dto.setAssigneeName(userDisplayName(assignee));
         dto.setMilestoneId(do_.getMilestoneId());
         dto.setSort(do_.getSort());
         dto.setDueDate(do_.getDueDate());
@@ -116,7 +129,7 @@ public final class Convertors {
         dto.setTaskId(do_.getTaskId());
         dto.setContent(do_.getContent());
         dto.setUserId(do_.getUserId());
-        dto.setUserNickname(user == null ? null : user.getNickname());
+        dto.setUserNickname(userDisplayName(user));
         dto.setCreatedAt(do_.getCreatedAt());
         return dto;
     }

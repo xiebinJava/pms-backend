@@ -20,6 +20,7 @@ public class ProjectDTO {
     private String createdByName;
     private String createdByAvatar;
     private Long projectManagerId;
+    private Long orgUnitId;
     private String projectManagerName;
     private String projectManagerAvatar;
     private LocalDate startDate;

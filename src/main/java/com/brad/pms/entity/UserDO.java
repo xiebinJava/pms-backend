@@ -14,16 +14,34 @@ public class UserDO {
 
     private String username;
 
+    /** Chinese display name; username remains the canonical English login name. */
+    private String nameZh;
+
+    /** Locale.ROOT-lower-cased username used for case-insensitive login. */
+    private String usernameNormalized;
+
     private String password;
 
     private String nickname;
 
     private String email;
 
+    private String phone;
+
     private String avatar;
 
     /** 系统级角色：0 普通用户，1 管理员。 */
     private Integer systemRole;
+
+    private String status;
+
+    private Integer failedLoginCount;
+
+    private LocalDateTime lockedUntil;
+
+    private LocalDateTime lastLoginAt;
+
+    private LocalDateTime passwordChangedAt;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
