@@ -265,6 +265,14 @@ public class ProjectService {
             taskCountMap.computeIfAbsent(pid, k -> new HashMap<>()).put(status, count);
         }
 
+        // The project list and detail page share node completion as the single
+        // source of truth for overall progress. Keep the stored value only as
+        // a legacy fallback for projects that have no nodes yet.
+        List<ProjectNodeDO> nodes = nodeMapper.selectList(
+                new LambdaQueryWrapper<ProjectNodeDO>().in(ProjectNodeDO::getProjectId, projectIds));
+        Map<Long, List<ProjectNodeDO>> nodesByProject = nodes.stream()
+                .collect(Collectors.groupingBy(ProjectNodeDO::getProjectId));
+
         // 负责人信息
         Map<Long, UserDO> userMap = loadUsers(userIds);
 
@@ -274,14 +282,19 @@ public class ProjectService {
             Map<Integer, Long> stats = taskCountMap.getOrDefault(pid, Collections.emptyMap());
             int total = stats.values().stream().mapToInt(Long::intValue).sum();
             int done = stats.getOrDefault(2, 0L).intValue();
-            int progress = total == 0 ? (p.getProgress() == null ? 0 : p.getProgress())
-                    : (int) Math.round(done * 100.0 / total);
+            int progress = calculateNodeProgress(nodesByProject.get(pid), p.getProgress());
             ProjectDTO dto = Convertors.toProject(p, userMap.get(p.getOwnerId()), userMap.get(p.getCreatedBy()),
                     userMap.get(p.getProjectManagerId()),
-                    memberCountMap.getOrDefault(pid, 0L).intValue(), total, done);
+                    memberCountMap.getOrDefault(pid, 0L).intValue(), total, done, progress);
             dto.setPermissions(permissionService.projectPermissions(p));
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    static int calculateNodeProgress(List<ProjectNodeDO> nodes, Integer storedProgress) {
+        if (nodes == null || nodes.isEmpty()) return storedProgress == null ? 0 : storedProgress;
+        long completed = nodes.stream().filter(node -> Integer.valueOf(2).equals(node.getStatus())).count();
+        return (int) Math.round(completed * 100.0 / nodes.size());
     }
 
     private void recordLifecycle(Long projectId, String action, String reason, int fromStatus, int toStatus) {

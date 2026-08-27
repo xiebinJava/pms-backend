@@ -45,7 +45,7 @@ public final class Convertors {
     }
 
     public static ProjectDTO toProject(ProjectDO do_, UserDO owner, UserDO createdBy, UserDO projectManager,
-                                       int memberCount, int taskCount, int doneTaskCount) {
+                                       int memberCount, int taskCount, int doneTaskCount, int progress) {
         ProjectDTO dto = new ProjectDTO();
         dto.setId(do_.getId());
         dto.setCode(do_.getCode());
@@ -64,7 +64,7 @@ public final class Convertors {
         dto.setOrgUnitId(do_.getOrgUnitId());
         dto.setStartDate(do_.getStartDate());
         dto.setEndDate(do_.getEndDate());
-        dto.setProgress(do_.getProgress() == null ? 0 : do_.getProgress());
+        dto.setProgress(progress);
         dto.setMemberCount(memberCount);
         dto.setTaskCount(taskCount);
         dto.setDoneTaskCount(doneTaskCount);
