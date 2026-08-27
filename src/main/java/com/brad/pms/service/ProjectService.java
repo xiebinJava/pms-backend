@@ -171,21 +171,7 @@ public class ProjectService {
         LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
                 .like(StringUtils.hasText(qry.getKeyword()), ProjectDO::getName, qry.getKeyword())
                 .orderByDesc(ProjectDO::getUpdatedAt);
-        LoginUser current = UserContext.get();
-        if (current != null && !UserContext.isAdministrator()) {
-            List<Long> allowedOrgIds = dataScopeResolver.resolveOrgUnitIds(current, "project:read");
-            boolean allCompany = dataScopeResolver.hasAllCompanyScope(current, "project:read");
-            List<Long> memberProjectIds = memberMapper.selectList(new LambdaQueryWrapper<ProjectMemberDO>()
-                    .eq(ProjectMemberDO::getUserId, current.getId())).stream()
-                    .map(ProjectMemberDO::getProjectId).distinct().collect(Collectors.toList());
-            if (allCompany) {
-                // no organization filter
-            } else if (allowedOrgIds.isEmpty() && memberProjectIds.isEmpty()) wrapper.eq(ProjectDO::getId, -1L);
-            else if (!allowedOrgIds.isEmpty() && !memberProjectIds.isEmpty()) {
-                wrapper.and(w -> w.in(ProjectDO::getOrgUnitId, allowedOrgIds).or().in(ProjectDO::getId, memberProjectIds));
-            } else if (!allowedOrgIds.isEmpty()) wrapper.in(ProjectDO::getOrgUnitId, allowedOrgIds);
-            else wrapper.in(ProjectDO::getId, memberProjectIds);
-        }
+        applyReadScope(wrapper);
         if (qry.getStatus() != null) {
             int status = ProjectStatus.normalize(qry.getStatus());
             if (status == ProjectStatus.ACTIVE.getCode()) {
@@ -206,7 +192,9 @@ public class ProjectService {
     }
 
     public Map<String, Object> stats() {
-        List<ProjectDO> all = projectMapper.selectList(null);
+        LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<>();
+        applyReadScope(wrapper);
+        List<ProjectDO> all = projectMapper.selectList(wrapper);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", all.size());
         result.put("active", countByStatus(all, ProjectStatus.ACTIVE.getCode()));
@@ -218,6 +206,29 @@ public class ProjectService {
                 .average().orElse(0);
         result.put("avgProgress", Math.round(avgProgress));
         return result;
+    }
+
+    /**
+     * Keeps aggregate endpoints subject to exactly the same organization/member
+     * visibility rules as the project list. This prevents a user with only a
+     * narrow project:read scope from inferring company-wide project counts.
+     */
+    private void applyReadScope(LambdaQueryWrapper<ProjectDO> wrapper) {
+        LoginUser current = UserContext.get();
+        if (current == null || UserContext.isAdministrator()) return;
+
+        List<Long> allowedOrgIds = dataScopeResolver.resolveOrgUnitIds(current, "project:read");
+        boolean allCompany = dataScopeResolver.hasAllCompanyScope(current, "project:read");
+        if (allCompany) return;
+
+        List<Long> memberProjectIds = memberMapper.selectList(new LambdaQueryWrapper<ProjectMemberDO>()
+                        .eq(ProjectMemberDO::getUserId, current.getId())).stream()
+                .map(ProjectMemberDO::getProjectId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (allowedOrgIds.isEmpty() && memberProjectIds.isEmpty()) wrapper.eq(ProjectDO::getId, -1L);
+        else if (!allowedOrgIds.isEmpty() && !memberProjectIds.isEmpty()) {
+            wrapper.and(w -> w.in(ProjectDO::getOrgUnitId, allowedOrgIds).or().in(ProjectDO::getId, memberProjectIds));
+        } else if (!allowedOrgIds.isEmpty()) wrapper.in(ProjectDO::getOrgUnitId, allowedOrgIds);
+        else wrapper.in(ProjectDO::getId, memberProjectIds);
     }
 
     private long countByStatus(List<ProjectDO> list, int status) {

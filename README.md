@@ -63,16 +63,20 @@ export OCEANBASE_PASSWORD=<业务密码>
 mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 ```
 
-OceanBase profile 会自动初始化缺失的表结构，但不会删除或覆盖已有业务数据。迁移当前 H2 内存数据请先保持 H2 后端运行，导出快照后再执行迁移脚本；详细规则见 `docs/superpowers/specs/2026-08-26-oceanbase-migration-design.md`。
+OceanBase profile 通过 Flyway 自动执行版本化迁移，不会删除或覆盖已有业务数据。迁移当前 H2 内存数据请先保持 H2 后端运行，导出快照后再执行迁移脚本；详细规则见 `docs/superpowers/specs/2026-08-26-oceanbase-migration-design.md`。
 
-## 默认账号
+## 开发账号与生产初始化
 
 | 用户名 | 密码 |
 | --- | --- |
 | admin | admin123 |
 | zhangsan / lisi / wangwu | admin123 |
 
-首次启动会自动初始化种子数据（2 个项目、6 个任务、2 个里程碑、4 名成员、1 条动态）。
+上表仅在 H2 开发/演示环境用于种子数据。生产或持久化 MySQL/OceanBase 环境不要使用共享默认密码；空库首次启动前请注入
+`PMS_BOOTSTRAP_ADMIN_USERNAME`、`PMS_BOOTSTRAP_ADMIN_NAME_ZH` 和至少 12 位的
+`PMS_BOOTSTRAP_ADMIN_PASSWORD`。管理员随后通过邀请或 Excel/CSV 导入员工。
+
+所有用户展示为 `中文名（English.Name）`，登录使用不区分大小写的英文名。每名员工有一个主归属，可拥有多个兼职/项目归属。
 
 ## 核心接口
 
@@ -90,6 +94,11 @@ OceanBase profile 会自动初始化缺失的表结构，但不会删除或覆�
 | GET/POST | `/projects/{id}/milestones` | 里程碑列表/新建 |
 | GET/POST | `/projects/{id}/members` | 成员列表/添加 |
 | GET/POST | `/projects/{id}/comments` | 动态列表/发布 |
+| GET/POST/PUT/DELETE | `/admin/org/tree`、`/admin/org`、`/admin/org/{id}` | 组织树与组织单元维护 |
+| GET/POST | `/admin/users`、`/admin/users/{id}/disable` | 人员、邀请、禁用与会话撤销 |
+| GET/POST/PUT/DELETE | `/admin/roles`、`/admin/roles/{id}` | 角色、权限点和数据范围 |
+| POST | `/admin/import/preview/organizations`、`/admin/import/preview/users`、`/admin/import/{id}/commit` | Excel/CSV 组织与员工导入 |
+| GET | `/admin/audit` | 审计日志筛选（操作、资源、人员、时间） |
 
 除登录外所有接口需携带请求头：`Authorization: Bearer <token>`。
 
@@ -100,3 +109,7 @@ OceanBase profile 会自动初始化缺失的表结构，但不会删除或覆�
 ```
 PMS_JWT_SECRET=<生产环境请设置强随机密钥>
 ```
+
+其他企业部署参数：`PMS_ACCESS_EXPIRE_MINUTES`、`PMS_REFRESH_EXPIRE_DAYS`、
+`PMS_PASSWORD_RESET_EXPOSE_TOKEN=false`。完整备份、Flyway 迁移、预检和验收步骤见
+[`docs/operations/enterprise-upgrade-runbook.md`](docs/operations/enterprise-upgrade-runbook.md)。
