@@ -30,10 +30,14 @@ public class PersonnelService {
     private final OperationLogService operationLogService;
 
     public List<PersonnelDTO> list(String keyword) {
-        List<UserDO> users = userMapper.selectList(new LambdaQueryWrapper<UserDO>()
-                .and(w -> w.like(keyword != null && !keyword.isBlank(), UserDO::getNameZh, keyword)
-                        .or().like(keyword != null && !keyword.isBlank(), UserDO::getUsername, keyword))
-                .orderByAsc(UserDO::getNameZh, UserDO::getUsername));
+        LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String normalizedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(UserDO::getNameZh, normalizedKeyword)
+                    .or().like(UserDO::getUsername, normalizedKeyword));
+        }
+        wrapper.orderByAsc(UserDO::getNameZh, UserDO::getUsername);
+        List<UserDO> users = userMapper.selectList(wrapper);
         return users.stream().map(this::toDto).collect(Collectors.toList());
     }
 
