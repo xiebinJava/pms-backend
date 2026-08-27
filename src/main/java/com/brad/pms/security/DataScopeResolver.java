@@ -1,6 +1,7 @@
 package com.brad.pms.security;
 
 import com.brad.pms.common.enums.DataScopeType;
+import com.brad.pms.common.enums.SystemRole;
 import com.brad.pms.entity.RoleDO;
 import com.brad.pms.entity.UserPositionDO;
 import com.brad.pms.entity.UserRoleDO;
@@ -29,7 +30,7 @@ public class DataScopeResolver {
     /** Resolves organization IDs; an empty list means no organization scope. */
     public List<Long> resolveOrgUnitIds(LoginUser user, String permissionCode) {
         if (user == null) return List.of();
-        if (UserContext.isAdministrator() || user.getSystemRole() != null && user.getSystemRole() == 1) {
+        if (SystemRole.isAdministrator(user.getSystemRole())) {
             return List.of();
         }
         if (permissionCode != null && permissionMapper.findLiveByUserId(user.getId()).stream()
@@ -77,7 +78,7 @@ public class DataScopeResolver {
 
     public boolean hasAllCompanyScope(LoginUser user, String permissionCode) {
         if (user == null) return false;
-        if (UserContext.isAdministrator() || user.getSystemRole() != null && user.getSystemRole() == 1) return true;
+        if (SystemRole.isAdministrator(user.getSystemRole())) return true;
         if (permissionCode != null && permissionMapper.findLiveByUserId(user.getId()).stream()
                 .noneMatch(permission -> permissionCode.equals(permission.getCode()))) return false;
         Set<Long> permissionRoleIds = permissionCode == null ? Set.of() : new HashSet<>(permissionMapper.findLiveRoleIdsByUserAndPermission(user.getId(), permissionCode));

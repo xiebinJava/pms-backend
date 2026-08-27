@@ -31,4 +31,18 @@ class RoleServiceTest {
         assertThatThrownBy(() -> roleService.create(cmd))
                 .hasMessage("权限点不存在: admin:not-a-real-permission");
     }
+
+    @Test
+    void roleWithoutPermissionIsRejected() {
+        UserContext.set(new LoginUser(1L, "admin", "管理员", 1));
+        RoleSaveCmd cmd = new RoleSaveCmd();
+        cmd.setCode("EMPTY_PERMISSION_TEST");
+        cmd.setName("空权限测试");
+        cmd.setDataScopeType("SELF");
+        cmd.setPermissionCodes(List.of());
+
+        assertThatThrownBy(() -> roleService.create(cmd))
+                .hasMessage("角色至少需要绑定一个权限点");
+    }
+
 }

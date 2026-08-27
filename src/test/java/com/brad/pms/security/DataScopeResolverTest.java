@@ -71,6 +71,23 @@ class DataScopeResolverTest {
         assertThat(resolver.hasAllCompanyScope(user, "project:read")).isTrue();
     }
 
+    @Test
+    void resolverUsesSuppliedUserRoleInsteadOfStaleThreadContext() {
+        UserContext.set(new LoginUser(99L, "admin", "管理员", 1));
+        LoginUser member = new LoginUser(7L, "member", "成员", 0);
+        RoleDO role = role("MEMBER", DataScopeType.SELF.name());
+        UserRoleDO grant = new UserRoleDO(); grant.setRoleId(11L);
+        when(userRoleMapper.findLiveByUserId(7L)).thenReturn(List.of(grant));
+        when(roleMapper.selectById(11L)).thenReturn(role);
+        com.brad.pms.entity.PermissionDO permission = new com.brad.pms.entity.PermissionDO(); permission.setCode("project:read");
+        when(permissionMapper.findLiveByUserId(7L)).thenReturn(List.of(permission));
+        when(permissionMapper.findLiveRoleIdsByUserAndPermission(7L, "project:read")).thenReturn(List.of(11L));
+
+        DataScopeResolver resolver = new DataScopeResolver(userRoleMapper, roleMapper, roleOrgScopeMapper, userPositionMapper, orgUnitMapper, permissionMapper);
+
+        assertThat(resolver.hasAllCompanyScope(member, "project:read")).isFalse();
+    }
+
     private RoleDO role(String code, String scope) {
         RoleDO role = new RoleDO(); role.setId(11L); role.setCode(code); role.setDataScopeType(scope); role.setEnabled(true); return role;
     }

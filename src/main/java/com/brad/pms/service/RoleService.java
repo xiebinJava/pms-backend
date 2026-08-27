@@ -37,11 +37,11 @@ public class RoleService {
 
     @Transactional
     public RoleDTO create(RoleSaveCmd cmd) {
-        if (cmd.getCode() == null || !cmd.getCode().matches("^[A-Z][A-Z0-9_:-]{1,59}$")) throw BusinessException.error("角色编码格式不正确");
+        String normalizedCode = normalizeCode(cmd.getCode());
         if (cmd.getName() == null || cmd.getName().isBlank()) throw BusinessException.error("角色名称不能为空");
-        if (roleMapper.findByCode(cmd.getCode()) != null) throw BusinessException.error("角色编码已存在");
+        if (roleMapper.findByCode(normalizedCode) != null) throw BusinessException.error("角色编码已存在");
         RoleDO role = new RoleDO();
-        role.setCode(cmd.getCode());
+        role.setCode(normalizedCode);
         role.setName(cmd.getName());
         role.setBuiltin(false);
         role.setDataScopeType(validateScope(cmd.getDataScopeType()));
@@ -117,8 +117,15 @@ public class RoleService {
     }
 
     private void saveBindings(RoleDO role, RoleSaveCmd cmd) {
+        List<String> permissionCodes = Optional.ofNullable(cmd.getPermissionCodes()).orElse(List.of()).stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(code -> !code.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+        if (permissionCodes.isEmpty()) throw BusinessException.error("角色至少需要绑定一个权限点");
         rolePermissionMapper.deleteByRoleId(role.getId());
-        for (String code : Optional.ofNullable(cmd.getPermissionCodes()).orElse(List.of())) {
+        for (String code : permissionCodes) {
             PermissionDO permission = permissionMapper.selectOne(new LambdaQueryWrapper<PermissionDO>().eq(PermissionDO::getCode, code));
             if (permission == null) throw BusinessException.error("权限点不存在: " + code);
             rolePermissionMapper.insert(role.getId(), permission.getId());
@@ -146,6 +153,13 @@ public class RoleService {
     private String validateScope(String scope) {
         try { return DataScopeType.valueOf(scope).name(); }
         catch (Exception e) { throw BusinessException.error("数据范围不正确"); }
+    }
+
+    private String normalizeCode(String code) {
+        if (code == null) throw BusinessException.error("角色编码格式不正确");
+        String normalized = code.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.matches("^[A-Z][A-Z0-9_:-]{1,59}$")) throw BusinessException.error("角色编码格式不正确");
+        return normalized;
     }
 
     private RoleDTO toDto(RoleDO role) {

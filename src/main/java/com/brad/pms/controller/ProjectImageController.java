@@ -2,6 +2,8 @@ package com.brad.pms.controller;
 
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.common.response.ResponseResult;
+import com.brad.pms.security.PermissionCode;
+import com.brad.pms.security.RequirePermission;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -34,6 +36,7 @@ public class ProjectImageController {
     }
 
     @PostMapping
+    @RequirePermission(PermissionCode.PROJECT_WRITE)
     public ResponseResult<Map<String, String>> upload(@RequestParam("file") MultipartFile file) {
         String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
         if (file.isEmpty()) throw BusinessException.error("请选择要上传的图片");
@@ -53,6 +56,7 @@ public class ProjectImageController {
     }
 
     @GetMapping("/{filename}")
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseEntity<Resource> read(@PathVariable String filename) {
         Path target = uploadDirectory.resolve(filename).normalize();
         if (!target.startsWith(uploadDirectory) || !Files.isRegularFile(target)) {
