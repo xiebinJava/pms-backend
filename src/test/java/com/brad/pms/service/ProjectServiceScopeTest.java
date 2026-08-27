@@ -8,6 +8,7 @@ import com.brad.pms.dto.response.ProjectPermissionsDTO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectMemberDO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.OrgUnitDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.security.DataScopeResolver;
 import com.brad.pms.security.LoginUser;
@@ -44,6 +45,7 @@ class ProjectServiceScopeTest {
     @Mock ProjectLifecycleLogMapper lifecycleLogMapper;
     @Mock UserPositionMapper userPositionMapper;
     @Mock DataScopeResolver dataScopeResolver;
+    @Mock OrgUnitMapper orgUnitMapper;
 
     @InjectMocks ProjectService projectService;
 
@@ -114,6 +116,39 @@ class ProjectServiceScopeTest {
         assertThat(result.getList().get(0).getProgress()).isEqualTo(50);
     }
 
+    @Test
+    void pageAndDetailExposeTheSameOrganizationPathAndLeaderDisplay() {
+        UserContext.set(new LoginUser(1L, "admin", "管理员", 1));
+        ProjectDO project = new ProjectDO();
+        project.setId(12L);
+        project.setOwnerId(1L);
+        project.setCreatedBy(1L);
+        project.setOrgUnitId(11L);
+        Page<ProjectDO> page = new Page<>(1, 10);
+        page.setTotal(1);
+        page.setRecords(List.of(project));
+        when(projectMapper.selectPage(any(), any())).thenReturn(page);
+        when(memberMapper.selectList(any())).thenReturn(List.of());
+        when(taskMapper.countByProjectIds(any())).thenReturn(List.of());
+        when(nodeMapper.selectList(any())).thenReturn(List.of());
+        when(userService.listByIds(any())).thenReturn(List.of(user(1L), user(8L)));
+        when(permissionService.projectPermissions(project)).thenReturn(new ProjectPermissionsDTO());
+        when(orgUnitMapper.selectList(any())).thenReturn(List.of(
+                org(1L, null, "公司总部", "/1/", null),
+                org(11L, 1L, "产品制造 BG", "/1/11/", 8L)
+        ));
+
+        ProjectPageQry query = new ProjectPageQry();
+        query.setCurrPage(1);
+        query.setPageSize(10);
+
+        var dto = projectService.page(query).getList().get(0);
+
+        assertThat(dto.getOrgUnitName()).isEqualTo("产品制造 BG");
+        assertThat(dto.getOrgUnitPath()).isEqualTo("公司总部 / 产品制造 BG");
+        assertThat(dto.getOrgUnitLeaderName()).isEqualTo("用户（user）");
+    }
+
     private static ProjectNodeDO node(int status) {
         ProjectNodeDO node = new ProjectNodeDO();
         node.setProjectId(9L);
@@ -127,5 +162,15 @@ class ProjectServiceScopeTest {
         user.setUsername(id == 1L ? "admin" : "user");
         user.setNameZh(id == 1L ? "管理员" : "用户");
         return user;
+    }
+
+    private static OrgUnitDO org(Long id, Long parentId, String name, String path, Long leaderId) {
+        OrgUnitDO org = new OrgUnitDO();
+        org.setId(id);
+        org.setParentId(parentId);
+        org.setName(name);
+        org.setPath(path);
+        org.setLeaderUserId(leaderId);
+        return org;
     }
 }

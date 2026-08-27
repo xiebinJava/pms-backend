@@ -21,6 +21,11 @@ public class ProjectDTO {
     private String createdByAvatar;
     private Long projectManagerId;
     private Long orgUnitId;
+    /** 业务线/组织归属名称，列表和详情统一使用同一份后端摘要。 */
+    private String orgUnitName;
+    /** 包含上级组织的可读路径，例如“公司总部 / 产品制造 BG”。 */
+    private String orgUnitPath;
+    private String orgUnitLeaderName;
     private String projectManagerName;
     private String projectManagerAvatar;
     private LocalDate startDate;

@@ -15,6 +15,7 @@ import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectLifecycleLogDO;
 import com.brad.pms.entity.ProjectMemberDO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.OrgUnitDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
@@ -22,6 +23,7 @@ import com.brad.pms.mapper.ProjectLifecycleLogMapper;
 import com.brad.pms.mapper.ProjectMilestoneMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.OrgUnitMapper;
 import com.brad.pms.mapper.UserPositionMapper;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.security.ProjectPermissionPolicy;
@@ -52,6 +54,7 @@ public class ProjectService {
     private final ProjectLifecycleLogMapper lifecycleLogMapper;
     private final UserPositionMapper userPositionMapper;
     private final DataScopeResolver dataScopeResolver;
+    private final OrgUnitMapper orgUnitMapper;
 
     @Transactional
     public ProjectDTO create(ProjectCreateCmd cmd) {
@@ -247,6 +250,11 @@ public class ProjectService {
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         projects.stream().map(ProjectDO::getCreatedBy).filter(Objects::nonNull).forEach(userIds::add);
         projects.stream().map(ProjectDO::getProjectManagerId).filter(Objects::nonNull).forEach(userIds::add);
+        Set<Long> projectOrgIds = projects.stream().map(ProjectDO::getOrgUnitId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, OrgUnitDO> orgUnitMap = loadProjectOrgUnits(projectOrgIds);
+        orgUnitMap.values().stream().map(OrgUnitDO::getLeaderUserId)
+                .filter(Objects::nonNull).forEach(userIds::add);
         userIds.add(UserContext.userId());
 
         // 成员数
@@ -286,6 +294,12 @@ public class ProjectService {
             ProjectDTO dto = Convertors.toProject(p, userMap.get(p.getOwnerId()), userMap.get(p.getCreatedBy()),
                     userMap.get(p.getProjectManagerId()),
                     memberCountMap.getOrDefault(pid, 0L).intValue(), total, done, progress);
+            OrgUnitDO orgUnit = orgUnitMap.get(p.getOrgUnitId());
+            if (orgUnit != null) {
+                dto.setOrgUnitName(orgUnit.getName());
+                dto.setOrgUnitPath(buildOrgUnitPath(orgUnit, orgUnitMap));
+                dto.setOrgUnitLeaderName(Convertors.userDisplayName(userMap.get(orgUnit.getLeaderUserId())));
+            }
             dto.setPermissions(permissionService.projectPermissions(p));
             return dto;
         }).collect(Collectors.toList());
@@ -312,5 +326,54 @@ public class ProjectService {
         if (userIds.isEmpty()) return Collections.emptyMap();
         return userService.listByIds(new ArrayList<>(userIds)).stream()
                 .collect(Collectors.toMap(UserDO::getId, u -> u));
+    }
+
+    /**
+     * Loads the selected organization and the ancestors encoded in its materialized path.
+     * This keeps project list/detail responses consistent without loading the whole tree.
+     */
+    private Map<Long, OrgUnitDO> loadProjectOrgUnits(Set<Long> projectOrgIds) {
+        if (projectOrgIds.isEmpty()) return Collections.emptyMap();
+        List<OrgUnitDO> direct = orgUnitMapper.selectList(new LambdaQueryWrapper<OrgUnitDO>()
+                .in(OrgUnitDO::getId, projectOrgIds));
+        if (direct == null || direct.isEmpty()) return Collections.emptyMap();
+
+        Set<Long> allIds = new LinkedHashSet<>(projectOrgIds);
+        direct.stream().map(OrgUnitDO::getPath).filter(StringUtils::hasText)
+                .forEach(path -> allIds.addAll(parseOrgPath(path)));
+        if (allIds.size() > projectOrgIds.size()) {
+            List<OrgUnitDO> ancestors = orgUnitMapper.selectList(new LambdaQueryWrapper<OrgUnitDO>()
+                    .in(OrgUnitDO::getId, allIds));
+            if (ancestors != null) direct = ancestors;
+        }
+        return direct.stream().filter(Objects::nonNull).filter(org -> org.getId() != null)
+                .collect(Collectors.toMap(OrgUnitDO::getId, org -> org, (left, right) -> left,
+                        LinkedHashMap::new));
+    }
+
+    private String buildOrgUnitPath(OrgUnitDO orgUnit, Map<Long, OrgUnitDO> orgUnitMap) {
+        List<String> names = parseOrgPath(orgUnit.getPath()).stream()
+                .map(orgUnitMap::get)
+                .filter(Objects::nonNull)
+                .map(OrgUnitDO::getName)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+        if (names.isEmpty() && StringUtils.hasText(orgUnit.getName())) return orgUnit.getName();
+        if (!names.contains(orgUnit.getName()) && StringUtils.hasText(orgUnit.getName())) names.add(orgUnit.getName());
+        return String.join(" / ", names);
+    }
+
+    private Set<Long> parseOrgPath(String path) {
+        if (!StringUtils.hasText(path)) return Collections.emptySet();
+        Set<Long> ids = new LinkedHashSet<>();
+        for (String value : path.split("/")) {
+            if (!StringUtils.hasText(value)) continue;
+            try {
+                ids.add(Long.valueOf(value));
+            } catch (NumberFormatException ignored) {
+                // Ignore malformed path fragments and fall back to the selected org name.
+            }
+        }
+        return ids;
     }
 }
