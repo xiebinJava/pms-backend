@@ -1,6 +1,7 @@
 package com.brad.pms.config;
 
 import com.brad.pms.entity.*;
+import com.brad.pms.common.enums.SystemRole;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.mapper.*;
 import com.brad.pms.service.NodeService;
@@ -42,6 +43,8 @@ public class DataInitializer implements CommandLineRunner {
         log.info("初始化种子数据：admin / admin123");
 
         UserDO admin = user("admin", "admin123", "管理员", "admin@pms.com");
+        admin.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
+        userMapper.updateById(admin);
         UserDO zhang = user("zhangsan", "admin123", "张三", "zhangsan@pms.com");
         UserDO li = user("lisi", "admin123", "李四", "lisi@pms.com");
         UserDO wang = user("wangwu", "admin123", "王五", "wangwu@pms.com");

@@ -30,7 +30,7 @@ public class AuthService {
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw BusinessException.error("用户名或密码错误");
         }
-        LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname());
+        LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname(), user.getSystemRole());
         return new LoginResponse(tokenProvider.createToken(loginUser), Convertors.toUser(user));
     }
 

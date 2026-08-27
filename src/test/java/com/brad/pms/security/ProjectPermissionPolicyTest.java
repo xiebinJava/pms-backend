@@ -12,10 +12,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProjectPermissionPolicyTest {
 
     @Test
-    void normalizesLegacyProjectStatusAndKeepsTheNewLifecycleContract() {
+    void exposesTheCompleteProjectLifecycleContract() {
         assertEquals(ProjectStatus.ACTIVE.getCode(), ProjectStatus.normalize(0));
+        assertEquals("进行中", ProjectStatus.labelOf(0));
         assertEquals("进行中", ProjectStatus.labelOf(ProjectStatus.ACTIVE.getCode()));
+        assertEquals("已完成", ProjectStatus.labelOf(ProjectStatus.COMPLETED.getCode()));
         assertEquals("已终止", ProjectStatus.labelOf(ProjectStatus.TERMINATED.getCode()));
+        assertEquals("已删除", ProjectStatus.labelOf(ProjectStatus.DELETED.getCode()));
         assertEquals("未开始", NodeStatus.labelOf(NodeStatus.NOT_STARTED.getCode()));
         assertEquals("已终止", NodeStatus.labelOf(NodeStatus.TERMINATED.getCode()));
     }
@@ -33,6 +36,17 @@ class ProjectPermissionPolicyTest {
         assertTrue(ProjectPermissionPolicy.canRollbackNode(
                 project(10L, 20L, ProjectStatus.COMPLETED.getCode()),
                 node(100L, 10L, 30L, NodeStatus.COMPLETED.getCode()), 20L));
+    }
+
+    @Test
+    void legacyZeroStatusProjectsBehaveAsActiveProjects() {
+        ProjectDO legacy = project(10L, 20L, 0);
+
+        assertTrue(ProjectPermissionPolicy.canManageProject(legacy, 10L));
+        assertTrue(ProjectPermissionPolicy.canManageProject(legacy, 20L));
+        assertTrue(ProjectPermissionPolicy.canTerminateProject(legacy, 20L));
+        assertFalse(ProjectPermissionPolicy.canManageProject(
+                project(10L, 20L, ProjectStatus.DELETED.getCode()), 20L));
     }
 
     @Test
@@ -64,6 +78,28 @@ class ProjectPermissionPolicyTest {
         task.setAssigneeId(20L);
         assertTrue(ProjectPermissionPolicy.canManageTask(project, node, task, 20L));
         assertTrue(ProjectPermissionPolicy.canEditTaskContent(project, node, task, 20L));
+    }
+
+    @Test
+    void systemAdministratorHasFullControlWithinOpenProject() {
+        ProjectDO project = project(10L, 20L, ProjectStatus.ACTIVE.getCode());
+        ProjectNodeDO node = node(100L, 10L, 30L, NodeStatus.IN_PROGRESS.getCode());
+        ProjectTaskDO task = new ProjectTaskDO();
+        task.setProjectId(10L);
+        task.setNodeId(100L);
+        task.setAssigneeId(40L);
+
+        assertTrue(ProjectPermissionPolicy.canManageProject(project, 99L, true));
+        assertTrue(ProjectPermissionPolicy.canManageNode(project, node, 99L, true));
+        assertTrue(ProjectPermissionPolicy.canCompleteNode(project, node, 99L, true));
+        assertTrue(ProjectPermissionPolicy.canManageTask(project, node, task, 99L, true));
+        assertTrue(ProjectPermissionPolicy.canEditTaskContent(project, node, task, 99L, true));
+        assertTrue(ProjectPermissionPolicy.canTerminateProject(project, 99L, true));
+        assertTrue(ProjectPermissionPolicy.canRollbackNode(
+                project,
+                node(100L, 10L, 30L, NodeStatus.COMPLETED.getCode()),
+                99L,
+                true));
     }
 
     private ProjectDO project(Long creatorId, Long managerId, Integer status) {

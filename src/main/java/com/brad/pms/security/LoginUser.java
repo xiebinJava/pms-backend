@@ -1,5 +1,6 @@
 package com.brad.pms.security;
 
+import com.brad.pms.common.enums.SystemRole;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,4 +16,9 @@ public class LoginUser {
     private Long id;
     private String username;
     private String nickname;
+    private Integer systemRole;
+
+    public LoginUser(Long id, String username, String nickname) {
+        this(id, username, nickname, SystemRole.USER.getCode());
+    }
 }

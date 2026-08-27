@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${OCEANBASE_HOST:127.0.0.1}:${OCEANBASE_PORT:2881}/${OCEANBASE_DATABASE:brad_pms}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${OCEANBASE_USER}
+    password: ${OCEANBASE_PASSWORD}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  h2:
+    console:
+      enabled: false
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 启动前请通过运行时环境提供 OCEANBASE_USER 和 OCEANBASE_PASSWORD。

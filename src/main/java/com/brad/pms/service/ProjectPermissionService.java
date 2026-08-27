@@ -59,14 +59,14 @@ public class ProjectPermissionService {
 
     public void requireProjectManager(Long projectId, String action) {
         ProjectDO project = requireProject(projectId);
-        if (!ProjectPermissionPolicy.isProjectManagerOrCreator(project, UserContext.userId())) {
+        if (!ProjectPermissionPolicy.hasProjectControl(project, UserContext.userId(), UserContext.isAdministrator())) {
             throw BusinessException.forbidden("仅项目创建人或项目经理可以" + action);
         }
     }
 
     public ProjectDO requireManageableProject(Long projectId, String action) {
         ProjectDO project = requireProject(projectId);
-        if (!ProjectPermissionPolicy.canManageProject(project, UserContext.userId())) {
+        if (!ProjectPermissionPolicy.canManageProject(project, UserContext.userId(), UserContext.isAdministrator())) {
             if (!ProjectPermissionPolicy.isProjectOpen(project)) {
                 throw BusinessException.forbidden("项目当前状态不允许" + action);
             }
@@ -78,7 +78,7 @@ public class ProjectPermissionService {
     public ProjectNodeDO requireManageableNode(Long projectId, Long nodeId, String action) {
         ProjectDO project = requireProject(projectId);
         ProjectNodeDO node = requireNode(projectId, nodeId);
-        if (!ProjectPermissionPolicy.canManageNode(project, node, UserContext.userId())) {
+        if (!ProjectPermissionPolicy.canManageNode(project, node, UserContext.userId(), UserContext.isAdministrator())) {
             if (NodeStatus.isReadOnly(node.getStatus())) {
                 throw BusinessException.forbidden("节点已锁定，回滚后才可以" + action);
             }
@@ -90,7 +90,7 @@ public class ProjectPermissionService {
     public ProjectNodeDO requireCompletableNode(Long projectId, Long nodeId) {
         ProjectDO project = requireProject(projectId);
         ProjectNodeDO node = requireNode(projectId, nodeId);
-        if (!ProjectPermissionPolicy.canCompleteNode(project, node, UserContext.userId())) {
+        if (!ProjectPermissionPolicy.canCompleteNode(project, node, UserContext.userId(), UserContext.isAdministrator())) {
             throw BusinessException.forbidden("仅当前节点负责人或项目负责人可以完成进行中的节点");
         }
         return node;
@@ -99,43 +99,45 @@ public class ProjectPermissionService {
     public ProjectNodeDO requireRollbackableNode(Long projectId, Long nodeId) {
         ProjectDO project = requireProject(projectId);
         ProjectNodeDO node = requireNode(projectId, nodeId);
-        if (!ProjectPermissionPolicy.canRollbackNode(project, node, UserContext.userId())) {
+        if (!ProjectPermissionPolicy.canRollbackNode(project, node, UserContext.userId(), UserContext.isAdministrator())) {
             throw BusinessException.forbidden("仅项目创建人或项目经理可以回滚已完成节点");
         }
         return node;
     }
 
     public ProjectPermissionsDTO projectPermissions(ProjectDO project) {
-        Long userId = UserContext.userId();
-        boolean manager = ProjectPermissionPolicy.isProjectManagerOrCreator(project, userId);
+        Long userId = UserContext.userIdOrNull();
+        boolean manager = ProjectPermissionPolicy.hasProjectControl(project, userId, UserContext.isAdministrator());
         boolean active = ProjectPermissionPolicy.isProjectOpen(project);
         ProjectPermissionsDTO dto = new ProjectPermissionsDTO();
         dto.setCanManageProject(active && manager);
         dto.setCanManageMembers(active && manager);
         dto.setCanSetProjectManager(active && manager);
         dto.setCanAssignNodeOwner(active && manager);
-        dto.setCanTerminateProject(ProjectPermissionPolicy.canTerminateProject(project, userId));
+        dto.setCanTerminateProject(ProjectPermissionPolicy.canTerminateProject(project, userId, UserContext.isAdministrator()));
         dto.setCanRestoreProject(manager && Objects.equals(project.getStatus(), ProjectStatus.TERMINATED.getCode()));
         dto.setCanDeleteProject(active && manager);
         return dto;
     }
 
     public NodePermissionsDTO nodePermissions(ProjectDO project, ProjectNodeDO node) {
-        Long userId = UserContext.userId();
+        Long userId = UserContext.userIdOrNull();
         NodePermissionsDTO dto = new NodePermissionsDTO();
-        dto.setCanEdit(ProjectPermissionPolicy.canManageNode(project, node, userId));
-        dto.setCanManageTasks(ProjectPermissionPolicy.canManageNode(project, node, userId));
-        dto.setCanComplete(ProjectPermissionPolicy.canCompleteNode(project, node, userId));
-        dto.setCanRollback(ProjectPermissionPolicy.canRollbackNode(project, node, userId));
+        boolean administrator = UserContext.isAdministrator();
+        dto.setCanEdit(ProjectPermissionPolicy.canManageNode(project, node, userId, administrator));
+        dto.setCanManageTasks(ProjectPermissionPolicy.canManageNode(project, node, userId, administrator));
+        dto.setCanComplete(ProjectPermissionPolicy.canCompleteNode(project, node, userId, administrator));
+        dto.setCanRollback(ProjectPermissionPolicy.canRollbackNode(project, node, userId, administrator));
         dto.setReadOnly(!ProjectPermissionPolicy.isProjectOpen(project)
                 || NodeStatus.isReadOnly(node.getStatus()));
         return dto;
     }
 
     public TaskPermissionsDTO taskPermissions(ProjectDO project, ProjectNodeDO node, ProjectTaskDO task) {
-        Long userId = UserContext.userId();
-        boolean manager = ProjectPermissionPolicy.canManageTask(project, node, task, userId);
-        boolean assignee = ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId);
+        Long userId = UserContext.userIdOrNull();
+        boolean administrator = UserContext.isAdministrator();
+        boolean manager = ProjectPermissionPolicy.canManageTask(project, node, task, userId, administrator);
+        boolean assignee = ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId, administrator);
         TaskPermissionsDTO dto = new TaskPermissionsDTO();
         if (node == null) {
             dto.setReadOnly(true);

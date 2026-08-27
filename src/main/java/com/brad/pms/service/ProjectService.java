@@ -101,20 +101,17 @@ public class ProjectService {
 
     @Transactional
     public void delete(Long id) {
-        permissionService.requireManageableProject(id, "删除项目");
-        // 关注人服务也会校验项目状态，必须在删除项目主记录前清理。
-        followerService.replace(id, Collections.emptyList());
-        projectMapper.deleteById(id);
-        memberMapper.delete(new LambdaQueryWrapper<ProjectMemberDO>().eq(ProjectMemberDO::getProjectId, id));
-        taskMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectTaskDO>().eq(com.brad.pms.entity.ProjectTaskDO::getProjectId, id));
-        milestoneMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectMilestoneDO>().eq(com.brad.pms.entity.ProjectMilestoneDO::getProjectId, id));
-        nodeMapper.delete(new LambdaQueryWrapper<com.brad.pms.entity.ProjectNodeDO>().eq(com.brad.pms.entity.ProjectNodeDO::getProjectId, id));
+        ProjectDO project = permissionService.requireManageableProject(id, "删除项目");
+        int fromStatus = ProjectStatus.normalize(project.getStatus());
+        project.setStatus(ProjectStatus.DELETED.getCode());
+        projectMapper.updateById(project);
+        recordLifecycle(id, "DELETE", "删除项目", fromStatus, ProjectStatus.DELETED.getCode());
     }
 
     @Transactional
     public ProjectDTO terminate(Long id, String reason) {
         ProjectDO project = permissionService.requireProject(id);
-        if (!ProjectPermissionPolicy.canTerminateProject(project, UserContext.userId())) {
+        if (!ProjectPermissionPolicy.canTerminateProject(project, UserContext.userId(), UserContext.isAdministrator())) {
             throw BusinessException.forbidden("仅进行中的项目可以终止，且仅项目创建人或项目经理可以操作");
         }
         int fromStatus = ProjectStatus.normalize(project.getStatus());
@@ -139,7 +136,7 @@ public class ProjectService {
         ProjectDO project = permissionService.requireProject(id);
         Long userId = UserContext.userId();
         if (!Objects.equals(project.getStatus(), ProjectStatus.TERMINATED.getCode())
-                || !ProjectPermissionPolicy.isProjectManagerOrCreator(project, userId)) {
+                || !ProjectPermissionPolicy.hasProjectControl(project, userId, UserContext.isAdministrator())) {
             throw BusinessException.forbidden("仅项目创建人或项目经理可以恢复已终止项目");
         }
         project.setStatus(ProjectStatus.ACTIVE.getCode());
@@ -161,8 +158,16 @@ public class ProjectService {
     public PageResult<ProjectDTO> page(ProjectPageQry qry) {
         LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
                 .like(StringUtils.hasText(qry.getKeyword()), ProjectDO::getName, qry.getKeyword())
-                .eq(qry.getStatus() != null, ProjectDO::getStatus, qry.getStatus())
                 .orderByDesc(ProjectDO::getUpdatedAt);
+        if (qry.getStatus() != null) {
+            int status = ProjectStatus.normalize(qry.getStatus());
+            if (status == ProjectStatus.ACTIVE.getCode()) {
+                // 旧数据可能仍保存为 0，列表筛选“进行中”时一并纳入并由 enrich 统一返回 1。
+                wrapper.in(ProjectDO::getStatus, 0, ProjectStatus.ACTIVE.getCode());
+            } else {
+                wrapper.eq(ProjectDO::getStatus, status);
+            }
+        }
 
         IPage<ProjectDO> page = projectMapper.selectPage(new Page<>(qry.getCurrPage(), qry.getPageSize()), wrapper);
         return PageResult.of(page.getTotal(), page.getCurrent(), page.getSize(), enrich(page.getRecords()));
@@ -180,6 +185,7 @@ public class ProjectService {
         result.put("active", countByStatus(all, ProjectStatus.ACTIVE.getCode()));
         result.put("completed", countByStatus(all, ProjectStatus.COMPLETED.getCode()));
         result.put("terminated", countByStatus(all, ProjectStatus.TERMINATED.getCode()));
+        result.put("deleted", countByStatus(all, ProjectStatus.DELETED.getCode()));
         double avgProgress = all.stream()
                 .mapToInt(p -> p.getProgress() == null ? 0 : p.getProgress())
                 .average().orElse(0);
@@ -188,7 +194,7 @@ public class ProjectService {
     }
 
     private long countByStatus(List<ProjectDO> list, int status) {
-        return list.stream().filter(p -> p.getStatus() != null && p.getStatus() == status).count();
+        return list.stream().filter(p -> ProjectStatus.normalize(p.getStatus()) == status).count();
     }
 
     private ProjectDO requireProject(Long id) {

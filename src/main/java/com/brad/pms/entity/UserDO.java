@@ -22,6 +22,9 @@ public class UserDO {
 
     private String avatar;
 
+    /** 系统级角色：0 普通用户，1 管理员。 */
+    private Integer systemRole;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

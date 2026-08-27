@@ -32,6 +32,7 @@ public class JwtTokenProvider {
                 .setSubject(String.valueOf(user.getId()))
                 .claim("username", user.getUsername())
                 .claim("nickname", user.getNickname())
+                .claim("systemRole", user.getSystemRole())
                 .setIssuedAt(now)
                 .setExpiration(new Date(now.getTime() + expireMillis))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -48,6 +49,7 @@ public class JwtTokenProvider {
         user.setId(Long.valueOf(claims.getSubject()));
         user.setUsername(claims.get("username", String.class));
         user.setNickname(claims.get("nickname", String.class));
+        user.setSystemRole(claims.get("systemRole", Integer.class));
         return user;
     }
 }

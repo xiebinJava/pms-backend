@@ -7,7 +7,7 @@
 - Java 17 + Maven
 - Spring Boot 2.7.5
 - MyBatis-Plus 3.4.1（分页插件 + 公共字段自动填充）
-- MySQL 8 / H2（开发环境内存库，开箱即用）
+- OceanBase（MySQL 兼容模式）/ MySQL 8 / H2（开发环境内存库，开箱即用）
 - JWT（jjwt）轻量登录鉴权，无第三方权限平台依赖
 - Lombok
 
@@ -48,6 +48,22 @@ CREATE DATABASE pms DEFAULT CHARACTER SET utf8mb4;
 mvn spring-boot:run -Dspring-boot.run.profiles=mysql \
   -Dspring-boot.run.arguments="--MYSQL_HOST=localhost --MYSQL_PORT=3306 --MYSQL_DB=pms --MYSQL_USER=root --MYSQL_PASSWORD=root"
 ```
+
+### 使用 OceanBase
+
+PMS 使用 OceanBase 的 MySQL 兼容模式，默认连接本机 `2881` 端口和 `brad_pms` 数据库。账号密码只通过运行时环境注入，不要写入仓库或启动日志：
+
+```bash
+export OCEANBASE_HOST=127.0.0.1
+export OCEANBASE_PORT=2881
+export OCEANBASE_DATABASE=brad_pms
+export OCEANBASE_USER=<业务账号>
+export OCEANBASE_PASSWORD=<业务密码>
+
+mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
+```
+
+OceanBase profile 会自动初始化缺失的表结构，但不会删除或覆盖已有业务数据。迁移当前 H2 内存数据请先保持 H2 后端运行，导出快照后再执行迁移脚本；详细规则见 `docs/superpowers/specs/2026-08-26-oceanbase-migration-design.md`。
 
 ## 默认账号
 

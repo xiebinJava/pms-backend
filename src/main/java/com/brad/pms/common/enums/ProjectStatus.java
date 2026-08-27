@@ -7,7 +7,8 @@ public enum ProjectStatus {
 
     ACTIVE(1, "进行中"),
     COMPLETED(2, "已完成"),
-    TERMINATED(3, "已终止");
+    TERMINATED(3, "已终止"),
+    DELETED(4, "已删除");
 
     private final int code;
     private final String label;
@@ -18,15 +19,15 @@ public enum ProjectStatus {
     }
 
     public static String labelOf(int code) {
+        int normalized = normalize(code);
         for (ProjectStatus s : values()) {
-            if (s.code == code) return s.label;
+            if (s.code == normalized) return s.label;
         }
-        if (code == 0) return ACTIVE.label;
         return String.valueOf(code);
     }
 
     /**
-     * 旧数据曾使用 0 表示项目未开始；项目生命周期规范统一从进行中开始，读取时兼容旧值。
+     * 兼容历史数据：项目状态 0 或空值统一按进行中处理。
      */
     public static int normalize(Integer code) {
         return code == null || code == 0 ? ACTIVE.code : code;
@@ -34,6 +35,11 @@ public enum ProjectStatus {
 
     public static boolean isReadOnly(Integer code) {
         int normalized = normalize(code);
-        return normalized == COMPLETED.code || normalized == TERMINATED.code;
+        return normalized == COMPLETED.code || normalized == TERMINATED.code || normalized == DELETED.code;
+    }
+
+    public static boolean isOpen(Integer code) {
+        int normalized = normalize(code);
+        return normalized == ACTIVE.code;
     }
 }

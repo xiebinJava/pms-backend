@@ -12,5 +12,6 @@ public class UserDTO {
     private String nickname;
     private String email;
     private String avatar;
+    private Integer systemRole;
     private LocalDateTime createdAt;
 }

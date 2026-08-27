@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     nickname   VARCHAR(50),
     email      VARCHAR(100),
     avatar     VARCHAR(255),
+    system_role TINYINT     NOT NULL DEFAULT 0 COMMENT '0普通用户 1管理员',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -15,7 +16,7 @@ CREATE TABLE IF NOT EXISTS project (
     code        VARCHAR(50)  NOT NULL,
     name        VARCHAR(100) NOT NULL,
     description VARCHAR(1000),
-    status      TINYINT      NOT NULL DEFAULT 1 COMMENT '1进行中 2已完成 3已终止',
+    status      TINYINT      NOT NULL DEFAULT 1 COMMENT '1进行中 2已完成 3已终止 4已删除',
     priority    TINYINT      NOT NULL DEFAULT 1 COMMENT '0低 1中 2高 3紧急',
     owner_id    BIGINT       NOT NULL,
     start_date  DATE,

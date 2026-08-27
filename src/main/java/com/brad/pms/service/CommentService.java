@@ -58,7 +58,7 @@ public class CommentService {
         var project = permissionService.requireProject(comment.getProjectId());
         Long userId = UserContext.userId();
         if (!java.util.Objects.equals(comment.getUserId(), userId)
-                && !ProjectPermissionPolicy.isProjectManagerOrCreator(project, userId)) {
+                && !ProjectPermissionPolicy.hasProjectControl(project, userId, UserContext.isAdministrator())) {
             throw BusinessException.forbidden("只能删除自己的评论，或由项目创建人/项目经理删除");
         }
         commentMapper.deleteById(id);

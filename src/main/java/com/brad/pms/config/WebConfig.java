@@ -2,6 +2,7 @@ package com.brad.pms.config;
 
 import com.brad.pms.security.AuthInterceptor;
 import com.brad.pms.security.JwtTokenProvider;
+import com.brad.pms.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -16,10 +17,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     private final JwtTokenProvider tokenProvider;
+    private final UserMapper userMapper;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new AuthInterceptor(tokenProvider))
+        registry.addInterceptor(new AuthInterceptor(tokenProvider, userMapper))
                 .addPathPatterns("/**")
                 .excludePathPatterns("/h2-console/**");
     }

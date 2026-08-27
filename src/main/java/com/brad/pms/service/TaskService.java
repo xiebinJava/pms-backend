@@ -80,8 +80,9 @@ public class TaskService {
         ProjectDO project = permissionService.requireProject(task.getProjectId());
         ProjectNodeDO node = permissionService.requireNode(task.getProjectId(), task.getNodeId());
         Long userId = UserContext.userId();
-        boolean manager = ProjectPermissionPolicy.canManageTask(project, node, task, userId);
-        boolean assignee = ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId);
+        boolean administrator = UserContext.isAdministrator();
+        boolean manager = ProjectPermissionPolicy.canManageTask(project, node, task, userId, administrator);
+        boolean assignee = ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId, administrator);
         if (!manager && !assignee) {
             throw BusinessException.forbidden("仅项目创建人、项目经理、节点负责人或任务负责人可以编辑任务");
         }
@@ -110,8 +111,9 @@ public class TaskService {
         ProjectDO project = permissionService.requireProject(task.getProjectId());
         ProjectNodeDO node = permissionService.requireNode(task.getProjectId(), task.getNodeId());
         Long userId = UserContext.userId();
-        if (!ProjectPermissionPolicy.canManageTask(project, node, task, userId)
-                && !ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId)) {
+        boolean administrator = UserContext.isAdministrator();
+        if (!ProjectPermissionPolicy.canManageTask(project, node, task, userId, administrator)
+                && !ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId, administrator)) {
             throw BusinessException.forbidden("当前用户没有移动该任务的权限");
         }
         task.setStatus(cmd.getStatus());
@@ -123,7 +125,7 @@ public class TaskService {
         ProjectTaskDO task = requireTask(id);
         ProjectDO project = permissionService.requireProject(task.getProjectId());
         ProjectNodeDO node = permissionService.requireNode(task.getProjectId(), task.getNodeId());
-        if (!ProjectPermissionPolicy.canManageTask(project, node, task, UserContext.userId())) {
+        if (!ProjectPermissionPolicy.canManageTask(project, node, task, UserContext.userId(), UserContext.isAdministrator())) {
             throw BusinessException.forbidden("仅项目创建人、项目经理或节点负责人可以删除任务");
         }
         taskMapper.deleteById(id);

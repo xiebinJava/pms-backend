@@ -24,6 +24,7 @@ public final class Convertors {
         dto.setNickname(do_.getNickname());
         dto.setEmail(do_.getEmail());
         dto.setAvatar(do_.getAvatar());
+        dto.setSystemRole(do_.getSystemRole());
         dto.setCreatedAt(do_.getCreatedAt());
         return dto;
     }
