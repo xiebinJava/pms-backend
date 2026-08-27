@@ -51,3 +51,6 @@ pms:
     refresh-expire-days: ${PMS_REFRESH_EXPIRE_DAYS:30}
     max-failed-logins: ${PMS_MAX_FAILED_LOGINS:5}
     lock-minutes: ${PMS_LOCK_MINUTES:15}
+    # Development fallback returns a copyable URL. Set false in production and
+    # provide a PasswordResetNotifier bean (mail/Feishu/WeCom integration).
+    password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:true}

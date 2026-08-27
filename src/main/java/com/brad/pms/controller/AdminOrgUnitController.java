@@ -3,6 +3,7 @@ package com.brad.pms.controller;
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.OrgUnitCreateCmd;
 import com.brad.pms.dto.request.OrgUnitMoveCmd;
+import com.brad.pms.dto.request.OrgUnitUpdateCmd;
 import com.brad.pms.dto.response.OrgUnitTreeDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
@@ -35,6 +36,13 @@ public class AdminOrgUnitController {
     @RequirePermission(PermissionCode.ORG_WRITE)
     public ResponseResult<OrgUnitTreeDTO> move(@PathVariable Long id, @RequestBody OrgUnitMoveCmd cmd) {
         return ResponseResult.success(orgUnitService.move(id, cmd));
+    }
+
+    @PutMapping("/{id}")
+    @RequirePermission(PermissionCode.ORG_WRITE)
+    public ResponseResult<OrgUnitTreeDTO> update(@PathVariable Long id,
+                                                 @Validated @RequestBody OrgUnitUpdateCmd cmd) {
+        return ResponseResult.success(orgUnitService.update(id, cmd));
     }
 
     @DeleteMapping("/{id}")

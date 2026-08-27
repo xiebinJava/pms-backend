@@ -9,7 +9,8 @@ import com.brad.pms.entity.PasswordResetTokenDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.PasswordResetTokenMapper;
 import com.brad.pms.mapper.UserMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,14 +18,28 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 
-@Service @RequiredArgsConstructor
+@Service
 public class PasswordResetService {
     private final UserMapper userMapper;
     private final PasswordResetTokenMapper tokenMapper;
     private final AuthService authService;
     private final OperationLogService operationLogService;
+    private final ObjectProvider<PasswordResetNotifier> notifierProvider;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
     private final SecureRandom random = new SecureRandom();
+
+    @Value("${pms.auth.password-reset-expose-token:true}")
+    private boolean exposeToken;
+
+    public PasswordResetService(UserMapper userMapper, PasswordResetTokenMapper tokenMapper,
+                                AuthService authService, OperationLogService operationLogService,
+                                ObjectProvider<PasswordResetNotifier> notifierProvider) {
+        this.userMapper = userMapper;
+        this.tokenMapper = tokenMapper;
+        this.authService = authService;
+        this.operationLogService = operationLogService;
+        this.notifierProvider = notifierProvider;
+    }
 
     @Transactional
     public ResetTokenResponse request(PasswordResetRequest request) {
@@ -35,7 +50,14 @@ public class PasswordResetService {
         PasswordResetTokenDO token = new PasswordResetTokenDO();
         token.setUserId(user.getId()); token.setTokenHash(AuthService.sha256(raw)); token.setExpiresAt(LocalDateTime.now().plusMinutes(30));
         tokenMapper.insert(token);
-        return new ResetTokenResponse("/auth/reset-password?token=" + raw, token.getExpiresAt().toString());
+        String resetUrl = "/auth/reset-password?token=" + raw;
+        PasswordResetNotifier notifier = notifierProvider.getIfAvailable();
+        if (notifier != null) {
+            notifier.send(user, resetUrl, token.getExpiresAt());
+        } else if (!exposeToken) {
+            throw BusinessException.error("未配置密码重置通知器，暂不能发出重置链接");
+        }
+        return new ResetTokenResponse(exposeToken ? resetUrl : "", token.getExpiresAt().toString());
     }
 
     @Transactional
