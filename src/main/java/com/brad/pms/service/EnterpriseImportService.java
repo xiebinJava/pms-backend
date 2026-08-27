@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EnterpriseImportService {
     private static final long MAX_FILE_SIZE = 5L * 1024 * 1024;
+    private static final int MAX_ROWS = 5000;
     private final ImportJobMapper importJobMapper;
     private final OrgUnitMapper orgUnitMapper;
     private final OrgUnitTypeMapper orgUnitTypeMapper;
@@ -86,8 +87,12 @@ public class EnterpriseImportService {
 
     @Transactional
     public void commit(String jobId) {
-        ImportJobDO job = importJobMapper.selectById(jobId);
-        if (job == null || !"PREVIEWED".equals(job.getStatus()) || job.getExpiresAt().isBefore(LocalDateTime.now())) throw BusinessException.error("导入预览不存在、已失效或包含错误");
+        ImportJobDO job = importJobMapper.selectByIdForUpdate(jobId);
+        if (job == null) throw BusinessException.error("导入预览不存在、已失效或包含错误");
+        if ("SUCCESS".equals(job.getStatus())) return;
+        if (!"PREVIEWED".equals(job.getStatus()) || job.getExpiresAt() == null || !job.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw BusinessException.error("导入预览不存在、已失效或包含错误");
+        }
         if (job.getErrorCount() != null && job.getErrorCount() > 0) throw BusinessException.error("请先修正预览错误");
         try {
             List<Map<String, String>> rows = objectMapper.readValue(job.getPreviewJson(), new TypeReference<List<Map<String, String>>>() { });
@@ -106,30 +111,35 @@ public class EnterpriseImportService {
     }
 
     private void commitOrganizations(List<Map<String, String>> rows) {
-        Map<String, OrgUnitDO> byCode = orgUnitMapper.selectList(null).stream().collect(Collectors.toMap(OrgUnitDO::getCode, o -> o));
-        for (Map<String, String> row : rows) if (byCode.containsKey(row.get("组织编码"))) throw BusinessException.error("组织编码已存在: " + row.get("组织编码"));
+        Map<String, OrgUnitDO> byCode = orgUnitMapper.selectList(null).stream().collect(Collectors.toMap(o -> normalizeCode(o.getCode()), o -> o));
+        Map<String, UserDO> usersByUsername = userMapper.selectList(null).stream()
+                .filter(user -> user.getUsername() != null)
+                .collect(Collectors.toMap(user -> EnterpriseDataMigration.normalizeUsername(user.getUsername()), user -> user, (left, right) -> left));
+        for (Map<String, String> row : rows) if (byCode.containsKey(normalizeCode(row.get("组织编码")))) throw BusinessException.error("组织编码已存在: " + row.get("组织编码"));
         List<Map<String, String>> pending = new ArrayList<>(rows);
         while (!pending.isEmpty()) {
             int inserted = 0;
             Iterator<Map<String, String>> iterator = pending.iterator();
             while (iterator.hasNext()) {
                 Map<String, String> row = iterator.next();
-            OrgUnitTypeDO type = orgUnitTypeMapper.selectOne(new LambdaQueryWrapper<OrgUnitTypeDO>().eq(OrgUnitTypeDO::getCode, row.get("组织类型编码")));
+            OrgUnitTypeDO type = orgUnitTypeMapper.selectOne(new LambdaQueryWrapper<OrgUnitTypeDO>().eq(OrgUnitTypeDO::getCode, normalizeCode(row.get("组织类型编码"))));
             if (type == null) throw BusinessException.error("组织类型不存在: " + row.get("组织类型编码"));
-            OrgUnitDO parent = row.get("父组织编码") == null || row.get("父组织编码").isBlank() ? null : byCode.get(row.get("父组织编码"));
+            OrgUnitDO parent = row.get("父组织编码") == null || row.get("父组织编码").isBlank() ? null : byCode.get(normalizeCode(row.get("父组织编码")));
             if (row.get("父组织编码") != null && !row.get("父组织编码").isBlank() && parent == null) continue;
+            UserDO leader = findImportLeader(usersByUsername, row.get("负责人英文名"));
             OrgUnitDO org = new OrgUnitDO();
-            org.setCode(row.get("组织编码"));
+            org.setCode(normalizeCode(row.get("组织编码")));
             org.setName(row.get("组织名称"));
             org.setTypeId(type.getId());
             org.setParentId(parent == null ? null : parent.getId());
             org.setSort(parseInt(row.get("排序"), 0));
             org.setStatus("ACTIVE");
+            org.setLeaderUserId(leader == null ? null : leader.getId());
             org.setPath("/");
             orgUnitMapper.insert(org);
             org.setPath(parent == null ? "/" + org.getId() + "/" : parent.getPath() + org.getId() + "/");
             orgUnitMapper.updateById(org);
-            byCode.put(org.getCode(), org);
+            byCode.put(normalizeCode(org.getCode()), org);
                 iterator.remove();
                 inserted++;
             }
@@ -141,8 +151,8 @@ public class EnterpriseImportService {
         Map<String, UserDO> usersByUsername = userMapper.selectList(null).stream()
                 .filter(user -> user.getUsername() != null)
                 .collect(Collectors.toMap(user -> EnterpriseDataMigration.normalizeUsername(user.getUsername()), user -> user));
-        Map<String, OrgUnitDO> orgs = orgUnitMapper.selectList(null).stream().collect(Collectors.toMap(OrgUnitDO::getCode, o -> o));
-        Map<String, PositionDO> positions = positionMapper.selectList(null).stream().collect(Collectors.toMap(PositionDO::getCode, p -> p));
+        Map<String, OrgUnitDO> orgs = orgUnitMapper.selectList(null).stream().collect(Collectors.toMap(o -> normalizeCode(o.getCode()), o -> o));
+        Map<String, PositionDO> positions = positionMapper.selectList(null).stream().collect(Collectors.toMap(p -> normalizeCode(p.getCode()), p -> p));
         for (Map<String, String> row : rows) {
             String username = row.get("英文名");
             String normalized = EnterpriseDataMigration.normalizeUsername(username);
@@ -163,17 +173,18 @@ public class EnterpriseImportService {
         for (Map<String, String> row : rows) {
             String normalized = EnterpriseDataMigration.normalizeUsername(row.get("英文名"));
             UserDO user = usersByUsername.get(normalized);
-            OrgUnitDO org = orgs.get(row.get("主组织编码"));
-            if (org == null) throw BusinessException.error("主组织不存在: " + row.get("主组织编码"));
+            OrgUnitDO org = orgs.get(normalizeCode(row.get("主组织编码")));
+            if (org == null || !"ACTIVE".equals(org.getStatus())) throw BusinessException.error("主组织不存在或已停用: " + row.get("主组织编码"));
             UserPositionDO position = new UserPositionDO();
             position.setUserId(user.getId());
             position.setOrgUnitId(org.getId());
-            PositionDO pos = positions.get(row.get("岗位编码"));
+            PositionDO pos = positions.get(normalizeCode(row.get("岗位编码")));
             position.setPositionId(pos == null ? null : pos.getId());
             String managerUsername = EnterpriseDataMigration.normalizeUsername(row.get("直属上级英文名"));
             if (managerUsername != null && !managerUsername.isBlank()) {
                 UserDO manager = usersByUsername.get(managerUsername);
                 if (manager == null) throw BusinessException.error("直属上级不存在: " + row.get("直属上级英文名"));
+                if (UserStatus.DISABLED.name().equals(manager.getStatus())) throw BusinessException.error("直属上级已停用: " + row.get("直属上级英文名"));
                 if (Objects.equals(manager.getId(), user.getId())) throw BusinessException.error("直属上级不能是本人: " + row.get("英文名"));
                 position.setManagerUserId(manager.getId());
             }
@@ -183,8 +194,9 @@ public class EnterpriseImportService {
             position.setStatus("ACTIVE");
             userPositionMapper.insert(position);
             if (row.get("角色编码") != null && !row.get("角色编码").isBlank()) {
-                RoleDO role = roleMapper.findByCode(row.get("角色编码"));
+                RoleDO role = roleMapper.findByCode(normalizeCode(row.get("角色编码")));
                 if (role == null) throw BusinessException.error("角色不存在: " + row.get("角色编码"));
+                if (!Boolean.TRUE.equals(role.getEnabled())) throw BusinessException.error("角色已停用: " + row.get("角色编码"));
                 UserRoleDO grant = new UserRoleDO();
                 grant.setUserId(user.getId());
                 grant.setRoleId(role.getId());
@@ -203,12 +215,15 @@ public class EnterpriseImportService {
                         CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).setIgnoreEmptyLines(true).build());
                 List<String> headers = parser.getHeaderNames();
                 validateHeaders(headers, expectedHeaders);
+                Map<String, Integer> headerIndexes = new HashMap<>();
+                for (int i = 0; i < headers.size(); i++) headerIndexes.put(stripBom(trim(headers.get(i))), i);
                 List<Map<String, String>> result = new ArrayList<>();
                 parser.forEach(record -> {
                     Map<String, String> row = new LinkedHashMap<>();
-                    for (String header : expectedHeaders) row.put(header, trim(record.get(header)));
+                    for (String header : expectedHeaders) row.put(header, trim(record.get(headerIndexes.get(header))));
                     result.add(row);
                 });
+                ensureRowLimit(result.size());
                 return result;
             }
             if (name.endsWith(".xlsx")) {
@@ -217,16 +232,19 @@ public class EnterpriseImportService {
                     Row headerRow = sheet.getRow(0);
                     if (headerRow == null) throw BusinessException.error("Excel 缺少表头");
                     List<String> headers = new ArrayList<>();
-                    for (int i = 0; i < headerRow.getLastCellNum(); i++) headers.add(cellValue(headerRow.getCell(i), true));
+                    for (int i = 0; i < headerRow.getLastCellNum(); i++) headers.add(stripBom(cellValue(headerRow.getCell(i), true)));
                     validateHeaders(headers, expectedHeaders);
+                    Map<String, Integer> headerIndexes = new HashMap<>();
+                    for (int i = 0; i < headers.size(); i++) headerIndexes.put(headers.get(i), i);
                     List<Map<String, String>> result = new ArrayList<>();
                     for (int r = 1; r <= sheet.getLastRowNum(); r++) {
                         Row rowData = sheet.getRow(r);
                         if (rowData == null) continue;
                         Map<String, String> row = new LinkedHashMap<>();
-                        for (int i = 0; i < expectedHeaders.size(); i++) row.put(expectedHeaders.get(i), cellValue(rowData.getCell(i), false));
+                        for (String header : expectedHeaders) row.put(header, cellValue(rowData.getCell(headerIndexes.get(header)), false));
                         if (row.values().stream().anyMatch(v -> v != null && !v.isBlank())) result.add(row);
                     }
+                    ensureRowLimit(result.size());
                     return result;
                 }
             }
@@ -252,23 +270,32 @@ public class EnterpriseImportService {
                 errors.add(new ImportRowErrorDTO(number, "邮箱/手机号", "至少填写一项联系方式"));
             }
             String key = "ORGANIZATIONS".equals(type) ? row.get("组织编码") : EnterpriseDataMigration.normalizeUsername(row.get("英文名"));
-            if (key != null && !key.isBlank() && !seen.add(key)) errors.add(new ImportRowErrorDTO(number, "ORGANIZATIONS".equals(type) ? "组织编码" : "英文名", "批次内重复"));
+            String duplicateKey = "ORGANIZATIONS".equals(type) ? normalizeCode(key) : key;
+            if (duplicateKey != null && !duplicateKey.isBlank() && !seen.add(duplicateKey)) errors.add(new ImportRowErrorDTO(number, "ORGANIZATIONS".equals(type) ? "组织编码" : "英文名", "批次内重复"));
             if ("USERS".equals(type) && key != null && !key.matches("^[a-z][a-z0-9._-]{1,49}$")) errors.add(new ImportRowErrorDTO(number, "英文名", "英文名格式不正确"));
         }
         if ("ORGANIZATIONS".equals(type)) {
-            Set<String> codes = rows.stream().map(row -> row.get("组织编码")).collect(Collectors.toSet());
+            Set<String> codes = rows.stream().map(row -> normalizeCode(row.get("组织编码"))).collect(Collectors.toSet());
+            Map<String, UserDO> users = userMapper.selectList(null).stream()
+                    .filter(user -> user.getUsername() != null)
+                    .collect(Collectors.toMap(user -> EnterpriseDataMigration.normalizeUsername(user.getUsername()), user -> user, (left, right) -> left));
             for (int i = 0; i < rows.size(); i++) {
                 String parent = rows.get(i).get("父组织编码");
-                if (parent != null && !parent.isBlank() && !codes.contains(parent) && orgUnitMapper.findByCode(parent) == null) errors.add(new ImportRowErrorDTO(i + 2, "父组织编码", "父组织不存在"));
+                if (parent != null && !parent.isBlank() && !codes.contains(normalizeCode(parent)) && orgUnitMapper.findByCode(normalizeCode(parent)) == null) errors.add(new ImportRowErrorDTO(i + 2, "父组织编码", "父组织不存在"));
+                String leader = EnterpriseDataMigration.normalizeUsername(rows.get(i).get("负责人英文名"));
+                if (leader != null && !leader.isBlank()) {
+                    UserDO user = users.get(leader);
+                    if (user == null || UserStatus.DISABLED.name().equals(user.getStatus())) errors.add(new ImportRowErrorDTO(i + 2, "负责人英文名", "负责人不存在或已停用"));
+                }
             }
         } else {
             Set<String> existing = userMapper.selectList(null).stream()
                     .map(user -> EnterpriseDataMigration.normalizeUsername(user.getUsername()))
                     .filter(Objects::nonNull).collect(Collectors.toSet());
             Map<String, OrgUnitDO> orgs = orgUnitMapper.selectList(null).stream()
-                    .collect(Collectors.toMap(OrgUnitDO::getCode, org -> org));
-            Set<String> roleCodes = roleMapper.selectList(null).stream().map(RoleDO::getCode).collect(Collectors.toSet());
-            Set<String> positionCodes = positionMapper.selectList(null).stream().map(PositionDO::getCode).collect(Collectors.toSet());
+                    .collect(Collectors.toMap(org -> normalizeCode(org.getCode()), org -> org));
+            Set<String> roleCodes = roleMapper.selectList(null).stream().map(role -> normalizeCode(role.getCode())).collect(Collectors.toSet());
+            Set<String> positionCodes = positionMapper.selectList(null).stream().map(position -> normalizeCode(position.getCode())).collect(Collectors.toSet());
             Set<String> allUsernames = new HashSet<>(existing);
             rows.stream().map(row -> EnterpriseDataMigration.normalizeUsername(row.get("英文名")))
                     .filter(Objects::nonNull).forEach(allUsernames::add);
@@ -277,11 +304,11 @@ public class EnterpriseImportService {
                 String username = EnterpriseDataMigration.normalizeUsername(row.get("英文名"));
                 if (username != null && existing.contains(username)) errors.add(new ImportRowErrorDTO(i + 2, "英文名", "账号已存在"));
                 String orgCode = row.get("主组织编码");
-                if (orgCode == null || orgCode.isBlank() || !orgs.containsKey(orgCode)) errors.add(new ImportRowErrorDTO(i + 2, "主组织编码", "主组织不存在"));
+                if (orgCode == null || orgCode.isBlank() || !orgs.containsKey(normalizeCode(orgCode)) || !"ACTIVE".equals(orgs.get(normalizeCode(orgCode)).getStatus())) errors.add(new ImportRowErrorDTO(i + 2, "主组织编码", "主组织不存在或已停用"));
                 String positionCode = row.get("岗位编码");
-                if (positionCode != null && !positionCode.isBlank() && !positionCodes.contains(positionCode)) errors.add(new ImportRowErrorDTO(i + 2, "岗位编码", "岗位不存在"));
+                if (positionCode != null && !positionCode.isBlank() && !positionCodes.contains(normalizeCode(positionCode))) errors.add(new ImportRowErrorDTO(i + 2, "岗位编码", "岗位不存在"));
                 String roleCode = row.get("角色编码");
-                if (roleCode != null && !roleCode.isBlank() && !roleCodes.contains(roleCode)) errors.add(new ImportRowErrorDTO(i + 2, "角色编码", "角色不存在"));
+                if (roleCode != null && !roleCode.isBlank() && !roleCodes.contains(normalizeCode(roleCode))) errors.add(new ImportRowErrorDTO(i + 2, "角色编码", "角色不存在"));
                 String manager = EnterpriseDataMigration.normalizeUsername(row.get("直属上级英文名"));
                 if (manager != null && !manager.isBlank() && !allUsernames.contains(manager)) errors.add(new ImportRowErrorDTO(i + 2, "直属上级英文名", "直属上级不存在"));
             }
@@ -290,7 +317,8 @@ public class EnterpriseImportService {
     }
 
     private void validateHeaders(List<String> actual, List<String> expected) {
-        if (new HashSet<>(actual).size() != actual.size() || !actual.containsAll(expected)) throw BusinessException.error("文件表头必须包含: " + String.join(",", expected));
+        List<String> normalized = actual.stream().map(value -> stripBom(trim(value))).collect(Collectors.toList());
+        if (new HashSet<>(normalized).size() != normalized.size() || !normalized.containsAll(expected)) throw BusinessException.error("文件表头必须包含: " + String.join(",", expected));
     }
 
     private String cellValue(Cell cell, boolean header) {
@@ -300,6 +328,16 @@ public class EnterpriseImportService {
     }
 
     private String trim(String value) { return value == null ? "" : value.trim(); }
+    private String stripBom(String value) { return value != null && !value.isEmpty() && value.charAt(0) == '\uFEFF' ? value.substring(1) : value; }
+    private String normalizeCode(String value) { return value == null ? null : value.trim().toUpperCase(Locale.ROOT); }
+    private void ensureRowLimit(int rows) { if (rows > MAX_ROWS) throw BusinessException.error("单个文件最多导入 " + MAX_ROWS + " 行"); }
+    private UserDO findImportLeader(Map<String, UserDO> usersByUsername, String username) {
+        if (username == null || username.isBlank()) return null;
+        UserDO leader = usersByUsername.get(EnterpriseDataMigration.normalizeUsername(username));
+        if (leader == null || UserStatus.DISABLED.name().equals(leader.getStatus())) throw BusinessException.error("负责人不存在或已停用: " + username);
+        if (userPositionMapper.findActiveByUserId(leader.getId()).isEmpty()) throw BusinessException.error("负责人必须有在职任职记录: " + username);
+        return leader;
+    }
     private int parseInt(String value, int fallback) { try { return value == null || value.isBlank() ? fallback : Integer.parseInt(value); } catch (Exception ignored) { return fallback; } }
     private String randomPassword() { byte[] bytes = new byte[18]; random.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
 }
