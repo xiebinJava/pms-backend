@@ -27,6 +27,7 @@ public class RoleService {
     private final RoleOrgScopeMapper roleOrgScopeMapper;
     private final UserRoleMapper userRoleMapper;
     private final UserMapper userMapper;
+    private final OrgUnitMapper orgUnitMapper;
     private final OperationLogService operationLogService;
 
     public List<RoleDTO> list() {
@@ -119,11 +120,20 @@ public class RoleService {
         rolePermissionMapper.deleteByRoleId(role.getId());
         for (String code : Optional.ofNullable(cmd.getPermissionCodes()).orElse(List.of())) {
             PermissionDO permission = permissionMapper.selectOne(new LambdaQueryWrapper<PermissionDO>().eq(PermissionDO::getCode, code));
-            if (permission != null) rolePermissionMapper.insert(role.getId(), permission.getId());
+            if (permission == null) throw BusinessException.error("权限点不存在: " + code);
+            rolePermissionMapper.insert(role.getId(), permission.getId());
         }
         roleOrgScopeMapper.deleteByRoleId(role.getId());
         if (DataScopeType.CUSTOM_ORGS.name().equals(role.getDataScopeType())) {
-            for (Long orgId : Optional.ofNullable(cmd.getCustomOrgUnitIds()).orElse(List.of())) roleOrgScopeMapper.insert(role.getId(), orgId);
+            List<Long> orgIds = Optional.ofNullable(cmd.getCustomOrgUnitIds()).orElse(List.of());
+            if (orgIds.isEmpty()) throw BusinessException.error("自定义组织范围不能为空");
+            for (Long orgId : orgIds) {
+                var org = orgUnitMapper.selectById(orgId);
+                if (org == null || !"ACTIVE".equals(org.getStatus())) {
+                    throw BusinessException.error("自定义组织不存在或已停用: " + orgId);
+                }
+                roleOrgScopeMapper.insert(role.getId(), orgId);
+            }
         }
     }
 
