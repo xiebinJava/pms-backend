@@ -28,7 +28,7 @@ public class PasswordResetService {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
     private final SecureRandom random = new SecureRandom();
 
-    @Value("${pms.auth.password-reset-expose-token:true}")
+    @Value("${pms.auth.password-reset-expose-token:false}")
     private boolean exposeToken;
 
     public PasswordResetService(UserMapper userMapper, PasswordResetTokenMapper tokenMapper,

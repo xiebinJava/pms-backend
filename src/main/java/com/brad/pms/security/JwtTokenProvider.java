@@ -22,6 +22,9 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(@Value("${pms.jwt.secret}") String secret,
                             @Value("${pms.auth.access-expire-minutes:30}") long accessExpireMinutes) {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("PMS_JWT_SECRET 至少需要 32 字节，请通过环境变量配置随机密钥");
+        }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expireMillis = accessExpireMinutes * 60_000L;
     }
