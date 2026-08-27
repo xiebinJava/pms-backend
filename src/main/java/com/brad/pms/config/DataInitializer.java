@@ -68,9 +68,11 @@ public class DataInitializer implements CommandLineRunner {
         UserDO admin = user("admin", "admin123", "管理员", "admin@pms.com");
         admin.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
         userMapper.updateById(admin);
-        UserDO zhang = user("zhangsan", "admin123", "张三", "zhangsan@pms.com");
-        UserDO li = user("lisi", "admin123", "李四", "lisi@pms.com");
-        UserDO wang = user("wangwu", "admin123", "王五", "wangwu@pms.com");
+        List<UserDO> demoUsers = createDemoUsers();
+        UserDO brad = demoUsers.get(0);
+        UserDO terry = demoUsers.get(1);
+        UserDO kevin = demoUsers.get(2);
+        UserDO claire = demoUsers.get(3);
 
         ProjectDO p1 = new ProjectDO();
         p1.setName("开源项目管理平台");
@@ -92,8 +94,8 @@ public class DataInitializer implements CommandLineRunner {
         p2.setDescription("对现有电商中台进行服务化改造与性能优化。");
         p2.setStatus(0);
         p2.setPriority(1);
-        p2.setOwnerId(zhang.getId());
-        p2.setCreatedBy(zhang.getId());
+        p2.setOwnerId(terry.getId());
+        p2.setCreatedBy(terry.getId());
         p2.setStartDate(LocalDate.now().plusDays(10));
         p2.setEndDate(LocalDate.now().plusDays(120));
         p2.setProgress(0);
@@ -102,11 +104,11 @@ public class DataInitializer implements CommandLineRunner {
         nodeService.initDefault(p2.getId());
 
         member(p1.getId(), admin.getId(), 0);
-        member(p1.getId(), zhang.getId(), 1);
-        member(p1.getId(), li.getId(), 2);
-        member(p1.getId(), wang.getId(), 2);
-        member(p2.getId(), zhang.getId(), 0);
-        member(p2.getId(), li.getId(), 1);
+        member(p1.getId(), brad.getId(), 1);
+        member(p1.getId(), terry.getId(), 2);
+        member(p1.getId(), kevin.getId(), 2);
+        member(p2.getId(), terry.getId(), 0);
+        member(p2.getId(), claire.getId(), 1);
 
         ProjectMilestoneDO m1 = new ProjectMilestoneDO();
         m1.setProjectId(p1.getId());
@@ -125,10 +127,10 @@ public class DataInitializer implements CommandLineRunner {
         milestoneMapper.insert(m2);
 
         task(p1.getId(), nodeId(p1Nodes, "kickoff"), "立项材料评审", "确认目标、范围与资源授权", 2, 2, admin.getId(), null, 1);
-        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, zhang.getId(), null, 2);
-        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, wang.getId(), null, 3);
-        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, zhang.getId(), m1.getId(), 4);
-        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, li.getId(), m1.getId(), 5);
+        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, terry.getId(), null, 2);
+        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, kevin.getId(), null, 3);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, terry.getId(), m1.getId(), 4);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, claire.getId(), m1.getId(), 5);
         task(p1.getId(), nodeId(p1Nodes, "knowledge"), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), m2.getId(), 6);
 
         ProjectCommentDO c1 = new ProjectCommentDO();
@@ -153,6 +155,20 @@ public class DataInitializer implements CommandLineRunner {
         user.setPasswordChangedAt(java.time.LocalDateTime.now());
         userMapper.insert(user);
         return user;
+    }
+
+    private List<UserDO> createDemoUsers() {
+        String[][] seeds = {
+                {"谢斌", "Brad.Xie"}, {"李强", "Terry.Li"}, {"周岚", "Linda.Zhou"}, {"陈宇", "Kevin.Chen"},
+                {"王璇", "Claire.Wang"}, {"赵晨", "Ethan.Zhao"}, {"刘洋", "Andy.Liu"}, {"孙悦", "Nina.Sun"},
+                {"黄凯", "Kyle.Huang"}, {"吴倩", "Grace.Wu"}, {"徐凡", "Frank.Xu"}, {"何敏", "Mia.He"},
+                {"高远", "Owen.Gao"}, {"郑琳", "Alice.Zheng"}, {"林浩", "Leo.Lin"}, {"郭婷", "Tina.Guo"},
+                {"唐杰", "Jason.Tang"}, {"沈薇", "Vivian.Shen"}, {"彭博", "Eric.Peng"}, {"宋妍", "Yuki.Song"}
+        };
+        return java.util.Arrays.stream(seeds)
+                .map(seed -> user(seed[1], "admin123", seed[0],
+                        EnterpriseDataMigration.normalizeUsername(seed[1]) + "@pms.com"))
+                .toList();
     }
 
     private boolean isPersistentProfile() {
