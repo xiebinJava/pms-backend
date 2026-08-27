@@ -46,6 +46,7 @@ pms:
     # Development fallback returns a copyable URL. Set false in production and
     # provide a PasswordResetNotifier bean (mail/Feishu/WeCom integration).
     password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:false}
+    invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:false}
   security:
     cors:
       allowed-origins: ${PMS_CORS_ALLOWED_ORIGINS:http://localhost:57979,http://127.0.0.1:57979}

@@ -6,10 +6,12 @@ import com.brad.pms.dto.request.RefreshTokenRequest;
 import com.brad.pms.dto.request.ActivationRequest;
 import com.brad.pms.dto.request.PasswordResetRequest;
 import com.brad.pms.dto.request.PasswordResetConfirmRequest;
+import com.brad.pms.dto.request.PasswordChangeRequest;
 import com.brad.pms.dto.response.ResetTokenResponse;
 import com.brad.pms.dto.response.LoginResponse;
 import com.brad.pms.dto.response.UserDTO;
 import com.brad.pms.security.IgnoreAuth;
+import com.brad.pms.security.UserContext;
 import com.brad.pms.service.AuthService;
 import com.brad.pms.service.InvitationService;
 import com.brad.pms.service.PasswordResetService;
@@ -57,14 +59,21 @@ public class AuthController {
                 }
             }
         }
-        LoginResponse response = authService.refresh(token);
+        LoginResponse response = authService.refresh(token, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         setRefreshCookie(httpResponse, response.getRefreshToken(), httpRequest.isSecure());
         return ResponseResult.success(response);
     }
 
     @PostMapping("/logout")
     public ResponseResult<Void> logout() {
-        authService.revokeAllSessions(com.brad.pms.security.UserContext.userId(), "USER_LOGOUT");
+        var current = UserContext.get();
+        authService.revokeSession(UserContext.userId(), current == null ? null : current.getSessionId(), "USER_LOGOUT");
+        return ResponseResult.success();
+    }
+
+    @PostMapping("/password/change")
+    public ResponseResult<Void> changePassword(@Validated @RequestBody PasswordChangeRequest request) {
+        authService.changePassword(request);
         return ResponseResult.success();
     }
 

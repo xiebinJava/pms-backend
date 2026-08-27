@@ -15,4 +15,14 @@ public interface AuthSessionMapper extends BaseMapper<AuthSessionDO> {
 
     @Update("UPDATE sys_auth_session SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = #{reason} WHERE user_id = #{userId} AND revoked_at IS NULL")
     int revokeAllByUserId(@Param("userId") Long userId, @Param("reason") String reason);
+
+    @Update("UPDATE sys_auth_session SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = #{reason} "
+            + "WHERE id = #{id} AND user_id = #{userId} AND refresh_token_hash = #{hash} "
+            + "AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP")
+    int revokeForRotation(@Param("id") Long id, @Param("userId") Long userId,
+                          @Param("hash") String hash, @Param("reason") String reason);
+
+    @Update("UPDATE sys_auth_session SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = #{reason} "
+            + "WHERE id = #{id} AND user_id = #{userId} AND revoked_at IS NULL")
+    int revokeById(@Param("id") Long id, @Param("userId") Long userId, @Param("reason") String reason);
 }

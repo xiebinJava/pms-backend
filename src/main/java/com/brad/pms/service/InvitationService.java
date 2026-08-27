@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -31,8 +33,12 @@ public class InvitationService {
     private final UserPositionMapper userPositionMapper;
     private final AuthService authService;
     private final OperationLogService operationLogService;
+    private final ObjectProvider<InvitationNotifier> notifierProvider;
     private final SecureRandom random = new SecureRandom();
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+
+    @Value("${pms.auth.invitation-expose-token:false}")
+    private boolean exposeToken;
 
     @Transactional
     public InvitationResponse invite(UserInviteCmd cmd) {
@@ -81,8 +87,15 @@ public class InvitationService {
         invitation.setStatus("PENDING");
         invitation.setCreatedBy(UserContext.userId());
         invitationMapper.insert(invitation);
+        String activationUrl = "/auth/activate?token=" + raw;
+        InvitationNotifier notifier = notifierProvider.getIfAvailable();
+        if (notifier != null) {
+            notifier.send(user, activationUrl, invitation.getExpiresAt());
+        } else if (!exposeToken) {
+            throw BusinessException.error("未配置账号邀请通知器，暂不能发出激活链接");
+        }
         operationLogService.record("USER_INVITED", "USER", user.getId(), null, java.util.Map.of("username", user.getUsername(), "nameZh", user.getNameZh()));
-        return new InvitationResponse(user.getId(), "/auth/activate?token=" + raw, invitation.getExpiresAt().toString());
+        return new InvitationResponse(user.getId(), exposeToken ? activationUrl : "", invitation.getExpiresAt().toString());
     }
 
     @Transactional

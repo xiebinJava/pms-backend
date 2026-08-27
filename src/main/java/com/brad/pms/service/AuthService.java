@@ -5,6 +5,7 @@ import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.config.EnterpriseDataMigration;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.LoginRequest;
+import com.brad.pms.dto.request.PasswordChangeRequest;
 import com.brad.pms.dto.response.LoginResponse;
 import com.brad.pms.dto.response.UserDTO;
 import com.brad.pms.entity.AuthSessionDO;
@@ -105,9 +106,15 @@ public class AuthService {
 
     @Transactional
     public LoginResponse refresh(String refreshToken) {
+        return refresh(refreshToken, null, null);
+    }
+
+    @Transactional(noRollbackFor = BusinessException.class)
+    public LoginResponse refresh(String refreshToken, String ip, String userAgent) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw BusinessException.unauthorized("刷新令牌不能为空");
         }
+        String oldHash = sha256(refreshToken);
         AuthSessionDO session = authSessionMapper.findByRefreshTokenHash(sha256(refreshToken));
         if (session == null || session.getRevokedAt() != null || session.getExpiresAt() == null
                 || session.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -117,11 +124,52 @@ public class AuthService {
         if (user == null || !UserStatus.ACTIVE.name().equals(user.getStatus())) {
             throw BusinessException.unauthorized("账号不可用");
         }
+        LocalDateTime now = LocalDateTime.now();
+        if (authSessionMapper.revokeForRotation(session.getId(), user.getId(), oldHash, "REFRESH_ROTATED") != 1) {
+            throw BusinessException.unauthorized("刷新令牌已失效");
+        }
+        String rotatedRefreshToken = randomToken();
+        AuthSessionDO rotated = new AuthSessionDO();
+        rotated.setUserId(user.getId());
+        rotated.setRefreshTokenHash(sha256(rotatedRefreshToken));
+        rotated.setExpiresAt(now.plusDays(refreshExpireDays));
+        rotated.setIp(ip == null ? session.getIp() : ip);
+        rotated.setUserAgent(userAgent == null ? session.getUserAgent() : truncate(userAgent, 500));
+        authSessionMapper.insert(rotated);
         LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname(), user.getSystemRole(),
-                user.getNameZh(), Convertors.userDisplayName(user), session.getId());
+                user.getNameZh(), Convertors.userDisplayName(user), rotated.getId());
         UserDTO dto = Convertors.toUser(user);
         dto.setPermissionCodes(authorizationService.effectivePermissionCodes(user.getId()));
-        return new LoginResponse(tokenProvider.createToken(loginUser), refreshToken, dto);
+        return new LoginResponse(tokenProvider.createToken(loginUser), rotatedRefreshToken, dto);
+    }
+
+    @Transactional
+    public void revokeSession(Long userId, Long sessionId, String reason) {
+        if (userId != null && sessionId != null) {
+            authSessionMapper.revokeById(sessionId, userId, reason == null ? "REVOKED" : reason);
+        }
+    }
+
+    @Transactional
+    public void changePassword(PasswordChangeRequest request) {
+        Long userId = UserContext.userId();
+        UserDO user = userMapper.selectById(userId);
+        if (user == null || !UserStatus.ACTIVE.name().equals(user.getStatus())) {
+            throw BusinessException.unauthorized("账号不可用");
+        }
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw BusinessException.error("当前密码不正确");
+        }
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw BusinessException.error("新密码不能与当前密码相同");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordChangedAt(LocalDateTime.now());
+        user.setFailedLoginCount(0);
+        user.setLockedUntil(null);
+        user.setStatus(UserStatus.ACTIVE.name());
+        userMapper.updateById(user);
+        revokeAllSessions(userId, "PASSWORD_CHANGED");
     }
 
     @Transactional

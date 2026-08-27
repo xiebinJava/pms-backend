@@ -21,3 +21,4 @@ pms:
     max-failed-logins: ${PMS_MAX_FAILED_LOGINS:5}
     lock-minutes: ${PMS_LOCK_MINUTES:15}
     password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:true}
+    invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:true}
