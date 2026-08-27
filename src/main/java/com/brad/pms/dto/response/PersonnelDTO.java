@@ -17,6 +17,8 @@ public class PersonnelDTO {
     private String primaryOrgName;
     private Long primaryOrgUnitId;
     private String primaryPositionName;
+    private List<Long> partTimePositionIds = new ArrayList<>();
+    private List<Long> partTimeOrgUnitIds = new ArrayList<>();
     private List<String> roles = new ArrayList<>();
     private List<String> partTimeOrgNames = new ArrayList<>();
 }

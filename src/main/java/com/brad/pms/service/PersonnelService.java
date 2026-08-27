@@ -66,6 +66,21 @@ public class PersonnelService {
     }
 
     @Transactional
+    public void removePartTimePosition(Long userId, Long positionId) {
+        requireUser(userId);
+        UserPositionDO position = userPositionMapper.selectById(positionId);
+        if (position == null || !Objects.equals(position.getUserId(), userId)
+                || Boolean.TRUE.equals(position.getIsPrimary()) || !"ACTIVE".equals(position.getStatus())) {
+            throw BusinessException.error("兼职归属不存在或不可移除");
+        }
+        position.setStatus("ENDED");
+        position.setEndDate(LocalDate.now());
+        userPositionMapper.updateById(position);
+        operationLogService.record("USER_PART_TIME_POSITION_REMOVED", "USER", userId,
+                Map.of("positionId", positionId, "orgUnitId", position.getOrgUnitId()), null);
+    }
+
+    @Transactional
     public void disable(Long userId, UserDisableCmd cmd) {
         UserDO user = requireUser(userId);
         if (user.getSystemRole() != null && user.getSystemRole() == 1
@@ -134,7 +149,11 @@ public class PersonnelService {
         for (UserPositionDO position : positions) {
             if (!Boolean.TRUE.equals(position.getIsPrimary())) {
                 OrgUnitDO org = orgUnitMapper.selectById(position.getOrgUnitId());
-                if (org != null) dto.getPartTimeOrgNames().add(org.getName());
+                if (org != null) {
+                    dto.getPartTimePositionIds().add(position.getId());
+                    dto.getPartTimeOrgUnitIds().add(org.getId());
+                    dto.getPartTimeOrgNames().add(org.getName());
+                }
             }
         }
         for (UserRoleDO grant : userRoleMapper.findLiveByUserId(user.getId())) {

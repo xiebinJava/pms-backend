@@ -51,6 +51,13 @@ public class AdminUserController {
         return ResponseResult.success();
     }
 
+    @DeleteMapping("/{id}/part-time-positions/{positionId}")
+    @RequirePermission(PermissionCode.USER_WRITE)
+    public ResponseResult<Void> removePartTime(@PathVariable Long id, @PathVariable Long positionId) {
+        personnelService.removePartTimePosition(id, positionId);
+        return ResponseResult.success();
+    }
+
     @PostMapping("/{id}/roles/{roleId}")
     @RequirePermission(PermissionCode.USER_WRITE)
     public ResponseResult<Void> assignRole(@PathVariable Long id, @PathVariable Long roleId) {
