@@ -3,5 +3,9 @@
 target
 *.log
 .env*
+uploads
+*.pem
+*.key
+*.p12
 docs
 src/test

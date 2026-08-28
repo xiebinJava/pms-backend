@@ -80,7 +80,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 `PMS_JWT_SECRET` 至少需要 32 字节随机值；缺失或过短时后端会拒绝启动。
 
-关闭后必须提供 `PasswordResetNotifier` Spring Bean，将重置链接投递到企业邮箱、飞书或企业微信；当前仓库只提供通知扩展点，不内置 SMTP 凭据。
+关闭后必须提供 `PasswordResetNotifier` Spring Bean，将重置链接投递到企业邮箱、飞书或企业微信；当前仓库提供 SMTP 实现和通知扩展点，不内置 SMTP 凭据。生产 SMTP 必须使用 HTTPS 的 `PMS_PUBLIC_BASE_URL`，并在启动检查中验证主机、端口、认证凭据和发件人。
 
 ## 5. 组织、权限与导入上线顺序
 
@@ -119,3 +119,8 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 发布前的完整代码、迁移、安全、浏览器冒烟与回滚清单见
 [`release-checklist.md`](release-checklist.md)。
+
+容器运行时默认使用后端 UID 10001、非 root Nginx、只读根文件系统、独立上传卷和
+`no-new-privileges`；后端与前端只有在健康检查通过后才被 Compose 视为可用。生产部署应
+根据机器容量调整 `mem_limit`/`cpus`，并通过反向代理提供 HTTPS。Nginx 仅在请求的
+`X-Forwarded-Proto` 为 `https` 时发送 HSTS，HTTP 本地调试不会写入 HSTS。

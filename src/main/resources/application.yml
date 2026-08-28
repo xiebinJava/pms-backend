@@ -60,7 +60,7 @@ pms:
     password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:false}
     invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:false}
   notification:
-    startup-check-enabled: ${PMS_NOTIFICATION_STARTUP_CHECK:false}
+    startup-check-enabled: ${PMS_NOTIFICATION_STARTUP_CHECK:true}
     mail:
       enabled: ${PMS_MAIL_ENABLED:false}
       base-url: ${PMS_PUBLIC_BASE_URL:http://localhost:57979}

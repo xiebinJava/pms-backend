@@ -11,7 +11,9 @@ spring:
     locations: classpath:db/migration
 
 pms:
-  upload-dir: ${PMS_UPLOAD_DIR:./uploads}
+  upload-dir: ${PMS_UPLOAD_DIR:/tmp/pms-test-uploads}
+  notification:
+    startup-check-enabled: false
   jwt:
     secret: ${PMS_JWT_SECRET:pms-open-source-test-secret-please-override-2026}
     expire-hours: 168

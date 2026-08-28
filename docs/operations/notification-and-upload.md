@@ -17,9 +17,9 @@ export PMS_PASSWORD_RESET_EXPOSE_TOKEN=false
 export PMS_INVITATION_EXPOSE_TOKEN=false
 ```
 
-启动检查开启后，如果找回密码或邀请没有通知器，或者 SMTP 主机/发件人缺失，后端会在启动阶段失败，避免生成无法送达的令牌。未知账号的找回请求仍返回通用结果，不泄露账号是否存在。邮件正文和日志不会输出令牌哈希或密码。
+生产配置默认开启启动检查；如果找回密码或邀请没有通知器，或者 SMTP 主机、端口、认证凭据、发件人缺失，后端会在启动阶段失败，避免生成无法送达的令牌。生产 SMTP 的 `PMS_PUBLIC_BASE_URL` 必须是 HTTPS 绝对地址。未知账号的找回请求仍返回通用结果，不泄露账号是否存在。邮件正文和日志不会输出令牌哈希或密码。
 
-开发环境若确实没有邮件服务，可保持启动检查关闭，并显式设置 `PMS_PASSWORD_RESET_EXPOSE_TOKEN=true` / `PMS_INVITATION_EXPOSE_TOKEN=true`，只在本地调试使用。
+开发环境若确实没有邮件服务，可显式设置 `PMS_NOTIFICATION_STARTUP_CHECK=false`，并设置 `PMS_PASSWORD_RESET_EXPOSE_TOKEN=true` / `PMS_INVITATION_EXPOSE_TOKEN=true`，只在本地调试使用。
 
 ## 文件上传
 
@@ -29,6 +29,7 @@ export PMS_INVITATION_EXPOSE_TOKEN=false
 - 单文件不超过 5MB；目录总配额由 `PMS_UPLOAD_QUOTA_BYTES` 控制，默认 500MB。
 - 原始文件名只用于界面展示，存储键使用随机 UUID，不会写入路径；读取时拒绝路径穿越。
 - 默认目录为 `/var/lib/pms/uploads`，Compose 使用独立 `pms-uploads` 持久卷；容器重建不会丢失图片。
+- `pms-uploads` 卷必须纳入宿主机/卷级备份；数据库恢复和图片卷恢复应作为同一批次演练，否则图片 URL 可能存在但文件缺失。
 
 对象存储接入时只需实现 `FileStorageService` 并替换本地 Bean，无需修改项目图片接口。
 
@@ -38,3 +39,4 @@ export PMS_INVITATION_EXPOSE_TOKEN=false
 2. 容器重建后访问一张旧图片，确认持久卷可见。
 3. 上传伪造 MIME、双扩展名、路径穿越和超配额文件，均应返回安全业务错误，不返回服务器真实路径。
 4. SMTP 配置变更后重启后端，确认通知器启动检查通过，再执行邀请和密码重置演练。
+5. 备份时同步快照 `pms-uploads` 卷；恢复到临时环境后同时校验数据库记录和图片可读性。

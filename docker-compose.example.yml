@@ -13,6 +13,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: "2.0"
 
   accounts-init:
     image: mysql:8.4
@@ -32,6 +35,10 @@ services:
       - ./docker/oceanbase-accounts-init.sh:/usr/local/bin/oceanbase-accounts-init.sh:ro
     entrypoint: ["/bin/sh", "/usr/local/bin/oceanbase-accounts-init.sh"]
     restart: "no"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: "0.5"
 
   schema-init:
     image: mysql:8.4
@@ -51,6 +58,10 @@ services:
       - ./src/main/resources/db/migration:/migrations:ro
     entrypoint: ["/bin/sh", "/usr/local/bin/oceanbase-init.sh"]
     restart: "no"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: "0.5"
 
   backend:
     build:
@@ -59,6 +70,14 @@ services:
     depends_on:
       schema-init:
         condition: service_completed_successfully
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    cpus: "1.0"
     environment:
       OCEANBASE_HOST: oceanbase
       OCEANBASE_PORT: 2881
@@ -69,7 +88,7 @@ services:
       PMS_CORS_ALLOWED_ORIGINS: ${PMS_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       PMS_UPLOAD_DIR: /var/lib/pms/uploads
       PMS_UPLOAD_QUOTA_BYTES: ${PMS_UPLOAD_QUOTA_BYTES:-524288000}
-      PMS_NOTIFICATION_STARTUP_CHECK: ${PMS_NOTIFICATION_STARTUP_CHECK:-false}
+      PMS_NOTIFICATION_STARTUP_CHECK: ${PMS_NOTIFICATION_STARTUP_CHECK:-true}
       PMS_MAIL_ENABLED: ${PMS_MAIL_ENABLED:-false}
       PMS_MAIL_HOST: ${PMS_MAIL_HOST:-}
       PMS_MAIL_PORT: ${PMS_MAIL_PORT:-587}
@@ -81,15 +100,37 @@ services:
       - "8080:8080"
     volumes:
       - pms-uploads:/var/lib/pms/uploads
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck-backend.sh"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
 
   frontend:
     build:
       context: ../pms-front
       dockerfile: Dockerfile
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m
+      - /var/run:rw,noexec,nosuid,size=1m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: "0.5"
     ports:
-      - "5173:80"
+      - "5173:8080"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck-frontend.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   oceanbase-data:

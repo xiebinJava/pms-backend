@@ -70,5 +70,16 @@ class LocalFileStorageServiceTest {
 
         assertThatThrownBy(() -> service.load("../secret.png"))
                 .hasMessageContaining("文件不存在");
+        assertThatThrownBy(() -> service.load("bad\u0000key.png"))
+                .hasMessageContaining("文件不存在");
+    }
+
+    @Test
+    void rejectsRelativeOrApplicationDirectoryUploadRoots(@TempDir Path tempDir) {
+        assertThatThrownBy(() -> new LocalFileStorageService(Path.of("uploads"), 1024))
+                .hasMessageContaining("absolute path");
+        assertThatThrownBy(() -> new LocalFileStorageService(
+                Path.of(System.getProperty("user.dir"), "uploads"), 1024))
+                .hasMessageContaining("application directory");
     }
 }

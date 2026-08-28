@@ -253,11 +253,11 @@
 
 - [x] **Step 1: 写上传安全测试**
 
-  覆盖伪造 MIME、双扩展名、路径穿越、超 5MB、超过用户配额、空文件和正常 PNG/JPEG；断言原始文件名不会成为存储路径，响应不返回服务器真实路径。
+  覆盖伪造 MIME、双扩展名、路径穿越、超 5MB、超过部署实例目录配额、空文件和正常 PNG/JPEG；断言原始文件名不会成为存储路径，响应不返回服务器真实路径。
 
 - [x] **Step 2: 抽象并实现文件存储**
 
-  使用随机 UUID 文件名和白名单扩展名，读取文件魔数确认类型；本地模式写入 `${PMS_UPLOAD_DIR}`，禁止写入应用工作目录；为 Compose 增加独立 `pms-uploads` 持久卷，并提供后续对象存储实现接口。
+  使用随机 UUID 文件名和白名单扩展名，读取文件魔数确认类型；本地模式写入 `${PMS_UPLOAD_DIR}`，要求绝对路径且禁止写入应用工作目录；以文件锁保护部署实例目录配额并在失败时清理临时文件；为 Compose 增加独立 `pms-uploads` 持久卷，并提供后续对象存储实现接口。
 
 - [x] **Step 3: 接入通知器**
 
@@ -298,23 +298,23 @@
 - Consumes: 后端 `/api/health`、前端 Nginx、OceanBase 健康检查和现有 Compose 服务。
 - Produces: 可观察、可自动恢复、默认最小权限的服务栈。
 
-- [ ] **Step 1: 固定镜像和构建上下文**
+- [x] **Step 1: 固定镜像和构建上下文**
 
-  为 OceanBase、MySQL 工具、Java runtime、Node build 和 Nginx 记录可更新的版本清单，并在发布配置中使用 digest；构建阶段不得复制 `.env`、`.git`、`target`、`dist` 和上传文件。
+  为 OceanBase、MySQL 工具、Java runtime、Node build 和 Nginx 记录可更新的固定版本标签；发布 CI 再将标签解析并锁定 digest。构建阶段不得复制 `.env`、`.git`、`target`、`dist` 和上传文件。
 
-- [ ] **Step 2: 增加健康检查和恢复策略**
+- [x] **Step 2: 增加健康检查和恢复策略**
 
   为 backend、frontend、schema-init 增加 healthcheck 或成功条件；backend/frontend 设置合理的 `restart: unless-stopped`，schema-init 保持 `restart: "no"`；backend 只有在 schema-init 成功并且 `/api/health` 为 UP 后才对外服务。
 
-- [ ] **Step 3: 加固容器权限和资源**
+- [x] **Step 3: 加固容器权限和资源**
 
   前端 Nginx 使用非 root 用户和可写临时目录；Compose 设置 `cap_drop: [ALL]`、`no-new-privileges`、CPU/内存上限和只读根文件系统（上传卷和 Nginx 临时目录显式可写）。
 
-- [ ] **Step 4: 增加边缘安全头和代理限制**
+- [x] **Step 4: 增加边缘安全头和代理限制**
 
   Nginx 增加 `X-Content-Type-Options`、`Referrer-Policy`、`Content-Security-Policy`、`Strict-Transport-Security`（仅 HTTPS 环境）、请求体上限、连接/读取超时和静态资源缓存策略；生产 CORS 只允许显式来源。
 
-- [ ] **Step 5: 验证容器**
+- [x] **Step 5: 验证容器**
 
   ```bash
   OCEANBASE_PASSWORD="$OCEANBASE_ROOT_PASSWORD" \
@@ -326,7 +326,7 @@
 
   Review 镜像中无密码、JWT、Git 历史和上传文件，容器以非 root 运行，服务重启后数据和上传文件仍存在。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add Dockerfile docker-compose.example.yml docker docs/operations/enterprise-upgrade-runbook.md

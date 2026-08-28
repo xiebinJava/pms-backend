@@ -61,6 +61,10 @@ export PMS_BACKUP_DIR=/var/backups/pms
 ./scripts/verify-backup.sh /var/backups/pms/brad_pms-<UTC时间>-v5.sql.gz
 ```
 
+项目图片不在数据库备份文件中。生产环境还必须对 Compose 的 `pms-uploads` 卷或
+`PMS_UPLOAD_DIR` 对应目录做同一时间点的文件级/卷级快照，并记录快照 ID；数据库和图片卷必须成对恢复。
+恢复演练时把卷挂载到临时环境，再用图片 URL 抽样确认文件可读。
+
 ## 恢复演练与回滚
 
 恢复只接受显式的空目标库，避免覆盖现有业务数据。先由 DBA 创建临时库并授权 `pms_migrator`，再执行：

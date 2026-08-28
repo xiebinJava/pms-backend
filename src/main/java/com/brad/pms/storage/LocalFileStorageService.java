@@ -10,8 +10,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -37,7 +40,14 @@ public class LocalFileStorageService implements FileStorageService {
         if (quotaBytes < 1) {
             throw new IllegalArgumentException("upload quota must be positive");
         }
+        if (uploadDir == null || !uploadDir.isAbsolute()) {
+            throw new IllegalArgumentException("upload directory must be an absolute path outside the application directory");
+        }
         this.root = uploadDir.toAbsolutePath().normalize();
+        Path workingDirectory = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        if (root.equals(workingDirectory) || root.startsWith(workingDirectory)) {
+            throw new IllegalArgumentException("upload directory must be outside the application directory");
+        }
         this.quotaBytes = quotaBytes;
     }
 
@@ -50,17 +60,31 @@ public class LocalFileStorageService implements FileStorageService {
         if (!IMAGE_TYPES.contains(actualType) || !actualType.equals(declaredType)) {
             throw BusinessException.error("文件类型与图片内容不匹配");
         }
-        if (directorySize() + file.getSize() > quotaBytes) {
-            throw BusinessException.error("上传空间已超过配额");
-        }
-
         String key = UUID.randomUUID() + extensionOf(actualType);
         try {
             Files.createDirectories(root);
-            Path target = root.resolve(key).normalize();
-            if (!target.startsWith(root)) throw new IOException("invalid storage key");
-            try (InputStream input = file.getInputStream()) {
-                Files.copy(input, target);
+            Path lockPath = root.resolve(".quota.lock");
+            try (FileChannel lockChannel = FileChannel.open(lockPath, java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.WRITE);
+                 FileLock ignored = lockChannel.lock()) {
+                if (directorySize() > quotaBytes - file.getSize()) {
+                    throw BusinessException.error("上传空间已超过配额");
+                }
+                Path target = root.resolve(key).normalize();
+                if (!target.startsWith(root)) throw new IOException("invalid storage key");
+                Path temporary = Files.createTempFile(root, ".upload-", ".tmp");
+                try {
+                    try (InputStream input = file.getInputStream()) {
+                        Files.copy(input, temporary, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    try {
+                        Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                    } catch (java.nio.file.AtomicMoveNotSupportedException ex) {
+                        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } finally {
+                    Files.deleteIfExists(temporary);
+                }
             }
             return new StoredFile(key, file.getOriginalFilename(), actualType, file.getSize());
         } catch (IOException ex) {
@@ -70,7 +94,7 @@ public class LocalFileStorageService implements FileStorageService {
 
     @Override
     public Resource load(String key) {
-        if (key == null || key.isBlank() || key.contains("/") || key.contains("\\")) {
+        if (key == null || key.isBlank() || key.contains("/") || key.contains("\\") || key.indexOf('\0') >= 0) {
             throw BusinessException.error("文件不存在");
         }
         Path target = root.resolve(key).normalize();
@@ -101,10 +125,12 @@ public class LocalFileStorageService implements FileStorageService {
     private long directorySize() {
         if (!Files.isDirectory(root)) return 0L;
         try (Stream<Path> files = Files.list(root)) {
-            return files.filter(Files::isRegularFile).mapToLong(path -> {
-                try { return Files.size(path); } catch (IOException ex) { return 0L; }
-            }).sum();
-        } catch (IOException ex) {
+            long total = 0L;
+            for (Path path : (Iterable<Path>) files::iterator) {
+                if (Files.isRegularFile(path)) total = Math.addExact(total, Files.size(path));
+            }
+            return total;
+        } catch (IOException | ArithmeticException ex) {
             throw BusinessException.error("无法读取上传空间");
         }
     }

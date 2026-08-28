@@ -20,6 +20,11 @@ public class NotificationConfigurationValidator implements ApplicationRunner {
     private final boolean mailEnabled;
     private final String mailHost;
     private final String mailFrom;
+    private final int mailPort;
+    private final boolean mailSmtpAuth;
+    private final String mailUsername;
+    private final String mailPassword;
+    private final String publicBaseUrl;
 
     public NotificationConfigurationValidator(
             ObjectProvider<PasswordResetNotifier> resetNotifiers,
@@ -29,7 +34,12 @@ public class NotificationConfigurationValidator implements ApplicationRunner {
             @Value("${pms.auth.invitation-expose-token:false}") boolean invitationTokenExposed,
             @Value("${pms.notification.mail.enabled:false}") boolean mailEnabled,
             @Value("${spring.mail.host:}") String mailHost,
-            @Value("${pms.notification.mail.from:}") String mailFrom) {
+            @Value("${pms.notification.mail.from:}") String mailFrom,
+            @Value("${spring.mail.port:587}") int mailPort,
+            @Value("${spring.mail.properties.mail.smtp.auth:true}") boolean mailSmtpAuth,
+            @Value("${spring.mail.username:}") String mailUsername,
+            @Value("${spring.mail.password:}") String mailPassword,
+            @Value("${pms.notification.mail.base-url:}") String publicBaseUrl) {
         this.resetNotifiers = resetNotifiers;
         this.invitationNotifiers = invitationNotifiers;
         this.startupCheckEnabled = startupCheckEnabled;
@@ -38,13 +48,24 @@ public class NotificationConfigurationValidator implements ApplicationRunner {
         this.mailEnabled = mailEnabled;
         this.mailHost = mailHost;
         this.mailFrom = mailFrom;
+        this.mailPort = mailPort;
+        this.mailSmtpAuth = mailSmtpAuth;
+        this.mailUsername = mailUsername;
+        this.mailPassword = mailPassword;
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         if (!startupCheckEnabled) return;
-        if (mailEnabled && (mailHost == null || mailHost.isBlank() || mailFrom == null || mailFrom.isBlank())) {
+        if (mailEnabled && (mailHost == null || mailHost.isBlank() || mailFrom == null || mailFrom.isBlank()
+                || mailPort < 1 || mailPort > 65535
+                || (mailSmtpAuth && (mailUsername == null || mailUsername.isBlank()
+                || mailPassword == null || mailPassword.isBlank())))) {
             throw new IllegalStateException("已启用 SMTP 通知，但未配置 PMS_MAIL_HOST 或 PMS_MAIL_FROM");
+        }
+        if (mailEnabled && !isHttpsUrl(publicBaseUrl)) {
+            throw new IllegalStateException("生产 SMTP 通知必须配置 HTTPS 的 PMS_PUBLIC_BASE_URL");
         }
         if (!resetTokenExposed && resetNotifiers.getIfAvailable() == null) {
             throw new IllegalStateException("已启用生产通知检查，但未配置密码重置通知器");
@@ -52,5 +73,9 @@ public class NotificationConfigurationValidator implements ApplicationRunner {
         if (!invitationTokenExposed && invitationNotifiers.getIfAvailable() == null) {
             throw new IllegalStateException("已启用生产通知检查，但未配置账号邀请通知器");
         }
+    }
+
+    private boolean isHttpsUrl(String value) {
+        return value != null && value.startsWith("https://") && value.length() > "https://".length();
     }
 }

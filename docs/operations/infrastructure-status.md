@@ -21,7 +21,6 @@
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
-| P1 | Compose 缺少完整健康检查、资源限制和前端非 root | 故障恢复和运行隔离能力不足 |
 | P1 | 无结构化日志、指标、告警和审计清理策略 | 问题定位和长期存储成本不可控 |
 | P1 | 无 OpenAPI、真实 OceanBase 集成 CI、E2E、镜像扫描和 SBOM | 开源交付缺少自动质量门禁 |
 | P2 | 尚未规划 Spring Boot 3/Java 21 升级 | 长期维护成本较高，但不是当前发布阻塞项 |
@@ -54,3 +53,4 @@
 | Task 2：OceanBase 备份、恢复与版本升级 | 已完成 | 升级脚本 V1–V5 首次记录、逐语句检查点、命名锁、备份 gzip/SHA-256、隔离库恢复和 `verify-enterprise-migration.sh` 均通过；提交 `246fe4c`、复核修正 `b318a9a`。 |
 | Task 3：统一安全边界、错误响应和请求链路 | 已完成 | 后端全量测试、前端 79 项 Node 测试、`pnpm typecheck`、`pnpm build` 通过；覆盖 400/401/403/409/422/500/429、requestId、刷新失败跳转、代理转发和敏感接口限流；提交见安全边界提交。 |
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
+| Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限和安全响应头已接入。 |
