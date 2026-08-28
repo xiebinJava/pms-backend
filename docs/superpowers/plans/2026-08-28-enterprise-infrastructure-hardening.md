@@ -163,7 +163,7 @@
 
   在 `docker compose` 中以 `pms_migrator` 执行 V1–V5，随后运行 preflight、行数、外键、唯一索引、软删除列和根组织检查；同一升级命令连续运行两次，第二次必须报告“无待执行版本”。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   mvn -q -Dtest=OceanbaseSqlImporterTest,OceanbaseUpgradeScriptTest test

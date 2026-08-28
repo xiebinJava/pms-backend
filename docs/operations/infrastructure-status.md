@@ -44,4 +44,4 @@
 | --- | --- | --- |
 | Task 0：基线盘点与文档状态对齐 | 已完成 | 后端 `mvn -q test` 通过；前端 Node 测试 77 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 通过；后端提交 `98fe24d`，前端提交 `aa2864d`。 |
 | Task 1：OceanBase 运行账号隔离 | 已完成 | 配置测试通过；Compose 解析通过；本地 OceanBase 已创建 `pms_app` / `pms_migrator`；应用账号建表被拒绝、迁移账号 DDL 通过；探针表已清理。 |
-| Task 2：OceanBase 备份、恢复与版本升级 | 已完成 | 升级脚本 V1–V5 首次记录、重复执行校验、迁移锁、备份 gzip/SHA-256、隔离库恢复和 `verify-enterprise-migration.sh` 均通过；后端提交待本次提交生成。 |
+| Task 2：OceanBase 备份、恢复与版本升级 | 已完成 | 升级脚本 V1–V5 首次记录、重复执行校验、迁移锁、备份 gzip/SHA-256、隔离库恢复和 `verify-enterprise-migration.sh` 均通过；后端提交 `246fe4c`。 |
