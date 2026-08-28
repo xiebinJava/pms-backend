@@ -130,3 +130,6 @@ PMS_JWT_SECRET=<生产环境请设置强随机密钥>
 `PMS_PASSWORD_RESET_EXPOSE_TOKEN=false`。完整备份、Flyway 迁移、预检和验收步骤见
 [`docs/operations/enterprise-upgrade-runbook.md`](docs/operations/enterprise-upgrade-runbook.md)。
 正式发布前请逐项执行 [`docs/operations/release-checklist.md`](docs/operations/release-checklist.md)。
+
+业务不变量、数据关系、权限/数据范围、认证、导入和 OceanBase 约束统一沉淀在
+[`docs/business-specification.md`](docs/business-specification.md)。

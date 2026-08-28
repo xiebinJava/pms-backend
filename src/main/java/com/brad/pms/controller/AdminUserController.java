@@ -1,6 +1,7 @@
 package com.brad.pms.controller;
 
 import com.brad.pms.common.response.ResponseResult;
+import com.brad.pms.common.page.PageResult;
 import com.brad.pms.dto.request.UserDisableCmd;
 import com.brad.pms.dto.request.UserPositionCmd;
 import com.brad.pms.dto.request.UserInviteCmd;
@@ -35,6 +36,14 @@ public class AdminUserController {
     @RequirePermission(PermissionCode.USER_READ)
     public ResponseResult<List<PersonnelDTO>> list(@RequestParam(required = false) String keyword) {
         return ResponseResult.success(personnelService.list(keyword));
+    }
+
+    @GetMapping("/page")
+    @RequirePermission(PermissionCode.USER_READ)
+    public ResponseResult<PageResult<PersonnelDTO>> page(@RequestParam(required = false) String keyword,
+                                                         @RequestParam(defaultValue = "1") long currPage,
+                                                         @RequestParam(defaultValue = "12") long pageSize) {
+        return ResponseResult.success(personnelService.page(keyword, currPage, pageSize));
     }
 
     @PutMapping("/{id}/primary-position")

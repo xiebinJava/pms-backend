@@ -1,9 +1,12 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.brad.pms.common.enums.AssignmentType;
 import com.brad.pms.common.enums.UserStatus;
 import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.common.page.PageResult;
 import com.brad.pms.dto.request.UserDisableCmd;
 import com.brad.pms.dto.request.UserPositionCmd;
 import com.brad.pms.dto.response.PersonnelDTO;
@@ -39,6 +42,22 @@ public class PersonnelService {
         wrapper.orderByAsc(UserDO::getNameZh, UserDO::getUsername);
         List<UserDO> users = userMapper.selectList(wrapper);
         return users.stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    public PageResult<PersonnelDTO> page(String keyword, long currPage, long pageSize) {
+        LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String normalizedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(UserDO::getNameZh, normalizedKeyword)
+                    .or().like(UserDO::getUsername, normalizedKeyword)
+                    .or().like(UserDO::getEmail, normalizedKeyword));
+        }
+        wrapper.orderByAsc(UserDO::getNameZh, UserDO::getUsername);
+        long safePage = Math.max(currPage, 1);
+        long safeSize = Math.min(Math.max(pageSize, 1), 100);
+        IPage<UserDO> page = userMapper.selectPage(new Page<>(safePage, safeSize), wrapper);
+        List<PersonnelDTO> records = page.getRecords().stream().map(this::toDto).collect(Collectors.toList());
+        return PageResult.of(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
 
     @Transactional
