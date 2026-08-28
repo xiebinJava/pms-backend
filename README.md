@@ -133,3 +133,7 @@ PMS_JWT_SECRET=<生产环境请设置强随机密钥>
 
 业务不变量、数据关系、权限/数据范围、认证、导入和 OceanBase 约束统一沉淀在
 [`docs/business-specification.md`](docs/business-specification.md)。
+
+企业级基础设施（数据库账号隔离、备份恢复、升级、容器、可观测性、CI 和开源交付）的当前状态见
+[`docs/operations/infrastructure-status.md`](docs/operations/infrastructure-status.md)，逐项执行计划见
+[`docs/superpowers/plans/2026-08-28-enterprise-infrastructure-hardening.md`](docs/superpowers/plans/2026-08-28-enterprise-infrastructure-hardening.md)。

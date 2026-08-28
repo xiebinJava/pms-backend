@@ -228,3 +228,14 @@
 ### 发布前仍需执行
 
 自动化测试使用 H2 仅验证迁移语法和业务回归，生产运行时仍只允许 OceanBase。发布前必须在目标 OceanBase 租户执行 `enterprise-preflight.sh`、V1–V5 迁移、`verify-enterprise-migration.sh` 和登录/健康检查冒烟，并记录结果到发布清单。
+
+### 基础设施后续计划（2026-08-28）
+
+上表的“阶段完成”表示此前业务能力和基础开源骨架已完成，不表示生产基础设施已经全部收口。以下事项转入独立计划继续执行：
+
+- `pms_app` / `pms_migrator` 数据库账号隔离和应用配置切换；
+- OceanBase 备份、恢复、迁移锁、版本校验和可重复升级；
+- 统一 HTTP 错误状态、限流、通知服务和上传持久化；
+- 容器加固、结构化日志、指标、审计保留、OpenAPI、集成 CI、E2E、镜像扫描和 SBOM。
+
+状态和验收证据统一记录在 [`docs/operations/infrastructure-status.md`](../operations/infrastructure-status.md)，执行计划见 [`2026-08-28-enterprise-infrastructure-hardening.md`](2026-08-28-enterprise-infrastructure-hardening.md)。
