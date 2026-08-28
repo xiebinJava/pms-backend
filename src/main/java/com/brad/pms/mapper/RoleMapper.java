@@ -6,6 +6,6 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 public interface RoleMapper extends BaseMapper<RoleDO> {
-    @Select("SELECT * FROM sys_role WHERE code = #{code} LIMIT 1")
+    @Select("SELECT * FROM sys_role WHERE code = #{code} AND deleted = FALSE LIMIT 1")
     RoleDO findByCode(@Param("code") String code);
 }

@@ -31,6 +31,7 @@ services:
       - ./src/main/resources/db/migration/V2__enterprise_identity_org_rbac.sql:/sql/V2__enterprise_identity_org_rbac.sql:ro
       - ./src/main/resources/db/migration/V3__project_node_schedule.sql:/sql/V3__project_node_schedule.sql:ro
       - ./src/main/resources/db/migration/V4__authentication_audit_indexes.sql:/sql/V4__authentication_audit_indexes.sql:ro
+      - ./src/main/resources/db/migration/V5__integrity_soft_delete_optimistic_lock.sql:/sql/V5__integrity_soft_delete_optimistic_lock.sql:ro
     entrypoint: ["/bin/sh", "/usr/local/bin/oceanbase-init.sh"]
     restart: "no"
 

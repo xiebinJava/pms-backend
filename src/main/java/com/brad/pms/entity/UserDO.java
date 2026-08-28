@@ -43,6 +43,12 @@ public class UserDO {
 
     private LocalDateTime passwordChangedAt;
 
+    @TableLogic(value = "false", delval = "true")
+    private Boolean deleted;
+
+    @Version
+    private Integer version;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

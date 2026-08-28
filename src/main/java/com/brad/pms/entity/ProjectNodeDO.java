@@ -35,6 +35,12 @@ public class ProjectNodeDO {
 
     private LocalDate endDate;
 
+    @TableLogic(value = "false", delval = "true")
+    private Boolean deleted;
+
+    @Version
+    private Integer version;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

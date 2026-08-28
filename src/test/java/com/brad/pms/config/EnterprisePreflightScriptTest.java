@@ -21,5 +21,6 @@ class EnterprisePreflightScriptTest {
         }
         assertThat(preflight).contains("parent_id IS NULL", "status='ACTIVE'");
         assertThat(verify).contains("exactly one active root organization is present");
+        assertThat(verify).contains("deleted", "version", "uk_project_code", "uk_project_node_key", "project_org_unit_fk");
     }
 }

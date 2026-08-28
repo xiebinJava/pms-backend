@@ -34,7 +34,7 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 使用应用同版本启动迁移。Flyway 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql` 顺序执行；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
+3. 使用应用同版本启动迁移。Flyway 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql` 顺序执行；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
 
    ```bash
    mvn -DskipTests package
@@ -107,7 +107,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 ## 8. 容器化与健康检查
 
 开源试用可从 `docker-compose.example.yml` 启动 OceanBase、后端和前端。示例仅适用于新建
-空库：`schema-init` 会执行 `schema.sql` 及 V2–V4 企业迁移，并写入一次性标记；已有生产库
+空库：`schema-init` 会执行 `schema.sql` 及 V2–V5 企业迁移，并写入一次性标记；已有生产库
 必须使用本手册的备份、预检和升级流程。
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与

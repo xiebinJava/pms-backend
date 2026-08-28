@@ -87,9 +87,25 @@ echo "Checking PMS database $DB_HOST:$DB_PORT/$DB_NAME (read-only)"
 for table_name in sys_login_log sys_auth_session sys_password_reset_token sys_operation_log; do
   assert_table "$table_name"
 done
-for index_name in uk_user_username_normalized idx_auth_session_user_status idx_login_log_user_created; do
+for index_name in uk_user_username_normalized idx_auth_session_user_status idx_login_log_user_created uk_project_code uk_project_node_key idx_project_deleted; do
   assert_index "$index_name"
 done
+for column_check in \
+  "sys_user|deleted" "sys_user|version" \
+  "project|deleted" "project|version" \
+  "project_node|deleted" "project_node|version"; do
+  table_name="${column_check%%|*}"; column_name="${column_check##*|}"
+  count="$(run_sql "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='$table_name' AND column_name='$column_name';" | tr -d '[:space:]')"
+  if [[ "$count" != "1" ]]; then echo "FAIL: required column $table_name.$column_name is missing" >&2; exit 1; fi
+done
+echo "PASS: integrity columns"
+for foreign_key_check in \
+  "project|project_org_unit_fk" "project_task|task_project_fk" "sys_user_position|user_position_user_fk"; do
+  table_name="${foreign_key_check%%|*}"; constraint_name="${foreign_key_check##*|}"
+  count="$(run_sql "SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='$table_name' AND constraint_name='$constraint_name' AND constraint_type='FOREIGN KEY';" | tr -d '[:space:]')"
+  if [[ "$count" != "1" ]]; then echo "FAIL: required foreign key $table_name.$constraint_name is missing" >&2; exit 1; fi
+done
+echo "PASS: integrity foreign keys"
 assert_empty "unique normalized English login names" \
   "SELECT username_normalized, COUNT(*) FROM sys_user GROUP BY username_normalized HAVING username_normalized IS NULL OR username_normalized='' OR COUNT(*)>1;"
 assert_zero "user positions reference existing users and org units" \

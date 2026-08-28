@@ -14,6 +14,7 @@
 - [ ] 已确认目标 OceanBase MySQL 兼容模式、字符集 `utf8mb4` 和时区。
 - [ ] 已完成数据库备份与恢复演练，并保存校验值。
 - [ ] 执行 `scripts/enterprise-preflight.sh` 通过。
+- [ ] 按 V1–V5 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键已落库。
 - [ ] 执行迁移后 `scripts/verify-enterprise-migration.sh` 通过。
 - [ ] 生产应用只使用 `oceanbase` profile；H2 仅存在于测试配置。
 - [ ] 迁移失败时不直接删除业务表，按升级手册恢复到新数据库。

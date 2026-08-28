@@ -68,18 +68,28 @@ done
 echo "PASS: required enterprise tables"
 
 for column_check in \
-  "sys_user|name_zh" "sys_user|username_normalized" "project|org_unit_id"; do
+  "sys_user|name_zh" "sys_user|username_normalized" "sys_user|deleted" "sys_user|version" \
+  "project|org_unit_id" "project|deleted" "project|version" \
+  "project_node|deleted" "project_node|version"; do
   table_name="${column_check%%|*}"; column_name="${column_check##*|}"
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='$table_name' AND column_name='$column_name';" | tr -d '[:space:]')"
   if [[ "$count" != "1" ]]; then echo "FAIL: column $table_name.$column_name is missing" >&2; exit 1; fi
 done
 echo "PASS: required enterprise columns"
 
-for index_name in uk_user_username_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created; do
+for index_name in uk_user_username_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created uk_project_code uk_project_node_key idx_project_deleted; do
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND index_name='$index_name';" | tr -d '[:space:]')"
   if [[ "$count" == "0" ]]; then echo "FAIL: index $index_name is missing" >&2; exit 1; fi
 done
 echo "PASS: required enterprise indexes"
+
+for foreign_key_check in \
+  "project|project_org_unit_fk" "project_task|task_project_fk" "sys_user_position|user_position_user_fk"; do
+  table_name="${foreign_key_check%%|*}"; constraint_name="${foreign_key_check##*|}"
+  count="$(run_sql "SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='$table_name' AND constraint_name='$constraint_name' AND constraint_type='FOREIGN KEY';" | tr -d '[:space:]')"
+  if [[ "$count" != "1" ]]; then echo "FAIL: foreign key $table_name.$constraint_name is missing" >&2; exit 1; fi
+done
+echo "PASS: integrity foreign keys"
 
 assert_exact "exactly one active root organization is present" \
   "SELECT COUNT(*) FROM sys_org_unit WHERE parent_id IS NULL AND status='ACTIVE';" 1

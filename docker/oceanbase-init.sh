@@ -43,6 +43,7 @@ run_mysql --database="$OCEANBASE_DATABASE" < /sql/schema.sql
 run_mysql --database="$OCEANBASE_DATABASE" < /sql/V2__enterprise_identity_org_rbac.sql
 run_mysql --database="$OCEANBASE_DATABASE" < /sql/V3__project_node_schedule.sql
 run_mysql --database="$OCEANBASE_DATABASE" < /sql/V4__authentication_audit_indexes.sql
+run_mysql --database="$OCEANBASE_DATABASE" < /sql/V5__integrity_soft_delete_optimistic_lock.sql
 run_mysql --database="$OCEANBASE_DATABASE" --execute \
   "CREATE TABLE pms_schema_bootstrap_marker (id TINYINT PRIMARY KEY, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
 run_mysql --database="$OCEANBASE_DATABASE" --execute \

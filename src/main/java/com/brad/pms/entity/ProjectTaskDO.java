@@ -37,6 +37,12 @@ public class ProjectTaskDO {
 
     private LocalDate dueDate;
 
+    @TableLogic(value = "false", delval = "true")
+    private Boolean deleted;
+
+    @Version
+    private Integer version;
+
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
 

@@ -186,7 +186,8 @@ project
 
 - 默认 profile 为 `oceanbase`，使用 MySQL 兼容模式和 2881 端口，数据库名为 `brad_pms`。
 - 生产连接参数通过 `OCEANBASE_HOST`、`OCEANBASE_PORT`、`OCEANBASE_DATABASE`、`OCEANBASE_USER`、`OCEANBASE_PASSWORD` 注入。
-- 表结构按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql` 顺序执行。
+- 表结构按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql` 顺序执行。
+- V5 为现有业务表补充逻辑删除标记、乐观锁版本号、关键唯一索引和跨表外键；应用查询必须遵守逻辑删除条件，关键更新必须携带版本号。
 - OceanBase profile 运行时不依赖 Flyway 自动执行；升级前先执行预检、备份策略和迁移脚本，再启动应用。
 - `application-h2.yml` 和 H2 快照只服务自动化测试/一次性迁移工具；文档、示例和上线脚本不得引导用户用 H2 运行生产。
 - 启动后通过 `/api/health` 或 `/api/healthz` 验证应用与数据库连通性；连接失败时优先检查网络、租户、账号权限和字符集，不要切换到 H2 掩盖故障。
