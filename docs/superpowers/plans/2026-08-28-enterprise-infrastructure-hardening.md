@@ -33,7 +33,7 @@
 - Test: `git diff --check`、现有后端和前端验证命令
 
 **Interfaces:**
-- Consumes: 当前 OceanBase `brad_pms` 实例、现有 V1–V5 脚本、Compose 和 CI 配置。
+- Consumes: 当前 OceanBase `brad_pms` 实例、现有 V1–V6 脚本、Compose 和 CI 配置。
 - Produces: 一份标记“已完成/待完成/风险”的基础设施清单，后续任务以此为唯一状态来源。
 
 - [x] **Step 1: 记录当前可重复的基线**
@@ -97,7 +97,7 @@
 
 - [x] **Step 3: 拆分 Compose 初始化职责**
 
-  增加一次性 `accounts-init` 服务，用 root 创建数据库和两个账号；`schema-init` 改用 `pms_migrator` 执行 schema 与 V1–V5；`backend` 改用 `pms_app`。现有数据非空时禁止初始化脚本覆盖，账号初始化必须幂等。
+  增加一次性 `accounts-init` 服务，用 root 创建数据库和两个账号；`schema-init` 改用 `pms_migrator` 执行 schema 与 V1–V6；`backend` 改用 `pms_app`。现有数据非空时禁止初始化脚本覆盖，账号初始化必须幂等。
 
 - [x] **Step 4: 编写权限冒烟脚本**
 
@@ -161,7 +161,7 @@
 
 - [x] **Step 5: 实现真实 OceanBase 冒烟**
 
-  在 `docker compose` 中以 `pms_migrator` 执行 V1–V5，随后运行 preflight、行数、外键、唯一索引、软删除列和根组织检查；同一升级命令连续运行两次，第二次必须报告“无待执行版本”。
+  在 `docker compose` 中以 `pms_migrator` 执行 V1–V6，随后运行 preflight、行数、外键、唯一索引、软删除列和根组织检查；同一升级命令连续运行两次，第二次必须报告“无待执行版本”。
 
 - [x] **Step 6: Commit**
 

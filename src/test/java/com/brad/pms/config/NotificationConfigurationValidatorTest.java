@@ -50,4 +50,21 @@ class NotificationConfigurationValidatorTest {
         assertThatThrownBy(() -> validator.run(new DefaultApplicationArguments()))
                 .hasMessageContaining("生产环境");
     }
+
+    @Test
+    void prodAliasIsProtectedAndUnknownEnvironmentFailsClosed() {
+        ObjectProvider<PasswordResetNotifier> reset = mock(ObjectProvider.class);
+        ObjectProvider<InvitationNotifier> invite = mock(ObjectProvider.class);
+        NotificationConfigurationValidator prod = new NotificationConfigurationValidator(
+                reset, invite, false, " prod ", true, false, false,
+                "", "", 587, true, true, "", "", "");
+        assertThatThrownBy(() -> prod.run(new DefaultApplicationArguments()))
+                .hasMessageContaining("生产环境");
+
+        NotificationConfigurationValidator unknown = new NotificationConfigurationValidator(
+                reset, invite, false, "production-like", false, false, false,
+                "", "", 587, true, true, "", "", "");
+        assertThatThrownBy(() -> unknown.run(new DefaultApplicationArguments()))
+                .hasMessageContaining("PMS_DEPLOYMENT_ENV");
+    }
 }

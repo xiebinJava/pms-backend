@@ -9,7 +9,28 @@ if [[ ! -f "$SPEC" ]]; then
 fi
 
 if command -v ruby >/dev/null 2>&1; then
-  ruby -e 'require "yaml"; value = YAML.load_file(ARGV.fetch(0)); abort "openapi must be 3.x" unless value.fetch("openapi").start_with?("3."); abort "paths missing" unless value["paths"].is_a?(Hash) && !value["paths"].empty?; puts "OpenAPI contract is valid: #{ARGV.fetch(0)}"' "$SPEC"
+  ruby - "$SPEC" <<'RUBY'
+require "yaml"
+spec = YAML.load_file(ARGV.fetch(0))
+abort "openapi must be 3.x" unless spec.fetch("openapi").start_with?("3.")
+paths = spec["paths"]
+abort "paths missing" unless paths.is_a?(Hash) && !paths.empty?
+expected = {
+  "/auth/login" => ["post"], "/auth/refresh" => ["post"], "/auth/me" => ["get"],
+  "/projects/page" => ["post"], "/projects" => ["post"], "/projects/{id}" => ["get", "put", "delete"],
+  "/admin/org/tree" => ["get"], "/org/tree" => ["get"], "/admin/org" => ["post"], "/admin/users" => ["get"],
+  "/admin/users/invite" => ["post"], "/admin/roles" => ["get"],
+  "/admin/import/preview/organizations" => ["post"], "/admin/import/preview/users" => ["post"],
+  "/admin/import/{jobId}/commit" => ["post"], "/admin/audit" => ["get"],
+  "/health" => ["get"], "/health/live" => ["get"]
+}
+expected.each do |route, methods|
+  abort "route missing: #{route}" unless paths.key?(route)
+  methods.each { |method| abort "method missing: #{method.upcase} #{route}" unless paths[route].key?(method) }
+end
+abort "legacy import template route must not be documented" if paths.key?("/admin/import/preview/{type}")
+puts "OpenAPI contract and route map are valid: #{ARGV.fetch(0)}"
+RUBY
 elif command -v python3 >/dev/null 2>&1; then
   python3 - "$SPEC" <<'PY'
 import sys
@@ -21,6 +42,23 @@ with open(sys.argv[1], encoding="utf-8") as handle:
     value = yaml.safe_load(handle)
 if not str(value.get("openapi", "")).startswith("3.") or not value.get("paths"):
     raise SystemExit("invalid OpenAPI contract")
+expected = {
+    "/auth/login": {"post"}, "/auth/refresh": {"post"}, "/auth/me": {"get"},
+    "/projects/page": {"post"}, "/projects": {"post"}, "/projects/{id}": {"get", "put", "delete"},
+    "/admin/org/tree": {"get"}, "/org/tree": {"get"}, "/admin/org": {"post"}, "/admin/users": {"get"},
+    "/admin/users/invite": {"post"}, "/admin/roles": {"get"},
+    "/admin/import/preview/organizations": {"post"}, "/admin/import/preview/users": {"post"},
+    "/admin/import/{jobId}/commit": {"post"}, "/admin/audit": {"get"},
+    "/health": {"get"}, "/health/live": {"get"},
+}
+for route, methods in expected.items():
+    if route not in value["paths"]:
+        raise SystemExit(f"route missing: {route}")
+    missing = methods.difference(value["paths"][route])
+    if missing:
+        raise SystemExit(f"method missing: {','.join(sorted(missing))} {route}")
+if "/admin/import/preview/{type}" in value["paths"]:
+    raise SystemExit("legacy import template route must not be documented")
 print(f"OpenAPI contract is valid: {sys.argv[1]}")
 PY
 else

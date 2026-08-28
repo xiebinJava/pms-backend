@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerMapping;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -50,16 +51,22 @@ public class ObservabilityConfig {
                 Timer timer = Timer.builder("pms.http.requests")
                         .description("PMS HTTP request duration")
                         .tag("method", request.getMethod())
-                        .tag("path", normalizePath(request.getRequestURI()))
+                        .tag("path", routeTemplate(request))
                         .tag("status", String.valueOf(response.getStatus()))
                         .register(registry);
                 sample.stop(timer);
             }
         }
 
-        private String normalizePath(String path) {
-            String normalized = path == null ? "unknown" : path.replaceAll("/[0-9]+(?=/|$)", "/{id}");
-            return normalized.length() > 100 ? normalized.substring(0, 100) : normalized;
+        private String routeTemplate(HttpServletRequest request) {
+            Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+            if (pattern instanceof String && !((String) pattern).isBlank()) {
+                String route = (String) pattern;
+                return route.length() > 100 ? route.substring(0, 100) : route;
+            }
+            // Do not use the raw URI for unmatched requests: random paths and
+            // upload UUIDs must not create unbounded metric time series.
+            return "UNMATCHED";
         }
     }
 }

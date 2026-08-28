@@ -15,6 +15,6 @@ public interface OperationLogMapper extends BaseMapper<OperationLogDO> {
     long countExpired(@Param("cutoff") LocalDateTime cutoff);
 
     @Delete("DELETE FROM sys_operation_log WHERE created_at < #{cutoff} "
-            + "AND action NOT IN ('PERMISSION_DENIED', 'AUTHORIZATION_DENIED')")
-    int deleteExpired(@Param("cutoff") LocalDateTime cutoff);
+            + "AND action NOT IN ('PERMISSION_DENIED', 'AUTHORIZATION_DENIED') LIMIT #{batchSize}")
+    int deleteExpiredBatch(@Param("cutoff") LocalDateTime cutoff, @Param("batchSize") int batchSize);
 }

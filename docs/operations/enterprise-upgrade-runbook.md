@@ -34,7 +34,7 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql` 顺序校验并只执行缺失版本；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
+3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql`、`V6__audit_retention_indexes.sql` 顺序校验并只执行缺失版本；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
 
    ```bash
    export OCEANBASE_USER=pms_migrator
@@ -109,13 +109,13 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 ## 8. 容器化与健康检查
 
 开源试用可从 `docker-compose.example.yml` 启动 OceanBase、后端和前端。示例仅适用于新建
-空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V5 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
+空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V6 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
 必须使用本手册的备份、预检和升级流程；检测到旧 Flyway 历史时，需先核对发布包并显式设置 `PMS_ACCEPT_FLYWAY_BASELINE=true`。
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
 `{"status":"UP","database":"UP"}`，数据库不可用返回 HTTP 503 与 `DOWN`。响应不包含
 连接串、SQL、密码或令牌。另有 `/api/health/live`（仅进程存活）和 `/api/health/ready`（数据库与迁移就绪），
-以及仅供内网监控使用的 `/api/actuator/health`、`/api/actuator/metrics`。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
+以及仅绑定管理地址/端口（默认容器内 `127.0.0.1:8081`）的 `/actuator/health`、`/actuator/metrics`。它们不会经过前端 `/api/**` 代理；如需内网监控，显式设置 `PMS_MANAGEMENT_ADDRESS` 与 `PMS_MANAGEMENT_PORT`，并只在内网发布该端口。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
 可用于串联一次请求的前后端日志。
 
 发布前的完整代码、迁移、安全、浏览器冒烟与回滚清单见
@@ -123,6 +123,9 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 容器运行时默认使用后端 UID 10001、非 root Nginx、只读根文件系统、独立上传卷和
 `no-new-privileges`；后端与前端只有在健康检查通过后才被 Compose 视为可用。生产部署应
-根据机器容量调整 `mem_limit`/`cpus`，并通过反向代理提供 HTTPS。Nginx 仅接受来自明确配置的
-本地/私有代理网段的 `X-Forwarded-Proto`，外层 TLS 终止代理必须位于这些网段内；不可信客户端的
-伪造头会被忽略。生产环境必须设置 `PMS_DEPLOYMENT_ENV=production`，启用通知启动校验并关闭重置/邀请 token 回显。
+根据机器容量调整 `mem_limit`/`cpus`，并通过反向代理提供 HTTPS。示例 Compose 将数据库/迁移服务
+放在 `pms-data` 私网、前端与后端放在独立的 `pms-edge` 私网；Nginx 默认只信任 loopback，
+不会把整个 Compose 服务网段当作代理。外层 TLS 终止代理必须使用明确的可信 IP/CIDR，并在
+`nginx.conf` 的 `set_real_ip_from`/`geo` 中按部署网络显式加入；其它转发头会被清空，不可信客户端的
+伪造头会被忽略。生产环境必须设置
+`PMS_DEPLOYMENT_ENV=production`，启用通知启动校验并关闭重置/邀请 token 回显。

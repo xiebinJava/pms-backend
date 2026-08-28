@@ -14,6 +14,9 @@ jobs:
         with:
           repository: xiebinJava/pms-front
           path: pms-front
+          # Keep backend integration tests paired with the reviewed frontend
+          # release. Bump this SHA only when the frontend commit is released.
+          ref: 2ea1730
       - name: Prepare ephemeral integration environment
         shell: bash
         run: |

@@ -101,7 +101,7 @@ echo "Checking PMS database $DB_HOST:$DB_PORT/$DB_NAME (read-only)"
 for table_name in sys_login_log sys_auth_session sys_password_reset_token sys_operation_log; do
   assert_table "$table_name"
 done
-for index_name in uk_user_username_normalized idx_auth_session_user_status idx_login_log_user_created uk_project_code uk_project_node_key idx_project_deleted; do
+for index_name in uk_user_username_normalized idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted; do
   assert_index "$index_name"
 done
 for column_check in \

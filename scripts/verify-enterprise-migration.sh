@@ -81,7 +81,7 @@ for column_check in \
 done
 echo "PASS: required enterprise columns"
 
-for index_name in uk_user_username_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created uk_project_code uk_project_node_key idx_project_deleted; do
+for index_name in uk_user_username_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted; do
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND index_name='$index_name';" | tr -d '[:space:]')"
   if [[ "$count" == "0" ]]; then echo "FAIL: index $index_name is missing" >&2; exit 1; fi
 done

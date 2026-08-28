@@ -22,7 +22,7 @@ public class HealthController {
 
     @Autowired
     public HealthController(DataSource dataSource) {
-        this(dataSource, 5);
+        this(dataSource, 6);
     }
 
     public HealthController(DataSource dataSource, int expectedMigrationVersion) {

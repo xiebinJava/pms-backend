@@ -67,6 +67,12 @@ class OceanbaseUpgradeScriptTest {
     }
 
     @Test
+    void retentionIndexMigrationLeadsWithCreatedAt() throws Exception {
+        String migration = Files.readString(Path.of("src/main/resources/db/migration/V6__audit_retention_indexes.sql"));
+        assertThat(migration).contains("idx_login_log_retention ON sys_login_log (created_at, result)");
+    }
+
+    @Test
     void upgradeRefusesToRunWithoutMigrationCredentials() throws Exception {
         ProcessBuilder builder = new ProcessBuilder("bash", "scripts/oceanbase-upgrade.sh");
         removeDatabaseCredentials(builder.environment());

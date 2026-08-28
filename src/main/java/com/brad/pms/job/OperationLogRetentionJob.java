@@ -13,7 +13,13 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Map;
 
-/** Daily, auditable cleanup of expired operational logs. */
+/**
+ * Daily, auditable cleanup of expired operational logs.
+ *
+ * The job deliberately has no enclosing transaction: each bounded DELETE is
+ * committed independently so row locks and undo data are released between
+ * batches. The final audit record is written after all batches complete.
+ */
 @Component
 @ConditionalOnProperty(name = "pms.audit.retention.enabled", havingValue = "true", matchIfMissing = true)
 public class OperationLogRetentionJob {
@@ -46,11 +52,19 @@ public class OperationLogRetentionJob {
 
     public Result runOnce(boolean dryRun) {
         LocalDateTime cutoff = LocalDateTime.now(clock).minusDays(retentionDays);
-        long candidates = operationLogMapper.countExpired(cutoff);
+        long candidates = operationLogMapper.countExpired(cutoff) + loginLogMapper.countExpiredSuccessful(cutoff);
         int deleted = 0;
         if (!dryRun) {
-            deleted = operationLogMapper.deleteExpired(cutoff);
-            loginLogMapper.deleteExpiredSuccessful(cutoff);
+            int batch;
+            do {
+                batch = operationLogMapper.deleteExpiredBatch(cutoff, 500);
+                deleted += batch;
+            } while (batch > 0);
+            int loginBatch;
+            do {
+                loginBatch = loginLogMapper.deleteExpiredSuccessfulBatch(cutoff, 500);
+                deleted += loginBatch;
+            } while (loginBatch > 0);
         }
         operationLogService.record("AUDIT_RETENTION_RUN", "AUDIT", null, null,
                 Map.of("retentionDays", retentionDays, "dryRun", dryRun,

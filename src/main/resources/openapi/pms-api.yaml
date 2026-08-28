@@ -119,6 +119,13 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /org/tree:
+    get:
+      tags: [组织与权限]
+      summary: 查询项目可用组织树
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /admin/org:
     post:
       tags: [组织与权限]
@@ -138,6 +145,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users/invite:
     post:
       tags: [组织与权限]
       summary: 邀请员工
@@ -155,15 +163,10 @@ paths:
       summary: 查询角色
       responses:
         '200': { $ref: '#/components/responses/Success' }
-  /admin/import/preview/{type}:
-    parameters:
-      - name: type
-        in: path
-        required: true
-        schema: { type: string, enum: [organizations, users] }
+  /admin/import/preview/organizations:
     post:
       tags: [导入与审计]
-      summary: 预览 Excel/CSV 导入
+      summary: 预览组织 Excel/CSV 导入
       requestBody:
         required: true
         content:
@@ -176,6 +179,34 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/import/preview/users:
+    post:
+      tags: [导入与审计]
+      summary: 预览员工 Excel/CSV 导入
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/import/{jobId}/commit:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      tags: [导入与审计]
+      summary: 提交导入任务
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /admin/audit:
     get:
       tags: [导入与审计]

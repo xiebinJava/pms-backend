@@ -86,10 +86,10 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 
 本地 OceanBase 4.3.5 演练已验证：
 
-- 现有 `brad_pms` 的 V1–V5 被记录并可重复校验；第二次升级无待执行版本。
+- 现有 `brad_pms` 的 V1–V6 被记录并可重复校验；第二次升级无待执行版本。
 - 备份压缩流和 SHA-256 校验通过，文件名带 `v5` 版本标识。
 - 备份恢复到隔离空库后，企业迁移校验通过；抽样数据（2 个项目、21 个用户、9 个组织、6 个任务）存在。
 
-另外，在专用临时库 `brad_pms_upgrade_smoke_20260828` 中使用 `pms_migrator` 完成了从空库执行 V1–V5、再次执行升级（输出 `No pending migrations`）和清理临时库的回归；共生成 28 张表，未触碰现有 `brad_pms`。
+另外，在专用临时库 `brad_pms_upgrade_smoke_20260828` 中使用 `pms_migrator` 完成了从空库执行 V1–V5、再次执行升级（输出 `No pending migrations`）和清理临时库的回归；共生成 28 张表，未触碰现有 `brad_pms`。V6 在现有 `brad_pms` 上单独应用并完成了二次幂等校验。
 
 以上是开发环境证据，生产发布仍需按目标环境保存备份位置、校验值、执行人和回滚联系人。

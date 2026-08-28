@@ -14,6 +14,8 @@
 | OpenAPI | 通过 | `./scripts/validate-openapi.sh` |
 | Shell 与差异检查 | 通过 | `bash -n scripts/*.sh docker/*.sh`、`git diff --check` |
 | Compose 静态解析 | 通过 | `docker compose ... config --quiet`（注入临时示例变量） |
+| 现有 OceanBase 只读预检 | 通过 | 使用本地 `fsclaw-oceanbase` 实例执行 `enterprise-preflight.sh` 与 `verify-enterprise-migration.sh`；未写入业务数据 |
+| 现有 `brad_pms` V6 迁移 | 通过 | 使用 `pms_migrator` 应用 `V6__audit_retention_indexes.sql`，第二次执行输出 `No pending migrations`；未删除或覆盖业务数据 |
 | CI YAML 解析 | 通过 | Ruby YAML parser 检查 backend/frontend workflow 与 Dependabot |
 | 浏览器用例编译 | 通过/跳过 | Playwright 用例可加载；无测试凭据时 2 项按设计跳过 |
 
@@ -21,7 +23,7 @@
 
 | 演练 | 状态 | 下一步 |
 | --- | --- | --- |
-| OceanBase 从零启动与 V1–V5 双次迁移 | 阻塞 | 在可访问 Docker Hub/镜像代理的 CI 执行 `integration.yml` |
+| OceanBase 从零启动与 V1–V6 双次迁移 | 阻塞 | 在可访问 Docker Hub/镜像代理的 CI 执行 `integration.yml` |
 | 备份、恢复与 RPO/RTO 计时 | 阻塞 | 使用真实 `brad_pms` 副本执行 `backup-oceanbase.sh`、`restore-oceanbase.sh`、`verify-backup.sh` |
 | backend/frontend 故障重启 | 阻塞 | 在部署机停止容器，验证健康探针、卷数据和自动恢复 |
 | Playwright 登录与页面链路 | 阻塞 | 在集成环境注入一次性管理员凭据后执行桌面/390px 用例 |

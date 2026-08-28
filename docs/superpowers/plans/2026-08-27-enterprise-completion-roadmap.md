@@ -227,7 +227,7 @@
 
 ### 发布前仍需执行
 
-自动化测试使用 H2 仅验证迁移语法和业务回归，生产运行时仍只允许 OceanBase。发布前必须在目标 OceanBase 租户执行 `enterprise-preflight.sh`、V1–V5 迁移、`verify-enterprise-migration.sh` 和登录/健康检查冒烟，并记录结果到发布清单。
+自动化测试使用 H2 仅验证迁移语法和业务回归，生产运行时仍只允许 OceanBase。发布前必须在目标 OceanBase 租户执行 `enterprise-preflight.sh`、V1–V6 迁移、`verify-enterprise-migration.sh` 和登录/健康检查冒烟，并记录结果到发布清单。
 
 ### 基础设施后续计划（2026-08-28）
 

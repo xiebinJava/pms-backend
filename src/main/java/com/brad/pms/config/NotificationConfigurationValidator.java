@@ -8,6 +8,9 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
+import java.util.Set;
+
 /** Fails fast in production when token delivery is required but not configured. */
 @Component
 public class NotificationConfigurationValidator implements ApplicationRunner {
@@ -63,7 +66,11 @@ public class NotificationConfigurationValidator implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if ("production".equalsIgnoreCase(deploymentEnvironment)
+        String environment = normalizeEnvironment(deploymentEnvironment);
+        if (!Set.of("development", "test", "staging", "production").contains(environment)) {
+            throw new IllegalStateException("PMS_DEPLOYMENT_ENV 必须是 development、test、staging 或 production");
+        }
+        if ("production".equals(environment)
                 && (resetTokenExposed || invitationTokenExposed || !startupCheckEnabled)) {
             throw new IllegalStateException("生产环境必须启用通知启动校验并禁止回显密码重置或邀请 token");
         }
@@ -84,6 +91,11 @@ public class NotificationConfigurationValidator implements ApplicationRunner {
         if (!invitationTokenExposed && invitationNotifiers.getIfAvailable() == null) {
             throw new IllegalStateException("已启用生产通知检查，但未配置账号邀请通知器");
         }
+    }
+
+    private String normalizeEnvironment(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return "prod".equals(normalized) ? "production" : normalized;
     }
 
     private boolean isHttpsUrl(String value) {
