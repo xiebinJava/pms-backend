@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MIGRATION_DIR="${PMS_MIGRATIONS_DIR:-$PROJECT_DIR/src/main/resources/db/migration}"
+TOOL_IMAGE="${PMS_MYSQL_TOOL_IMAGE:-mysql:8.4}"
 
 usage() {
   cat <<'USAGE'
@@ -14,6 +15,7 @@ The command is non-destructive: it never drops a database or truncates data.
 USAGE
 }
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then usage; exit 0; fi
+if [[ $# -ne 0 ]]; then usage >&2; exit 2; fi
 
 DB_HOST="${OCEANBASE_HOST:-127.0.0.1}"
 DB_PORT="${OCEANBASE_PORT:-2881}"
@@ -40,14 +42,26 @@ if command -v mysql >/dev/null 2>&1; then
   SQL_CLIENT=mysql
 elif command -v obclient >/dev/null 2>&1; then
   SQL_CLIENT=obclient
+elif command -v docker >/dev/null 2>&1; then
+  SQL_CLIENT=container
 else
-  echo "mysql or obclient client is required" >&2
+  echo "mysql/obclient client or Docker is required" >&2
   exit 2
 fi
 
-mysql_base=("$SQL_CLIENT" --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names)
-sql() { MYSQL_PWD="$OCEANBASE_PASSWORD" "${mysql_base[@]}" --execute "$1"; }
-sql_file() { MYSQL_PWD="$OCEANBASE_PASSWORD" "${mysql_base[@]}" < "$1"; }
+mysql_args=(--protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names)
+container_mysql() {
+  MYSQL_PWD="$OCEANBASE_PASSWORD" docker run --rm --network host -e MYSQL_PWD "$TOOL_IMAGE" \
+    mysql "${mysql_args[@]}" "$@"
+}
+run_mysql() {
+  if [[ "$SQL_CLIENT" == "container" ]]; then
+    container_mysql "$@" < /dev/null
+  else
+    MYSQL_PWD="$OCEANBASE_PASSWORD" "$SQL_CLIENT" "${mysql_args[@]}" "$@" < /dev/null
+  fi
+}
+sql() { run_mysql --execute "$1"; }
 
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -68,15 +82,41 @@ sql "CREATE TABLE IF NOT EXISTS pms_schema_migration_history (
   checksum CHAR(64) NOT NULL,
   applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )"
+sql "CREATE TABLE IF NOT EXISTS pms_schema_migration_step (
+  version VARCHAR(50) NOT NULL,
+  step_no INT NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (version, step_no)
+)"
 sql "CREATE TABLE IF NOT EXISTS pms_schema_migration_lock (
   id TINYINT PRIMARY KEY,
+  lock_name VARCHAR(64) NOT NULL DEFAULT 'pms-schema-upgrade',
+  owner_token VARCHAR(128) NULL,
   locked_until TIMESTAMP NULL
 )"
-sql "INSERT INTO pms_schema_migration_lock (id, locked_until) VALUES (1, NULL) ON DUPLICATE KEY UPDATE id=id"
 
+# Upgrade installations created by the first Task 2 implementation in place.
+lock_column_count="$(sql "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='pms_schema_migration_lock' AND column_name='lock_name';" | tr -d '[:space:]')"
+if [[ "$lock_column_count" != "1" ]]; then
+  sql "ALTER TABLE pms_schema_migration_lock ADD COLUMN lock_name VARCHAR(64) NOT NULL DEFAULT 'pms-schema-upgrade'"
+fi
+owner_column_count="$(sql "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='pms_schema_migration_lock' AND column_name='owner_token';" | tr -d '[:space:]')"
+if [[ "$owner_column_count" != "1" ]]; then
+  sql "ALTER TABLE pms_schema_migration_lock ADD COLUMN owner_token VARCHAR(128) NULL"
+fi
+sql "INSERT INTO pms_schema_migration_lock (id, lock_name, owner_token, locked_until)
+  VALUES (1, 'pms-schema-upgrade', NULL, NULL) ON DUPLICATE KEY UPDATE id=id"
+
+OWNER_TOKEN="${PMS_MIGRATION_OWNER_TOKEN:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 acquired=0
 for _ in $(seq 1 30); do
-  result="$(sql "UPDATE pms_schema_migration_lock SET locked_until=DATE_ADD(NOW(), INTERVAL $LOCK_MINUTES MINUTE) WHERE id=1 AND (locked_until IS NULL OR locked_until < NOW()); SELECT ROW_COUNT();" | tail -n 1 | tr -d '[:space:]')"
+  result="$(sql "UPDATE pms_schema_migration_lock
+    SET owner_token='$OWNER_TOKEN', lock_name='pms-schema-upgrade',
+        locked_until=DATE_ADD(NOW(), INTERVAL $LOCK_MINUTES MINUTE)
+    WHERE id=1 AND lock_name='pms-schema-upgrade'
+      AND (owner_token IS NULL OR locked_until IS NULL OR locked_until < NOW());
+    SELECT ROW_COUNT();" | tail -n 1 | tr -d '[:space:]')"
   if [[ "$result" == "1" ]]; then
     acquired=1
     break
@@ -84,16 +124,54 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 if [[ "$acquired" != "1" ]]; then
-  echo "could not acquire schema migration lock within 30 seconds" >&2
+  echo "could not acquire named schema migration lock pms-schema-upgrade within 30 seconds" >&2
   exit 1
 fi
 
 release_lock() {
-  sql "UPDATE pms_schema_migration_lock SET locked_until=NULL WHERE id=1" >/dev/null 2>&1 || true
+  sql "UPDATE pms_schema_migration_lock SET owner_token=NULL, locked_until=NULL
+    WHERE id=1 AND lock_name='pms-schema-upgrade' AND owner_token='$OWNER_TOKEN'" >/dev/null 2>&1 || true
 }
 trap release_lock EXIT INT TERM
 
 flyway_exists="$(sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='flyway_schema_history';" | tr -d '[:space:]')"
+pending=0
+
+apply_statement() {
+  local version="$1" step_no="$2" checksum="$3" statement="$4" stored_step
+  stored_step="$(sql "SELECT checksum FROM pms_schema_migration_step WHERE version='$version' AND step_no=$step_no;" | tr -d '[:space:]')"
+  if [[ -n "$stored_step" ]]; then
+    if [[ "$stored_step" != "$checksum" ]]; then
+      echo "checksum mismatch for partially applied migration V${version}" >&2
+      exit 1
+    fi
+    return 0
+  fi
+  run_mysql --execute "$statement"
+  local escaped_version escaped_checksum
+  escaped_version="${version//\'/\'\'}"
+  escaped_checksum="${checksum//\'/\'\'}"
+  sql "INSERT INTO pms_schema_migration_step (version, step_no, checksum) VALUES ('$escaped_version', $step_no, '$escaped_checksum')"
+}
+
+apply_migration_file() {
+  local file="$1" version="$2" checksum="$3"
+  local step_no=0 line buffer='' statement
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    buffer+="$line"$'\n'
+    if [[ "$line" == *";" ]]; then
+      step_no=$((step_no + 1))
+      statement="${buffer%$'\n'}"
+      statement="${statement%;}"
+      buffer=''
+      apply_statement "$version" "$step_no" "$checksum" "$statement"
+    fi
+  done < "$file"
+  if [[ -n "${buffer//[$' \t\r\n']/}" ]]; then
+    step_no=$((step_no + 1))
+    apply_statement "$version" "$step_no" "$checksum" "$buffer"
+  fi
+}
 
 for file in "$MIGRATION_DIR"/V*.sql; do
   [[ -f "$file" ]] || continue
@@ -117,16 +195,27 @@ for file in "$MIGRATION_DIR"/V*.sql; do
   if [[ "$flyway_exists" == "1" ]]; then
     flyway_applied="$(sql "SELECT COUNT(*) FROM flyway_schema_history WHERE version='$version' AND success=1;" | tr -d '[:space:]')"
     if [[ "$flyway_applied" == "1" ]]; then
+      if [[ "${PMS_ACCEPT_FLYWAY_BASELINE:-false}" != "true" ]]; then
+        echo "V${version} exists in Flyway history without a SHA-256 checkpoint; verify the deployed script and set PMS_ACCEPT_FLYWAY_BASELINE=true to record it" >&2
+        exit 1
+      fi
       sql "INSERT INTO pms_schema_migration_history (version, description, checksum) VALUES ('$version', '$description', '$checksum')"
-      echo "V${version} recorded from existing Flyway history"
+      echo "V${version} recorded from explicitly accepted Flyway baseline"
+      pending=1
       continue
     fi
   fi
 
   echo "Applying V${version} (${description})"
-  sql_file "$file"
+  apply_migration_file "$file" "$version" "$checksum"
   sql "INSERT INTO pms_schema_migration_history (version, description, checksum) VALUES ('$version', '$description', '$checksum')"
   echo "V${version} applied"
+  pending=1
 done
 
-echo "OceanBase upgrade completed. No database or table was dropped."
+if [[ "$pending" == "0" ]]; then
+  echo "No pending migrations. All migration checksums verified."
+else
+  echo "OceanBase upgrade completed."
+fi
+echo "No database or table was dropped."

@@ -70,6 +70,7 @@ case "$BACKUP_PATH" in
     command -v zstd >/dev/null 2>&1 || { echo "zstd is required to restore this backup" >&2; exit 2; }
     decompressor=(zstd -dc "$BACKUP_PATH")
     ;;
+  (*) echo "unsupported backup extension; expected .sql.gz or .sql.zst" >&2; exit 2;;
 esac
 if [[ "$SQL_CLIENT" == "container" ]]; then
   "${decompressor[@]}" | container_mysql

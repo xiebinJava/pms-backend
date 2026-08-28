@@ -16,13 +16,16 @@ DB_PORT="${PMS_DB_PORT:-${MYSQL_PORT:-${OCEANBASE_PORT:-3306}}}"
 DB_NAME="${PMS_DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-${OCEANBASE_DATABASE:-brad_pms}}}}"
 DB_USER="${PMS_DB_USER:-${MYSQL_USER:-${OCEANBASE_USER:-}}}"
 DB_PASSWORD="${PMS_DB_PASSWORD:-${MYSQL_PASSWORD:-${OCEANBASE_PASSWORD:-}}}"
+TOOL_IMAGE="${PMS_MYSQL_TOOL_IMAGE:-mysql:8.4}"
 
 if command -v mysql >/dev/null 2>&1; then
   SQL_CLIENT=mysql
 elif command -v obclient >/dev/null 2>&1; then
   SQL_CLIENT=obclient
+elif command -v docker >/dev/null 2>&1; then
+  SQL_CLIENT=container
 else
-  echo "mysql or obclient client is required (MySQL 8 or OceanBase MySQL mode)" >&2
+  echo "mysql/obclient client or Docker (mysql:8.4) is required (MySQL 8 or OceanBase MySQL mode)" >&2
   exit 2
 fi
 if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
@@ -30,9 +33,16 @@ if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
   exit 2
 fi
 
-mysql_cmd=("$SQL_CLIENT" --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names --raw)
+mysql_args=(--protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names --raw)
+container_mysql() {
+  MYSQL_PWD="$DB_PASSWORD" docker run --rm --network host -e MYSQL_PWD "$TOOL_IMAGE" mysql "${mysql_args[@]}" "$@"
+}
 run_sql() {
-  MYSQL_PWD="$DB_PASSWORD" "${mysql_cmd[@]}" --execute "$1"
+  if [[ "$SQL_CLIENT" == "container" ]]; then
+    container_mysql --execute "$1"
+  else
+    MYSQL_PWD="$DB_PASSWORD" "$SQL_CLIENT" "${mysql_args[@]}" --execute "$1"
+  fi
 }
 
 assert_empty() {

@@ -33,9 +33,9 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 
 `oceanbase-upgrade.sh` 会：
 
-1. 创建迁移历史表和可过期租约锁（默认 30 分钟），同一时间只允许一个升级进程。
-2. 读取 `flyway_schema_history`，把已经成功的 V1–V5 记录到新历史表，不重复执行旧版本。
-3. 对每个脚本保存 SHA-256；脚本内容被修改时立即失败，不会继续升级。
+1. 创建迁移历史、逐语句检查点和带 `pms-schema-upgrade` 名称的租约锁（默认 30 分钟），同一时间只允许一个升级进程；释放锁时校验 owner token，避免误清理其他进程的锁。
+2. 读取 `flyway_schema_history`。旧 Flyway 记录没有本工具的 SHA-256 检查点时默认暂停，运维人员核对发布包后显式设置 `PMS_ACCEPT_FLYWAY_BASELINE=true` 才能记录，避免静默接受被替换的脚本。
+3. 对每个脚本保存 SHA-256，并为每条已成功执行的语句保存检查点；脚本内容被修改或中途失败时立即失败，已完成语句不会重复执行。
 4. 只执行缺失版本，不执行 `DROP DATABASE` 或 `TRUNCATE`。
 
 同一命令连续执行两次是安全的；第二次应显示所有版本已校验且没有待执行版本。升级失败时保留日志，先恢复到新库并完成预检，再切换应用连接，禁止直接删除生产表。
@@ -43,8 +43,8 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 ## 生成备份
 
 ```bash
-export OCEANBASE_USER=pms_app
-export OCEANBASE_PASSWORD="$PMS_APP_PASSWORD"
+export OCEANBASE_USER=pms_migrator
+export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 export PMS_BACKUP_DIR=/var/backups/pms
 ./scripts/backup-oceanbase.sh
 ```
@@ -55,7 +55,7 @@ export PMS_BACKUP_DIR=/var/backups/pms
 - 同名 `.sha256` 校验文件
 - 同名 `.meta` 元数据（库名、脚本版本、生成时间和表级行数统计）
 
-备份使用一致性事务快照和十六进制二进制值，不记录密码。备份目录权限应为 `700`，并按企业策略加密、异地复制和定期清理。生成后必须执行：
+备份使用一致性事务快照、跳过表锁/删除表语句和十六进制二进制值，不记录密码；默认使用迁移账号读取结构并支持恢复所需的建表权限。备份目录权限应为 `700`，并按企业策略加密、异地复制和定期清理。生成后必须执行：
 
 ```bash
 ./scripts/verify-backup.sh /var/backups/pms/brad_pms-<UTC时间>-v5.sql.gz
@@ -85,5 +85,7 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 - 现有 `brad_pms` 的 V1–V5 被记录并可重复校验；第二次升级无待执行版本。
 - 备份压缩流和 SHA-256 校验通过，文件名带 `v5` 版本标识。
 - 备份恢复到隔离空库后，企业迁移校验通过；抽样数据（2 个项目、21 个用户、9 个组织、6 个任务）存在。
+
+另外，在专用临时库 `brad_pms_upgrade_smoke_20260828` 中使用 `pms_migrator` 完成了从空库执行 V1–V5、再次执行升级（输出 `No pending migrations`）和清理临时库的回归；共生成 28 张表，未触碰现有 `brad_pms`。
 
 以上是开发环境证据，生产发布仍需按目标环境保存备份位置、校验值、执行人和回滚联系人。

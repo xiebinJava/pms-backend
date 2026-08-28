@@ -38,6 +38,11 @@ class OceanbaseUpgradeScriptTest {
         assertThat(script).contains("pms_schema_migration_lock");
         assertThat(script).contains("sha256sum");
         assertThat(script).contains("locked_until");
+        assertThat(script).contains("owner_token");
+        assertThat(script).contains("pms-schema-upgrade");
+        assertThat(script).contains("pms_schema_migration_step");
+        assertThat(script).contains("PMS_ACCEPT_FLYWAY_BASELINE");
+        assertThat(script).contains("No pending migrations");
         assertThat(script).doesNotContain("DROP DATABASE");
         assertThat(script).doesNotContain("TRUNCATE");
     }
@@ -50,8 +55,11 @@ class OceanbaseUpgradeScriptTest {
 
         assertThat(backup).contains("sha256");
         assertThat(backup).contains("single-transaction");
+        assertThat(backup).contains("skip-add-drop-table");
+        assertThat(backup).contains("skip-lock-tables");
         assertThat(restore).contains("--allow-empty-target");
         assertThat(restore).contains("verify-backup.sh");
+        assertThat(restore).contains("unsupported backup extension");
         assertThat(restore).doesNotContain("DROP DATABASE");
         assertThat(restore).doesNotContain("TRUNCATE");
         assertThat(verify).contains("gzip -t");

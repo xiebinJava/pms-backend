@@ -18,12 +18,12 @@ if [[ $# -ne 0 ]]; then usage >&2; exit 2; fi
 DB_HOST="${OCEANBASE_HOST:-127.0.0.1}"
 DB_PORT="${OCEANBASE_PORT:-2881}"
 DB_NAME="${OCEANBASE_DATABASE:-brad_pms}"
-DB_USER="${OCEANBASE_USER:-pms_app}"
+DB_USER="${OCEANBASE_BACKUP_USER:-${OCEANBASE_USER:-pms_migrator}}"
 if [[ -z "${OCEANBASE_PASSWORD:-}" ]]; then
-  OCEANBASE_PASSWORD="${PMS_APP_PASSWORD:-}"
+  OCEANBASE_PASSWORD="${PMS_MIGRATOR_PASSWORD:-${PMS_APP_PASSWORD:-}}"
 fi
 if [[ -z "$OCEANBASE_PASSWORD" ]]; then
-  echo "OCEANBASE_PASSWORD or PMS_APP_PASSWORD is required" >&2
+  echo "OCEANBASE_PASSWORD or PMS_MIGRATOR_PASSWORD is required" >&2
   exit 2
 fi
 case "$DB_NAME" in
@@ -80,8 +80,9 @@ metadata_file="${archive}.meta"
 cleanup_partial() { rm -f "$archive" "$checksum_file" "$metadata_file"; }
 trap cleanup_partial ERR INT TERM
 
+dump_options=(--single-transaction --skip-lock-tables --skip-add-locks --skip-add-drop-table --no-tablespaces --triggers --hex-blob)
 if [[ "$dump_mode" == "host" ]]; then
-  dump_cmd=(mysqldump --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --single-transaction --routines --triggers --hex-blob "$DB_NAME")
+  dump_cmd=(mysqldump --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" "${dump_options[@]}" "$DB_NAME")
   if [[ "$archive" == *.zst ]]; then
     MYSQL_PWD="$OCEANBASE_PASSWORD" "${dump_cmd[@]}" | "${compressor[@]}"
   else
@@ -91,7 +92,7 @@ else
   container_dump() {
     MYSQL_PWD="$OCEANBASE_PASSWORD" docker run --rm --network host -e MYSQL_PWD mysql:8.4 \
       mysqldump --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" \
-      --single-transaction --routines --triggers --hex-blob "$DB_NAME"
+      "${dump_options[@]}" "$DB_NAME"
   }
   if [[ "$archive" == *.zst ]]; then
     container_dump | "${compressor[@]}"
