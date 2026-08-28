@@ -15,14 +15,14 @@
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 工作区状态 | 已确认 | 后端和前端无业务代码未提交修改 |
+| 工作区状态 | 提交前检查 | 当前阶段改动将在复核通过后分阶段提交 |
 
 ## 仍需完成
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
-| P1 | 无结构化日志、指标、告警和审计清理策略 | 问题定位和长期存储成本不可控 |
-| P1 | 无 OpenAPI、真实 OceanBase 集成 CI、E2E、镜像扫描和 SBOM | 开源交付缺少自动质量门禁 |
+| P1 | 真实 OceanBase 集成、备份恢复和故障演练尚未在本机完成 | 当前 Docker Hub 网络不可用，必须在 CI/部署机执行后才能发布 |
+| P1 | CI、E2E、镜像扫描和 SBOM 已配置但尚未取得本次运行报告 | 需要 GitHub Actions 或具备镜像缓存的 CI 执行 |
 | P2 | 尚未规划 Spring Boot 3/Java 21 升级 | 长期维护成本较高，但不是当前发布阻塞项 |
 
 ## 已收口能力
@@ -54,3 +54,6 @@
 | Task 3：统一安全边界、错误响应和请求链路 | 已完成 | 后端全量测试、前端 79 项 Node 测试、`pnpm typecheck`、`pnpm build` 通过；覆盖 400/401/403/409/422/500/429、requestId、刷新失败跳转、代理转发和敏感接口限流；提交见安全边界提交。 |
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限和安全响应头已接入。 |
+| Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、Actuator 指标、UTC JSON 日志、审计脱敏与 180 天清理任务已接入。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 已配置，待 CI 实跑 | CI workflow、OceanBase 集成、Playwright 桌面/390px、Trivy、SPDX SBOM、Dependabot 已提交工作树；本机 Playwright 无凭据按设计跳过。 |
+| Task 8：生产演练与开源交付 | 文档完成，演练阻塞 | [`drill-records/2026-08-28-production-readiness.md`](drill-records/2026-08-28-production-readiness.md) 记录了通过项和 Docker Hub 超时证据；真实部署/备份恢复/故障演练待 CI 或部署机。 |

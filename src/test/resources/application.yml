@@ -11,6 +11,8 @@ spring:
     locations: classpath:db/migration
 
 pms:
+  deployment:
+    environment: test
   upload-dir: ${PMS_UPLOAD_DIR:/tmp/pms-test-uploads}
   notification:
     startup-check-enabled: false

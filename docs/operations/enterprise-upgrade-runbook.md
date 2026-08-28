@@ -114,7 +114,8 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
 `{"status":"UP","database":"UP"}`，数据库不可用返回 HTTP 503 与 `DOWN`。响应不包含
-连接串、SQL、密码或令牌。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
+连接串、SQL、密码或令牌。另有 `/api/health/live`（仅进程存活）和 `/api/health/ready`（数据库与迁移就绪），
+以及仅供内网监控使用的 `/api/actuator/health`、`/api/actuator/metrics`。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
 可用于串联一次请求的前后端日志。
 
 发布前的完整代码、迁移、安全、浏览器冒烟与回滚清单见
@@ -122,5 +123,6 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 容器运行时默认使用后端 UID 10001、非 root Nginx、只读根文件系统、独立上传卷和
 `no-new-privileges`；后端与前端只有在健康检查通过后才被 Compose 视为可用。生产部署应
-根据机器容量调整 `mem_limit`/`cpus`，并通过反向代理提供 HTTPS。Nginx 仅在请求的
-`X-Forwarded-Proto` 为 `https` 时发送 HSTS，HTTP 本地调试不会写入 HSTS。
+根据机器容量调整 `mem_limit`/`cpus`，并通过反向代理提供 HTTPS。Nginx 仅接受来自明确配置的
+本地/私有代理网段的 `X-Forwarded-Proto`，外层 TLS 终止代理必须位于这些网段内；不可信客户端的
+伪造头会被忽略。生产环境必须设置 `PMS_DEPLOYMENT_ENV=production`，启用通知启动校验并关闭重置/邀请 token 回显。

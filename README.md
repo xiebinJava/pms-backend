@@ -54,9 +54,12 @@ cp .env.oceanbase.example .env
 docker compose -f docker-compose.example.yml up --build
 ```
 
-Compose 会先等待 OceanBase，再在空库执行核心表和企业迁移，最后启动后端与前端。前端地址为
-`http://localhost:5173`，健康检查为 `http://localhost:8080/api/health`。初始化服务只使用
-`pms_schema_bootstrap_marker` 做一次性标记；已有业务库请按升级手册执行预检和迁移，不要直接套用示例 Compose。
+Compose 会先等待 OceanBase，再依次运行 `accounts-init`（创建最小权限账号）、`schema-init`
+（执行版本化 V1–V5 迁移）和 `uploads-init`（修复持久化上传卷的属主），最后启动后端与前端。
+前端地址为 `http://localhost:5173`；后端端口仅绑定本机 `127.0.0.1:8080`。健康检查包括
+`/api/health/live`（存活）、`/api/health/ready`（数据库与迁移就绪）和 `/api/actuator/health`。
+示例 Compose 默认关闭 SMTP 启动校验、允许在响应中返回本地重置/邀请 token，生产部署必须通过环境变量
+启用 SMTP 校验、配置 HTTPS 公网地址并关闭 token 回显。已有业务库请按升级手册执行预检和迁移，不要直接套用示例 Compose。
 
 自动化测试使用独立的嵌入式测试数据库，不会改变 OceanBase 数据：
 
@@ -115,6 +118,8 @@ mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 | POST | `/admin/import/preview/organizations`、`/admin/import/preview/users`、`/admin/import/{id}/commit` | Excel/CSV 组织与员工导入 |
 | GET | `/admin/audit` | 审计日志筛选和分页（操作、资源、人员、时间、`currPage`、`pageSize`） |
 | GET | `/health`、`/healthz` | 应用与 OceanBase 数据库健康检查（无需登录） |
+| GET | `/health/live`、`/health/ready` | 存活与数据库/迁移就绪探针（无需登录） |
+| GET | `/actuator/health`、`/actuator/metrics` | 内网运维健康与指标端点 |
 
 除登录外所有接口需携带请求头：`Authorization: Bearer <token>`。
 
@@ -133,6 +138,12 @@ PMS_JWT_SECRET=<生产环境请设置强随机密钥>
 
 业务不变量、数据关系、权限/数据范围、认证、导入和 OceanBase 约束统一沉淀在
 [`docs/business-specification.md`](docs/business-specification.md)。
+
+OpenAPI 合同位于 `src/main/resources/openapi/pms-api.yaml`，本地校验：
+
+```bash
+./scripts/validate-openapi.sh
+```
 
 企业级基础设施（数据库账号隔离、备份恢复、升级、容器、可观测性、CI 和开源交付）的当前状态见
 [`docs/operations/infrastructure-status.md`](docs/operations/infrastructure-status.md)，逐项执行计划见

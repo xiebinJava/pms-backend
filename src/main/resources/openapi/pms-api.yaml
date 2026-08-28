@@ -1,0 +1,272 @@
+openapi: 3.0.3
+info:
+  title: PMS 项目管理 API
+  version: 0.1.0
+  description: 单企业私有化部署的项目、组织和权限管理接口。
+servers:
+  - url: /api
+tags:
+  - name: 认证
+  - name: 项目
+  - name: 组织与权限
+  - name: 导入与审计
+paths:
+  /auth/login:
+    post:
+      tags: [认证]
+      security: []
+      summary: 英文名登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/refresh:
+    post:
+      tags: [认证]
+      security: []
+      summary: 刷新访问令牌
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/me:
+    get:
+      tags: [认证]
+      summary: 当前用户
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /projects/page:
+    post:
+      tags: [项目]
+      summary: 项目分页查询
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keyword: { type: string }
+                status: { type: integer }
+                currPage: { type: integer, minimum: 1, default: 1 }
+                pageSize: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /projects:
+    post:
+      tags: [项目]
+      summary: 创建项目
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [项目]
+      summary: 项目详情
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [项目]
+      summary: 更新项目
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [项目]
+      summary: 删除项目
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/org/tree:
+    get:
+      tags: [组织与权限]
+      summary: 查询组织树
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/org:
+    post:
+      tags: [组织与权限]
+      summary: 新增组织单元
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/users:
+    get:
+      tags: [组织与权限]
+      summary: 查询人员
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [组织与权限]
+      summary: 邀请员工
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /admin/roles:
+    get:
+      tags: [组织与权限]
+      summary: 查询角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/import/preview/{type}:
+    parameters:
+      - name: type
+        in: path
+        required: true
+        schema: { type: string, enum: [organizations, users] }
+    post:
+      tags: [导入与审计]
+      summary: 预览 Excel/CSV 导入
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/audit:
+    get:
+      tags: [导入与审计]
+      summary: 分页查询审计日志
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /health:
+    get:
+      tags: [认证]
+      security: []
+      summary: 就绪探针
+      responses:
+        '200': { description: 数据库和迁移就绪 }
+        '503': { description: 服务未就绪 }
+  /health/live:
+    get:
+      tags: [认证]
+      security: []
+      summary: 存活探针
+      responses:
+        '200': { description: 进程存活 }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, description: 英文名，不区分大小写 }
+        password: { type: string, format: password }
+    ApiResponse:
+      type: object
+      properties:
+        code: { type: integer, example: 0 }
+        msg: { type: string }
+        data: {}
+        requestId: { type: string }
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          required: [code, msg, requestId]
+  responses:
+    Success:
+      description: 请求成功
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+    Unauthorized:
+      description: 未认证或会话已失效
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: 无权访问
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: 数据冲突
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    BusinessError:
+      description: 业务校验失败
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    TooManyRequests:
+      description: 请求过于频繁
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+security:
+  - bearerAuth: []

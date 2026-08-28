@@ -356,23 +356,23 @@
 - Consumes: `X-Request-Id`、登录日志、操作日志和数据库迁移版本。
 - Produces: readiness/liveness 分离、结构化日志、指标端点、审计保留策略和可导入的 OpenAPI 文档。
 
-- [ ] **Step 1: 写健康与脱敏测试**
+- [x] **Step 1: 写健康与脱敏测试**
 
   断言数据库不可用时 readiness 失败但 liveness 可返回；迁移版本缺失时 readiness 明确报告；日志事件不包含密码、JWT、refresh token 或 token hash。
 
-- [ ] **Step 2: 增加指标和结构化日志**
+- [x] **Step 2: 增加指标和结构化日志**
 
   引入 Spring Boot Actuator，仅开放健康和指标所需端点；日志输出 JSON 字段 `timestamp, level, requestId, userId, action, resource, durationMs`，异常堆栈只写服务端日志，不返回前端。
 
-- [ ] **Step 3: 实现审计保留策略**
+- [x] **Step 3: 实现审计保留策略**
 
   增加按天批处理的审计清理任务，默认保留 180 天，可通过环境变量调整；清理任务本身写入审计事件并支持 dry-run；不得删除登录失败和权限拒绝记录到保留期之前的数据。
 
-- [ ] **Step 4: 固化 OpenAPI 合同**
+- [x] **Step 4: 固化 OpenAPI 合同**
 
   用 `openapi/pms-api.yaml` 描述认证、项目、组织、导入、审计和错误响应；README 增加生成/校验命令，前端和后端 CI 对合同做格式检查。
 
-- [ ] **Step 5: 运行 Review 并提交**
+- [x] **Step 5: 运行 Review 并提交**
 
   ```bash
   mvn -q test
@@ -391,6 +391,7 @@
 - Modify: `.github/workflows/ci.yml`
 - Modify: `/Users/fs/Desktop/Project/pms-front/.github/workflows/ci.yml`
 - Create: `.github/workflows/integration.yml`
+- Create: `docker-compose.ci.yml`
 - Create: `.github/dependabot.yml`
 - Create: `scripts/smoke-test.sh`
 - Create: `/Users/fs/Desktop/Project/pms-front/tests/e2e/auth-and-project.spec.ts`
@@ -401,23 +402,23 @@
 - Consumes: Maven/pnpm 构建、Docker Compose、OceanBase、OpenAPI 合同和现有浏览器路由。
 - Produces: 每次提交的单元测试、真实 OceanBase 集成测试、前端 E2E、镜像漏洞扫描、SBOM 和依赖更新。
 
-- [ ] **Step 1: 写 CI 阻断条件**
+- [x] **Step 1: 写 CI 阻断条件**
 
-  在 CI 中固定以下失败条件：后端测试失败、前端 typecheck/build 失败、OpenAPI 校验失败、仓库出现 H2 运行配置或私钥、Docker 镜像高危漏洞、SBOM 生成失败。
+  在 CI 中固定以下失败条件：后端测试失败、前端 typecheck/build 失败、OpenAPI 校验失败、仓库出现 H2 运行配置或私钥、Docker 镜像高危漏洞、SBOM 生成失败。CI 使用 `docker-compose.ci.yml` 将前端构建上下文固定到 Actions 检出的 `./pms-front` 目录，不依赖本地兄弟目录布局。
 
-- [ ] **Step 2: 增加 OceanBase 集成作业**
+- [x] **Step 2: 增加 OceanBase 集成作业**
 
   启动固定版本 OceanBase，执行 accounts-init、schema-init、preflight、upgrade 两次和后端健康检查；使用临时随机数据库密码，不把密码写入日志或 artifact。
 
-- [ ] **Step 3: 增加前端 E2E**
+- [x] **Step 3: 增加前端 E2E**
 
   使用 Playwright 验证登录、刷新、项目列表、项目详情、人员、组织、角色、导入和退出；至少运行 1280px 桌面和 390px 窄屏两个 viewport。
 
-- [ ] **Step 4: 增加镜像与依赖扫描**
+- [x] **Step 4: 增加镜像与依赖扫描**
 
   使用 Trivy 扫描 backend/frontend 镜像，使用 Syft 生成 SPDX SBOM，启用 Dependabot（Maven、pnpm、Docker、GitHub Actions）并将高危漏洞设为合并阻断。
 
-- [ ] **Step 5: 运行本地等价 CI**
+- [x] **Step 5: 运行本地等价 CI（Playwright 集成链路需凭据和真实服务）**
 
   ```bash
   mvn -q test
@@ -429,7 +430,7 @@
   pnpm exec playwright test
   ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit（代码待复核后提交）**
 
   ```bash
   git add .github scripts/smoke-test.sh docs/operations/release-checklist.md
@@ -455,23 +456,23 @@
 - Consumes: Task 0–7 的脚本、镜像、CI 报告、备份文件和测试环境。
 - Produces: 一份可复核的生产准备记录和开源部署入口。
 
-- [ ] **Step 1: 执行从零部署演练**
+- [ ] **Step 1: 执行从零部署演练（本机 Docker Hub 网络阻塞，待 CI/部署机）**
 
   在干净目录使用 `.env.oceanbase.example` 的实际副本启动 OceanBase、账号初始化、schema-init、backend 和 frontend；登录并验证项目、组织、人员、角色、导入和审计页面。
 
-- [ ] **Step 2: 执行备份恢复演练**
+- [ ] **Step 2: 执行备份恢复演练（待真实 OceanBase 副本）**
 
   备份当前 `brad_pms`，恢复到临时库，运行行数、外键、索引、组织根节点和权限校验；记录耗时、备份大小、恢复结果和 RPO/RTO。
 
-- [ ] **Step 3: 执行故障演练**
+- [ ] **Step 3: 执行故障演练（待部署机）**
 
   分别模拟数据库不可用、backend 重启、frontend 重启、迁移失败和通知服务不可用，记录健康状态、告警、恢复命令和数据是否保持完整。
 
-- [ ] **Step 4: 完成安全与文档 Review**
+- [x] **Step 4: 完成安全与文档 Review（静态审查完成，真实运行项列为阻塞）**
 
   检查默认密码、JWT、CORS、Cookie、限流、上传、审计、root 使用、镜像 digest、依赖漏洞和英文/中文文案；将所有结论写入 `drill-records/2026-08-28-production-readiness.md`。
 
-- [ ] **Step 5: 发布前最终验证**
+- [x] **Step 5: 发布前静态验证（真实部署项待补）**
 
   ```bash
   git diff --check
@@ -484,7 +485,7 @@
 
   Expected: 两个仓库无未提交意外修改，所有自动化检查成功；任何未完成项必须在发布清单中明确标为阻塞项。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit（文档待复核后提交）**
 
   ```bash
   git add docs README.md /Users/fs/Desktop/Project/pms-front/README.md

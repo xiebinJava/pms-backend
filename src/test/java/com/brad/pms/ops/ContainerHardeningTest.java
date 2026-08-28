@@ -36,6 +36,11 @@ class ContainerHardeningTest {
         assertThat(compose).contains("mem_limit:");
         assertThat(compose).contains("cpus:");
         assertThat(compose).contains("healthcheck:");
+        assertThat(compose).contains("127.0.0.1:2881:2881");
+        assertThat(compose).contains("127.0.0.1:8080:8080");
+        assertThat(compose).contains("uploads-init:");
+        assertThat(compose).contains("chown -R 10001:10001");
+        assertThat(compose).contains("PMS_NOTIFICATION_STARTUP_CHECK:-false");
     }
 
     @Test
@@ -47,5 +52,8 @@ class ContainerHardeningTest {
         assertThat(nginx).contains("Strict-Transport-Security");
         assertThat(nginx).contains("client_max_body_size");
         assertThat(nginx).contains("proxy_read_timeout");
+        assertThat(nginx).contains("proxy_set_header X-Forwarded-For $remote_addr");
+        assertThat(nginx).contains("proxy_set_header X-Forwarded-Proto $forwarded_proto");
+        assertThat(nginx).contains("geo $trusted_proxy");
     }
 }

@@ -7,6 +7,8 @@
 - [ ] 后端使用 Java 17，执行 `mvn -q test` 全部通过。
 - [ ] 前端执行 `pnpm typecheck` 和 `pnpm build` 全部通过。
 - [ ] CI 的后端测试、前端检查和密钥扫描均通过。
+- [ ] CI 的 OceanBase 集成冒烟、Playwright 桌面/窄屏测试、Trivy 高危扫描和 SPDX SBOM 均通过。
+- [ ] OpenAPI 合同通过 `./scripts/validate-openapi.sh` 校验。
 - [ ] 发布版本、数据库迁移脚本和回滚说明已标记并归档。
 
 ## OceanBase 与迁移
@@ -26,6 +28,7 @@
 - [ ] `OCEANBASE_USER` 使用最小必要权限，密码通过密钥管理或运行环境注入。
 - [ ] `PMS_CORS_ALLOWED_ORIGINS` 只填写正式前端来源，不使用 `*`。
 - [ ] 关闭 `PMS_PASSWORD_RESET_EXPOSE_TOKEN` 和 `PMS_INVITATION_EXPOSE_TOKEN`，并验证通知适配器。
+- [ ] `PMS_DEPLOYMENT_ENV=production`，通知启动校验开启；HTTPS 反代来自可信代理网段。
 - [ ] 已创建正式管理员并更换所有演示账号密码，不使用共享默认密码。
 - [ ] 已验证禁用、改密、注销和刷新令牌轮换会立即结束旧会话。
 
@@ -43,6 +46,7 @@
 
 - [ ] `GET /api/health` 和 `GET /api/healthz` 在数据库正常时返回 200/UP。
 - [ ] 数据库不可用时健康检查返回 503/DOWN，不暴露 SQL 或连接密码。
+- [ ] `/api/health/live` 与 `/api/health/ready` 可分别用于存活/就绪探针，Actuator 端点仅允许内网监控访问。
 - [ ] API 响应包含 `X-Request-Id`，审计日志保存相同 request id。
 - [ ] 审计页可按动作、资源、操作人和时间分页检索，敏感字段已脱敏。
 - [ ] 已配置日志保留、磁盘空间、数据库连接池和告警负责人。

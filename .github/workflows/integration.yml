@@ -1,0 +1,74 @@
+name: integration-and-e2e
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  oceanbase-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: xiebinJava/pms-front
+          path: pms-front
+      - name: Prepare ephemeral integration environment
+        shell: bash
+        run: |
+          umask 077
+          root_password="$(openssl rand -hex 24)"
+          app_password="$(openssl rand -hex 24)"
+          migrator_password="$(openssl rand -hex 24)"
+          jwt_secret="$(openssl rand -hex 32)"
+          admin_password="$(openssl rand -hex 16)"
+          {
+            echo "OCEANBASE_ROOT_PASSWORD=$root_password"
+            echo "PMS_APP_PASSWORD=$app_password"
+            echo "PMS_MIGRATOR_PASSWORD=$migrator_password"
+            echo "OCEANBASE_USER=pms_app"
+            echo "OCEANBASE_PASSWORD=$app_password"
+            echo "PMS_JWT_SECRET=$jwt_secret"
+            echo "PMS_DEPLOYMENT_ENV=development"
+            echo "PMS_BOOTSTRAP_ADMIN_USERNAME=brad.xie"
+            echo "PMS_BOOTSTRAP_ADMIN_NAME_ZH=谢斌"
+            echo "PMS_BOOTSTRAP_ADMIN_PASSWORD=$admin_password"
+            echo "PMS_NOTIFICATION_STARTUP_CHECK=false"
+            echo "PMS_PASSWORD_RESET_EXPOSE_TOKEN=true"
+            echo "PMS_INVITATION_EXPOSE_TOKEN=true"
+          } > .env
+          {
+            echo "E2E_PASSWORD=$admin_password"
+            echo "PMS_SMOKE_PASSWORD=$admin_password"
+          } >> "$GITHUB_ENV"
+          echo "PMS_SMOKE_USERNAME=brad.xie" >> "$GITHUB_ENV"
+      - name: Start OceanBase, backend and frontend
+        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml up -d --build frontend
+      - name: Run read-only migration preflight
+        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm --entrypoint /bin/bash schema-init /usr/local/bin/enterprise-preflight.sh
+      - name: Re-run migrations to verify idempotency
+        run: |
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm schema-init
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm schema-init
+      - name: Verify enterprise migration
+        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm --entrypoint /bin/bash schema-init /usr/local/bin/verify-enterprise-migration.sh
+      - name: Run API smoke test
+        run: ./scripts/smoke-test.sh
+      - name: Install Playwright browser
+        working-directory: pms-front
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Run desktop and mobile browser smoke tests
+        working-directory: pms-front
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5173
+          E2E_USERNAME: brad.xie
+        run: pnpm exec playwright test
+      - name: Show service status on failure
+        if: failure()
+        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml ps
+      - name: Stop integration stack
+        if: always()
+        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml down -v
