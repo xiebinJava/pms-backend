@@ -6,6 +6,8 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,5 +42,28 @@ class OceanbaseConfigurationTest {
         assertThat(source.getProperty("pms.jwt.secret")).isEqualTo("${PMS_JWT_SECRET:}");
         assertThat(source.getProperty("pms.security.cors.allowed-origins"))
                 .isEqualTo("${PMS_CORS_ALLOWED_ORIGINS:http://localhost:57979,http://127.0.0.1:57979}");
+    }
+
+    @Test
+    void composeSeparatesRuntimeAndMigrationDatabaseAccounts() throws Exception {
+        String compose = Files.readString(Path.of("docker-compose.example.yml"));
+
+        assertThat(compose).contains("OCEANBASE_USER: pms_app");
+        assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}");
+        assertThat(compose).contains("OCEANBASE_USER: pms_migrator");
+        assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}");
+        assertThat(compose).doesNotContain("OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}");
+    }
+
+    @Test
+    void mysqlProfileAlsoRequiresExplicitCredentials() throws Exception {
+        List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
+                "mysql", new ClassPathResource("application-mysql.yml"));
+        PropertySource<?> source = sources.get(0);
+
+        assertThat(source.getProperty("spring.datasource.username"))
+                .isEqualTo("${MYSQL_USER}");
+        assertThat(source.getProperty("spring.datasource.password"))
+                .isEqualTo("${MYSQL_PASSWORD}");
     }
 }

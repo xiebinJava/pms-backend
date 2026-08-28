@@ -31,7 +31,11 @@ until run_mysql --execute "SELECT 1" >/dev/null 2>&1; do
   sleep 2
 done
 
-run_mysql --execute "CREATE DATABASE IF NOT EXISTS \`$OCEANBASE_DATABASE\` DEFAULT CHARACTER SET utf8mb4"
+database_exists="$(run_mysql --execute "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$OCEANBASE_DATABASE';" | tr -d '[:space:]')"
+if [ "$database_exists" != "1" ]; then
+  echo "Database $OCEANBASE_DATABASE does not exist; run oceanbase-accounts-init.sh with root first" >&2
+  exit 1
+fi
 marker="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='pms_schema_bootstrap_marker'"
 if [ "$(run_mysql --database="$OCEANBASE_DATABASE" --execute "$marker" | tr -d '[:space:]')" = "1" ]; then
   echo "PMS schema is already initialized"

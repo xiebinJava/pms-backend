@@ -3,7 +3,7 @@ services:
     image: oceanbase/oceanbase-ce:4.3.5.1
     environment:
       MODE: mini
-      OB_TENANT_PASSWORD: ${OCEANBASE_PASSWORD:?set OCEANBASE_PASSWORD}
+      OB_TENANT_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
     ports:
       - "2881:2881"
     volumes:
@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 30
 
-  schema-init:
+  accounts-init:
     image: mysql:8.4
     depends_on:
       oceanbase:
@@ -23,8 +23,27 @@ services:
       OCEANBASE_HOST: oceanbase
       OCEANBASE_PORT: 2881
       OCEANBASE_DATABASE: brad_pms
-      OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}
-      OCEANBASE_PASSWORD: ${OCEANBASE_PASSWORD:?set OCEANBASE_PASSWORD}
+      OCEANBASE_ROOT_USER: root@sys
+      OCEANBASE_ROOT_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
+      PMS_APP_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}
+      PMS_MIGRATOR_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}
+      PMS_ROTATE_ACCOUNT_PASSWORDS: ${PMS_ROTATE_ACCOUNT_PASSWORDS:-false}
+    volumes:
+      - ./docker/oceanbase-accounts-init.sh:/usr/local/bin/oceanbase-accounts-init.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/oceanbase-accounts-init.sh"]
+    restart: "no"
+
+  schema-init:
+    image: mysql:8.4
+    depends_on:
+      accounts-init:
+        condition: service_completed_successfully
+    environment:
+      OCEANBASE_HOST: oceanbase
+      OCEANBASE_PORT: 2881
+      OCEANBASE_DATABASE: brad_pms
+      OCEANBASE_USER: pms_migrator
+      OCEANBASE_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}
     volumes:
       - ./docker/oceanbase-init.sh:/usr/local/bin/oceanbase-init.sh:ro
       - ./src/main/resources/schema.sql:/sql/schema.sql:ro
@@ -46,8 +65,8 @@ services:
       OCEANBASE_HOST: oceanbase
       OCEANBASE_PORT: 2881
       OCEANBASE_DATABASE: brad_pms
-      OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}
-      OCEANBASE_PASSWORD: ${OCEANBASE_PASSWORD:?set OCEANBASE_PASSWORD}
+      OCEANBASE_USER: pms_app
+      OCEANBASE_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}
       PMS_JWT_SECRET: ${PMS_JWT_SECRET:?set a random PMS_JWT_SECRET of at least 32 bytes}
       PMS_CORS_ALLOWED_ORIGINS: ${PMS_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
     ports:

@@ -36,15 +36,15 @@
 - Consumes: 当前 OceanBase `brad_pms` 实例、现有 V1–V5 脚本、Compose 和 CI 配置。
 - Produces: 一份标记“已完成/待完成/风险”的基础设施清单，后续任务以此为唯一状态来源。
 
-- [ ] **Step 1: 记录当前可重复的基线**
+- [x] **Step 1: 记录当前可重复的基线**
 
   在 `infrastructure-status.md` 固定记录以下结果：OceanBase V5 已执行、后端 71 项测试通过、前端 77 项测试通过、`pnpm typecheck` 和 `pnpm build` 通过、两个仓库工作区干净；同时列出当前缺口：应用仍默认使用 root、无备份恢复自动化、无 OpenAPI、无漏洞扫描、上传目录无持久卷、错误 HTTP 状态不统一。
 
-- [ ] **Step 2: 对齐路线图勾选状态**
+- [x] **Step 2: 对齐路线图勾选状态**
 
   将已完成的历史任务与本计划的待执行基础设施任务分开，保留历史提交说明，避免把“业务功能已完成”误认为“生产基础设施已完成”。
 
-- [ ] **Step 3: 运行基线验证**
+- [x] **Step 3: 运行基线验证**
 
   ```bash
   cd /Users/fs/Desktop/Project/pms-backend
@@ -59,7 +59,7 @@
 
   Expected: 后端测试、前端类型检查和构建全部成功，两个仓库无格式错误。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
   ```bash
   git add docs/operations/infrastructure-status.md docs/superpowers/plans/2026-08-27-enterprise-completion-roadmap.md README.md
@@ -87,23 +87,23 @@
 - Consumes: `OCEANBASE_ROOT_PASSWORD`、`PMS_APP_PASSWORD`、`PMS_MIGRATOR_PASSWORD`，以及已有 `brad_pms` 数据库。
 - Produces: `pms_app`（运行时 DML 权限）和 `pms_migrator`（迁移 DDL 权限）；后端配置强制要求 `OCEANBASE_USER` 和 `OCEANBASE_PASSWORD`，不再默认回退到 root。
 
-- [ ] **Step 1: 写配置失败测试**
+- [x] **Step 1: 写配置失败测试**
 
   为以下场景补充测试：OceanBase profile 缺少 `OCEANBASE_USER` 失败；缺少 `OCEANBASE_PASSWORD` 失败；配置 `root@sys` 作为应用账号时启动校验失败；配置 `pms_app` 时通过。
 
-- [ ] **Step 2: 编写账号初始化脚本**
+- [x] **Step 2: 编写账号初始化脚本**
 
-  `oceanbase-accounts-init.sh` 只允许用 `root@sys` 首次执行，创建或更新两个账号：`pms_app` 对 `brad_pms.*` 授予 `SELECT, INSERT, UPDATE, DELETE`；`pms_migrator` 授予迁移需要的 DML 和 `CREATE, ALTER, INDEX, REFERENCES, CREATE VIEW, TRIGGER` 权限。脚本使用 `MYSQL_PWD` 传递密码，执行前拒绝空的生产密码，并且打印账号名和权限摘要但不打印密码。
+  `oceanbase-accounts-init.sh` 只允许用 `root@sys` 首次执行，创建或更新两个账号：`pms_app` 对 `brad_pms.*` 授予 `SELECT, INSERT, UPDATE, DELETE`；`pms_migrator` 授予迁移需要的 DML 和 `CREATE, ALTER, INDEX, REFERENCES, CREATE VIEW, TRIGGER` 权限，不授予 `DROP`。脚本使用 `MYSQL_PWD` 传递密码，执行前拒绝空的生产密码，并且打印账号名和权限摘要但不打印密码。
 
-- [ ] **Step 3: 拆分 Compose 初始化职责**
+- [x] **Step 3: 拆分 Compose 初始化职责**
 
   增加一次性 `accounts-init` 服务，用 root 创建数据库和两个账号；`schema-init` 改用 `pms_migrator` 执行 schema 与 V1–V5；`backend` 改用 `pms_app`。现有数据非空时禁止初始化脚本覆盖，账号初始化必须幂等。
 
-- [ ] **Step 4: 编写权限冒烟脚本**
+- [x] **Step 4: 编写权限冒烟脚本**
 
-  `check-oceanbase-privileges.sh` 使用应用账号验证 `SELECT/INSERT/UPDATE/DELETE` 可用、`CREATE TABLE` 被拒绝；使用迁移账号验证 `CREATE TABLE`、`ALTER TABLE` 可用；脚本只在临时表上测试，并在结束时删除临时表。
+  `check-oceanbase-privileges.sh` 使用应用账号验证 `SELECT/INSERT/UPDATE/DELETE` 可用、`CREATE TABLE` 被拒绝；使用迁移账号验证 `CREATE TABLE`、`ALTER TABLE` 可用。由于当前 OceanBase 不支持 MySQL 临时表，脚本使用带时间戳的探针表，并用 root 账号在退出时清理，不授予 `pms_migrator` 删除表权限。
 
-- [ ] **Step 5: 运行并 Review**
+- [x] **Step 5: 运行并 Review**
 
   ```bash
   OCEANBASE_PASSWORD="$OCEANBASE_ROOT_PASSWORD" \
@@ -114,7 +114,7 @@
 
   Review 应确认后端容器环境中不存在 root 凭据，账号初始化重复执行不会修改业务数据，失败时不会输出密码。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add docker docker-compose.example.yml src/main/resources/application-oceanbase.yml .env.oceanbase.example docs/operations/database-accounts.md scripts/check-oceanbase-privileges.sh src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java

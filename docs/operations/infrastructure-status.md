@@ -39,3 +39,11 @@
 4. 本地空密码 OceanBase 只允许作为当前开发实例特例，生产环境必须使用非空强密码。
 
 详细步骤见 [`../superpowers/plans/2026-08-28-enterprise-infrastructure-hardening.md`](../superpowers/plans/2026-08-28-enterprise-infrastructure-hardening.md)。
+
+## 执行记录
+
+| 任务 | 状态 | Review 证据 |
+| --- | --- | --- |
+| Task 0：基线盘点与文档状态对齐 | 已完成 | 后端 `mvn -q test` 通过；前端 Node 测试 77 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 通过；后端提交 `98fe24d`，前端提交 `aa2864d`。 |
+| Task 1：OceanBase 运行账号隔离 | 已完成 | 配置测试通过；Compose 解析通过；本地 OceanBase 已创建 `pms_app` / `pms_migrator`；应用账号建表被拒绝、迁移账号 DDL 通过；探针表已清理。 |
+| Task 2：OceanBase 备份、恢复与版本升级 | 进行中 | 待执行 |
