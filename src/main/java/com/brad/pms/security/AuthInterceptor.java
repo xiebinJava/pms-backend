@@ -7,6 +7,7 @@ import com.brad.pms.mapper.AuthSessionMapper;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -87,7 +88,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 writeError(response, e.getCode(), e.getMessage());
                 return false;
             } catch (Exception e) {
-                log.debug("token 解析失败: {}", e.getMessage());
+                log.debug("token 解析失败: {}", e.getClass().getSimpleName());
             }
         }
         writeUnauthorized(response, "未登录或登录已过期");
@@ -101,8 +102,17 @@ public class AuthInterceptor implements HandlerInterceptor {
     private void writeError(HttpServletResponse response, int code, String message) throws Exception {
         response.setStatus(code);
         response.setContentType("application/json;charset=UTF-8");
-        String safeMessage = message == null ? "请求失败" : message.replace("\\", "\\\\").replace("\"", "\\\"");
-        response.getWriter().write("{\"code\":" + code + ",\"msg\":\"" + safeMessage + "\",\"data\":null}");
+        String requestId = MDC.get("requestId");
+        if (requestId != null) response.setHeader("X-Request-Id", requestId);
+        String safeMessage = jsonEscape(message == null ? "请求失败" : message);
+        String safeRequestId = requestId == null ? "null" : "\"" + jsonEscape(requestId) + "\"";
+        response.getWriter().write("{\"code\":" + code + ",\"msg\":\"" + safeMessage
+                + "\",\"data\":null,\"requestId\":" + safeRequestId + "}");
+    }
+
+    private String jsonEscape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\r", "\\r").replace("\n", "\\n");
     }
 
     @Override

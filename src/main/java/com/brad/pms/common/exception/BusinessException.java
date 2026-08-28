@@ -11,7 +11,7 @@ public class BusinessException extends RuntimeException {
     private final int code;
 
     public BusinessException(String message) {
-        this(ResponseCode.ERROR, message);
+        this(ResponseCode.UNPROCESSABLE_ENTITY, message);
     }
 
     public BusinessException(int code, String message) {
@@ -35,5 +35,7 @@ public class BusinessException extends RuntimeException {
         public static final int ERROR = 500;
         public static final int UNAUTHORIZED = 401;
         public static final int FORBIDDEN = 403;
+        public static final int CONFLICT = 409;
+        public static final int UNPROCESSABLE_ENTITY = 422;
     }
 }

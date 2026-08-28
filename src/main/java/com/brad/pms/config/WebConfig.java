@@ -5,6 +5,7 @@ import com.brad.pms.security.JwtTokenProvider;
 import com.brad.pms.mapper.UserMapper;
 import com.brad.pms.mapper.AuthSessionMapper;
 import com.brad.pms.security.AuthorizationService;
+import com.brad.pms.security.RequestRateLimitInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
 import java.util.List;
+import java.time.Clock;
+import java.time.Duration;
 
 /**
  * Web 配置：CORS + 鉴权拦截器
@@ -30,8 +33,17 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${pms.security.cors.allowed-origins:http://localhost:57979,http://127.0.0.1:57979}")
     private String allowedOrigins;
 
+    @Value("${pms.security.rate-limit.capacity:10}")
+    private int rateLimitCapacity;
+
+    @Value("${pms.security.rate-limit.window-seconds:60}")
+    private long rateLimitWindowSeconds;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new RequestRateLimitInterceptor(
+                        rateLimitCapacity, Duration.ofSeconds(rateLimitWindowSeconds), Clock.systemUTC()))
+                .addPathPatterns("/**");
         registry.addInterceptor(new AuthInterceptor(tokenProvider, userMapper, authSessionMapper, authorizationService))
                 .addPathPatterns("/**");
     }

@@ -1,5 +1,6 @@
 server:
   port: 8080
+  forward-headers-strategy: framework
   servlet:
     context-path: /api
 
@@ -48,5 +49,8 @@ pms:
     password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:false}
     invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:false}
   security:
+    rate-limit:
+      capacity: ${PMS_RATE_LIMIT_CAPACITY:10}
+      window-seconds: ${PMS_RATE_LIMIT_WINDOW_SECONDS:60}
     cors:
       allowed-origins: ${PMS_CORS_ALLOWED_ORIGINS:http://localhost:57979,http://127.0.0.1:57979}

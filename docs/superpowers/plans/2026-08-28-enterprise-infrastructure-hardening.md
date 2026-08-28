@@ -195,23 +195,23 @@
 - Consumes: `BusinessException`、认证拦截器、`X-Request-Id`、前端 Axios 响应拦截器。
 - Produces: 统一错误合同：HTTP 401/403/400/409/422/500 与响应体 `code/msg/data/requestId` 一致；登录、刷新、重置、邀请和上传接口具备限流；TLS 终止代理后的刷新 Cookie 正确设置 `Secure`。
 
-- [ ] **Step 1: 写错误合同测试**
+- [x] **Step 1: 写错误合同测试**
 
   断言认证失败返回 HTTP 401、权限不足返回 403、参数校验返回 400、冲突返回 409、业务校验失败返回 422、未知异常返回 500；每个响应都包含 `requestId`，且不包含 SQL、密码、JWT 或令牌哈希。
 
-- [ ] **Step 2: 修复后端异常处理**
+- [x] **Step 2: 修复后端异常处理**
 
   在 `GlobalExceptionHandler` 使用 `ResponseEntity<ResponseResult<?>>` 设置真实 HTTP 状态；保留现有业务码兼容前端，同时把状态映射集中到一个方法中，避免控制器自行重复实现。
 
-- [ ] **Step 3: 修复前端错误处理**
+- [x] **Step 3: 修复前端错误处理**
 
   Axios 只在 HTTP 401 且刷新失败时跳转登录页；业务错误直接展示后端 `msg`，不再因为 `error.response` 为空而被覆盖成“网络异常”；保留 redirect 参数并防止同一错误重复弹窗。
 
-- [ ] **Step 4: 加入代理和限流配置**
+- [x] **Step 4: 加入代理和限流配置**
 
   启用 Spring forwarded headers 支持，让 TLS 终止代理后的 Cookie 正确带 `Secure`；对登录、refresh、密码重置、邀请和上传按 IP + 账号设置令牌桶限流，超过阈值返回 429，并把限流结果写入安全日志。
 
-- [ ] **Step 5: 运行 Review**
+- [x] **Step 5: 运行 Review**
 
   ```bash
   mvn -q -Dtest=GlobalExceptionHandlerTest,AuthInterceptorTest test
@@ -222,7 +222,7 @@
 
   Review 401/403、刷新 Cookie、连续登录失败和代理转发四条链路，确保前端不再重复提示或错误跳转。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add src/main/java src/main/resources/application.yml src/test/java /Users/fs/Desktop/Project/pms-front/src/plugins/http /Users/fs/Desktop/Project/pms-front/src/plugins/http/http.test.mjs

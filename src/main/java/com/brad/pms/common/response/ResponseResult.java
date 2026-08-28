@@ -1,6 +1,7 @@
 package com.brad.pms.common.response;
 
 import lombok.Getter;
+import org.slf4j.MDC;
 
 /**
  * 统一返回结构（CQRS 响应风格）
@@ -12,15 +13,24 @@ public class ResponseResult<T> {
     public static final int ERROR = 500;
     public static final int PARAM_ERROR = 400;
     public static final int UNAUTHORIZED = 401;
+    public static final int FORBIDDEN = 403;
+    public static final int CONFLICT = 409;
+    public static final int UNPROCESSABLE_ENTITY = 422;
 
     private final int code;
     private final String msg;
     private final T data;
+    private final String requestId;
 
     private ResponseResult(int code, String msg, T data) {
+        this(code, msg, data, MDC.get("requestId"));
+    }
+
+    private ResponseResult(int code, String msg, T data, String requestId) {
         this.code = code;
         this.msg = msg;
         this.data = data;
+        this.requestId = requestId;
     }
 
     public static <T> ResponseResult<T> success() {
@@ -37,5 +47,9 @@ public class ResponseResult<T> {
 
     public static <T> ResponseResult<T> error(int code, String msg) {
         return new ResponseResult<>(code, msg, null);
+    }
+
+    public static <T> ResponseResult<T> error(int code, String msg, String requestId) {
+        return new ResponseResult<>(code, msg, null, requestId);
     }
 }
