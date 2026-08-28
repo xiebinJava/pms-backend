@@ -251,19 +251,19 @@
 - Consumes: `PMS_UPLOAD_DIR`、通知 SMTP/飞书/企业微信配置、项目图片上传接口。
 - Produces: 可替换的持久化存储接口、文件魔数校验、文件名随机化、配额和通知器启动检查。
 
-- [ ] **Step 1: 写上传安全测试**
+- [x] **Step 1: 写上传安全测试**
 
   覆盖伪造 MIME、双扩展名、路径穿越、超 5MB、超过用户配额、空文件和正常 PNG/JPEG；断言原始文件名不会成为存储路径，响应不返回服务器真实路径。
 
-- [ ] **Step 2: 抽象并实现文件存储**
+- [x] **Step 2: 抽象并实现文件存储**
 
   使用随机 UUID 文件名和白名单扩展名，读取文件魔数确认类型；本地模式写入 `${PMS_UPLOAD_DIR}`，禁止写入应用工作目录；为 Compose 增加独立 `pms-uploads` 持久卷，并提供后续对象存储实现接口。
 
-- [ ] **Step 3: 接入通知器**
+- [x] **Step 3: 接入通知器**
 
-  提供 SMTP 实现并保留飞书/企业微信适配接口；生产配置开启邀请或找回密码时，如果没有通知器 bean，应用启动检查必须明确失败；开发环境只有显式 `PMS_EXPOSE_RESET_TOKEN=true` 才能返回令牌。
+  提供 SMTP 实现并保留飞书/企业微信适配接口；生产配置开启邀请或找回密码时，如果没有通知器 bean，应用启动检查必须明确失败；开发环境只有显式 `PMS_PASSWORD_RESET_EXPOSE_TOKEN=true`（邀请流程对应 `PMS_INVITATION_EXPOSE_TOKEN=true`）才会返回令牌。
 
-- [ ] **Step 4: 运行测试和安全 Review**
+- [x] **Step 4: 运行测试和安全 Review**
 
   ```bash
   mvn -q -Dtest=LocalFileStorageServiceTest,ProjectImageControllerTest,PasswordResetServiceTest,InvitationServiceTest test
@@ -271,7 +271,7 @@
 
   Review 文件权限、容器重建后文件可见性、邮件正文脱敏和日志中无令牌。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add src/main/java src/main/resources/application.yml docker-compose.example.yml docs/operations/notification-and-upload.md src/test/java

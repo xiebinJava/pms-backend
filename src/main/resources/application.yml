@@ -25,6 +25,15 @@ spring:
     # introduced by V2 and later migrations.
     baseline-version: 1
     locations: classpath:db/migration
+  # SMTP properties are only consumed when PMS_MAIL_ENABLED=true.
+  mail:
+    host: ${PMS_MAIL_HOST:}
+    port: ${PMS_MAIL_PORT:587}
+    username: ${PMS_MAIL_USERNAME:}
+    password: ${PMS_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${PMS_MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${PMS_MAIL_SMTP_STARTTLS:true}
 
 mybatis-plus:
   configuration:
@@ -34,7 +43,9 @@ mybatis-plus:
     banner: false
 
 pms:
-  upload-dir: ${PMS_UPLOAD_DIR:./uploads}
+  upload-dir: ${PMS_UPLOAD_DIR:/var/lib/pms/uploads}
+  upload:
+    quota-bytes: ${PMS_UPLOAD_QUOTA_BYTES:524288000}
   jwt:
     # 生产环境务必通过环境变量/配置文件覆盖
     secret: ${PMS_JWT_SECRET:}
@@ -48,6 +59,12 @@ pms:
     # provide a PasswordResetNotifier bean (mail/Feishu/WeCom integration).
     password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:false}
     invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:false}
+  notification:
+    startup-check-enabled: ${PMS_NOTIFICATION_STARTUP_CHECK:false}
+    mail:
+      enabled: ${PMS_MAIL_ENABLED:false}
+      base-url: ${PMS_PUBLIC_BASE_URL:http://localhost:57979}
+      from: ${PMS_MAIL_FROM:}
   security:
     rate-limit:
       capacity: ${PMS_RATE_LIMIT_CAPACITY:10}
