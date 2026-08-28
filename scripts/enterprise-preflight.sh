@@ -17,8 +17,12 @@ DB_NAME="${PMS_DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-${OCEANBASE_DATABASE:-brad
 DB_USER="${PMS_DB_USER:-${MYSQL_USER:-${OCEANBASE_USER:-}}}"
 DB_PASSWORD="${PMS_DB_PASSWORD:-${MYSQL_PASSWORD:-${OCEANBASE_PASSWORD:-}}}"
 
-if ! command -v mysql >/dev/null 2>&1; then
-  echo "mysql client is required (MySQL 8 or OceanBase MySQL mode)" >&2
+if command -v mysql >/dev/null 2>&1; then
+  SQL_CLIENT=mysql
+elif command -v obclient >/dev/null 2>&1; then
+  SQL_CLIENT=obclient
+else
+  echo "mysql or obclient client is required (MySQL 8 or OceanBase MySQL mode)" >&2
   exit 2
 fi
 if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
@@ -26,7 +30,7 @@ if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
   exit 2
 fi
 
-mysql_cmd=(mysql --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names --raw)
+mysql_cmd=("$SQL_CLIENT" --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names --raw)
 run_sql() {
   MYSQL_PWD="$DB_PASSWORD" "${mysql_cmd[@]}" --execute "$1"
 }

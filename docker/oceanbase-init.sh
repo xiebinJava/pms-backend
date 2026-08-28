@@ -11,8 +11,17 @@ case "$OCEANBASE_DATABASE" in
   (*[!A-Za-z0-9_.-]*) echo "OCEANBASE_DATABASE contains unsupported characters" >&2; exit 2;;
 esac
 
+if command -v mysql >/dev/null 2>&1; then
+  SQL_CLIENT=mysql
+elif command -v obclient >/dev/null 2>&1; then
+  SQL_CLIENT=obclient
+else
+  echo "mysql or obclient client is required" >&2
+  exit 2
+fi
+
 run_mysql() {
-  MYSQL_PWD="$OCEANBASE_PASSWORD" mysql \
+  MYSQL_PWD="$OCEANBASE_PASSWORD" "$SQL_CLIENT" \
     --protocol=tcp \
     --host="$OCEANBASE_HOST" \
     --port="$OCEANBASE_PORT" \

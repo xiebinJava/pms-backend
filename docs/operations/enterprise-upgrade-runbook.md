@@ -23,8 +23,8 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
 ## 3. 迁移步骤
 
-1. 停止应用写入，完成全量备份并记录备份校验值。
-   2. 在目标库执行只读预检：
+1. 停止应用写入，使用 [`oceanbase-backup-restore.md`](oceanbase-backup-restore.md) 的 `backup-oceanbase.sh` 完成全量备份并记录 SHA-256 校验值。
+2. 在目标库执行只读预检：
 
    ```bash
    ./scripts/enterprise-preflight.sh
@@ -34,21 +34,23 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 使用应用同版本启动迁移。Flyway 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql` 顺序执行；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
+3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql` 顺序校验并只执行缺失版本；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
 
    ```bash
-   mvn -DskipTests package
-   java -jar target/pms-backend-0.1.0.jar \
-     --spring.profiles.active=mysql
+   export OCEANBASE_USER=pms_migrator
+   export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
+   ./scripts/oceanbase-upgrade.sh
    ```
 
-   OceanBase 使用 `--spring.profiles.active=oceanbase`，并提供 `OCEANBASE_HOST/PORT/DATABASE/USER/PASSWORD`。
+   启动应用时使用 `--spring.profiles.active=oceanbase`，并提供 `OCEANBASE_HOST/PORT/DATABASE/USER/PASSWORD`。应用运行时使用 `pms_app`，不要使用 `pms_migrator` 或 `root`。
 
 4. 迁移完成后执行只读验收：
 
    ```bash
    ./scripts/verify-enterprise-migration.sh
    ```
+
+   如需回滚，恢复到新建临时库后再执行上述验收；恢复命令和生产库保护参数见 [`oceanbase-backup-restore.md`](oceanbase-backup-restore.md)。
 
    验收包括企业表、关键列和索引、唯一活动根组织、内置 RBAC 角色以及项目组织归属。
 
@@ -95,7 +97,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 ## 7. 运行检查清单
 
-- [ ] 数据库备份与恢复演练完成
+- [ ] 数据库备份与恢复演练完成（含 `verify-backup.sh` 校验）
 - [ ] `enterprise-preflight.sh` 通过
 - [ ] Flyway 迁移日志无错误
 - [ ] `verify-enterprise-migration.sh` 通过

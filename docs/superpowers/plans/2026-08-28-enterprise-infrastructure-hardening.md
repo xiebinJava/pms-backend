@@ -143,23 +143,23 @@
 - Consumes: 迁移目录 `src/main/resources/db/migration/V*.sql`、`pms_migrator` 凭据、备份目录和 OceanBase MySQL/obclient 客户端。
 - Produces: 可重复执行的升级命令、带校验和的备份文件、迁移锁和清晰的版本状态。
 
-- [ ] **Step 1: 为升级状态写测试**
+- [x] **Step 1: 为升级状态写测试**
 
   覆盖目标库不存在、目标库为空、目标库已有 V1–V5、重复执行同一版本、两个升级进程并发、脚本中途失败以及 checksum 不匹配六种场景；测试不得执行 `DROP DATABASE` 或 `TRUNCATE`。
 
-- [ ] **Step 2: 统一客户端发现和参数传递**
+- [x] **Step 2: 统一客户端发现和参数传递**
 
   升级、预检、备份和恢复脚本按顺序使用宿主机 `obclient`/`mysql`，找不到时使用已固定版本的 `mysql:8.4` 工具容器；密码通过 `MYSQL_PWD` 传入，命令输出统一隐藏连接参数中的密码。
 
-- [ ] **Step 3: 实现备份与恢复**
+- [x] **Step 3: 实现备份与恢复**
 
   备份脚本输出 `brad_pms-<UTC时间>-<schema版本>.sql.zst`、SHA-256 文件和元数据（数据库版本、表行数、脚本版本）；恢复脚本默认只允许恢复到显式指定的空库或临时库，恢复前执行确认参数 `--allow-empty-target`，恢复后运行 `verify-backup.sh`。
 
-- [ ] **Step 4: 实现升级锁和版本校验**
+- [x] **Step 4: 实现升级锁和版本校验**
 
   升级脚本获取数据库命名锁 `pms-schema-upgrade`，读取 `flyway_schema_history` 或兼容的版本表，校验每个脚本的 SHA-256；仅执行缺失版本，已成功版本不得重复执行，失败时保留日志并输出下一步恢复命令。
 
-- [ ] **Step 5: 实现真实 OceanBase 冒烟**
+- [x] **Step 5: 实现真实 OceanBase 冒烟**
 
   在 `docker compose` 中以 `pms_migrator` 执行 V1–V5，随后运行 preflight、行数、外键、唯一索引、软删除列和根组织检查；同一升级命令连续运行两次，第二次必须报告“无待执行版本”。
 
