@@ -42,7 +42,7 @@ jobs:
           vuln-type: os,library
           severity: HIGH,CRITICAL
       - name: Generate backend SPDX SBOM
-        uses: anchore/sbom-action@v0.17.0
+        uses: anchore/sbom-action@v0.24.2
         with:
           image: pms-backend:ci
           format: spdx-json
