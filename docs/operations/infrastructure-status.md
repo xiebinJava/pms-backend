@@ -15,7 +15,7 @@
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 工作区状态 | 提交前检查 | 最新基础设施修复已完成复核，提交后将分别推送两个远程分支 |
+| 发布基线 | 已对齐 | 后端 `origin/main`=`c86f45e`、前端 `origin/main`=`bc2aab1` 均已包含功能分支提交；远程不使用 `master` |
 
 ## 仍需完成
 
@@ -55,5 +55,5 @@
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
-| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 已配置，待 CI 实跑 | CI workflow 已固定前端修复提交 `2ea1730`；OceanBase 集成、Playwright 桌面/390px、Trivy、SPDX SBOM、Dependabot 已配置；本机 Playwright 无凭据按设计跳过。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 已配置，待 CI 实跑 | CI workflow 已固定前端发布提交 `bc2aab1`；OceanBase 集成、Playwright 桌面/390px、Trivy、SPDX SBOM、Dependabot 已配置；本机 Playwright 无凭据按设计跳过。 |
 | Task 8：生产演练与开源交付 | 文档完成，演练阻塞 | [`drill-records/2026-08-28-production-readiness.md`](drill-records/2026-08-28-production-readiness.md) 记录了通过项和 Docker Hub 超时证据；真实部署/备份恢复/故障演练待 CI 或部署机。 |
