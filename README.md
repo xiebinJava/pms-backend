@@ -60,7 +60,7 @@ Compose 会先等待 OceanBase，再依次运行 `accounts-init`（创建最小�
 `/api/health/live`（存活）与 `/api/health/ready`（数据库与迁移就绪）。Actuator 健康和指标端点
 默认仅绑定后端容器内 `127.0.0.1:8081`，不经过前端代理；需要监控时通过
 `PMS_MANAGEMENT_ADDRESS`/`PMS_MANAGEMENT_PORT` 显式发布到内网。
-示例 Compose 默认关闭 SMTP 启动校验、允许在响应中返回本地重置/邀请 token，生产部署必须通过环境变量
+示例 Compose 默认使用 `development` 环境、关闭 SMTP 启动校验并允许在响应中返回本地重置/邀请 token，生产部署必须通过环境变量
 启用 SMTP 校验、配置 HTTPS 公网地址并关闭 token 回显。已有业务库请按升级手册执行预检和迁移，不要直接套用示例 Compose。
 
 自动化测试使用独立的嵌入式测试数据库，不会改变 OceanBase 数据：

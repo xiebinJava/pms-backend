@@ -44,6 +44,7 @@ class ContainerHardeningTest {
         assertThat(compose).contains("uploads-init:");
         assertThat(compose).contains("chown -R 10001:10001");
         assertThat(compose).contains("PMS_NOTIFICATION_STARTUP_CHECK:-false");
+        assertThat(compose).contains("PMS_DEPLOYMENT_ENV:-development");
         assertThat(compose).contains("pms-data:", "pms-edge:", "networks: [pms-data, pms-edge]");
         assertThat(compose).contains("networks: [pms-edge]");
     }

@@ -117,7 +117,9 @@ services:
       OCEANBASE_USER: pms_app
       OCEANBASE_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}
       PMS_JWT_SECRET: ${PMS_JWT_SECRET:?set a random PMS_JWT_SECRET of at least 32 bytes}
-      PMS_DEPLOYMENT_ENV: ${PMS_DEPLOYMENT_ENV:-production}
+      # The example stack is for local evaluation. Production deployments must
+      # explicitly set PMS_DEPLOYMENT_ENV=production and the secure flags below.
+      PMS_DEPLOYMENT_ENV: ${PMS_DEPLOYMENT_ENV:-development}
       PMS_BOOTSTRAP_ADMIN_USERNAME: ${PMS_BOOTSTRAP_ADMIN_USERNAME:?set bootstrap admin English name}
       PMS_BOOTSTRAP_ADMIN_NAME_ZH: ${PMS_BOOTSTRAP_ADMIN_NAME_ZH:?set bootstrap admin Chinese name}
       PMS_BOOTSTRAP_ADMIN_PASSWORD: ${PMS_BOOTSTRAP_ADMIN_PASSWORD:?set bootstrap admin password}

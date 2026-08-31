@@ -73,3 +73,9 @@
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
 - 最新后端 CI `33350718216`、前端 CI `33350720703` 已触发验证；最新集成运行 `33350718220` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代。
+
+### Task 3：生产配置核查
+
+- `OceanbaseConfigurationTest`、`NotificationConfigurationValidatorTest`、`ContainerHardeningTest`：通过；Compose 配置解析：通过；私钥材料扫描：无命中。
+- 示例 Compose 默认显式使用 `development`，避免本地示例在未配置 SMTP 时误以 `production` 启动；生产部署仍必须显式设置 `PMS_DEPLOYMENT_ENV=production`、强 JWT、正式 SMTP、受限 CORS，并关闭重置/邀请 token 回显。
+- 当前未写入任何生产密钥或凭据；生产配置仍需目标企业通过密钥管理器注入，不能在本地或 Git 中代填。
