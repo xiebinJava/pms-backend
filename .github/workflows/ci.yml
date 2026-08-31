@@ -33,7 +33,7 @@ jobs:
       - name: Build backend image for security scan
         run: docker build --tag pms-backend:ci .
       - name: Scan backend image (high and critical)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: pms-backend:ci
           format: table
