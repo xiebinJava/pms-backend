@@ -87,3 +87,8 @@
 - 已通过现有 `fsclaw-oceanbase` 容器内的 `obclient` 完成只读 `SELECT 1` 连通性确认。
 - `enterprise-preflight.sh`、完整备份和空库恢复暂未完成：本机没有 MySQL/OceanBase 客户端，仓库脚本尝试拉取的 `mysql:8.4` 镜像受 Docker Hub 网络超时阻塞；当前容器也不含 `mysqldump`。
 - 详细证据和安全边界见 [`drill-records/2026-08-31-oceanbase-recovery.md`](drill-records/2026-08-31-oceanbase-recovery.md)。在具备客户端/镜像缓存和明确空目标库前，不对现有 `brad_pms` 执行恢复。
+
+### Task 5：目标环境应用验收
+
+- 前端 CI 已通过，但本机前后端服务当前未运行，且依赖目录因磁盘空间不足清理后尚未恢复；未用静态文件服务冒充带 `/api` 代理的完整环境。
+- 浏览器登录、项目、组织、权限、导入和窄屏验收待目标环境启动后执行。详细入口与验收路径见 [`drill-records/2026-08-31-application-acceptance.md`](drill-records/2026-08-31-application-acceptance.md)。
