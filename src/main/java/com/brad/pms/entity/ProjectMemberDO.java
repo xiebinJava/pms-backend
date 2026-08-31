@@ -18,6 +18,12 @@ public class ProjectMemberDO {
 
     private Integer role;
 
+    @TableLogic(value = "false", delval = "true")
+    private Boolean deleted;
+
+    @Version
+    private Integer version;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

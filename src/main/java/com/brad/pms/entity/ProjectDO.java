@@ -25,11 +25,22 @@ public class ProjectDO {
 
     private Long ownerId;
 
+    private Long projectManagerId;
+
+    /** Primary organization responsible for the project. */
+    private Long orgUnitId;
+
     private LocalDate startDate;
 
     private LocalDate endDate;
 
     private Integer progress;
+
+    @TableLogic(value = "false", delval = "true")
+    private Boolean deleted;
+
+    @Version
+    private Integer version;
 
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;

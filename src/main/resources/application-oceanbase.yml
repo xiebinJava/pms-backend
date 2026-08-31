@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${OCEANBASE_HOST:127.0.0.1}:${OCEANBASE_PORT:2881}/${OCEANBASE_DATABASE:brad_pms}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${OCEANBASE_USER}
+    password: ${OCEANBASE_PASSWORD}
+  sql:
+    init:
+      # Flyway owns the persistent schema; do not replay schema.sql on every
+      # OceanBase startup.
+      mode: never
+  flyway:
+    # OceanBase 4.x reports MySQL 5.7 metadata. Flyway Community refuses
+    # MySQL 5.7 at runtime, so OceanBase schema changes are applied by the
+    # repository migration scripts before deployment instead of at startup.
+    enabled: false
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 启动前请通过运行时环境提供 OCEANBASE_USER 和 OCEANBASE_PASSWORD。

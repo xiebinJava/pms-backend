@@ -14,7 +14,7 @@ public interface ProjectTaskMapper extends BaseMapper<ProjectTaskDO> {
             "<script>",
             "SELECT project_id, status, COUNT(*) AS cnt",
             "FROM project_task",
-            "WHERE project_id IN",
+            "WHERE deleted = FALSE AND project_id IN",
             "<foreach collection='projectIds' item='pid' open='(' separator=',' close=')'>",
             "#{pid}",
             "</foreach>",

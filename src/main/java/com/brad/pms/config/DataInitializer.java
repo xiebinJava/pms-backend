@@ -1,22 +1,29 @@
 package com.brad.pms.config;
 
 import com.brad.pms.entity.*;
+import com.brad.pms.common.enums.SystemRole;
+import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.mapper.*;
+import com.brad.pms.service.NodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
- * 种子数据：首次启动自动创建默认管理员账号与演示数据
- * 默认账号：admin / admin123
+ * Local demo seed data. Persistent deployments use explicit bootstrap
+ * credentials and never receive a shared default password.
  */
 @Slf4j
 @Component
+@Order(1)
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
@@ -26,21 +33,46 @@ public class DataInitializer implements CommandLineRunner {
     private final ProjectTaskMapper taskMapper;
     private final ProjectMilestoneMapper milestoneMapper;
     private final ProjectCommentMapper commentMapper;
+    private final NodeService nodeService;
+    private final EnterpriseDataMigration enterpriseDataMigration;
+    private final Environment environment;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @Override
     @Transactional
     public void run(String... args) {
-        if (userMapper.selectCount(null) != null && userMapper.selectCount(null) > 0) {
+        Integer userCount = userMapper.selectCount(null);
+        if (userCount != null && userCount > 0) {
+            enterpriseDataMigration.backfillUsersAndProjects();
             return;
         }
-        log.info("初始化种子数据：admin / admin123");
+
+        if (isPersistentProfile()) {
+            String username = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_USERNAME");
+            String nameZh = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_NAME_ZH");
+            String password = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_PASSWORD");
+            if (password.length() < 12) {
+                throw new IllegalStateException("PMS_BOOTSTRAP_ADMIN_PASSWORD 至少需要 12 位");
+            }
+            UserDO bootstrap = user(username, password, nameZh, username + "@localhost");
+            bootstrap.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
+            userMapper.updateById(bootstrap);
+            enterpriseDataMigration.backfillUsersAndProjects();
+            log.info("已创建企业初始管理员: {}", username);
+            return;
+        }
+
+        log.info("初始化测试演示数据（登录名：admin，密码：admin123，仅限测试配置）");
 
         UserDO admin = user("admin", "admin123", "管理员", "admin@pms.com");
-        UserDO zhang = user("zhangsan", "admin123", "张三", "zhangsan@pms.com");
-        UserDO li = user("lisi", "admin123", "李四", "lisi@pms.com");
-        UserDO wang = user("wangwu", "admin123", "王五", "wangwu@pms.com");
+        admin.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
+        userMapper.updateById(admin);
+        List<UserDO> demoUsers = createDemoUsers();
+        UserDO brad = demoUsers.get(0);
+        UserDO terry = demoUsers.get(1);
+        UserDO kevin = demoUsers.get(2);
+        UserDO claire = demoUsers.get(3);
 
         ProjectDO p1 = new ProjectDO();
         p1.setName("开源项目管理平台");
@@ -48,30 +80,35 @@ public class DataInitializer implements CommandLineRunner {
         p1.setStatus(1);
         p1.setPriority(2);
         p1.setOwnerId(admin.getId());
+        p1.setCreatedBy(admin.getId());
         p1.setStartDate(LocalDate.now().minusDays(20));
         p1.setEndDate(LocalDate.now().plusDays(80));
         p1.setProgress(35);
         p1.setCode("PRJ-000001");
         projectMapper.insert(p1);
+        nodeService.initDefault(p1.getId());
+        List<ProjectNodeDTO> p1Nodes = nodeService.list(p1.getId());
 
         ProjectDO p2 = new ProjectDO();
         p2.setName("电商中台重构");
         p2.setDescription("对现有电商中台进行服务化改造与性能优化。");
         p2.setStatus(0);
         p2.setPriority(1);
-        p2.setOwnerId(zhang.getId());
+        p2.setOwnerId(terry.getId());
+        p2.setCreatedBy(terry.getId());
         p2.setStartDate(LocalDate.now().plusDays(10));
         p2.setEndDate(LocalDate.now().plusDays(120));
         p2.setProgress(0);
         p2.setCode("PRJ-000002");
         projectMapper.insert(p2);
+        nodeService.initDefault(p2.getId());
 
         member(p1.getId(), admin.getId(), 0);
-        member(p1.getId(), zhang.getId(), 1);
-        member(p1.getId(), li.getId(), 2);
-        member(p1.getId(), wang.getId(), 2);
-        member(p2.getId(), zhang.getId(), 0);
-        member(p2.getId(), li.getId(), 1);
+        member(p1.getId(), brad.getId(), 1);
+        member(p1.getId(), terry.getId(), 2);
+        member(p1.getId(), kevin.getId(), 2);
+        member(p2.getId(), terry.getId(), 0);
+        member(p2.getId(), claire.getId(), 1);
 
         ProjectMilestoneDO m1 = new ProjectMilestoneDO();
         m1.setProjectId(p1.getId());
@@ -89,28 +126,65 @@ public class DataInitializer implements CommandLineRunner {
         m2.setStatus(0);
         milestoneMapper.insert(m2);
 
-        task(p1.getId(), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 2, 2, zhang.getId(), m1.getId(), 1);
-        task(p1.getId(), "搭建前端工程骨架", "Vite + Vue3 + ant-design-vue + UnoCSS", 2, 2, li.getId(), m1.getId(), 2);
-        task(p1.getId(), "实现项目 CRUD 接口", "含分页、搜索与负责人", 2, 1, zhang.getId(), m1.getId(), 3);
-        task(p1.getId(), "实现任务看板", "支持拖拽切换状态", 1, 2, li.getId(), m1.getId(), 4);
-        task(p1.getId(), "里程碑管理", "列表与状态流转", 0, 1, wang.getId(), m1.getId(), 5);
-        task(p1.getId(), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), m2.getId(), 6);
+        task(p1.getId(), nodeId(p1Nodes, "kickoff"), "立项材料评审", "确认目标、范围与资源授权", 2, 2, admin.getId(), null, 1);
+        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, terry.getId(), null, 2);
+        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, kevin.getId(), null, 3);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, terry.getId(), m1.getId(), 4);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, claire.getId(), m1.getId(), 5);
+        task(p1.getId(), nodeId(p1Nodes, "knowledge"), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), m2.getId(), 6);
 
         ProjectCommentDO c1 = new ProjectCommentDO();
         c1.setProjectId(p1.getId());
         c1.setContent("欢迎加入开源项目管理平台，开发过程中有任何问题随时在评论区讨论。");
         c1.setUserId(admin.getId());
         commentMapper.insert(c1);
+
+        enterpriseDataMigration.backfillUsersAndProjects();
     }
 
     private UserDO user(String username, String rawPassword, String nickname, String email) {
         UserDO user = new UserDO();
         user.setUsername(username);
+        user.setUsernameNormalized(EnterpriseDataMigration.normalizeUsername(username));
         user.setPassword(encoder.encode(rawPassword));
+        user.setNameZh(nickname);
         user.setNickname(nickname);
         user.setEmail(email);
+        user.setStatus("ACTIVE");
+        user.setFailedLoginCount(0);
+        user.setPasswordChangedAt(java.time.LocalDateTime.now());
         userMapper.insert(user);
         return user;
+    }
+
+    private List<UserDO> createDemoUsers() {
+        String[][] seeds = {
+                {"谢斌", "Brad.Xie"}, {"李强", "Terry.Li"}, {"周岚", "Linda.Zhou"}, {"陈宇", "Kevin.Chen"},
+                {"王璇", "Claire.Wang"}, {"赵晨", "Ethan.Zhao"}, {"刘洋", "Andy.Liu"}, {"孙悦", "Nina.Sun"},
+                {"黄凯", "Kyle.Huang"}, {"吴倩", "Grace.Wu"}, {"徐凡", "Frank.Xu"}, {"何敏", "Mia.He"},
+                {"高远", "Owen.Gao"}, {"郑琳", "Alice.Zheng"}, {"林浩", "Leo.Lin"}, {"郭婷", "Tina.Guo"},
+                {"唐杰", "Jason.Tang"}, {"沈薇", "Vivian.Shen"}, {"彭博", "Eric.Peng"}, {"宋妍", "Yuki.Song"}
+        };
+        return java.util.Arrays.stream(seeds)
+                .map(seed -> user(seed[1], "admin123", seed[0],
+                        EnterpriseDataMigration.normalizeUsername(seed[1]) + "@pms.com"))
+                .toList();
+    }
+
+    private boolean isPersistentProfile() {
+        return java.util.Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "mysql".equalsIgnoreCase(profile)
+                        || "oceanbase".equalsIgnoreCase(profile)
+                        || "prod".equalsIgnoreCase(profile)
+                        || "production".equalsIgnoreCase(profile));
+    }
+
+    private String requiredBootstrap(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("首次启动企业环境时必须设置 " + key);
+        }
+        return value.trim();
     }
 
     private void member(Long projectId, Long userId, int role) {
@@ -121,10 +195,19 @@ public class DataInitializer implements CommandLineRunner {
         memberMapper.insert(m);
     }
 
-    private void task(Long projectId, String title, String desc, int status, int priority,
+    private Long nodeId(List<ProjectNodeDTO> nodes, String nodeKey) {
+        return nodes.stream()
+                .filter(node -> nodeKey.equals(node.getNodeKey()))
+                .map(ProjectNodeDTO::getId)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private void task(Long projectId, Long nodeId, String title, String desc, int status, int priority,
                       Long assigneeId, Long milestoneId, int sort) {
         ProjectTaskDO t = new ProjectTaskDO();
         t.setProjectId(projectId);
+        t.setNodeId(nodeId);
         t.setTitle(title);
         t.setDescription(desc);
         t.setStatus(status);

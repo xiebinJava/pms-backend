@@ -1,0 +1,50 @@
+name: backend-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run backend tests
+        run: mvn -q test
+      - name: Validate OpenAPI contract
+        run: ./scripts/validate-openapi.sh
+      - name: Check runtime configuration does not enable H2
+        run: |
+          if git grep -nE 'h2:|jdbc:h2|org\.h2' -- src/main/resources/application*.yml; then
+            echo 'H2 must remain test-only' >&2
+            exit 1
+          fi
+      - name: Check repository for private key material
+        run: |
+          if git grep -nE 'AKIA[0-9A-Z]{16}|-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----'; then
+            echo 'credential material detected in repository' >&2
+            exit 1
+          fi
+      - name: Build backend image for security scan
+        run: docker build --tag pms-backend:ci .
+      - name: Scan backend image (high and critical)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: pms-backend:ci
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+      - name: Generate backend SPDX SBOM
+        uses: anchore/sbom-action@v0.17.0
+        with:
+          image: pms-backend:ci
+          format: spdx-json
+          output-file: backend-sbom.spdx.json
+          artifact-name: backend-sbom.spdx.json

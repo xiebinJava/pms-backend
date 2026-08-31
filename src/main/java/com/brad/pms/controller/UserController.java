@@ -2,6 +2,8 @@ package com.brad.pms.controller;
 
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.response.UserDTO;
+import com.brad.pms.security.PermissionCode;
+import com.brad.pms.security.RequirePermission;
 import com.brad.pms.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +21,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/search")
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<List<UserDTO>> search(@RequestParam(required = false) String keyword) {
         return ResponseResult.success(userService.search(keyword));
     }

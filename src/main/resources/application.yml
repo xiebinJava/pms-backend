@@ -1,24 +1,40 @@
 server:
   port: 8080
+  forward-headers-strategy: framework
   servlet:
     context-path: /api
 
 spring:
   application:
     name: pms-backend
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:pms;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
-    username: sa
-    password:
+  profiles:
+    # All local and enterprise runtime runs use OceanBase.
+    default: oceanbase
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   sql:
     init:
-      mode: always
-      schema-locations: classpath:schema.sql
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+      # Flyway owns schema initialization for every profile.
+      mode: never
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    # V1 mirrors the pre-Flyway schema.sql baseline. Enterprise tables are
+    # introduced by V2 and later migrations.
+    baseline-version: 1
+    locations: classpath:db/migration
+  # SMTP properties are only consumed when PMS_MAIL_ENABLED=true.
+  mail:
+    host: ${PMS_MAIL_HOST:}
+    port: ${PMS_MAIL_PORT:587}
+    username: ${PMS_MAIL_USERNAME:}
+    password: ${PMS_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${PMS_MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${PMS_MAIL_SMTP_STARTTLS:true}
+      mail.smtp.starttls.required: ${PMS_MAIL_SMTP_STARTTLS_REQUIRED:true}
 
 mybatis-plus:
   configuration:
@@ -28,7 +44,60 @@ mybatis-plus:
     banner: false
 
 pms:
+  deployment:
+    environment: ${PMS_DEPLOYMENT_ENV:production}
+  upload-dir: ${PMS_UPLOAD_DIR:/var/lib/pms/uploads}
+  upload:
+    quota-bytes: ${PMS_UPLOAD_QUOTA_BYTES:524288000}
   jwt:
     # 生产环境务必通过环境变量/配置文件覆盖
-    secret: ${PMS_JWT_SECRET:pms-open-source-dev-secret-please-override-in-production-2026}
+    secret: ${PMS_JWT_SECRET:}
     expire-hours: 168
+  auth:
+    access-expire-minutes: ${PMS_ACCESS_EXPIRE_MINUTES:30}
+    refresh-expire-days: ${PMS_REFRESH_EXPIRE_DAYS:30}
+    max-failed-logins: ${PMS_MAX_FAILED_LOGINS:5}
+    lock-minutes: ${PMS_LOCK_MINUTES:15}
+    # Development fallback returns a copyable URL. Set false in production and
+    # provide a PasswordResetNotifier bean (mail/Feishu/WeCom integration).
+    password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:false}
+    invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:false}
+  notification:
+    startup-check-enabled: ${PMS_NOTIFICATION_STARTUP_CHECK:true}
+    mail:
+      enabled: ${PMS_MAIL_ENABLED:false}
+      base-url: ${PMS_PUBLIC_BASE_URL:http://localhost:57979}
+      from: ${PMS_MAIL_FROM:}
+  audit:
+    retention-days: ${PMS_AUDIT_RETENTION_DAYS:180}
+    retention:
+      enabled: ${PMS_AUDIT_RETENTION_ENABLED:true}
+      dry-run: ${PMS_AUDIT_RETENTION_DRY_RUN:false}
+      cron: ${PMS_AUDIT_RETENTION_CRON:0 0 2 * * *}
+  security:
+    rate-limit:
+      capacity: ${PMS_RATE_LIMIT_CAPACITY:10}
+      window-seconds: ${PMS_RATE_LIMIT_WINDOW_SECONDS:60}
+    cors:
+      allowed-origins: ${PMS_CORS_ALLOWED_ORIGINS:http://localhost:57979,http://127.0.0.1:57979}
+
+management:
+  # Keep operational endpoints off the public servlet port. Operators may
+  # override the address/port for an internal monitoring network only.
+  server:
+    port: ${PMS_MANAGEMENT_PORT:8081}
+    address: ${PMS_MANAGEMENT_ADDRESS:127.0.0.1}
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

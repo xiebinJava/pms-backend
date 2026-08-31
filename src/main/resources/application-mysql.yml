@@ -2,12 +2,13 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:pms}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:root}
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
   sql:
     init:
-      mode: always
-      schema-locations: classpath:schema.sql
+      # Flyway owns the persistent schema; do not replay schema.sql on every
+      # MySQL startup (its legacy indexes are intentionally not destructive).
+      mode: never
 
 mybatis-plus:
   configuration:

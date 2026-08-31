@@ -15,11 +15,15 @@ public class ProjectTaskDO {
 
     private Long projectId;
 
+    private Long nodeId;
+
     private Long parentId;
 
     private String title;
 
     private String description;
+
+    private String deliverable;
 
     private Integer status;
 
@@ -32,6 +36,12 @@ public class ProjectTaskDO {
     private Integer sort;
 
     private LocalDate dueDate;
+
+    @TableLogic(value = "false", delval = "true")
+    private Boolean deleted;
+
+    @Version
+    private Integer version;
 
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;

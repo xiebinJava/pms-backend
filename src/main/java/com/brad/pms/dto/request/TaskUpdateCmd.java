@@ -11,6 +11,8 @@ public class TaskUpdateCmd {
 
     private String description;
 
+    private String deliverable;
+
     private Integer status;
 
     private Integer priority;

@@ -9,6 +9,7 @@ import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.security.ProjectPermissionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +23,10 @@ public class CommentService {
 
     private final ProjectCommentMapper commentMapper;
     private final UserService userService;
+    private final ProjectPermissionService permissionService;
 
     public List<ProjectCommentDTO> listByProject(Long projectId) {
+        permissionService.requireProject(projectId);
         List<ProjectCommentDO> comments = commentMapper.selectList(
                 new LambdaQueryWrapper<ProjectCommentDO>()
                         .eq(ProjectCommentDO::getProjectId, projectId)
@@ -37,6 +40,7 @@ public class CommentService {
     }
 
     public ProjectCommentDTO add(Long projectId, CommentCreateCmd cmd) {
+        permissionService.requireProject(projectId);
         ProjectCommentDO comment = new ProjectCommentDO();
         comment.setProjectId(projectId);
         comment.setTaskId(cmd.getTaskId());
@@ -50,6 +54,12 @@ public class CommentService {
         ProjectCommentDO comment = commentMapper.selectById(id);
         if (comment == null) {
             throw BusinessException.error("评论不存在");
+        }
+        var project = permissionService.requireProject(comment.getProjectId());
+        Long userId = UserContext.userId();
+        if (!java.util.Objects.equals(comment.getUserId(), userId)
+                && !ProjectPermissionPolicy.hasProjectControl(project, userId, UserContext.isAdministrator())) {
+            throw BusinessException.forbidden("只能删除自己的评论，或由项目创建人/项目经理删除");
         }
         commentMapper.deleteById(id);
     }

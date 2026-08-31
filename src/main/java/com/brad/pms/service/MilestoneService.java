@@ -24,8 +24,10 @@ public class MilestoneService {
 
     private final ProjectMilestoneMapper milestoneMapper;
     private final ProjectTaskMapper taskMapper;
+    private final ProjectPermissionService permissionService;
 
     public List<ProjectMilestoneDTO> listByProject(Long projectId) {
+        permissionService.requireProject(projectId);
         List<ProjectMilestoneDO> milestones = milestoneMapper.selectList(
                 new LambdaQueryWrapper<ProjectMilestoneDO>()
                         .eq(ProjectMilestoneDO::getProjectId, projectId)
@@ -49,6 +51,7 @@ public class MilestoneService {
     }
 
     public ProjectMilestoneDTO create(Long projectId, MilestoneCreateCmd cmd) {
+        permissionService.requireManageableProject(projectId, "创建里程碑");
         ProjectMilestoneDO milestone = new ProjectMilestoneDO();
         milestone.setProjectId(projectId);
         milestone.setTitle(cmd.getTitle());
@@ -61,6 +64,7 @@ public class MilestoneService {
 
     public ProjectMilestoneDTO update(Long id, MilestoneUpdateCmd cmd) {
         ProjectMilestoneDO milestone = requireMilestone(id);
+        permissionService.requireManageableProject(milestone.getProjectId(), "编辑里程碑");
         if (StringUtils.hasText(cmd.getTitle())) milestone.setTitle(cmd.getTitle());
         if (cmd.getDescription() != null) milestone.setDescription(cmd.getDescription());
         if (cmd.getDueDate() != null) milestone.setDueDate(cmd.getDueDate());
@@ -70,7 +74,8 @@ public class MilestoneService {
     }
 
     public void delete(Long id) {
-        requireMilestone(id);
+        ProjectMilestoneDO milestone = requireMilestone(id);
+        permissionService.requireManageableProject(milestone.getProjectId(), "删除里程碑");
         milestoneMapper.deleteById(id);
     }
 

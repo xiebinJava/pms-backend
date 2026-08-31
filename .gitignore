@@ -6,4 +6,8 @@ target/
 *.iml
 .vscode/
 .DS_Store
+.env.*.local
+.env
+.run/
 *.log
+backups/

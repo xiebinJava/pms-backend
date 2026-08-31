@@ -10,9 +10,11 @@ public class ProjectTaskDTO {
 
     private Long id;
     private Long projectId;
+    private Long nodeId;
     private Long parentId;
     private String title;
     private String description;
+    private String deliverable;
     private Integer status;
     private Integer priority;
     private Long assigneeId;
@@ -22,4 +24,5 @@ public class ProjectTaskDTO {
     private LocalDate dueDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private TaskPermissionsDTO permissions;
 }

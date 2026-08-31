@@ -4,6 +4,7 @@ import lombok.Data;
 
 import javax.validation.constraints.NotBlank;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class ProjectUpdateCmd {
@@ -19,7 +20,15 @@ public class ProjectUpdateCmd {
 
     private Long ownerId;
 
+    private Long projectManagerId;
+
     private LocalDate startDate;
 
     private LocalDate endDate;
+
+    private List<Long> memberIds;
+
+    private List<Long> followerIds;
+
+    private Long orgUnitId;
 }
