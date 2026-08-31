@@ -22,7 +22,7 @@
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
 | P1 | 真实 OceanBase 集成、备份恢复和故障演练尚未在本机完成 | 当前 Docker Hub 网络不可用，必须在 CI/部署机执行后才能发布 |
-| P1 | CI、E2E、镜像扫描和 SBOM 已配置但尚未取得本次运行报告 | 需要 GitHub Actions 或具备镜像缓存的 CI 执行 |
+| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | 需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务 |
 | P2 | 尚未规划 Spring Boot 3/Java 21 升级 | 长期维护成本较高，但不是当前发布阻塞项 |
 
 ## 已收口能力
@@ -55,7 +55,7 @@
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
-| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 本地门禁通过，远程待凭据后重跑 | Trivy Action 已固定为有效的 `v0.36.0`；前端发布提交固定为 `bc2aab1`；OceanBase 集成、Playwright 桌面/390px、Trivy、SPDX SBOM、Dependabot 已配置。远程集成工作流需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库；本机 Playwright 无凭据按设计跳过。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 本地门禁通过，远程集成待凭据后重跑 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端跨仓库容器检查在未检出前端时安全跳过，由集成流水线覆盖；后端 CI、前端 CI 正在重跑。远程集成工作流仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库；本机 Playwright 无凭据按设计跳过。 |
 | Task 8：生产演练与开源交付 | 文档完成，演练阻塞 | [`drill-records/2026-08-28-production-readiness.md`](drill-records/2026-08-28-production-readiness.md) 记录了通过项和 Docker Hub 超时证据；真实部署/备份恢复/故障演练待 CI 或部署机。 |
 
 ## 2026-08-31 合并后收口执行记录
@@ -71,4 +71,5 @@
 - 后端 `mvn -q test`：通过；`./scripts/validate-openapi.sh`：通过；`bash -n scripts/*.sh docker/*.sh`：通过。
 - 前端 `pnpm test`：79 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
-- 远程 `main` 的失败原因已定位：CI 中 Trivy Action 缺少版本号 `v` 前缀；集成工作流默认 Token 无权读取私有前端仓库。对应修复已写入工作流，集成测试还需配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑。
+- 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
+- 最新后端 CI `33350718216`、前端 CI `33350720703` 已触发验证；最新集成运行 `33350718220` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代。

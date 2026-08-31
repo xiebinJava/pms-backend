@@ -84,8 +84,8 @@ jobs:
           E2E_USERNAME: brad.xie
         run: pnpm exec playwright test
       - name: Show service status on failure
-        if: failure()
+        if: ${{ failure() && hashFiles('.env') != '' }}
         run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml ps
       - name: Stop integration stack
-        if: always()
+        if: ${{ always() && hashFiles('.env') != '' }}
         run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml down -v
