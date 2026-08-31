@@ -72,10 +72,18 @@
 - 前端 `pnpm test`：79 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
-- 最新后端 CI `33350718216`、前端 CI `33350720703` 已触发验证；最新集成运行 `33350718220` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代。
+- 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端 CI `33350901998` 的单元测试、OpenAPI 和密钥扫描通过，但镜像依赖扫描发现高危/严重漏洞，暂不能标记为发布通过。
+- 最新集成运行 `33350901997` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代。
+- 后端镜像扫描阻塞项：Spring Boot 2.7.5、Spring Framework 5.3.23、Tomcat 9.0.68、MyBatis-Plus 3.4.1、Jackson 2.13、Logback 1.2.11、Connector/J 8.0.31 等依赖存在已修复版本的 HIGH/CRITICAL 漏洞；需要单独完成依赖升级兼容性验证后再重跑扫描，不能通过降低 Trivy 阈值解决。
 
 ### Task 3：生产配置核查
 
 - `OceanbaseConfigurationTest`、`NotificationConfigurationValidatorTest`、`ContainerHardeningTest`：通过；Compose 配置解析：通过；私钥材料扫描：无命中。
 - 示例 Compose 默认显式使用 `development`，避免本地示例在未配置 SMTP 时误以 `production` 启动；生产部署仍必须显式设置 `PMS_DEPLOYMENT_ENV=production`、强 JWT、正式 SMTP、受限 CORS，并关闭重置/邀请 token 回显。
 - 当前未写入任何生产密钥或凭据；生产配置仍需目标企业通过密钥管理器注入，不能在本地或 Git 中代填。
+
+### Task 4：OceanBase 备份恢复预检
+
+- 已通过现有 `fsclaw-oceanbase` 容器内的 `obclient` 完成只读 `SELECT 1` 连通性确认。
+- `enterprise-preflight.sh`、完整备份和空库恢复暂未完成：本机没有 MySQL/OceanBase 客户端，仓库脚本尝试拉取的 `mysql:8.4` 镜像受 Docker Hub 网络超时阻塞；当前容器也不含 `mysqldump`。
+- 详细证据和安全边界见 [`drill-records/2026-08-31-oceanbase-recovery.md`](drill-records/2026-08-31-oceanbase-recovery.md)。在具备客户端/镜像缓存和明确空目标库前，不对现有 `brad_pms` 执行恢复。
