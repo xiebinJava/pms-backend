@@ -1,6 +1,6 @@
 # 基础设施就绪状态
 
-更新时间：2026-08-28
+更新时间：2026-08-31
 
 本文件只记录企业级基础设施状态，不代表业务功能已经完成生产验收。每完成一个基础设施任务，必须补充验证命令、结果和对应提交。
 
@@ -55,7 +55,7 @@
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
-| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 本地门禁通过，远程集成待凭据后重跑 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端跨仓库容器检查在未检出前端时安全跳过，由集成流水线覆盖；后端 CI、前端 CI 正在重跑。远程集成工作流仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库；本机 Playwright 无凭据按设计跳过。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 后端/前端 CI 与本地门禁通过，跨仓库集成待凭据 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 和 SPDX SBOM；远程集成 `33352990811` 仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库；本机 Playwright 无凭据按设计跳过。 |
 | Task 8：生产演练与开源交付 | 文档完成，演练阻塞 | [`drill-records/2026-08-28-production-readiness.md`](drill-records/2026-08-28-production-readiness.md) 记录了通过项和 Docker Hub 超时证据；真实部署/备份恢复/故障演练待 CI 或部署机。 |
 
 ## 2026-08-31 合并后收口执行记录
