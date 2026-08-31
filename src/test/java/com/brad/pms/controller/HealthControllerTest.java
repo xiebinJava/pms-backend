@@ -6,12 +6,22 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.lang.reflect.Field;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class HealthControllerTest {
+
+    @Test
+    void defaultReadinessExpectsLatestEmailIdentityMigration() throws Exception {
+        HealthController controller = new HealthController(mock(DataSource.class));
+        Field field = HealthController.class.getDeclaredField("expectedMigrationVersion");
+        field.setAccessible(true);
+
+        assertThat(field.getInt(controller)).isEqualTo(7);
+    }
 
     @Test
     void livenessDoesNotDependOnDatabase() throws Exception {

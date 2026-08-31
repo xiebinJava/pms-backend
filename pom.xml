@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.5</version>
+        <version>3.5.14</version>
         <relativePath/>
     </parent>
 
@@ -18,8 +18,16 @@
 
     <properties>
         <java.version>17</java.version>
-        <mybatis-plus.version>3.4.1</mybatis-plus.version>
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <jjwt.version>0.11.5</jjwt.version>
+        <!-- Keep the web/security stack on the latest Spring Boot 3.5 line. -->
+        <spring-framework.version>6.2.19</spring-framework.version>
+        <spring-security.version>6.5.7</spring-security.version>
+        <tomcat.version>11.0.22</tomcat.version>
+        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <micrometer.version>1.15.12</micrometer.version>
+        <logback.version>1.5.18</logback.version>
+        <mysql-connector-j.version>9.4.0</mysql-connector-j.version>
     </properties>
 
     <dependencies>
@@ -50,14 +58,20 @@
         <!-- MyBatis-Plus -->
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
             <version>${mybatis-plus.version}</version>
         </dependency>
 
         <!-- OceanBase MySQL-compatible runtime driver -->
         <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>${mysql-connector-j.version}</version>
             <scope>runtime</scope>
         </dependency>
         <!-- Embedded database is test-only; production runs use OceanBase. -->

@@ -17,12 +17,14 @@ import java.util.Map;
 /** Minimal liveness/readiness probe for self-hosted deployments. */
 @RestController
 public class HealthController {
+    private static final int LATEST_MIGRATION_VERSION = 7;
+
     private final DataSource dataSource;
     private final int expectedMigrationVersion;
 
     @Autowired
     public HealthController(DataSource dataSource) {
-        this(dataSource, 6);
+        this(dataSource, LATEST_MIGRATION_VERSION);
     }
 
     public HealthController(DataSource dataSource, int expectedMigrationVersion) {

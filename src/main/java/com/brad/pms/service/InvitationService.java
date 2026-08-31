@@ -42,18 +42,31 @@ public class InvitationService {
 
     @Transactional
     public InvitationResponse invite(UserInviteCmd cmd) {
-        String normalized = EnterpriseDataMigration.normalizeUsername(cmd.getUsername());
-        if (normalized == null || !normalized.matches("^[a-z][a-z0-9._-]{1,49}$")) {
+        String email = cmd.getEmail() == null ? null : cmd.getEmail().trim();
+        String emailNormalized = EnterpriseDataMigration.normalizeEmail(email);
+        if (emailNormalized == null || emailNormalized.isBlank() || !emailNormalized.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw BusinessException.error("请输入有效邮箱");
+        }
+        if (userMapper.findByEmailNormalized(emailNormalized) != null) throw BusinessException.error("邮箱已存在");
+        String username = cmd.getUsername() == null ? null : cmd.getUsername().trim();
+        String usernameNormalized = EnterpriseDataMigration.normalizeUsername(username);
+        if (usernameNormalized != null && !usernameNormalized.isBlank()
+                && !usernameNormalized.matches("^[a-z][a-z0-9._-]{1,49}$")) {
             throw BusinessException.error("英文名需以字母开头，只能包含字母、数字、点、下划线或短横线");
         }
-        if (userMapper.findByUsernameNormalized(normalized) != null) throw BusinessException.error("英文名已存在");
+        if (usernameNormalized != null && userMapper.findByUsernameNormalized(usernameNormalized) != null) {
+            throw BusinessException.error("英文名已存在");
+        }
         OrgUnitDO primaryOrg = requireOrg(cmd.getOrgUnitId());
         UserDO user = new UserDO();
-        user.setUsername(cmd.getUsername().trim());
-        user.setUsernameNormalized(normalized);
-        user.setNameZh(cmd.getNameZh().trim());
-        user.setNickname(cmd.getNameZh().trim());
-        user.setEmail(cmd.getEmail());
+        user.setUsername(username == null || username.isBlank() ? generatedLegacyUsername(emailNormalized) : username);
+        user.setUsernameNormalized(usernameNormalized == null || usernameNormalized.isBlank()
+                ? EnterpriseDataMigration.normalizeUsername(user.getUsername()) : usernameNormalized);
+        String nameZh = cmd.getNameZh() == null ? null : cmd.getNameZh().trim();
+        user.setNameZh(nameZh == null || nameZh.isBlank() ? null : nameZh);
+        user.setNickname(user.getNameZh());
+        user.setEmail(email);
+        user.setEmailNormalized(emailNormalized);
         user.setPhone(cmd.getPhone());
         user.setPassword(encoder.encode(randomToken()));
         user.setStatus(UserStatus.PENDING_ACTIVATION.name());
@@ -94,7 +107,11 @@ public class InvitationService {
         } else if (!exposeToken) {
             throw BusinessException.error("未配置账号邀请通知器，暂不能发出激活链接");
         }
-        operationLogService.record("USER_INVITED", "USER", user.getId(), null, java.util.Map.of("username", user.getUsername(), "nameZh", user.getNameZh()));
+        java.util.Map<String, Object> after = new java.util.LinkedHashMap<>();
+        after.put("email", user.getEmail());
+        if (user.getNameZh() != null) after.put("nameZh", user.getNameZh());
+        if (cmd.getUsername() != null && !cmd.getUsername().isBlank()) after.put("username", user.getUsername());
+        operationLogService.record("USER_INVITED", "USER", user.getId(), null, after);
         return new InvitationResponse(user.getId(), exposeToken ? activationUrl : "", invitation.getExpiresAt().toString());
     }
 
@@ -123,5 +140,9 @@ public class InvitationService {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private String generatedLegacyUsername(String normalizedEmail) {
+        return "user-" + AuthService.sha256(normalizedEmail).substring(0, 16);
     }
 }

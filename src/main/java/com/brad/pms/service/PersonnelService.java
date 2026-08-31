@@ -37,9 +37,10 @@ public class PersonnelService {
         if (keyword != null && !keyword.isBlank()) {
             String normalizedKeyword = keyword.trim();
             wrapper.and(w -> w.like(UserDO::getNameZh, normalizedKeyword)
-                    .or().like(UserDO::getUsername, normalizedKeyword));
+                    .or().like(UserDO::getUsername, normalizedKeyword)
+                    .or().like(UserDO::getEmail, normalizedKeyword));
         }
-        wrapper.orderByAsc(UserDO::getNameZh, UserDO::getUsername);
+        wrapper.orderByAsc(UserDO::getNameZh, UserDO::getUsername, UserDO::getEmail);
         List<UserDO> users = userMapper.selectList(wrapper);
         return users.stream().map(this::toDto).collect(Collectors.toList());
     }

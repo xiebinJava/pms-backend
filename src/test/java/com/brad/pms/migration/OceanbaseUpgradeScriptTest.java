@@ -48,6 +48,15 @@ class OceanbaseUpgradeScriptTest {
     }
 
     @Test
+    void upgradeWorkflowAllowsOceanbaseContainerClientOverride() throws Exception {
+        String script = Files.readString(Path.of("scripts/oceanbase-upgrade.sh"));
+
+        assertThat(script).contains("PMS_MYSQL_TOOL_CLIENT");
+        assertThat(script).contains("--entrypoint");
+        assertThat(script).contains("\"$TOOL_CLIENT\"");
+    }
+
+    @Test
     void backupAndRestoreRequireIntegrityVerification() throws Exception {
         String backup = Files.readString(Path.of("scripts/backup-oceanbase.sh"));
         String restore = Files.readString(Path.of("scripts/restore-oceanbase.sh"));
@@ -57,6 +66,8 @@ class OceanbaseUpgradeScriptTest {
         assertThat(backup).contains("single-transaction");
         assertThat(backup).contains("skip-add-drop-table");
         assertThat(backup).contains("skip-lock-tables");
+        assertThat(backup).contains("SELECT COUNT(*) FROM");
+        assertThat(backup).doesNotContain("table_rows");
         assertThat(restore).contains("--allow-empty-target");
         assertThat(restore).contains("verify-backup.sh");
         assertThat(restore).contains("unsupported backup extension");

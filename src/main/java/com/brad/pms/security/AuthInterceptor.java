@@ -11,8 +11,8 @@ import org.slf4j.MDC;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 登录鉴权拦截器：解析 Authorization: Bearer <token>，写入 UserContext

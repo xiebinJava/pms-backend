@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 
 /**
  * 全局异常处理（统一异常处理）

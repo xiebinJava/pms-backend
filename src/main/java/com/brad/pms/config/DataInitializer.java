@@ -4,6 +4,7 @@ import com.brad.pms.entity.*;
 import com.brad.pms.common.enums.SystemRole;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.mapper.*;
+import com.brad.pms.service.AuthService;
 import com.brad.pms.service.NodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,24 +43,30 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        Integer userCount = userMapper.selectCount(null);
+        Long userCount = userMapper.selectCount(null);
         if (userCount != null && userCount > 0) {
             enterpriseDataMigration.backfillUsersAndProjects();
             return;
         }
 
         if (isPersistentProfile()) {
-            String username = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_USERNAME");
-            String nameZh = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_NAME_ZH");
+            String email = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_EMAIL");
+            String normalizedEmail = EnterpriseDataMigration.normalizeEmail(email);
+            if (normalizedEmail == null || !normalizedEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+                throw new IllegalStateException("PMS_BOOTSTRAP_ADMIN_EMAIL 必须是有效邮箱");
+            }
+            String username = optionalBootstrap("PMS_BOOTSTRAP_ADMIN_USERNAME");
+            String nameZh = optionalBootstrap("PMS_BOOTSTRAP_ADMIN_NAME_ZH");
             String password = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_PASSWORD");
             if (password.length() < 12) {
                 throw new IllegalStateException("PMS_BOOTSTRAP_ADMIN_PASSWORD 至少需要 12 位");
             }
-            UserDO bootstrap = user(username, password, nameZh, username + "@localhost");
+            if (username == null) username = "user-" + AuthService.sha256(normalizedEmail).substring(0, 16);
+            UserDO bootstrap = user(username, password, nameZh, email);
             bootstrap.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
             userMapper.updateById(bootstrap);
             enterpriseDataMigration.backfillUsersAndProjects();
-            log.info("已创建企业初始管理员: {}", username);
+            log.info("已创建企业初始管理员邮箱: {}", email);
             return;
         }
 
@@ -150,6 +157,7 @@ public class DataInitializer implements CommandLineRunner {
         user.setNameZh(nickname);
         user.setNickname(nickname);
         user.setEmail(email);
+        user.setEmailNormalized(EnterpriseDataMigration.normalizeEmail(email));
         user.setStatus("ACTIVE");
         user.setFailedLoginCount(0);
         user.setPasswordChangedAt(java.time.LocalDateTime.now());
@@ -185,6 +193,11 @@ public class DataInitializer implements CommandLineRunner {
             throw new IllegalStateException("首次启动企业环境时必须设置 " + key);
         }
         return value.trim();
+    }
+
+    private String optionalBootstrap(String key) {
+        String value = System.getenv(key);
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private void member(Long projectId, Long userId, int role) {

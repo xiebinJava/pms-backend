@@ -28,6 +28,7 @@ class EnterpriseDataMigrationTest {
         assertThat(admin).isNotNull();
         assertThat(admin.getNameZh()).isEqualTo("管理员");
         assertThat(admin.getUsernameNormalized()).isEqualTo("admin");
+        assertThat(admin.getEmailNormalized()).isEqualTo("admin@pms.com");
         assertThat(admin.getStatus()).isEqualTo("ACTIVE");
         assertThat(count("sys_user_role", "user_id = " + admin.getId())).isGreaterThanOrEqualTo(1);
         assertThat(count("sys_user_position", "user_id = " + admin.getId() + " AND is_primary = TRUE AND status = 'ACTIVE'")).isEqualTo(1);

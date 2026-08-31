@@ -168,9 +168,10 @@ public class OrgUnitService {
         dto.setStatus(unit.getStatus());
         dto.setLeaderUserId(unit.getLeaderUserId());
         dto.setSort(unit.getSort());
-        dto.setMemberCount(userPositionMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.UserPositionDO>()
+        Long memberCount = userPositionMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.UserPositionDO>()
                 .eq(com.brad.pms.entity.UserPositionDO::getOrgUnitId, unit.getId())
-                .eq(com.brad.pms.entity.UserPositionDO::getStatus, "ACTIVE")));
+                .eq(com.brad.pms.entity.UserPositionDO::getStatus, "ACTIVE"));
+        dto.setMemberCount(memberCount == null ? 0 : Math.toIntExact(memberCount));
         if (unit.getLeaderUserId() != null) {
             UserDO leader = userMapper.selectById(unit.getLeaderUserId());
             dto.setLeaderDisplayName(com.brad.pms.convertor.Convertors.userDisplayName(leader));

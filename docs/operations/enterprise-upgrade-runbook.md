@@ -4,7 +4,7 @@
 
 ## 1. 上线前原则
 
-- 生产数据库使用 MySQL 8 或 OceanBase MySQL 兼容模式；H2 仅用于开发、演示和自动化测试。
+- 运行时数据库固定使用 OceanBase MySQL 兼容模式；H2 仅用于自动化测试和一次性历史迁移快照，不作为本地或生产运行回退。
 - 迁移前必须备份数据库，并在副本上演练。本文脚本全部只读，不会打印密码，也不会自动删除或覆盖业务数据。
 - 固定使用一个业务数据库账号，授予迁移所需 DDL/DML 权限；应用运行账号按企业安全规范收敛权限。
 - 生产环境必须设置随机的 `PMS_JWT_SECRET`（至少 32 字节），不要使用仓库里的开发默认值。
@@ -30,11 +30,11 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
    ./scripts/enterprise-preflight.sh
    ```
 
-   预检会检查英文登录名唯一性、组织/角色/项目引用完整性和组织路径。出现 `FAIL` 时先修复数据，不要跳过。
+   预检会检查邮箱唯一性、旧英文名兼容字段唯一性、组织/角色/项目引用完整性和组织路径。出现 `FAIL` 时先修复数据，不要跳过。
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql`、`V6__audit_retention_indexes.sql` 顺序校验并只执行缺失版本；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
+3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql`、`V6__audit_retention_indexes.sql`、`V7__email_identity.sql` 顺序校验并只执行缺失版本；`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
 
    ```bash
    export OCEANBASE_USER=pms_migrator
@@ -59,12 +59,14 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 持久化环境没有共享默认账号。首次空库启动前注入一次性管理员：
 
 ```bash
-export PMS_BOOTSTRAP_ADMIN_USERNAME=brad.xie
+export PMS_BOOTSTRAP_ADMIN_EMAIL='admin@example.com'
+# Optional display names; keep the legacy username only when old clients need it.
 export PMS_BOOTSTRAP_ADMIN_NAME_ZH='谢斌'
+export PMS_BOOTSTRAP_ADMIN_USERNAME='brad.xie'
 export PMS_BOOTSTRAP_ADMIN_PASSWORD='至少 12 位的随机密码'
 ```
 
-管理员登录后通过“人员与权限”邀请或导入员工。所有界面统一展示 `中文名（English.Name）`，登录英文名不区分大小写；英文名归一化字段由数据库唯一索引保护。
+管理员登录后通过“人员与权限”邀请或导入员工。邮箱是唯一核心身份，登录邮箱不区分大小写；中文名和英文名可选，界面优先展示 `中文名（English.Name）`，缺少姓名时展示邮箱。邮箱归一化字段由数据库唯一索引保护，旧英文名登录仅在兼容期内保留。
 
 生产环境建议关闭开发用的复制链接返回：
 
@@ -87,7 +89,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 1. 在“组织架构”创建/校准根组织、业务群（BG）、部门/项目组，并为人员设置一个主归属和可选的兼职/项目归属。
 2. 在“角色管理”确认内置角色与六类数据范围（本人、组织、本组织及下级、本人及下属、自定义组织、全公司）。自定义组织角色必须绑定至少一个有效组织。
 3. 在“人员与权限”邀请少量管理员和业务负责人，验证禁用账号会结束职位、撤销会话且保留历史审计。
-4. 批量导入时先上传 Excel/CSV，检查预览、错误行和 manager 英文名解析结果；确认无误后再提交。导入采用全有或全无事务，不要绕过预览直接写库。
+4. 批量导入时先上传 Excel/CSV，检查预览、错误行和直属上级邮箱解析结果（兼容旧英文名）；确认无误后再提交。导入采用全有或全无事务，不要绕过预览直接写库。
 
 ## 6. 回滚与故障处理
 
@@ -109,7 +111,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 ## 8. 容器化与健康检查
 
 开源试用可从 `docker-compose.example.yml` 启动 OceanBase、后端和前端。示例仅适用于新建
-空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V6 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
+空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V7 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
 必须使用本手册的备份、预检和升级流程；检测到旧 Flyway 历史时，需先核对发布包并显式设置 `PMS_ACCEPT_FLYWAY_BASELINE=true`。
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
@@ -129,3 +131,12 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 `nginx.conf` 的 `set_real_ip_from`/`geo` 中按部署网络显式加入；其它转发头会被清空，不可信客户端的
 伪造头会被忽略。生产环境必须设置
 `PMS_DEPLOYMENT_ENV=production`，启用通知启动校验并关闭重置/邀请 token 回显。
+
+## 9. 私有仓库集成测试凭据
+
+后端的 `.github/workflows/integration.yml` 会检出私有前端仓库并执行 OceanBase + Playwright
+集成测试。由于 GitHub Actions 的默认 `GITHUB_TOKEN` 只能读取当前仓库，必须在
+`xiebinJava/pms-backend` 的 Settings → Secrets and variables → Actions 中创建仓库级 secret
+`PMS_FRONT_REPO_READ_TOKEN`。该 Token 只授予 `xiebinJava/pms-front` 的 Contents: Read 权限，
+不要复用管理员个人 Token，也不要把 Token 写入 workflow、日志或 `.env`。未配置该 secret 时，
+工作流会在检出前给出明确错误并停止，不会误报为 OceanBase 或应用故障。

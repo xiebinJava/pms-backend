@@ -14,11 +14,14 @@ public class UserDO {
 
     private String username;
 
-    /** Chinese display name; username remains the canonical English login name. */
+    /** Optional Chinese display name. */
     private String nameZh;
 
-    /** Locale.ROOT-lower-cased username used for case-insensitive login. */
+    /** Locale.ROOT-lower-cased legacy username kept for compatibility. */
     private String usernameNormalized;
+
+    /** Locale.ROOT-lower-cased email used as the canonical account identity. */
+    private String emailNormalized;
 
     private String password;
 

@@ -67,12 +67,18 @@ public class EnterpriseDataMigration implements CommandLineRunner {
         PositionDO defaultPosition = requirePosition("EMPLOYEE", "普通员工");
         for (UserDO user : users) {
             boolean changed = false;
-            if (user.getNameZh() == null || user.getNameZh().isBlank()) {
-                user.setNameZh(user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
+            if ((user.getNameZh() == null || user.getNameZh().isBlank())
+                    && user.getNickname() != null && !user.getNickname().isBlank()) {
+                user.setNameZh(user.getNickname());
                 changed = true;
             }
             if (!Objects.equals(user.getUsernameNormalized(), normalizeUsername(user.getUsername()))) {
                 user.setUsernameNormalized(normalizeUsername(user.getUsername()));
+                changed = true;
+            }
+            String normalizedEmail = normalizeEmail(user.getEmail());
+            if (!Objects.equals(user.getEmailNormalized(), normalizedEmail)) {
+                user.setEmailNormalized(normalizedEmail);
                 changed = true;
             }
             if (user.getStatus() == null || user.getStatus().isBlank()) {
@@ -257,5 +263,9 @@ public class EnterpriseDataMigration implements CommandLineRunner {
 
     public static String normalizeUsername(String username) {
         return username == null ? null : username.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public static String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }

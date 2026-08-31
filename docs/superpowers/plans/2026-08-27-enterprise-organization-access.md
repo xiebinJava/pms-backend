@@ -156,7 +156,7 @@ In one `@Transactional` `CommandLineRunner`, first stop with a clear error if tw
 
 - [ ] **Step 5: Replace insecure demo initialization behavior**
 
-Change `DataInitializer` so local sample users explicitly receive `nameZh`, canonical English `username`, normalized username, and active status. In production profiles, initialize the first administrator only from `PMS_BOOTSTRAP_ADMIN_USERNAME`, `PMS_BOOTSTRAP_ADMIN_NAME_ZH`, and `PMS_BOOTSTRAP_ADMIN_PASSWORD`; reject absent bootstrap credentials when no user exists.
+Change `DataInitializer` so local sample users explicitly receive email, optional `nameZh`, legacy username, normalized email/username, and active status. In production profiles, initialize the first administrator from required `PMS_BOOTSTRAP_ADMIN_EMAIL` and `PMS_BOOTSTRAP_ADMIN_PASSWORD`, with optional display names and legacy username; reject absent bootstrap credentials when no user exists.
 
 - [ ] **Step 6: Run data migration tests**
 
@@ -475,7 +475,7 @@ git commit -m "feat: manage roles and invited accounts"
 **Interfaces:**
 - `previewOrganizations(MultipartFile file)` and `previewUsers(MultipartFile file)` parse `.xlsx` and `.csv` and return rows plus validation errors without writing business data.
 - `commit(UUID importJobId)` writes all rows in a single transaction only when preview has zero errors.
-- Organization rows use `组织编码,组织名称,组织类型编码,父组织编码,负责人英文名,排序`; user rows use `中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名`.
+- Organization rows use `组织编码,组织名称,组织类型编码,父组织编码,负责人邮箱,排序` (旧 `负责人英文名` 兼容); user rows use `中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级邮箱` (旧 `直属上级英文名` 兼容).
 
 - [ ] **Step 1: Write import validation tests**
 
@@ -792,3 +792,7 @@ git -C /Users/fs/Desktop/Project/pms-front commit -m "docs: document enterprise 
 - Spec coverage: Tasks 1–2 implement schema and legacy migration; Tasks 3 and 6 implement identity, invitation, reset, sessions, and login security; Tasks 4–5 implement RBAC, scope, organizations, positions, lifecycle, and audit; Task 7 implements Excel/CSV import; Task 8 protects existing project behavior; Tasks 9–10 implement the frontend and approved navigation; Task 11 provides migration, documentation, and release verification.
 - No placeholders: every task names concrete files, contracts, commands, and expected behavior; no task depends on an unnamed later component.
 - Type consistency: `usernameNormalized`, `nameZh`, `displayName`, `OrgUnitService`, `PersonnelService`, `AuthorizationService`, `DataScopeResolver`, and `EnterpriseImportService` use the same names across dependent tasks.
+
+## 身份规则修订（2026-08-31）
+
+本计划早期条目以“中文名 + 英文名登录”为前提，作为历史实施记录保留。当前生效规则由邮箱核心身份改造覆盖：邮箱必填且 trim/小写后写入 `email_normalized` 唯一索引；中文名和英文名可选；没有姓名时界面展示邮箱；旧 `username`、旧英文名导入表头和旧英文名登录仅在兼容期内保留。V7 迁移、预检和前后端测试已同步到该规则。

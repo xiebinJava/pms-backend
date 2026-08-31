@@ -43,8 +43,12 @@ public class PasswordResetService {
 
     @Transactional
     public ResetTokenResponse request(PasswordResetRequest request) {
-        UserDO user = userMapper.findByUsernameNormalized(EnterpriseDataMigration.normalizeUsername(request.getUsername()));
-        // Return a generic response for unknown names to avoid account enumeration.
+        boolean emailReset = request.getEmail() != null && !request.getEmail().isBlank();
+        String identifier = emailReset ? request.getEmail() : request.getUsername();
+        UserDO user = emailReset
+                ? userMapper.findByEmailNormalized(EnterpriseDataMigration.normalizeEmail(identifier))
+                : userMapper.findByUsernameNormalized(EnterpriseDataMigration.normalizeUsername(identifier));
+        // Return a generic response for unknown identifiers to avoid account enumeration.
         if (user == null) return new ResetTokenResponse("", LocalDateTime.now().plusMinutes(30).toString());
         String raw = randomToken();
         PasswordResetTokenDO token = new PasswordResetTokenDO();

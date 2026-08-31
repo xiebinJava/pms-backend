@@ -35,9 +35,26 @@ public final class Convertors {
 
     public static String userDisplayName(UserDO user) {
         if (user == null) return null;
-        String nameZh = user.getNameZh() == null || user.getNameZh().isBlank() ? user.getNickname() : user.getNameZh();
-        if (nameZh == null || nameZh.isBlank()) return user.getUsername();
-        return nameZh + "（" + user.getUsername() + "）";
+        String nameZh = firstNonBlank(user.getNameZh(), user.getNickname());
+        String username = trimToNull(user.getUsername());
+        String email = trimToNull(user.getEmail());
+        boolean generatedUsername = username != null && username.matches("user-[a-fA-F0-9]{16}");
+        if (nameZh != null && username != null && !generatedUsername) return nameZh + "（" + username + "）";
+        if (nameZh != null) return nameZh;
+        // Email is the stable identity fallback. The generated legacy username
+        // exists only for schema/backwards compatibility and must not leak into
+        // user-facing labels when no display names were supplied.
+        if (username != null && !generatedUsername) return username;
+        if (email != null) return email;
+        return username;
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return trimToNull(first) == null ? trimToNull(second) : trimToNull(first);
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public static List<UserDTO> toUsers(List<UserDO> list) {
@@ -79,6 +96,7 @@ public final class Convertors {
         dto.setProjectId(do_.getProjectId());
         dto.setUserId(do_.getUserId());
         dto.setUsername(user == null ? null : user.getUsername());
+        dto.setEmail(user == null ? null : user.getEmail());
         dto.setNickname(userDisplayName(user));
         dto.setDisplayName(userDisplayName(user));
         dto.setAvatar(user == null ? null : user.getAvatar());

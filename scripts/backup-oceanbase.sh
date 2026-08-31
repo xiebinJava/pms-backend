@@ -113,7 +113,20 @@ fi
   printf 'created_at_utc=%s\n' "$timestamp"
   printf 'backup_file=%s\n' "$(basename "$archive")"
   printf 'row_counts:\n'
-  sql "SELECT CONCAT(table_name, '=', table_rows) FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_name;"
+  # information_schema table statistics are estimates for OceanBase/MySQL and
+  # are not suitable as restore evidence. Query exact counts for every table
+  # while keeping identifiers constrained to metadata results.
+  while IFS= read -r table_name; do
+    case "$table_name" in
+      (*[!A-Za-z0-9_.-]*) echo "unsupported table identifier in metadata: $table_name" >&2; exit 1;;
+    esac
+    row_count="$(sql "SELECT COUNT(*) FROM \`$table_name\`;" | tr -d '[:space:]')"
+    if ! [[ "$row_count" =~ ^[0-9]+$ ]]; then
+      echo "could not read exact row count for table $table_name" >&2
+      exit 1
+    fi
+    printf '%s=%s\n' "$table_name" "$row_count"
+  done < <(sql "SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_name;")
 } > "$metadata_file"
 trap - ERR INT TERM
 echo "OceanBase backup created: $archive"

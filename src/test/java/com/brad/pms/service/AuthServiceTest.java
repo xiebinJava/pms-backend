@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
+import org.mockito.ArgumentMatchers;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -84,6 +85,23 @@ class AuthServiceTest {
     }
 
     @Test
+    void loginUsesNormalizedEmailAsPrimaryIdentity() {
+        user.setEmail("Brad.Xie@Example.com");
+        user.setEmailNormalized("brad.xie@example.com");
+        when(userMapper.findByEmailNormalized("brad.xie@example.com")).thenReturn(user);
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("  BRAD.XIE@EXAMPLE.COM ");
+        request.setPassword("CorrectPassword1!");
+
+        LoginResponse response = authService.login(request);
+
+        assertThat(response.getUser().getEmail()).isEqualTo("Brad.Xie@Example.com");
+        verify(userMapper).findByEmailNormalized("brad.xie@example.com");
+        verify(userMapper, never()).findByUsernameNormalized(anyString());
+    }
+
+    @Test
     void disabledUserCannotRefreshSession() {
         user.setStatus("DISABLED");
         AuthSessionDO session = new AuthSessionDO();
@@ -103,10 +121,10 @@ class AuthServiceTest {
         request.setPassword("WrongPassword1!");
 
         assertThatThrownBy(() -> authService.login(request, "10.0.0.8", "test-agent"))
-                .hasMessage("用户名或密码错误");
+                .hasMessage("邮箱或密码错误");
 
         assertThat(user.getFailedLoginCount()).isEqualTo(1);
-        verify(loginLogMapper).insert(argThat(log ->
+        verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
                 "FAILURE".equals(log.getResult())
                         && Long.valueOf(7L).equals(log.getUserId())
                         && "brad.xie".equals(log.getLoginName())
@@ -123,7 +141,7 @@ class AuthServiceTest {
 
         authService.login(request, "10.0.0.8", "test-agent");
 
-        verify(loginLogMapper).insert(argThat(log ->
+        verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
                 "SUCCESS".equals(log.getResult())
                         && Long.valueOf(7L).equals(log.getUserId())
                         && "LOGIN_SUCCESS".equals(log.getReason())));
@@ -137,9 +155,9 @@ class AuthServiceTest {
         request.setPassword("WrongPassword1!");
 
         assertThatThrownBy(() -> authService.login(request, "10.0.0.9", "test-agent"))
-                .hasMessage("用户名或密码错误");
+                .hasMessage("邮箱或密码错误");
 
-        verify(loginLogMapper).insert(argThat(log ->
+        verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
                 "FAILURE".equals(log.getResult())
                         && log.getUserId() == null
                         && "unknown.user".equals(log.getLoginName())
@@ -168,7 +186,7 @@ class AuthServiceTest {
         assertThat(response.getAccessToken()).isEqualTo("rotated-access");
         assertThat(response.getRefreshToken()).isNotEqualTo("refresh").isNotBlank();
         verify(sessionMapper).revokeForRotation(eq(99L), eq(7L), eq(AuthService.sha256("refresh")), eq("REFRESH_ROTATED"));
-        verify(sessionMapper).insert(argThat(next -> next.getId().equals(100L)
+        verify(sessionMapper).insert(ArgumentMatchers.<AuthSessionDO>argThat(next -> next.getId().equals(100L)
                 && next.getUserId().equals(7L)
                 && "10.0.0.2".equals(next.getIp())
                 && "new-agent".equals(next.getUserAgent())));
