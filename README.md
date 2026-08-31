@@ -55,7 +55,7 @@ docker compose -f docker-compose.example.yml up --build
 ```
 
 Compose 会先等待 OceanBase，再依次运行 `accounts-init`（创建最小权限账号）、`schema-init`
-（执行版本化 V1–V5 迁移）和 `uploads-init`（修复持久化上传卷的属主），最后启动后端与前端。
+（执行版本化 V1–V6 迁移）和 `uploads-init`（修复持久化上传卷的属主），最后启动后端与前端。
 前端地址为 `http://localhost:5173`；后端端口仅绑定本机 `127.0.0.1:8080`。健康检查包括
 `/api/health/live`（存活）与 `/api/health/ready`（数据库与迁移就绪）。Actuator 健康和指标端点
 默认仅绑定后端容器内 `127.0.0.1:8081`，不经过前端代理；需要监控时通过
