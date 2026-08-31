@@ -24,7 +24,8 @@
         <spring-framework.version>6.2.19</spring-framework.version>
         <spring-security.version>6.5.7</spring-security.version>
         <tomcat.version>11.0.22</tomcat.version>
-        <jackson.version>2.21.4</jackson.version>
+        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <micrometer.version>1.15.12</micrometer.version>
         <logback.version>1.5.18</logback.version>
         <mysql-connector-j.version>9.4.0</mysql-connector-j.version>
     </properties>
