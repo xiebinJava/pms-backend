@@ -12,7 +12,7 @@
 
 ## 当前执行状态（2026-08-31）
 
-- Task 1：已完成。两个远程 `main` 基线已核对，后端集成工作流固定当前前端提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`。
+- Task 1：已完成。后端远程 `main`=`f6ffe94a2f53f8da549bd2d34643b457b081aa28`，前端远程 `main`=`1519e88736d2d9fe19c1e436b8a96cd66b1457bf`；后端集成工作流已固定当前前端 `main` 提交。
 - Task 2：后端/前端本地门禁与后端 CI 已完成；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。跨仓库集成 `33352990811` 仍等待 `PMS_FRONT_REPO_READ_TOKEN`。
 - Task 3：配置、Compose、密钥材料和安全启动校验已完成自动化核查；生产密钥注入必须在目标企业环境执行。
 - Task 4：已在本机真实 OceanBase 完成 V1–V7 幂等升级、逻辑备份、SHA-256、隔离空库恢复、数据比对和停库恢复演练。
@@ -68,7 +68,7 @@ Expected: 两个工作区 clean，当前分支为 `main`，且本地 `main` 不�
 
 - [ ] **Step 3: 固定集成工作流使用的前端发布提交**
 
-将后端 `.github/workflows/integration.yml` 中前端 checkout 的 `ref` 更新为本次发布的提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`，保留注释说明该 SHA 与发布基线对应；发布合并后再把该 SHA 回填为远程 `main` 的最终提交。
+将后端 `.github/workflows/integration.yml` 中前端 checkout 的 `ref` 固定为本次发布的远程 `main` 提交 `1519e88`，并保留注释说明该 SHA 与发布基线对应。
 
 - [ ] **Step 4: 更新状态文档并 review**
 

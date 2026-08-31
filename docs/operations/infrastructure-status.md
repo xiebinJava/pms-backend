@@ -15,14 +15,14 @@
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 发布基线 | 已对齐 | 后端 `origin/main`=`c86f45e`、前端 `origin/main`=`bc2aab1` 均已包含功能分支提交；远程不使用 `master` |
+| 发布基线 | 已对齐 | 后端 `origin/main`=`f6ffe94a`、前端 `origin/main`=`1519e887` 均已包含功能分支提交；远程不使用 `master` |
 
 ## 仍需完成
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
 | P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V7 升级幂等、preflight、verify、逻辑备份、隔离空库恢复、数据比对和停库恢复演练；生产仍需按企业 RPO/RTO 保存介质与联系人 |
-| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | checkout 已更新为当前前端提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`；需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务，该 Secret 不能由代码代填 |
+| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | checkout 已更新为当前前端 `main` 提交 `1519e88`；需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务，该 Secret 不能由代码代填 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 已收口能力
@@ -70,9 +70,9 @@
 
 ### Task 1：发布基线
 
-- 后端远程 `main`：`c86f45e`，已包含 `codex/oceanbase-migration` 的 `eb5c6a8`。
-- 前端远程 `main`：`bc2aab1`，已包含 `codex/pms-design-system` 的 `2ea1730`。
-- 后端集成工作流已固定当前前端提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`；远程主分支名称为 `main`，没有 `master`。
+- 后端远程 `main`：`f6ffe94a2f53f8da549bd2d34643b457b081aa28`，已合并 `codex/oceanbase-migration`。
+- 前端远程 `main`：`1519e88736d2d9fe19c1e436b8a96cd66b1457bf`，已合并 `codex/pms-design-system`，并包含邮箱身份 E2E 修正。
+- 后端集成工作流已固定本次前端发布提交 `1519e88736d2d9fe19c1e436b8a96cd66b1457bf`；远程主分支名称为 `main`，没有 `master`。
 
 ### Task 2：本地门禁与远程 CI
 

@@ -27,7 +27,7 @@ jobs:
           token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
           # Keep backend integration tests paired with the current reviewed
           # frontend commit. Update this immutable SHA for every release.
-          ref: 0ced09529c62ad5a68c906ecbb98d7be5d88fc9c
+          ref: 1519e88736d2d9fe19c1e436b8a96cd66b1457bf
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
