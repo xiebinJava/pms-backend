@@ -129,3 +129,12 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 `nginx.conf` 的 `set_real_ip_from`/`geo` 中按部署网络显式加入；其它转发头会被清空，不可信客户端的
 伪造头会被忽略。生产环境必须设置
 `PMS_DEPLOYMENT_ENV=production`，启用通知启动校验并关闭重置/邀请 token 回显。
+
+## 9. 私有仓库集成测试凭据
+
+后端的 `.github/workflows/integration.yml` 会检出私有前端仓库并执行 OceanBase + Playwright
+集成测试。由于 GitHub Actions 的默认 `GITHUB_TOKEN` 只能读取当前仓库，必须在
+`xiebinJava/pms-backend` 的 Settings → Secrets and variables → Actions 中创建仓库级 secret
+`PMS_FRONT_REPO_READ_TOKEN`。该 Token 只授予 `xiebinJava/pms-front` 的 Contents: Read 权限，
+不要复用管理员个人 Token，也不要把 Token 写入 workflow、日志或 `.env`。未配置该 secret 时，
+工作流会在检出前给出明确错误并停止，不会误报为 OceanBase 或应用故障。

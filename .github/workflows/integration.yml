@@ -8,12 +8,23 @@ jobs:
   oceanbase-and-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Validate frontend repository read token
+        env:
+          FRONTEND_REPO_READ_TOKEN: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
+        run: |
+          if [[ -z "$FRONTEND_REPO_READ_TOKEN" ]]; then
+            echo "::error::Configure PMS_FRONT_REPO_READ_TOKEN with read-only Contents access to xiebinJava/pms-front before running integration-and-e2e."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           repository: xiebinJava/pms-front
           path: pms-front
+          token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
           # Keep backend integration tests paired with the reviewed frontend
           # release. This SHA is the frontend commit merged into origin/main.
           ref: bc2aab1
