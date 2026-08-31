@@ -44,27 +44,38 @@ class EnterpriseImportServiceTest {
     }
 
     @Test
-    void previewRejectsCaseInsensitiveDuplicateEnglishNamesWithoutCreatingUsers() {
+    void previewRejectsCaseInsensitiveDuplicateEmailsWithoutCreatingUsers() {
         String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
-                + "测试甲,Import.Reviewer,reviewer1@example.com,,HQ,EMPLOYEE,MEMBER,\n"
-                + "测试乙,IMPORT.REVIEWER,reviewer2@example.com,,HQ,EMPLOYEE,MEMBER,\n";
+                + "测试甲,Import.Reviewer,Reviewer@example.com,,HQ,EMPLOYEE,MEMBER,\n"
+                + "测试乙,IMPORT.REVIEWER,reviewer@EXAMPLE.com,,HQ,EMPLOYEE,MEMBER,\n";
 
         ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
                 "file", "users.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
 
         assertThat(preview.getRowCount()).isEqualTo(2);
-        assertThat(preview.getErrors()).anyMatch(error -> "英文名".equals(error.getField()) && "批次内重复".equals(error.getMessage()));
+        assertThat(preview.getErrors()).anyMatch(error -> "邮箱".equals(error.getField()) && "批次内重复".equals(error.getMessage()));
     }
 
     @Test
-    void previewAcceptsPhoneAsTheOnlyContact() {
+    void previewRequiresEmailEvenWhenPhoneIsPresent() {
         String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
                 + "测试丙,Import.Phone,,13800000000,HQ,EMPLOYEE,MEMBER,\n";
 
         ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
                 "file", "users-phone.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
 
-        assertThat(preview.getErrors()).noneMatch(error -> "邮箱/手机号".equals(error.getField()));
+        assertThat(preview.getErrors()).anyMatch(error -> "邮箱".equals(error.getField()));
+    }
+
+    @Test
+    void previewAcceptsEmailWithoutChineseOrEnglishNames() {
+        String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
+                + ",,email.only@example.com,,HQ,EMPLOYEE,MEMBER,\n";
+
+        ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
+                "file", "users-email-only.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(preview.getErrors()).isEmpty();
     }
 
     @Test
@@ -90,7 +101,7 @@ class EnterpriseImportServiceTest {
         ImportPreviewDTO preview = importService.previewOrganizations(new MockMultipartFile(
                 "file", "organizations.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
 
-        assertThat(preview.getErrors()).noneMatch(error -> "负责人英文名".equals(error.getField()));
+        assertThat(preview.getErrors()).noneMatch(error -> "负责人邮箱".equals(error.getField()));
         importService.commit(preview.getJobId());
         assertThat(orgUnitMapper.findByCode("IMPORT-BG").getLeaderUserId()).isEqualTo(1L);
     }

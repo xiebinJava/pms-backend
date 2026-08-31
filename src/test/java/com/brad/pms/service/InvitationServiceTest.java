@@ -10,11 +10,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentMatchers;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,5 +54,28 @@ class InvitationServiceTest {
 
         assertThat(response.getActivationUrl()).isEmpty();
         verify(notifier).send(any(UserDO.class), contains("/auth/activate?token="), any());
+    }
+
+    @Test
+    void invitationAllowsMissingDisplayNamesWhenEmailIsProvided() {
+        UserContext.set(new LoginUser(1L, "admin", "管理员"));
+        OrgUnitDO org = new OrgUnitDO(); org.setId(10L); org.setStatus("ACTIVE");
+        when(userMapper.findByEmailNormalized("email.only@example.com")).thenReturn(null);
+        when(orgUnitMapper.selectById(10L)).thenReturn(org);
+        when(notifierProvider.getIfAvailable()).thenReturn(notifier);
+        doAnswer(invocation -> { invocation.<UserDO>getArgument(0).setId(23L); return 1; }).when(userMapper).insert(any(UserDO.class));
+
+        InvitationService service = new InvitationService(userMapper, invitationMapper, orgUnitMapper,
+                positionMapper, roleMapper, userRoleMapper, userPositionMapper, authService,
+                operationLogService, notifierProvider);
+        UserInviteCmd command = new UserInviteCmd();
+        command.setEmail("Email.Only@Example.com"); command.setOrgUnitId(10L);
+
+        service.invite(command);
+
+        verify(userMapper).insert(ArgumentMatchers.<UserDO>argThat(user ->
+                "Email.Only@Example.com".equals(user.getEmail())
+                        && "email.only@example.com".equals(user.getEmailNormalized())
+                        && user.getNameZh() == null));
     }
 }

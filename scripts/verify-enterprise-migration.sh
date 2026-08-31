@@ -72,7 +72,7 @@ done
 echo "PASS: required enterprise tables"
 
 for column_check in \
-  "sys_user|name_zh" "sys_user|username_normalized" "sys_user|deleted" "sys_user|version" \
+  "sys_user|name_zh" "sys_user|username_normalized" "sys_user|email_normalized" "sys_user|deleted" "sys_user|version" \
   "project|org_unit_id" "project|deleted" "project|version" \
   "project_node|deleted" "project_node|version"; do
   table_name="${column_check%%|*}"; column_name="${column_check##*|}"
@@ -81,7 +81,7 @@ for column_check in \
 done
 echo "PASS: required enterprise columns"
 
-for index_name in uk_user_username_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted; do
+for index_name in uk_user_username_normalized uk_user_email_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted; do
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND index_name='$index_name';" | tr -d '[:space:]')"
   if [[ "$count" == "0" ]]; then echo "FAIL: index $index_name is missing" >&2; exit 1; fi
 done

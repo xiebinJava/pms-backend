@@ -8,9 +8,9 @@
 
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
-| OceanBase `brad_pms` | 已迁移至 V6 | 本地实例版本历史、表结构、索引、外键和行数校验通过；V6 审计清理索引已应用并完成二次幂等校验 |
+| OceanBase `brad_pms` | 已迁移至 V6，V7 待执行 | 本地实例版本历史、表结构、索引、外键和行数校验通过；V7 邮箱身份迁移需在目标租户执行并完成预检 |
 | 后端回归 | 已通过 | `mvn -q test`，包含错误契约、鉴权和限流测试 |
-| 前端回归 | 已通过 | `pnpm test`，79 项通过 |
+| 前端回归 | 已通过 | `pnpm test`，80 项通过 |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
@@ -60,6 +60,13 @@
 
 ## 2026-08-31 合并后收口执行记录
 
+### 邮箱核心身份改造（当前变更）
+
+- 新增 V7 `email_normalized` 字段及唯一索引；新增账号以邮箱登录，中文名和英文名可选。
+- 旧 `username` 登录、旧导入表头和历史显示数据保留兼容；无姓名账号统一回退展示邮箱。
+- 邀请与员工导入要求邮箱唯一，组织负责人、直属上级均支持邮箱标识；主归属关系与组织负责人关系不合并。
+- 本次变更需在目标 OceanBase 执行 V7 并重新跑 preflight/verify；缺少邮箱的历史账号会被预检阻断，需先补齐真实邮箱。
+
 ### Task 1：发布基线
 
 - 后端远程 `main`：`c86f45e`，已包含 `codex/oceanbase-migration` 的 `eb5c6a8`。
@@ -69,7 +76,7 @@
 ### Task 2：本地门禁与远程 CI
 
 - 后端 `mvn -q test`：通过；`./scripts/validate-openapi.sh`：通过；`bash -n scripts/*.sh docker/*.sh`：通过。
-- 前端 `pnpm test`：79 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
+- 前端 `pnpm test`：80 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
 - 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端升级后 CI `33352990972` 已通过单元测试、OpenAPI、H2/密钥扫描、后端镜像 Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。

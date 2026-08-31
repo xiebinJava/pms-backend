@@ -27,7 +27,7 @@
 | 项目成员 | 项目协作范围内的人员，角色包括负责人、管理员、成员。 |
 | 数据范围 | 角色在组织和项目数据上的可见范围，不等同于功能权限。 |
 
-所有用户统一用“中文名（英文名）”展示，例如“谢斌（Brad.Xie）”。英文名（`username`）是唯一登录标识，登录匹配不区分大小写；数据中保留用户输入的展示形式，同时以 `username_normalized` 做唯一约束和查询。
+用户展示遵循“中文名（英文名）”优先、邮箱兜底的规则，例如“谢斌（Brad.Xie）”。邮箱是新账号的唯一核心身份，登录时对邮箱执行 trim + 小写规范化并按 `email_normalized` 查询；中文名和英文名均可选。历史 `username` 字段保留为兼容字段，旧英文名登录在兼容期内仍可用，并继续以 `username_normalized` 保证唯一。
 
 ## 3. 核心业务不变量
 
@@ -38,7 +38,7 @@
 3. 组织负责人独立于员工主归属。调整员工主归属不得自动改变组织负责人；调整组织负责人也不得改写员工主归属。
 4. 组织树只能形成一棵无环父子树。停用组织前，必须处理有效子组织、成员和项目引用，不能产生孤儿数据。
 5. 组织编码、岗位编码、角色编码、权限编码在各自命名空间内唯一；组织节点移动后必须同步维护 `path` 和下级节点可见范围。
-6. `username_normalized` 使用 `Locale.ROOT` 小写规范化，并建立唯一索引；`Brad.Xie`、`brad.xie`、`BRAD.XIE` 不能创建为三个账号。
+6. `email_normalized` 使用 `Locale.ROOT` 小写规范化，并建立唯一索引；`Brad@Example.com`、`brad@example.com` 不能创建为两个账号。历史 `username_normalized` 同样保持唯一，避免旧客户端产生冲突。
 7. 生产运行只使用 OceanBase；H2 仅用于自动化测试或一次性历史迁移快照，不能作为生产回退数据库。
 8. 所有会改变人员、组织、角色、项目生命周期、导入结果或认证状态的写操作都要留下可追踪审计记录。
 9. 已完成、已终止或已删除的项目/节点按只读处理；恢复项目必须通过明确的恢复操作和原因，不得靠普通编辑绕过生命周期。
@@ -62,7 +62,7 @@ sys_user
 
 | 表 | 职责 | 关键字段/约束 |
 | --- | --- | --- |
-| `sys_user` | 账号、中文名、英文登录名、认证状态 | `username_normalized` 唯一；`ACTIVE/LOCKED/DISABLED/PENDING_ACTIVATION` |
+| `sys_user` | 账号邮箱、可选中文名/英文名、认证状态 | `email_normalized` 唯一；`username_normalized` 为兼容字段且唯一；`ACTIVE/LOCKED/DISABLED/PENDING_ACTIVATION` |
 | `sys_user_position` | 用户与组织的主归属、兼职归属、直属上级 | `user_id/org_unit_id/is_primary/assignment_type/status` |
 | `sys_org_unit` | 可视化组织树和业务线 | `parent_id/path/type_id/leader_user_id/status` |
 | `sys_position` | 岗位字典 | 编码唯一，可停用 |
@@ -141,7 +141,7 @@ project
 
 ## 7. 认证与安全规则
 
-1. 登录接口使用英文名，服务端先规范化再查询；错误提示不能泄露“账号不存在”还是“密码错误”的可枚举信息。
+1. 登录接口以邮箱为核心，服务端先执行 trim + 小写规范化再查询；旧英文名仅作为兼容字段；错误提示不能泄露“账号不存在”还是“密码错误”的可枚举信息。
 2. 成功登录签发访问令牌和刷新令牌；刷新令牌只存哈希，退出登录或停用账号时撤销会话。
 3. 连续失败登录会累加 `failed_login_count`，达到策略后进入 `LOCKED`；成功登录会重置失败计数并记录 `last_login_at`。
 4. 密码重置令牌只存哈希并设置有效期，默认不在生产响应中暴露明文令牌。
@@ -177,16 +177,16 @@ project
 
 1. 管理员上传 Excel/CSV，服务端限制文件类型、大小（当前实现上限 5 MB）和行数（当前实现上限 5000 行）。
 2. 预览阶段只解析和校验，不写业务表；返回逐行错误、规范化结果和汇总数量。
-3. 组织导入先处理父子关系和编码冲突；员工导入校验中文名、英文名、主组织编码、直属上级英文名、角色和日期。
+3. 组织导入先处理父子关系和编码冲突；员工导入要求邮箱和主组织编码，中文名/英文名可选，直属上级优先填写邮箱（兼容旧英文名），同时校验角色和日期。
 4. 提交阶段使用导入任务 ID，在事务内写入组织、用户、归属和角色，并写入 `sys_import_job` 与操作日志；失败应整体回滚，不产生半批数据。
-5. 同一规范化英文名、组织编码或角色编码重复时必须明确报错；已存在记录只能按产品定义的更新策略处理，不能静默覆盖。
+5. 同一规范化邮箱、组织编码或角色编码重复时必须明确报错；英文名如填写也必须唯一；已存在记录只能按产品定义的更新策略处理，不能静默覆盖。
 6. 导入完成后可在审计日志中通过 `IMPORT_COMMITTED` 和导入任务 ID 追踪；预览结果过期后不可再次提交。
 
 ## 10. OceanBase 与部署
 
 - 默认 profile 为 `oceanbase`，使用 MySQL 兼容模式和 2881 端口，数据库名为 `brad_pms`。
 - 生产连接参数通过 `OCEANBASE_HOST`、`OCEANBASE_PORT`、`OCEANBASE_DATABASE`、`OCEANBASE_USER`、`OCEANBASE_PASSWORD` 注入。
-- 表结构按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql`、`V6__audit_retention_indexes.sql` 顺序执行。
+- 表结构按 `V1__baseline_project_schema.sql`、`V2__enterprise_identity_org_rbac.sql`、`V3__project_node_schedule.sql`、`V4__authentication_audit_indexes.sql`、`V5__integrity_soft_delete_optimistic_lock.sql`、`V6__audit_retention_indexes.sql`、`V7__email_identity.sql` 顺序执行。
 - V5 为现有业务表补充逻辑删除标记、乐观锁版本号、关键唯一索引和跨表外键；应用查询必须遵守逻辑删除条件，关键更新必须携带版本号。
 - OceanBase profile 运行时不依赖 Flyway 自动执行；升级前先执行预检、备份策略和迁移脚本，再启动应用。
 - `application-h2.yml` 和 H2 快照只服务自动化测试/一次性迁移工具；文档、示例和上线脚本不得引导用户用 H2 运行生产。

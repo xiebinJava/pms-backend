@@ -58,11 +58,17 @@ public class AuthService {
 
     @Transactional(noRollbackFor = BusinessException.class)
     public LoginResponse login(LoginRequest request, String ip, String userAgent) {
-        String normalized = EnterpriseDataMigration.normalizeUsername(request.getUsername());
-        UserDO user = userMapper.findByUsernameNormalized(normalized);
+        boolean emailLogin = request.getEmail() != null && !request.getEmail().isBlank();
+        String rawIdentifier = emailLogin ? request.getEmail() : request.getUsername();
+        String normalized = emailLogin
+                ? EnterpriseDataMigration.normalizeEmail(rawIdentifier)
+                : EnterpriseDataMigration.normalizeUsername(rawIdentifier);
+        UserDO user = emailLogin
+                ? userMapper.findByEmailNormalized(normalized)
+                : userMapper.findByUsernameNormalized(normalized);
         if (user == null) {
             recordLoginAttempt(null, normalized, "FAILURE", "INVALID_CREDENTIALS", ip, userAgent);
-            throw BusinessException.unauthorized("用户名或密码错误");
+            throw BusinessException.unauthorized("邮箱或密码错误");
         }
         LocalDateTime now = LocalDateTime.now();
         if (UserStatus.DISABLED.name().equals(user.getStatus())) {
@@ -77,7 +83,7 @@ public class AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             registerFailure(user, now);
             recordLoginAttempt(user, normalized, "FAILURE", "INVALID_CREDENTIALS", ip, userAgent);
-            throw BusinessException.unauthorized("用户名或密码错误");
+            throw BusinessException.unauthorized("邮箱或密码错误");
         }
 
         user.setFailedLoginCount(0);

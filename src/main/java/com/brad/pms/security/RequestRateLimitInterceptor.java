@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Small in-process guard for credential and upload endpoints. It is deliberately
- * conservative: the client IP is always part of the key, while a username
+ * conservative: the client IP is always part of the key, while an email
  * parameter/header is included when a caller supplies one. Account-level
  * failed-login locking remains enforced by AuthService.
  */
@@ -87,7 +87,9 @@ public class RequestRateLimitInterceptor implements HandlerInterceptor {
     }
 
     private String rateKey(HttpServletRequest request) {
-        String account = request.getParameter("username");
+        String account = request.getParameter("email");
+        if (account == null || account.isBlank()) account = request.getParameter("username");
+        if (account == null || account.isBlank()) account = request.getHeader("X-Login-Email");
         if (account == null || account.isBlank()) account = request.getHeader("X-Login-Username");
         if (account == null || account.isBlank()) account = "-";
         return request.getRemoteAddr() + "|" + normalizedPath(request) + "|" + account.trim().toLowerCase();

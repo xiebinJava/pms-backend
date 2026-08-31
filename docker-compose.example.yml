@@ -120,8 +120,9 @@ services:
       # The example stack is for local evaluation. Production deployments must
       # explicitly set PMS_DEPLOYMENT_ENV=production and the secure flags below.
       PMS_DEPLOYMENT_ENV: ${PMS_DEPLOYMENT_ENV:-development}
-      PMS_BOOTSTRAP_ADMIN_USERNAME: ${PMS_BOOTSTRAP_ADMIN_USERNAME:?set bootstrap admin English name}
-      PMS_BOOTSTRAP_ADMIN_NAME_ZH: ${PMS_BOOTSTRAP_ADMIN_NAME_ZH:?set bootstrap admin Chinese name}
+      PMS_BOOTSTRAP_ADMIN_EMAIL: ${PMS_BOOTSTRAP_ADMIN_EMAIL:?set bootstrap admin email}
+      PMS_BOOTSTRAP_ADMIN_USERNAME: ${PMS_BOOTSTRAP_ADMIN_USERNAME:-}
+      PMS_BOOTSTRAP_ADMIN_NAME_ZH: ${PMS_BOOTSTRAP_ADMIN_NAME_ZH:-}
       PMS_BOOTSTRAP_ADMIN_PASSWORD: ${PMS_BOOTSTRAP_ADMIN_PASSWORD:?set bootstrap admin password}
       PMS_CORS_ALLOWED_ORIGINS: ${PMS_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       PMS_UPLOAD_DIR: /var/lib/pms/uploads

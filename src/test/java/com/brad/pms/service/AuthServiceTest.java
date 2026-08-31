@@ -85,6 +85,23 @@ class AuthServiceTest {
     }
 
     @Test
+    void loginUsesNormalizedEmailAsPrimaryIdentity() {
+        user.setEmail("Brad.Xie@Example.com");
+        user.setEmailNormalized("brad.xie@example.com");
+        when(userMapper.findByEmailNormalized("brad.xie@example.com")).thenReturn(user);
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("  BRAD.XIE@EXAMPLE.COM ");
+        request.setPassword("CorrectPassword1!");
+
+        LoginResponse response = authService.login(request);
+
+        assertThat(response.getUser().getEmail()).isEqualTo("Brad.Xie@Example.com");
+        verify(userMapper).findByEmailNormalized("brad.xie@example.com");
+        verify(userMapper, never()).findByUsernameNormalized(anyString());
+    }
+
+    @Test
     void disabledUserCannotRefreshSession() {
         user.setStatus("DISABLED");
         AuthSessionDO session = new AuthSessionDO();
@@ -104,7 +121,7 @@ class AuthServiceTest {
         request.setPassword("WrongPassword1!");
 
         assertThatThrownBy(() -> authService.login(request, "10.0.0.8", "test-agent"))
-                .hasMessage("用户名或密码错误");
+                .hasMessage("邮箱或密码错误");
 
         assertThat(user.getFailedLoginCount()).isEqualTo(1);
         verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
@@ -138,7 +155,7 @@ class AuthServiceTest {
         request.setPassword("WrongPassword1!");
 
         assertThatThrownBy(() -> authService.login(request, "10.0.0.9", "test-agent"))
-                .hasMessage("用户名或密码错误");
+                .hasMessage("邮箱或密码错误");
 
         verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
                 "FAILURE".equals(log.getResult())

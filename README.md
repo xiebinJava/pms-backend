@@ -55,7 +55,7 @@ docker compose -f docker-compose.example.yml up --build
 ```
 
 Compose 会先等待 OceanBase，再依次运行 `accounts-init`（创建最小权限账号）、`schema-init`
-（执行版本化 V1–V6 迁移）和 `uploads-init`（修复持久化上传卷的属主），最后启动后端与前端。
+（执行版本化 V1–V7 迁移）和 `uploads-init`（修复持久化上传卷的属主），最后启动后端与前端。
 前端地址为 `http://localhost:5173`；后端端口仅绑定本机 `127.0.0.1:8080`。健康检查包括
 `/api/health/live`（存活）与 `/api/health/ready`（数据库与迁移就绪）。Actuator 健康和指标端点
 默认仅绑定后端容器内 `127.0.0.1:8081`，不经过前端代理；需要监控时通过
@@ -92,11 +92,12 @@ mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 | admin | admin123 |
 | zhangsan / lisi / wangwu | admin123 |
 
-上表仅在自动化测试配置用于种子数据。OceanBase 环境不要使用共享默认密码；空库首次启动前请注入
-`PMS_BOOTSTRAP_ADMIN_USERNAME`、`PMS_BOOTSTRAP_ADMIN_NAME_ZH` 和至少 12 位的
-`PMS_BOOTSTRAP_ADMIN_PASSWORD`。管理员随后通过邀请或 Excel/CSV 导入员工。
+上表仅在自动化测试配置用于种子数据。OceanBase 环境不要使用共享默认密码；空库首次启动前请注入管理员邮箱
+`PMS_BOOTSTRAP_ADMIN_EMAIL` 和至少 12 位的 `PMS_BOOTSTRAP_ADMIN_PASSWORD`。中文名、英文名可选，旧客户端仍可同时提供
+`PMS_BOOTSTRAP_ADMIN_USERNAME`。管理员随后通过邀请或 Excel/CSV 导入员工。
 
-所有用户展示为 `中文名（English.Name）`，登录使用不区分大小写的英文名。每名员工有一个主归属，可拥有多个兼职/项目归属。
+邮箱是账号的唯一核心身份，登录时不区分大小写并自动去除首尾空格。用户展示优先使用
+`中文名（English.Name）`，缺少姓名时回退到邮箱；英文名和中文名均可选。每名员工有一个主归属，可拥有多个兼职/项目归属。
 
 ## 核心接口
 

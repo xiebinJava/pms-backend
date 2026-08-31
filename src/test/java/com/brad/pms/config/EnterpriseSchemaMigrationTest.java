@@ -24,6 +24,7 @@ class EnterpriseSchemaMigrationTest {
             assertThat(tableExists(connection, "sys_role")).isTrue();
             assertThat(tableExists(connection, "sys_auth_session")).isTrue();
             assertThat(columnExists(connection, "sys_user", "username_normalized")).isTrue();
+            assertThat(columnExists(connection, "sys_user", "email_normalized")).isTrue();
             assertThat(columnExists(connection, "sys_user", "name_zh")).isTrue();
             assertThat(columnExists(connection, "project", "org_unit_id")).isTrue();
             assertThat(columnExists(connection, "project_node", "start_date")).isTrue();

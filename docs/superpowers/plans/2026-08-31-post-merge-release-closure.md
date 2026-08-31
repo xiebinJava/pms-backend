@@ -266,7 +266,7 @@ git commit -m "docs: record OceanBase recovery drill"
 PMS_SMOKE_BASE_URL=http://127.0.0.1:8080/api ./scripts/smoke-test.sh
 ```
 
-Expected: liveness、readiness 和配置的英文名管理员登录全部通过。
+Expected: liveness、readiness 和配置的邮箱管理员登录全部通过；历史英文名兼容登录按兼容性用例验证。
 
 - [ ] **Step 3: 执行浏览器验收路径**
 
@@ -306,7 +306,7 @@ git commit -m "docs: record application acceptance"
 
 - [ ] **Step 2: 生成发布说明**
 
-在 `docs/operations/releases/v0.1.0.md` 写入版本提交、迁移版本 V1–V6、验证命令、CI 运行链接、部署步骤、回滚限制、备份恢复证据、已知缺口和安全注意事项。
+在 `docs/operations/releases/v0.1.0.md` 写入版本提交、迁移版本 V1–V7、验证命令、CI 运行链接、部署步骤、回滚限制、备份恢复证据、已知缺口和安全注意事项。
 
 - [ ] **Step 3: 最终检查并创建 tag**
 

@@ -18,7 +18,7 @@ class EnterprisePreflightScriptTest {
             assertThat(script).contains("set -euo pipefail", "MYSQL_PWD");
             assertThat(script).doesNotContain("DROP DATABASE", "TRUNCATE");
             assertThat(script).contains("sys_login_log", "sys_auth_session", "uk_user_username_normalized",
-                    "idx_login_log_user_created", "idx_login_log_retention");
+                    "uk_user_email_normalized", "idx_login_log_user_created", "idx_login_log_retention");
         }
         assertThat(preflight).contains("parent_id IS NULL", "status='ACTIVE'");
         assertThat(verify).contains("exactly one active root organization is present");

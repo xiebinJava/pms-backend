@@ -15,7 +15,7 @@ paths:
     post:
       tags: [认证]
       security: []
-      summary: 英文名登录
+      summary: 邮箱登录
       requestBody:
         required: true
         content:
@@ -244,9 +244,10 @@ components:
   schemas:
     LoginRequest:
       type: object
-      required: [username, password]
+      required: [email, password]
       properties:
-        username: { type: string, description: 英文名，不区分大小写 }
+        email: { type: string, format: email, description: 登录邮箱，不区分大小写 }
+        username: { type: string, deprecated: true, description: 兼容旧客户端的英文名，不区分大小写 }
         password: { type: string, format: password }
     ApiResponse:
       type: object
