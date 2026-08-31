@@ -10,6 +10,15 @@
 
 **Spec:** `docs/operations/infrastructure-status.md`、`docs/operations/release-checklist.md`、`docs/operations/enterprise-upgrade-runbook.md`、`/Users/fs/Desktop/Project/pms-front/docs/frontend-design-system.md`
 
+## 当前执行状态（2026-08-31）
+
+- Task 1：已完成。两个远程 `main` 基线已核对，后端集成工作流固定前端 `bc2aab1`。
+- Task 2：后端/前端本地门禁与后端 CI 已完成；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。跨仓库集成 `33352990811` 仍等待 `PMS_FRONT_REPO_READ_TOKEN`。
+- Task 3：配置、Compose、密钥材料和安全启动校验已完成自动化核查；生产密钥注入必须在目标企业环境执行。
+- Task 4：现有 OceanBase 只读连通性已确认；备份、空库恢复和故障演练等待具备 `obclient`/备份工具的部署机。
+- Task 5：目标环境未启动，浏览器验收尚未执行。
+- Task 6：发布候选文档已生成；待 Task 2/4/5 的 P1 条件关闭后再创建 `v0.1.0` tag。
+
 ## Global Constraints
 
 - 远程主分支为 `main`，不存在 `master`；后端和前端均以远程 `main` 作为发布基线。

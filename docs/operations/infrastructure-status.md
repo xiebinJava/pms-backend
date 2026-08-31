@@ -72,9 +72,9 @@
 - 前端 `pnpm test`：79 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
-- 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端 CI `33350901998` 的单元测试、OpenAPI 和密钥扫描通过，但该运行基于升级前提交，镜像依赖扫描发现高危/严重漏洞，暂不能标记为发布通过。
+- 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端升级后 CI `33352990972` 已通过单元测试、OpenAPI、H2/密钥扫描、后端镜像 Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。
 - 最新集成运行 `33350901997` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代。
-- 后端镜像扫描已完成受控修复：Spring Boot 3.5.14、Spring Framework 6.2.19、Tomcat 11.0.22、MyBatis-Plus 3.5.17、Jackson 2.21.4、Micrometer 1.15.12、Logback 1.5.18、Connector/J 9.4.0，并迁移到 Jakarta Servlet/Validation；本地完整测试通过，需在新提交上重跑 Trivy 才能关闭该门禁。
+- 后端镜像扫描已完成受控修复：Spring Boot 3.5.14、Spring Framework 6.2.19、Tomcat 11.0.22、MyBatis-Plus 3.5.17、Jackson 2.21.4、Micrometer 1.15.12、Logback 1.5.18、Connector/J 9.4.0，并迁移到 Jakarta Servlet/Validation；本地完整测试与远程 Trivy/SBOM 均通过。
 
 #### 依赖安全升级 Review（2026-08-31）
 
