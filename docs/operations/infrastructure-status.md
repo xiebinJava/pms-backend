@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | P1 | 真实 OceanBase 集成、备份恢复和故障演练尚未在本机完成 | 当前 Docker Hub 网络不可用，必须在 CI/部署机执行后才能发布 |
 | P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | 需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务 |
-| P2 | 尚未规划 Spring Boot 3/Java 21 升级 | 长期维护成本较高，但不是当前发布阻塞项 |
+| P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 已收口能力
 
@@ -72,9 +72,16 @@
 - 前端 `pnpm test`：79 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
-- 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端 CI `33350901998` 的单元测试、OpenAPI 和密钥扫描通过，但镜像依赖扫描发现高危/严重漏洞，暂不能标记为发布通过。
+- 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端 CI `33350901998` 的单元测试、OpenAPI 和密钥扫描通过，但该运行基于升级前提交，镜像依赖扫描发现高危/严重漏洞，暂不能标记为发布通过。
 - 最新集成运行 `33350901997` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代。
-- 后端镜像扫描阻塞项：Spring Boot 2.7.5、Spring Framework 5.3.23、Tomcat 9.0.68、MyBatis-Plus 3.4.1、Jackson 2.13、Logback 1.2.11、Connector/J 8.0.31 等依赖存在已修复版本的 HIGH/CRITICAL 漏洞；需要单独完成依赖升级兼容性验证后再重跑扫描，不能通过降低 Trivy 阈值解决。
+- 后端镜像扫描已完成受控修复：Spring Boot 3.5.14、Spring Framework 6.2.19、Tomcat 11.0.22、MyBatis-Plus 3.5.17、Jackson 2.21.4、Logback 1.5.18、Connector/J 9.4.0，并迁移到 Jakarta Servlet/Validation；本地完整测试通过，需在新提交上重跑 Trivy 才能关闭该门禁。
+
+#### 依赖安全升级 Review（2026-08-31）
+
+- 选择 Spring Boot 3.5.14 是因为 Spring Boot 2.7/Spring Framework 5 已无法覆盖当前 Trivy 数据库中需要 Spring 6.2.x 的修复项；没有降低扫描阈值，也没有添加漏洞忽略规则。
+- 为保持 Java 17，完成 `javax.validation`/`javax.servlet` 到 Jakarta API 的源码与测试迁移，并切换 `mybatis-plus-spring-boot3-starter`；MyBatis-Plus 3.5.17 分页插件显式依赖 `mybatis-plus-jsqlparser`。
+- 兼容性修复：MyBatis-Plus 3.5 的 `selectCount` 返回 `Long`，服务层计数和 DTO 转换已显式处理；Mockito 对重载 `insert` 使用显式泛型 matcher，避免测试编译歧义。
+- Review 结果：`mvn -Dmaven.repo.local=/private/tmp/pms-m2 -q test` 通过（112 tests，退出码 0）；下一步必须在 GitHub Actions 新提交上完成镜像 Trivy 扫描。
 
 ### Task 3：生产配置核查
 

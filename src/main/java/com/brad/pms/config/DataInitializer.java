@@ -42,7 +42,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        Integer userCount = userMapper.selectCount(null);
+        Long userCount = userMapper.selectCount(null);
         if (userCount != null && userCount > 0) {
             enterpriseDataMigration.backfillUsersAndProjects();
             return;

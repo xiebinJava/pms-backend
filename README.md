@@ -5,8 +5,8 @@
 ## 技术栈
 
 - Java 17 + Maven
-- Spring Boot 2.7.5
-- MyBatis-Plus 3.4.1（分页插件 + 公共字段自动填充）
+- Spring Boot 3.5.14（Java 17，Jakarta API）
+- MyBatis-Plus 3.5.17（分页插件 + 公共字段自动填充）
 - OceanBase（MySQL 兼容模式）
 - JWT（jjwt）轻量登录鉴权，无第三方权限平台依赖
 - Lombok

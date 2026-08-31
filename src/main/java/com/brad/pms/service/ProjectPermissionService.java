@@ -65,7 +65,7 @@ public class ProjectPermissionService {
         if (userId == null) {
             throw BusinessException.error("项目经理必须是项目成员");
         }
-        Integer count = memberMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.ProjectMemberDO>()
+        Long count = memberMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.ProjectMemberDO>()
                 .eq(com.brad.pms.entity.ProjectMemberDO::getProjectId, projectId)
                 .eq(com.brad.pms.entity.ProjectMemberDO::getUserId, userId));
         if (count == null || count == 0) {

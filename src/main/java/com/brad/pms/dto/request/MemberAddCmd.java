@@ -2,7 +2,7 @@ package com.brad.pms.dto.request;
 
 import lombok.Data;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 @Data
 public class MemberAddCmd {

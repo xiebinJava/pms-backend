@@ -42,7 +42,7 @@ public class MemberService {
         if (userId == null) {
             throw BusinessException.error("用户不能为空");
         }
-        Integer exists = memberMapper.selectCount(
+        Long exists = memberMapper.selectCount(
                 new LambdaQueryWrapper<ProjectMemberDO>()
                         .eq(ProjectMemberDO::getProjectId, projectId)
                         .eq(ProjectMemberDO::getUserId, userId));

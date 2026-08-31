@@ -108,7 +108,7 @@ public class NodeService {
             throw BusinessException.forbidden("节点已锁定，回滚后才可以分配节点负责人");
         }
         if (ownerId != null) {
-            Integer memberCount = memberMapper.selectCount(new LambdaQueryWrapper<ProjectMemberDO>()
+            Long memberCount = memberMapper.selectCount(new LambdaQueryWrapper<ProjectMemberDO>()
                     .eq(ProjectMemberDO::getProjectId, projectId)
                     .eq(ProjectMemberDO::getUserId, ownerId));
             if (memberCount == null || memberCount == 0) {
@@ -251,9 +251,9 @@ public class NodeService {
         if (project == null || project.getStatus() == 2 || project.getStatus() == 3) {
             return;
         }
-        Integer total = nodeMapper.selectCount(new LambdaQueryWrapper<ProjectNodeDO>()
+        Long total = nodeMapper.selectCount(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId));
-        Integer done = nodeMapper.selectCount(new LambdaQueryWrapper<ProjectNodeDO>()
+        Long done = nodeMapper.selectCount(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId)
                 .eq(ProjectNodeDO::getStatus, NodeStatus.COMPLETED.getCode()));
         int progress = total == null || total == 0 ? 0 : (int) Math.round(done * 100.0 / total);

@@ -4,9 +4,9 @@
 
 **Goal:** 在前后端代码已进入远程 `main` 后，完成 OceanBase 私有化部署的发布验证、生产配置、备份恢复演练和开源交付收口。
 
-**Architecture:** 保持单企业本地部署，不引入多租户迁移。运行时数据库只使用 OceanBase `brad_pms`；后端以 Java 17/Spring Boot 2.7 提供 `/api`，前端以 Vue 3/Vite 提供静态应用，所有发布验证通过 CI 和可重复脚本完成。
+**Architecture:** 保持单企业本地部署，不引入多租户迁移。运行时数据库只使用 OceanBase `brad_pms`；后端以 Java 17/Spring Boot 3.5 提供 `/api`，前端以 Vue 3/Vite 提供静态应用，所有发布验证通过 CI 和可重复脚本完成。
 
-**Tech Stack:** Java 17、Spring Boot 2.7、MyBatis-Plus、OceanBase MySQL 兼容模式、Vue 3、TypeScript、Vite、pnpm、Docker Compose、GitHub Actions、Playwright。
+**Tech Stack:** Java 17、Spring Boot 3.5、Jakarta Validation/Servlet、MyBatis-Plus、OceanBase MySQL 兼容模式、Vue 3、TypeScript、Vite、pnpm、Docker Compose、GitHub Actions、Playwright。
 
 **Spec:** `docs/operations/infrastructure-status.md`、`docs/operations/release-checklist.md`、`docs/operations/enterprise-upgrade-runbook.md`、`/Users/fs/Desktop/Project/pms-front/docs/frontend-design-system.md`
 
