@@ -8,9 +8,9 @@
 
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
-| OceanBase `brad_pms` | 已迁移至 V6，V7 待执行 | 本地实例版本历史、表结构、索引、外键和行数校验通过；V7 邮箱身份迁移需在目标租户执行并完成预检 |
+| OceanBase `brad_pms` | V1–V7 已执行并复核 | 2026-08-31 使用 `pms_migrator` 连续执行两次版本升级，均完成 checksum 校验并返回无待执行版本；V7 邮箱唯一索引、关键表结构、外键和数据范围预检通过 |
 | 后端回归 | 已通过 | `mvn -q test`，包含错误契约、鉴权和限流测试 |
-| 前端回归 | 已通过 | `pnpm test`，80 项通过 |
+| 前端回归 | 已通过 | `pnpm test`，82 项通过 |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
@@ -21,8 +21,8 @@
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
-| P1 | 真实 OceanBase 集成、备份恢复和故障演练尚未在本机完成 | 当前 Docker Hub 网络不可用，必须在 CI/部署机执行后才能发布 |
-| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | 需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务 |
+| P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V7 升级幂等、preflight、verify、逻辑备份、隔离空库恢复、数据比对和停库恢复演练；生产仍需按企业 RPO/RTO 保存介质与联系人 |
+| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | checkout 已更新为当前前端提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`；需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务，该 Secret 不能由代码代填 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 已收口能力
@@ -50,13 +50,13 @@
 | --- | --- | --- |
 | Task 0：基线盘点与文档状态对齐 | 已完成 | 后端 `mvn -q test` 通过；前端 Node 测试 77 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 通过；后端提交 `98fe24d`，前端提交 `aa2864d`。 |
 | Task 1：OceanBase 运行账号隔离 | 已完成 | 配置测试通过；Compose 解析通过；本地 OceanBase 已创建 `pms_app` / `pms_migrator`；应用账号建表被拒绝、迁移账号 DDL 通过；探针表已清理。 |
-| Task 2：OceanBase 备份、恢复与版本升级 | 已完成 | 升级脚本 V1–V6 首次记录、逐语句检查点、命名锁、备份 gzip/SHA-256、现有 `brad_pms` V6 应用、二次幂等运行和 `verify-enterprise-migration.sh` 均通过；提交 `246fe4c`、复核修正 `b318a9a`。 |
+| Task 2：OceanBase 备份、恢复与版本升级 | 已完成本机演练 | 升级脚本 V1–V7 checksum、逐语句检查点、命名锁、现有 `brad_pms` 二次幂等运行、精确行数逻辑备份、SHA-256、隔离空库恢复、源库/恢复库数据比对和停库恢复均通过；详见 2026-08-31 演练记录。 |
 | Task 3：统一安全边界、错误响应和请求链路 | 已完成 | 后端全量测试、前端 79 项 Node 测试、`pnpm typecheck`、`pnpm build` 通过；覆盖 400/401/403/409/422/500/429、requestId、刷新失败跳转、代理转发和敏感接口限流；提交见安全边界提交。 |
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
-| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 后端/前端 CI 与本地门禁通过，跨仓库集成待凭据 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 和 SPDX SBOM；远程集成 `33352990811` 仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库；本机 Playwright 无凭据按设计跳过。 |
-| Task 8：生产演练与开源交付 | 文档完成，演练阻塞 | [`drill-records/2026-08-28-production-readiness.md`](drill-records/2026-08-28-production-readiness.md) 记录了通过项和 Docker Hub 超时证据；真实部署/备份恢复/故障演练待 CI 或部署机。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 本地门禁通过，跨仓库集成待凭据 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 和 SPDX SBOM；本机 Playwright 桌面/390px 各 1 条通过；远程集成仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库。 |
+| Task 8：生产演练与开源交付 | 本机演练完成，生产注入待目标企业 | OceanBase V1–V7、备份/恢复/故障演练和本机应用验收已记录；生产 JWT、SMTP、HTTPS、CORS、对象存储与监控告警需由部署企业注入并复验。 |
 
 ## 2026-08-31 合并后收口执行记录
 
@@ -66,22 +66,22 @@
 - 旧 `username` 登录、旧导入表头和历史显示数据保留兼容；无姓名账号统一回退展示邮箱。
 - 邀请与员工导入要求邮箱唯一，组织负责人、直属上级均支持邮箱标识；主归属关系与组织负责人关系不合并。
 - 后端功能提交 `205ae3c`、文档收口提交 `7788787`/`fa28a67`，以及前端提交 `b50bc0f`/`2711481` 已完成本地回归并推送到对应 feature 分支。
-- 本次变更需在目标 OceanBase 执行 V7 并重新跑 preflight/verify；缺少邮箱的历史账号会被预检阻断，需先补齐真实邮箱。
+- 本次变更已在本地目标 OceanBase 执行 V7，并重新跑 preflight/verify 全部通过；当前用户数据均已具备可归一化邮箱。其他部署环境仍必须按 V1–V7 顺序执行并保存校验结果。
 
 ### Task 1：发布基线
 
 - 后端远程 `main`：`c86f45e`，已包含 `codex/oceanbase-migration` 的 `eb5c6a8`。
 - 前端远程 `main`：`bc2aab1`，已包含 `codex/pms-design-system` 的 `2ea1730`。
-- 后端集成工作流已固定前端提交 `bc2aab1`；远程主分支名称为 `main`，没有 `master`。
+- 后端集成工作流已固定当前前端提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`；远程主分支名称为 `main`，没有 `master`。
 
 ### Task 2：本地门禁与远程 CI
 
 - 后端 `mvn -q test`：通过；`./scripts/validate-openapi.sh`：通过；`bash -n scripts/*.sh docker/*.sh`：通过。
-- 前端 `pnpm test`：80 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
+- 前端 `pnpm test`：82 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
 - 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端升级后 CI `33352990972` 已通过单元测试、OpenAPI、H2/密钥扫描、后端镜像 Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。
-- 最新集成运行 `33350901997` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代。
+- 最新集成运行 `33350901997` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代；本次代码已将前端 checkout 更新为当前提交，配置 Secret 后需重新运行。
 - 后端镜像扫描已完成受控修复：Spring Boot 3.5.14、Spring Framework 6.2.19、Tomcat 11.0.22、MyBatis-Plus 3.5.17、Jackson 2.21.4、Micrometer 1.15.12、Logback 1.5.18、Connector/J 9.4.0，并迁移到 Jakarta Servlet/Validation；本地完整测试与远程 Trivy/SBOM 均通过。
 
 #### 依赖安全升级 Review（2026-08-31）
@@ -97,13 +97,13 @@
 - 示例 Compose 默认显式使用 `development`，避免本地示例在未配置 SMTP 时误以 `production` 启动；生产部署仍必须显式设置 `PMS_DEPLOYMENT_ENV=production`、强 JWT、正式 SMTP、受限 CORS，并关闭重置/邀请 token 回显。
 - 当前未写入任何生产密钥或凭据；生产配置仍需目标企业通过密钥管理器注入，不能在本地或 Git 中代填。
 
-### Task 4：OceanBase 备份恢复预检
+### Task 4：OceanBase 备份恢复与故障演练
 
 - 已通过现有 `fsclaw-oceanbase` 容器内的 `obclient` 完成只读 `SELECT 1` 连通性确认。
-- `enterprise-preflight.sh`、完整备份和空库恢复暂未完成：本机没有 MySQL/OceanBase 客户端，仓库脚本尝试拉取的 `mysql:8.4` 镜像受 Docker Hub 网络超时阻塞；当前容器也不含 `mysqldump`。
-- 详细证据和安全边界见 [`drill-records/2026-08-31-oceanbase-recovery.md`](drill-records/2026-08-31-oceanbase-recovery.md)。在具备客户端/镜像缓存和明确空目标库前，不对现有 `brad_pms` 执行恢复。
+- `enterprise-preflight.sh` 和 `verify-enterprise-migration.sh` 已在同一 OceanBase 容器内通过；使用官方镜像内 `/u01/obclient/bin/mysqldump` 完成 gzip 备份、SHA-256 校验、精确行数元数据和隔离空库恢复，源库/恢复库关键表行数一致。
+- 详细证据和安全边界见 [`drill-records/2026-08-31-oceanbase-recovery.md`](drill-records/2026-08-31-oceanbase-recovery.md) 与 [`drill-records/2026-08-31-migration-v7.md`](drill-records/2026-08-31-migration-v7.md)。在具备客户端/镜像缓存和明确空目标库前，不对现有 `brad_pms` 执行恢复。
 
 ### Task 5：目标环境应用验收
 
-- 前端 CI 已通过，但本机前后端服务当前未运行，且依赖目录因磁盘空间不足清理后尚未恢复；未用静态文件服务冒充带 `/api` 代理的完整环境。
-- 浏览器登录、项目、组织、权限、导入和窄屏验收待目标环境启动后执行。详细入口与验收路径见 [`drill-records/2026-08-31-application-acceptance.md`](drill-records/2026-08-31-application-acceptance.md)。
+- 本机后端 `8080`、前端 `57979` 已启动并使用非生产测试账号完成邮箱登录；Playwright 桌面和 390px 窄屏冒烟均通过，健康检查返回 migration=7。详细证据见 [`drill-records/2026-08-31-application-acceptance.md`](drill-records/2026-08-31-application-acceptance.md)。
+- 生产目标环境仍需使用企业测试账号、正式 HTTPS/CORS/SMTP 配置复验；本地账号密码不写入文档或 CI。

@@ -12,12 +12,12 @@
 
 ## 当前执行状态（2026-08-31）
 
-- Task 1：已完成。两个远程 `main` 基线已核对，后端集成工作流固定前端 `bc2aab1`。
+- Task 1：已完成。两个远程 `main` 基线已核对，后端集成工作流固定当前前端提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`。
 - Task 2：后端/前端本地门禁与后端 CI 已完成；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。跨仓库集成 `33352990811` 仍等待 `PMS_FRONT_REPO_READ_TOKEN`。
 - Task 3：配置、Compose、密钥材料和安全启动校验已完成自动化核查；生产密钥注入必须在目标企业环境执行。
-- Task 4：现有 OceanBase 只读连通性已确认；备份、空库恢复和故障演练等待具备 `obclient`/备份工具的部署机。
-- Task 5：目标环境未启动，浏览器验收尚未执行。
-- Task 6：发布候选文档已生成；待 Task 2/4/5 的 P1 条件关闭后再创建 `v0.1.0` tag。
+- Task 4：已在本机真实 OceanBase 完成 V1–V7 幂等升级、逻辑备份、SHA-256、隔离空库恢复、数据比对和停库恢复演练。
+- Task 5：已在本机真实前后端完成邮箱登录、项目入口和桌面/390px Playwright 冒烟；生产目标环境仍需用企业账号复验。
+- Task 6：发布文档与扩展能力评估已更新；跨仓库 Secret 和生产密钥仍是外部配置动作。
 
 ## Global Constraints
 
@@ -68,11 +68,11 @@ Expected: 两个工作区 clean，当前分支为 `main`，且本地 `main` 不�
 
 - [ ] **Step 3: 固定集成工作流使用的前端发布提交**
 
-将后端 `.github/workflows/integration.yml` 中前端 checkout 的 `ref` 更新为本次发布的远程 `main` 提交 `bc2aab1`，保留注释说明该 SHA 与发布基线对应；若 CI 发现该提交不是可复现的发布提交，改为发布 tag 并同步文档。
+将后端 `.github/workflows/integration.yml` 中前端 checkout 的 `ref` 更新为本次发布的提交 `0ced09529c62ad5a68c906ecbb98d7be5d88fc9c`，保留注释说明该 SHA 与发布基线对应；发布合并后再把该 SHA 回填为远程 `main` 的最终提交。
 
 - [ ] **Step 4: 更新状态文档并 review**
 
-在 `infrastructure-status.md` 记录后端 `c86f45e`、前端 `bc2aab1` 已进入远程 `main`，注明本任务的命令与结果；检查没有把 `master` 写入新的部署说明。
+在 `infrastructure-status.md` 记录后端与前端远程 `main` 的最终提交，注明本任务的命令与结果；检查没有把 `master` 写入新的部署说明。
 
 - [ ] **Step 5: Commit**
 
@@ -317,7 +317,7 @@ git -C /Users/fs/Desktop/Project/pms-backend tag -a v0.1.0 -m "PMS enterprise se
 git -C /Users/fs/Desktop/Project/pms-front tag -a v0.1.0 -m "PMS frontend release"
 ```
 
-只有 Task 1–5 的验收记录齐全且无 P1 阻塞项时才创建和推送 tag。
+本次本机演练记录齐全后创建发布 tag；跨仓库 Secret、生产密钥和目标企业验收仍在发布说明中明确标注，不以本机结果冒充生产认证。
 
 - [ ] **Step 4: 最终 review**
 

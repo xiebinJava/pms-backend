@@ -25,9 +25,9 @@ jobs:
           repository: xiebinJava/pms-front
           path: pms-front
           token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
-          # Keep backend integration tests paired with the reviewed frontend
-          # release. This SHA is the frontend commit merged into origin/main.
-          ref: bc2aab1
+          # Keep backend integration tests paired with the current reviewed
+          # frontend commit. Update this immutable SHA for every release.
+          ref: 0ced09529c62ad5a68c906ecbb98d7be5d88fc9c
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
@@ -48,6 +48,7 @@ jobs:
             echo "OCEANBASE_PASSWORD=$app_password"
             echo "PMS_JWT_SECRET=$jwt_secret"
             echo "PMS_DEPLOYMENT_ENV=development"
+            echo "PMS_BOOTSTRAP_ADMIN_EMAIL=brad.xie@pms.com"
             echo "PMS_BOOTSTRAP_ADMIN_USERNAME=brad.xie"
             echo "PMS_BOOTSTRAP_ADMIN_NAME_ZH=谢斌"
             echo "PMS_BOOTSTRAP_ADMIN_PASSWORD=$admin_password"
@@ -81,7 +82,7 @@ jobs:
         working-directory: pms-front
         env:
           E2E_BASE_URL: http://127.0.0.1:5173
-          E2E_USERNAME: brad.xie
+          E2E_USERNAME: brad.xie@pms.com
         run: pnpm exec playwright test
       - name: Show service status on failure
         if: ${{ failure() && hashFiles('.env') != '' }}

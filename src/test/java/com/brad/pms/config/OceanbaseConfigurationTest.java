@@ -28,6 +28,10 @@ class OceanbaseConfigurationTest {
                 .isEqualTo("${OCEANBASE_USER}");
         assertThat(source.getProperty("spring.datasource.password"))
                 .isEqualTo("${OCEANBASE_PASSWORD}");
+        assertThat(source.getProperty("spring.datasource.hikari.connection-timeout"))
+                .isEqualTo("${PMS_DB_CONNECTION_TIMEOUT_MS:3000}");
+        assertThat(source.getProperty("spring.datasource.hikari.validation-timeout"))
+                .isEqualTo("${PMS_DB_VALIDATION_TIMEOUT_MS:1000}");
         assertThat(source.getProperty("spring.h2.console.enabled")).isNull();
     }
 
