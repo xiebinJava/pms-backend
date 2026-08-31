@@ -1,6 +1,7 @@
 package com.brad.pms.ops;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,7 +20,9 @@ class ContainerHardeningTest {
 
     @Test
     void frontendImageUsesUnprivilegedNginxAndHealthProbe() throws Exception {
-        String dockerfile = Files.readString(Path.of("../pms-front/Dockerfile"));
+        Path frontendDockerfile = Path.of("../pms-front/Dockerfile");
+        Assumptions.assumeTrue(Files.exists(frontendDockerfile), "frontend repository is not checked out in this job");
+        String dockerfile = Files.readString(frontendDockerfile);
         assertThat(dockerfile).contains("nginx-unprivileged");
         assertThat(dockerfile).contains("USER nginx");
         assertThat(Files.isExecutable(Path.of("../pms-front/healthcheck-frontend.sh"))).isTrue();
@@ -47,7 +50,9 @@ class ContainerHardeningTest {
 
     @Test
     void nginxAddsSecurityHeadersAndProxyLimits() throws Exception {
-        String nginx = Files.readString(Path.of("../pms-front/nginx.conf"));
+        Path frontendNginx = Path.of("../pms-front/nginx.conf");
+        Assumptions.assumeTrue(Files.exists(frontendNginx), "frontend repository is not checked out in this job");
+        String nginx = Files.readString(frontendNginx);
         assertThat(nginx).contains("X-Content-Type-Options");
         assertThat(nginx).contains("Referrer-Policy");
         assertThat(nginx).contains("Content-Security-Policy");
