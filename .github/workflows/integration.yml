@@ -28,6 +28,9 @@ jobs:
           # Keep backend integration tests paired with the reviewed frontend
           # release. This SHA is the frontend commit merged into origin/main.
           ref: bc2aab1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
       - name: Prepare ephemeral integration environment
         shell: bash
         run: |
