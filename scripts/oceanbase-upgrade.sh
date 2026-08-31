@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MIGRATION_DIR="${PMS_MIGRATIONS_DIR:-$PROJECT_DIR/src/main/resources/db/migration}"
 TOOL_IMAGE="${PMS_MYSQL_TOOL_IMAGE:-mysql:8.4}"
+TOOL_CLIENT="${PMS_MYSQL_TOOL_CLIENT:-mysql}"
 
 usage() {
   cat <<'USAGE'
@@ -51,8 +52,8 @@ fi
 
 mysql_args=(--protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names)
 container_mysql() {
-  MYSQL_PWD="$OCEANBASE_PASSWORD" docker run --rm --network host -e MYSQL_PWD "$TOOL_IMAGE" \
-    mysql "${mysql_args[@]}" "$@"
+  MYSQL_PWD="$OCEANBASE_PASSWORD" docker run --rm --network host -e MYSQL_PWD \
+    --entrypoint "$TOOL_CLIENT" "$TOOL_IMAGE" "${mysql_args[@]}" "$@"
 }
 run_mysql() {
   if [[ "$SQL_CLIENT" == "container" ]]; then

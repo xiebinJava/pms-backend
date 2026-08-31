@@ -48,6 +48,15 @@ class OceanbaseUpgradeScriptTest {
     }
 
     @Test
+    void upgradeWorkflowAllowsOceanbaseContainerClientOverride() throws Exception {
+        String script = Files.readString(Path.of("scripts/oceanbase-upgrade.sh"));
+
+        assertThat(script).contains("PMS_MYSQL_TOOL_CLIENT");
+        assertThat(script).contains("--entrypoint");
+        assertThat(script).contains("\"$TOOL_CLIENT\"");
+    }
+
+    @Test
     void backupAndRestoreRequireIntegrityVerification() throws Exception {
         String backup = Files.readString(Path.of("scripts/backup-oceanbase.sh"));
         String restore = Files.readString(Path.of("scripts/restore-oceanbase.sh"));
