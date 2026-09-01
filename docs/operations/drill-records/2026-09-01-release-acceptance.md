@@ -57,7 +57,7 @@ PMS_OCEANBASE_VERIFY=true bash scripts/verify-oceanbase.sh
 
 ## 当前阻塞与后续动作
 
-1. 跨仓库 CI：后端工作流已固定前端提交 `73714231bb6794126b96c3b0c14fe0b5715455f7`；当前已恢复 GitHub 认证，但后端仓库仍需添加仅 `pms-front` Contents: Read 的 `PMS_FRONT_REPO_READ_TOKEN` Secret 后重跑 `integration-and-e2e`。
+1. 跨仓库 CI：前端提交 `73714231bb6794126b96c3b0c14fe0b5715455f7` 的 CI 运行 `33498749972` 已通过；后端工作流运行 `33498860635` 已到凭据预检。当前已恢复 GitHub 认证，但后端仓库仍需添加仅 `pms-front` Contents: Read 的 `PMS_FRONT_REPO_READ_TOKEN` Secret 后重跑 `integration-and-e2e`。
 2. 生产配置：仍需目标企业注入强 JWT、OceanBase 应用/迁移密码、SMTP、HTTPS、受限 CORS、对象存储和监控告警，并保存 RPO/RTO、备份介质和故障联系人。
 3. 本记录是本机演练证据；生产环境必须按同一命令和清单重新执行，不能直接把本机通过视为生产通过。
 

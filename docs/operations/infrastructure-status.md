@@ -22,7 +22,7 @@
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
 | P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V10 升级幂等、preflight、verify、逻辑备份、隔离空库恢复、数据比对和停库恢复演练；生产仍需按企业 RPO/RTO 保存介质与联系人 |
-| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | checkout 已更新为当前前端 `main` 提交 `7371423`；需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务，该 Secret 不能由代码代填 |
+| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | 前端 `main` 提交 `7371423` 的 CI（运行 `33498749972`）已通过；后端集成运行 `33498860635` 在凭据预检处停止，需要配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑，该 Secret 不能由代码代填 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 已收口能力
@@ -56,7 +56,7 @@
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
-| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 本地门禁通过，跨仓库集成待凭据 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 和 SPDX SBOM；2026-09-01 本机 Playwright 桌面/390px 2 项及使用手册录制 1 项通过；远程集成仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 前端 CI 通过，后端跨仓库集成待凭据 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；前端 `7371423` 的 CI `33498749972` 已通过测试、类型检查、构建、Trivy HIGH/CRITICAL 和 SPDX SBOM；后端集成 `33498860635` 已到凭据预检；2026-09-01 本机 Playwright 桌面/390px 2 项及使用手册录制 1 项通过；远程集成仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库。 |
 | Task 8：生产演练与开源交付 | 本机演练完成，生产注入待目标企业 | OceanBase V1–V10、备份/恢复、应用健康检查、邮箱登录和本机 Playwright 验收已记录；生产 JWT、SMTP、HTTPS、CORS、对象存储与监控告警需由部署企业注入并复验。 |
 
 ## 2026-08-31 合并后收口执行记录
