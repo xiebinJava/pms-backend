@@ -6,8 +6,11 @@ import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.CommentCreateCmd;
 import com.brad.pms.dto.response.ProjectCommentDTO;
 import com.brad.pms.entity.ProjectCommentDO;
+import com.brad.pms.entity.ProjectDO;
+import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
+import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.security.ProjectPermissionPolicy;
 import lombok.RequiredArgsConstructor;
@@ -22,15 +25,20 @@ import java.util.stream.Collectors;
 public class CommentService {
 
     private final ProjectCommentMapper commentMapper;
+    private final ProjectTaskMapper taskMapper;
     private final UserService userService;
     private final ProjectPermissionService permissionService;
+    private final NotificationService notificationService;
 
-    public List<ProjectCommentDTO> listByProject(Long projectId) {
+    public List<ProjectCommentDTO> listByProject(Long projectId, Long taskId) {
         permissionService.requireProject(projectId);
+        if (taskId != null) requireTaskInProject(projectId, taskId);
+        LambdaQueryWrapper<ProjectCommentDO> query = new LambdaQueryWrapper<ProjectCommentDO>()
+                .eq(ProjectCommentDO::getProjectId, projectId);
+        if (taskId != null) query.eq(ProjectCommentDO::getTaskId, taskId);
+        else query.isNull(ProjectCommentDO::getTaskId);
         List<ProjectCommentDO> comments = commentMapper.selectList(
-                new LambdaQueryWrapper<ProjectCommentDO>()
-                        .eq(ProjectCommentDO::getProjectId, projectId)
-                        .orderByDesc(ProjectCommentDO::getCreatedAt));
+                query.orderByDesc(ProjectCommentDO::getCreatedAt));
         Map<Long, UserDO> userMap = userService.listByIds(
                         comments.stream().map(ProjectCommentDO::getUserId).collect(Collectors.toList()))
                 .stream().collect(Collectors.toMap(UserDO::getId, u -> u));
@@ -40,14 +48,27 @@ public class CommentService {
     }
 
     public ProjectCommentDTO add(Long projectId, CommentCreateCmd cmd) {
-        permissionService.requireProject(projectId);
+        ProjectDO project = permissionService.requireProject(projectId);
+        ProjectTaskDO task = cmd.getTaskId() == null ? null : requireTaskInProject(projectId, cmd.getTaskId());
         ProjectCommentDO comment = new ProjectCommentDO();
         comment.setProjectId(projectId);
         comment.setTaskId(cmd.getTaskId());
         comment.setContent(cmd.getContent());
         comment.setUserId(UserContext.userId());
         commentMapper.insert(comment);
-        return Convertors.toComment(comment, null);
+        notificationService.notifyComment(projectId, cmd.getTaskId(), cmd.getContent(),
+                task == null ? null : task.getAssigneeId(),
+                project.getProjectManagerId());
+        UserDO author = userService.listByIds(List.of(comment.getUserId())).stream().findFirst().orElse(null);
+        return Convertors.toComment(comment, author);
+    }
+
+    private ProjectTaskDO requireTaskInProject(Long projectId, Long taskId) {
+        ProjectTaskDO task = taskMapper.selectById(taskId);
+        if (task == null || !java.util.Objects.equals(task.getProjectId(), projectId)) {
+            throw BusinessException.error("任务不属于当前项目");
+        }
+        return task;
     }
 
     public void delete(Long id) {

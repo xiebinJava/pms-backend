@@ -59,6 +59,7 @@ class ProjectServiceScopeTest {
         TableInfoHelper.initTableInfo(assistant, ProjectDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectMemberDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectNodeDO.class);
+        TableInfoHelper.initTableInfo(assistant, OrgUnitDO.class);
     }
 
     @Test
@@ -84,6 +85,35 @@ class ProjectServiceScopeTest {
         assertThat(stats).containsEntry("avgProgress", 50L);
         verify(dataScopeResolver).resolveOrgUnitIds(user, "project:read");
         verify(dataScopeResolver).hasAllCompanyScope(user, "project:read");
+    }
+
+    @Test
+    void listReadableByIdsAppliesTheSameReadScopeAsProjectList() {
+        LoginUser user = new LoginUser(7L, "member", "成员", 0);
+        UserContext.set(user);
+        when(dataScopeResolver.resolveOrgUnitIds(user, "project:read")).thenReturn(List.of(42L));
+        when(dataScopeResolver.hasAllCompanyScope(user, "project:read")).thenReturn(false);
+        when(projectMapper.selectList(any())).thenReturn(List.of());
+        when(memberMapper.selectList(any())).thenReturn(List.of());
+
+        assertThat(projectService.listReadableByIds(List.of(1L, 2L))).isEmpty();
+        assertThat(projectService.listReadableByIds(List.of())).isEmpty();
+        verify(dataScopeResolver).resolveOrgUnitIds(user, "project:read");
+    }
+
+    @Test
+    void listReadableIdsAppliesTheSameReadScopeAsProjectList() {
+        LoginUser user = new LoginUser(7L, "member", "成员", 0);
+        UserContext.set(user);
+        when(dataScopeResolver.resolveOrgUnitIds(user, "project:read")).thenReturn(List.of(42L));
+        when(dataScopeResolver.hasAllCompanyScope(user, "project:read")).thenReturn(false);
+        when(memberMapper.selectList(any())).thenReturn(List.of());
+        ProjectDO project = new ProjectDO();
+        project.setId(11L);
+        when(projectMapper.selectList(any())).thenReturn(List.of(project));
+
+        assertThat(projectService.listReadableIds()).containsExactly(11L);
+        verify(dataScopeResolver).resolveOrgUnitIds(user, "project:read");
     }
 
     @Test

@@ -194,6 +194,36 @@ public class ProjectService {
         return enrich(Collections.singletonList(project)).get(0);
     }
 
+    /**
+     * Returns readable, non-deleted projects for the given IDs using the same
+     * data-scope rules as the project list. Used by the workbench aggregate.
+     */
+    public List<ProjectDTO> listReadableByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return Collections.emptyList();
+        LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
+                .in(ProjectDO::getId, ids)
+                .ne(ProjectDO::getStatus, ProjectStatus.DELETED.getCode())
+                .orderByDesc(ProjectDO::getUpdatedAt);
+        applyReadScope(wrapper);
+        return enrich(projectMapper.selectList(wrapper));
+    }
+
+    /**
+     * IDs of non-deleted projects the current user can read. Search and inbox
+     * use this so they never leak titles from outside the data scope.
+     */
+    public List<Long> listReadableIds() {
+        LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
+                .select(ProjectDO::getId)
+                .ne(ProjectDO::getStatus, ProjectStatus.DELETED.getCode());
+        applyReadScope(wrapper);
+        return projectMapper.selectList(wrapper).stream()
+                .map(ProjectDO::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
     public Map<String, Object> stats() {
         LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<>();
         applyReadScope(wrapper);

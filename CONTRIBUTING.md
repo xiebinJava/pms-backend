@@ -6,7 +6,9 @@ PMS is a single-tenant, self-hosted project management system. Backend and front
 
 - Java 17 and Maven for `pms-backend`
 - Node.js 22 and pnpm 9.15.9 for `pms-front`
-- OceanBase (MySQL compatible) for local runtime; H2 is test-only
+- Contributor local runtime: MySQL 8 via `docker-compose.mysql.yml` and `./scripts/start-local-mysql.sh`
+- Enterprise / drill runtime: OceanBase (MySQL compatible), database `brad_pms`
+- H2 is test-only
 
 ## Checks before you open a pull request
 

@@ -69,5 +69,6 @@ class OceanbaseConfigurationTest {
                 .isEqualTo("${MYSQL_USER}");
         assertThat(source.getProperty("spring.datasource.password"))
                 .isEqualTo("${MYSQL_PASSWORD}");
+        assertThat(source.getProperty("spring.flyway.enabled")).isEqualTo(true);
     }
 }

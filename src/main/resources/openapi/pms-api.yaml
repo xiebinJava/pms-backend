@@ -130,6 +130,67 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /workbench:
+    get:
+      tags: [项目]
+      summary: 当前用户工作台聚合（我的任务、参与项目、最近动态）
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /notifications:
+    get:
+      tags: [项目]
+      summary: 当前用户站内通知
+      parameters:
+        - name: unreadFirst
+          in: query
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /notifications/unread-count:
+    get:
+      tags: [项目]
+      summary: 未读通知数量
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /notifications/{id}/read:
+    post:
+      tags: [项目]
+      summary: 将一条通知标为已读
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /notifications/read-all:
+    post:
+      tags: [项目]
+      summary: 将全部通知标为已读
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /search:
+    get:
+      tags: [项目]
+      summary: 在可读范围内搜索项目、任务和评论
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /projects/page:
     post:
       tags: [项目]
@@ -245,6 +306,13 @@ paths:
   /tasks/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
+    get:
+      tags: [任务与节点]
+      summary: 任务详情（含子任务、任务评论和附件）
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     put:
       tags: [任务与节点]
       summary: 更新任务
@@ -258,6 +326,39 @@ paths:
     delete:
       tags: [任务与节点]
       summary: 删除任务
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}/attachments:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [任务与节点]
+      summary: 上传任务附件（图片或 PDF）
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}/attachments/{attachmentId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: attachmentId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    get:
+      tags: [任务与节点]
+      summary: 下载任务附件
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [任务与节点]
+      summary: 删除任务附件
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -412,7 +513,11 @@ paths:
       - $ref: '#/components/parameters/ProjectId'
     get:
       tags: [项目]
-      summary: 项目动态列表
+      summary: 项目动态列表；传入 taskId 时仅返回该任务评论
+      parameters:
+        - name: taskId
+          in: query
+          schema: { type: integer, format: int64 }
       responses:
         '200': { $ref: '#/components/responses/Success' }
     post:

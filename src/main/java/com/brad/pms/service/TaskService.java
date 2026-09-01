@@ -8,27 +8,37 @@ import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.TaskCreateCmd;
 import com.brad.pms.dto.request.TaskMoveCmd;
 import com.brad.pms.dto.request.TaskUpdateCmd;
+import com.brad.pms.dto.response.ProjectCommentDTO;
 import com.brad.pms.dto.response.ProjectTaskDTO;
+import com.brad.pms.dto.response.TaskDetailDTO;
+import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.UserDO;
+import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
 public class TaskService {
 
     private final ProjectTaskMapper taskMapper;
+    private final ProjectCommentMapper commentMapper;
     private final UserService userService;
     private final ProjectPermissionService permissionService;
+    private final TaskAttachmentService attachmentService;
+    private final NotificationService notificationService;
 
     public List<ProjectTaskDTO> listByProject(Long projectId, Long nodeId) {
         ProjectDO project = permissionService.requireProject(projectId);
@@ -37,16 +47,56 @@ public class TaskService {
         if (nodeId != null) query.eq(ProjectTaskDO::getNodeId, nodeId);
         query.orderByAsc(ProjectTaskDO::getSort).orderByDesc(ProjectTaskDO::getCreatedAt);
         List<ProjectTaskDO> tasks = taskMapper.selectList(query);
+        Map<Long, Long> subtaskCounts = tasks.stream()
+                .filter(task -> task.getParentId() != null)
+                .collect(Collectors.groupingBy(ProjectTaskDO::getParentId, Collectors.counting()));
         Map<Long, UserDO> userMap = userService.listByIds(
                         tasks.stream().map(ProjectTaskDO::getAssigneeId)
-                                .filter(java.util.Objects::nonNull)
+                                .filter(Objects::nonNull)
                                 .collect(Collectors.toList()))
                 .stream().collect(Collectors.toMap(UserDO::getId, u -> u));
         return tasks.stream()
-                .map(t -> toDTO(t, project,
-                        t.getNodeId() == null ? null : permissionService.requireNode(projectId, t.getNodeId()),
-                        t.getAssigneeId() == null ? null : userMap.get(t.getAssigneeId())))
+                .filter(task -> task.getParentId() == null)
+                .map(t -> {
+                    ProjectTaskDTO dto = toDTO(t, project,
+                            t.getNodeId() == null ? null : permissionService.requireNode(projectId, t.getNodeId()),
+                            t.getAssigneeId() == null ? null : userMap.get(t.getAssigneeId()));
+                    dto.setSubtaskCount(subtaskCounts.getOrDefault(t.getId(), 0L).intValue());
+                    return dto;
+                })
                 .collect(Collectors.toList());
+    }
+
+    public TaskDetailDTO getDetail(Long id) {
+        ProjectTaskDO task = requireTask(id);
+        ProjectDO project = permissionService.requireProject(task.getProjectId());
+        ProjectNodeDO node = task.getNodeId() == null ? null : permissionService.requireNode(task.getProjectId(), task.getNodeId());
+        List<ProjectTaskDO> children = taskMapper.selectList(new LambdaQueryWrapper<ProjectTaskDO>()
+                .eq(ProjectTaskDO::getParentId, id)
+                .orderByAsc(ProjectTaskDO::getSort)
+                .orderByDesc(ProjectTaskDO::getCreatedAt));
+        Map<Long, UserDO> userMap = userService.listByIds(
+                        Stream.concat(
+                                        Stream.of(task.getAssigneeId()),
+                                        children.stream().map(ProjectTaskDO::getAssigneeId))
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .collect(Collectors.toList()))
+                .stream().collect(Collectors.toMap(UserDO::getId, u -> u));
+        TaskDetailDTO dto = new TaskDetailDTO();
+        BeanUtils.copyProperties(
+                toDTO(task, project, node, task.getAssigneeId() == null ? null : userMap.get(task.getAssigneeId())),
+                dto);
+        dto.setSubtaskCount(children.size());
+        dto.setSubtasks(children.stream()
+                .map(child -> toDTO(child, project, node,
+                        child.getAssigneeId() == null ? null : userMap.get(child.getAssigneeId())))
+                .collect(Collectors.toList()));
+        dto.setComments(toComments(commentMapper.selectList(new LambdaQueryWrapper<ProjectCommentDO>()
+                .eq(ProjectCommentDO::getTaskId, id)
+                .orderByDesc(ProjectCommentDO::getCreatedAt))));
+        dto.setAttachments(attachmentService.listByTask(id));
+        return dto;
     }
 
     public ProjectTaskDTO create(TaskCreateCmd cmd) {
@@ -58,10 +108,23 @@ public class TaskService {
         if (cmd.getAssigneeId() != null) {
             permissionService.requireProjectMember(cmd.getProjectId(), cmd.getAssigneeId());
         }
+        Long parentId = cmd.getParentId();
+        if (parentId != null) {
+            ProjectTaskDO parent = requireTask(parentId);
+            if (!Objects.equals(parent.getProjectId(), cmd.getProjectId())) {
+                throw BusinessException.error("子任务必须属于同一个项目");
+            }
+            if (parent.getParentId() != null) {
+                throw BusinessException.error("子任务不能再拆分子任务");
+            }
+            if (parent.getNodeId() != null && !Objects.equals(parent.getNodeId(), cmd.getNodeId())) {
+                throw BusinessException.error("子任务必须归属父任务所在节点");
+            }
+        }
         ProjectTaskDO task = new ProjectTaskDO();
         task.setProjectId(cmd.getProjectId());
         task.setNodeId(cmd.getNodeId());
-        task.setParentId(cmd.getParentId());
+        task.setParentId(parentId);
         task.setTitle(cmd.getTitle());
         task.setDescription(cmd.getDescription());
         task.setDeliverable(cmd.getDeliverable());
@@ -72,6 +135,9 @@ public class TaskService {
         task.setSort(cmd.getSort());
         task.setDueDate(cmd.getDueDate());
         taskMapper.insert(task);
+        if (task.getAssigneeId() != null) {
+            notificationService.notifyTaskAssigned(task.getProjectId(), task.getId(), task.getTitle(), task.getAssigneeId());
+        }
         return toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
     }
 
@@ -95,6 +161,7 @@ public class TaskService {
         if (cmd.getDeliverable() != null) task.setDeliverable(cmd.getDeliverable());
         if (cmd.getStatus() != null) task.setStatus(cmd.getStatus());
         if (manager && cmd.getPriority() != null) task.setPriority(cmd.getPriority());
+        Long previousAssignee = task.getAssigneeId();
         if (manager && cmd.getAssigneeId() != null) {
             permissionService.requireProjectMember(task.getProjectId(), cmd.getAssigneeId());
             task.setAssigneeId(cmd.getAssigneeId());
@@ -103,6 +170,9 @@ public class TaskService {
         if (cmd.getSort() != null) task.setSort(cmd.getSort());
         if (cmd.getDueDate() != null) task.setDueDate(cmd.getDueDate());
         taskMapper.updateById(task);
+        if (task.getAssigneeId() != null && !Objects.equals(previousAssignee, task.getAssigneeId())) {
+            notificationService.notifyTaskAssigned(task.getProjectId(), task.getId(), task.getTitle(), task.getAssigneeId());
+        }
         return toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
     }
 
@@ -128,6 +198,13 @@ public class TaskService {
         if (!ProjectPermissionPolicy.canManageTask(project, node, task, UserContext.userId(), UserContext.isAdministrator())) {
             throw BusinessException.forbidden("仅项目创建人、项目经理或节点负责人可以删除任务");
         }
+        List<ProjectTaskDO> children = taskMapper.selectList(new LambdaQueryWrapper<ProjectTaskDO>()
+                .eq(ProjectTaskDO::getParentId, id));
+        for (ProjectTaskDO child : children) {
+            attachmentService.deleteAllForTask(child.getId());
+            taskMapper.deleteById(child.getId());
+        }
+        attachmentService.deleteAllForTask(id);
         taskMapper.deleteById(id);
     }
 
@@ -148,5 +225,15 @@ public class TaskService {
         ProjectTaskDTO dto = Convertors.toTask(task, assignee);
         dto.setPermissions(permissionService.taskPermissions(project, node, task));
         return dto;
+    }
+
+    private List<ProjectCommentDTO> toComments(List<ProjectCommentDO> comments) {
+        if (comments.isEmpty()) return List.of();
+        Map<Long, UserDO> userMap = userService.listByIds(
+                        comments.stream().map(ProjectCommentDO::getUserId).filter(Objects::nonNull).collect(Collectors.toList()))
+                .stream().collect(Collectors.toMap(UserDO::getId, u -> u, (left, right) -> left));
+        return comments.stream()
+                .map(comment -> Convertors.toComment(comment, userMap.get(comment.getUserId())))
+                .collect(Collectors.toList());
     }
 }

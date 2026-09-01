@@ -7,7 +7,8 @@
 - Java 17 + Maven
 - Spring Boot 3.5.14（Java 17，Jakarta API）
 - MyBatis-Plus 3.5.17（分页插件 + 公共字段自动填充）
-- OceanBase（MySQL 兼容模式）
+- OceanBase（MySQL 兼容模式，企业默认）
+- MySQL 8（仅贡献者本地轻量路径，库名默认 `pms`）
 - JWT（jjwt）轻量登录鉴权，无第三方权限平台依赖
 - Lombok
 
@@ -28,7 +29,26 @@ com.brad.pms
 
 ## 快速启动
 
-默认使用本机 **OceanBase**（MySQL 兼容模式）。请先准备 `brad_pms` 数据库并注入连接账号：
+企业与演练默认使用本机 **OceanBase**（MySQL 兼容模式）和库名 `brad_pms`。贡献者本地试用可以走下面的 **MySQL 8 轻量路径**，不要把企业库改成 MySQL。
+
+### 贡献者：MySQL 8 轻量路径
+
+只启动一个本机 MySQL 8.4 容器，后端用 `mysql` profile，Flyway 在首次空库启动时自动执行到最新迁移（含任务附件 V8、站内通知 V9）。这条路径的库名是 `pms`，不是企业库 `brad_pms`。
+
+```bash
+cp .env.mysql.example .env.mysql.local
+# 编辑 .env.mysql.local：填入 MYSQL_PASSWORD、MYSQL_ROOT_PASSWORD、
+# 至少 32 字节的 PMS_JWT_SECRET，以及至少 12 位的 PMS_BOOTSTRAP_ADMIN_PASSWORD
+./scripts/start-local-mysql.sh
+```
+
+前端在兄弟仓库 `pms-front` 执行 `pnpm dev`，代理到 `http://localhost:8080`。空库首次启动会创建演示管理员 `alex.zhang@example.com` / 张伟。停止后端：`./scripts/stop-local-mysql.sh`；同时关掉容器（保留数据卷）：`./scripts/stop-local-mysql.sh --down`。
+
+默认端口绑定 `127.0.0.1:3306`。若本机已占用 3306，在 `.env.mysql.local` 里改 `MYSQL_PORT`。
+
+### 企业默认：OceanBase
+
+请先准备 `brad_pms` 数据库并注入连接账号：
 
 ```bash
 export OCEANBASE_HOST=127.0.0.1
@@ -55,7 +75,7 @@ docker compose -f docker-compose.example.yml up --build
 ```
 
 Compose 会先等待 OceanBase，再依次运行 `accounts-init`（创建最小权限账号）、`schema-init`
-（执行版本化 V1–V7 迁移）和 `uploads-init`（修复持久化上传卷的属主），最后启动后端与前端。
+（执行版本化 V1–V9 迁移）和 `uploads-init`（修复持久化上传卷的属主），最后启动后端与前端。
 前端地址为 `http://localhost:5173`；后端端口仅绑定本机 `127.0.0.1:8080`。健康检查包括
 `/api/health/live`（存活）与 `/api/health/ready`（数据库与迁移就绪）。Actuator 健康和指标端点
 默认仅绑定后端容器内 `127.0.0.1:8081`，不经过前端代理；需要监控时通过
@@ -106,11 +126,16 @@ mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 | POST | `/auth/login` | 登录，返回 JWT |
 | GET | `/auth/me` | 当前用户 |
 | GET | `/users/search?keyword=` | 用户搜索 |
+| GET | `/workbench` | 当前用户工作台聚合（任务、参与项目、最近动态） |
+| GET | `/notifications` | 站内通知；另有 `/unread-count`、`/{id}/read`、`/read-all` |
+| GET | `/search?q=` | 在可读范围内搜索项目、任务和评论 |
 | POST | `/projects/page` | 项目分页查询（keyword/status） |
 | POST | `/projects` | 新建项目 |
 | GET/PUT/DELETE | `/projects/{id}` | 项目详情/更新/删除 |
 | GET/POST | `/projects/{id}/tasks` | 任务列表/新建 |
+| GET | `/tasks/{id}` | 任务详情（子任务、评论、附件） |
 | PUT/DELETE | `/tasks/{id}` | 任务更新/删除 |
+| POST/GET/DELETE | `/tasks/{id}/attachments` | 任务附件上传/下载/删除 |
 | PUT | `/tasks/{id}/move` | 任务拖拽改状态 |
 | GET/POST | `/projects/{id}/milestones` | 里程碑列表/新建 |
 | GET/POST | `/projects/{id}/members` | 成员列表/添加 |

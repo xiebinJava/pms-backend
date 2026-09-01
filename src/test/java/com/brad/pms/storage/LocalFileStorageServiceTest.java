@@ -65,6 +65,28 @@ class LocalFileStorageServiceTest {
     }
 
     @Test
+    void storesPdfAttachmentsAndDeletesBySafeKey(@TempDir Path tempDir) throws Exception {
+        LocalFileStorageService service = new LocalFileStorageService(tempDir, 1024 * 1024);
+        byte[] pdf = "%PDF-1.4 fake".getBytes();
+        LocalFileStorageService.StoredFile stored = service.storeAttachment(new MockMultipartFile(
+                "file", "设计稿.pdf", "application/pdf", pdf));
+
+        assertThat(stored.key()).matches("[0-9a-f-]{36}\\.pdf");
+        assertThat(Files.exists(tempDir.resolve(stored.key()))).isTrue();
+
+        service.delete(stored.key());
+        assertThat(Files.exists(tempDir.resolve(stored.key()))).isFalse();
+    }
+
+    @Test
+    void rejectsNonPdfAttachments(@TempDir Path tempDir) {
+        LocalFileStorageService service = new LocalFileStorageService(tempDir, 1024 * 1024);
+        assertThatThrownBy(() -> service.storeAttachment(new MockMultipartFile(
+                "file", "note.txt", "text/plain", "hello".getBytes())))
+                .hasMessageContaining("图片或 PDF");
+    }
+
+    @Test
     void rejectsPathLikeStorageKeys(@TempDir Path tempDir) {
         LocalFileStorageService service = new LocalFileStorageService(tempDir, 1024);
 

@@ -69,6 +69,28 @@ public class LocalFileStorageService implements FileStorageService {
         if (!IMAGE_TYPES.contains(actualType) || !actualType.equals(declaredType)) {
             throw BusinessException.error("文件类型与图片内容不匹配");
         }
+        return persist(file, actualType, "图片保存失败，请稍后重试");
+    }
+
+    @Override
+    public synchronized StoredFile storeAttachment(MultipartFile file) {
+        if (file == null || file.isEmpty()) throw BusinessException.error("请选择要上传的附件");
+        if (file.getSize() > MAX_FILE_SIZE) throw BusinessException.error("附件大小不能超过 5MB");
+        String declaredType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        String actualType = detectImageType(file);
+        if (actualType.isEmpty() && isPdf(file) && "application/pdf".equals(declaredType)) {
+            actualType = "application/pdf";
+        }
+        if (actualType.isEmpty() || (!IMAGE_TYPES.contains(actualType) && !"application/pdf".equals(actualType))) {
+            throw BusinessException.error("附件仅支持图片或 PDF");
+        }
+        if (!actualType.equals(declaredType)) {
+            throw BusinessException.error("文件类型与内容不匹配");
+        }
+        return persist(file, actualType, "附件保存失败，请稍后重试");
+    }
+
+    private StoredFile persist(MultipartFile file, String actualType, String saveError) {
         String key = UUID.randomUUID() + extensionOf(actualType);
         try {
             Files.createDirectories(root);
@@ -104,7 +126,7 @@ public class LocalFileStorageService implements FileStorageService {
             }
             return new StoredFile(key, file.getOriginalFilename(), actualType, file.getSize());
         } catch (IOException ex) {
-            throw BusinessException.error("图片保存失败，请稍后重试");
+            throw BusinessException.error(saveError);
         }
     }
 
@@ -113,7 +135,7 @@ public class LocalFileStorageService implements FileStorageService {
         if (key == null || key.isBlank() || key.contains("/") || key.contains("\\") || key.indexOf('\0') >= 0) {
             throw BusinessException.error("文件不存在");
         }
-        if (!key.matches("[0-9a-fA-F-]{36}\\.(png|jpg|gif|webp)")) {
+        if (!isSafeStorageKey(key)) {
             throw BusinessException.error("文件不存在");
         }
         try {
@@ -128,6 +150,37 @@ public class LocalFileStorageService implements FileStorageService {
             return new FileSystemResource(target);
         } catch (IOException ex) {
             throw BusinessException.error("文件不存在");
+        }
+    }
+
+    @Override
+    public void delete(String key) {
+        if (key == null || key.isBlank() || key.contains("/") || key.contains("\\") || key.indexOf('\0') >= 0) {
+            return;
+        }
+        if (!isSafeStorageKey(key)) return;
+        try {
+            Path storageRoot = verifiedRoot();
+            Path target = storageRoot.resolve(key).normalize();
+            if (!target.startsWith(storageRoot) || Files.isSymbolicLink(target)) return;
+            Files.deleteIfExists(target);
+        } catch (IOException ignored) {
+            // Soft-delete in the database still hides the file from the API.
+        }
+    }
+
+    private static boolean isSafeStorageKey(String key) {
+        return key.matches("[0-9a-fA-F-]{36}\\.(png|jpg|gif|webp|pdf)");
+    }
+
+    private boolean isPdf(MultipartFile file) {
+        try (InputStream input = file.getInputStream()) {
+            byte[] header = input.readNBytes(5);
+            return header.length >= 5
+                    && header[0] == '%' && header[1] == 'P' && header[2] == 'D'
+                    && header[3] == 'F' && header[4] == '-';
+        } catch (IOException ex) {
+            throw BusinessException.error("无法读取上传文件");
         }
     }
 
@@ -202,6 +255,7 @@ public class LocalFileStorageService implements FileStorageService {
             case "image/png" -> ".png";
             case "image/gif" -> ".gif";
             case "image/webp" -> ".webp";
+            case "application/pdf" -> ".pdf";
             default -> ".jpg";
         };
     }

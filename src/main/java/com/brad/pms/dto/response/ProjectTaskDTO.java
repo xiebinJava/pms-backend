@@ -24,5 +24,6 @@ public class ProjectTaskDTO {
     private LocalDate dueDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer subtaskCount;
     private TaskPermissionsDTO permissions;
 }

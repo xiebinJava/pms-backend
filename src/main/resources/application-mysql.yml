@@ -4,16 +4,24 @@ spring:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:pms}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
+    hikari:
+      connection-timeout: ${PMS_DB_CONNECTION_TIMEOUT_MS:3000}
+      validation-timeout: ${PMS_DB_VALIDATION_TIMEOUT_MS:1000}
   sql:
     init:
       # Flyway owns the persistent schema; do not replay schema.sql on every
       # MySQL startup (its legacy indexes are intentionally not destructive).
       mode: never
+  flyway:
+    # MySQL 8 is a first-class Flyway target. First empty-database start
+    # applies V1 through the latest migration automatically.
+    enabled: true
 
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
-# 启动方式：
-#   CREATE DATABASE pms DEFAULT CHARACTER SET utf8mb4;
-#   mvn spring-boot:run -Dspring-boot.run.profiles=mysql
+# Contributor local path (not the enterprise OceanBase / brad_pms database):
+#   cp .env.mysql.example .env.mysql.local
+#   ./scripts/start-local-mysql.sh
+# MYSQL_USER and MYSQL_PASSWORD must be injected; they have no defaults.

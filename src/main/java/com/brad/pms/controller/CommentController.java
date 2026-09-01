@@ -21,8 +21,9 @@ public class CommentController {
 
     @GetMapping("/projects/{projectId}/comments")
     @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<List<ProjectCommentDTO>> list(@PathVariable Long projectId) {
-        return ResponseResult.success(commentService.listByProject(projectId));
+    public ResponseResult<List<ProjectCommentDTO>> list(@PathVariable Long projectId,
+                                                        @RequestParam(required = false) Long taskId) {
+        return ResponseResult.success(commentService.listByProject(projectId, taskId));
     }
 
     @PostMapping("/projects/{projectId}/comments")
