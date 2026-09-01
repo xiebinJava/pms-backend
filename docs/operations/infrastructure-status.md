@@ -9,13 +9,13 @@
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
 | OceanBase `brad_pms` | V1–V10 已执行并复核 | 使用 `pms_migrator` 连续执行两次版本升级，均完成 checksum 校验并返回无待执行版本；V7 邮箱唯一索引、V8 任务附件、V9 站内通知、V10 通知节点标识及关键表结构、外键和数据范围预检通过 |
-| 后端回归 | 已通过 | `mvn -q test`，包含错误契约、鉴权和限流测试 |
-| 前端回归 | 已通过 | `pnpm test`，110 项通过 |
+| 后端回归 | 已通过 | `mvn -q test`，186 个用例通过（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试 |
+| 前端回归 | 已通过 | `pnpm test`，111 项通过（当前 `main` 提交 `eb8e4e8`） |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 发布基线 | 已对齐 | 后端 `v1.0.0`=`7cc2820`、前端 `v1.0.0`=`1519e887` 均已包含功能分支提交；后续 main 仅有文档收口提交；远程不使用 `master` |
+| 发布基线 | 本地已收口，远程集成待凭据 | `v1.0.0` 标签仍指向后端 `7cc2820` / 前端 `1519e887`；当前本地 `main` 为后端 `88e06d9`、前端 `eb8e4e8`，均已提交但尚未推送；远程不使用 `master` |
 
 ## 仍需完成
 
@@ -49,10 +49,10 @@
 
 | 任务 | 状态 | Review 证据 |
 | --- | --- | --- |
-| Task 0：基线盘点与文档状态对齐 | 已完成 | 后端 `mvn -q test` 通过；前端 Node 测试 77 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 通过；后端提交 `98fe24d`，前端提交 `aa2864d`。 |
+| Task 0：基线盘点与文档状态对齐 | 已完成 | 当前后端 `mvn -q test` 186 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 111 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 和隐私扫描通过；本地提交为后端 `88e06d9`、前端 `eb8e4e8`。 |
 | Task 1：OceanBase 运行账号隔离 | 已完成 | 配置测试通过；Compose 解析通过；本地 OceanBase 已创建 `pms_app` / `pms_migrator`；应用账号建表被拒绝、迁移账号 DDL 通过；探针表已清理。 |
 | Task 2：OceanBase 备份、恢复与版本升级 | 已完成本机演练 | 升级脚本 V1–V10 checksum、逐语句检查点、命名锁、现有 `brad_pms` 二次幂等运行、精确行数逻辑备份、SHA-256、隔离空库恢复、源库/恢复库数据比对和停库恢复均通过；详见演练记录。 |
-| Task 3：统一安全边界、错误响应和请求链路 | 已完成 | 后端全量测试、前端 79 项 Node 测试、`pnpm typecheck`、`pnpm build` 通过；覆盖 400/401/403/409/422/500/429、requestId、刷新失败跳转、代理转发和敏感接口限流；提交见安全边界提交。 |
+| Task 3：统一安全边界、错误响应和请求链路 | 已完成 | 后端全量测试、前端 111 项 Node 测试、`pnpm typecheck`、`pnpm build` 通过；覆盖 400/401/403/409/422/500/429、requestId、刷新失败跳转、代理转发和敏感接口限流；提交见安全边界提交。 |
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
@@ -78,7 +78,7 @@
 ### Task 2：本地门禁与远程 CI
 
 - 后端 `mvn -q test`：通过；`./scripts/validate-openapi.sh`：通过；`bash -n scripts/*.sh docker/*.sh`：通过。
-- 前端 `pnpm test`：82 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
+- 前端 `pnpm test`：111 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
 - 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端升级后 CI `33352990972` 已通过单元测试、OpenAPI、H2/密钥扫描、后端镜像 Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。
@@ -90,7 +90,7 @@
 - 选择 Spring Boot 3.5.14 是因为 Spring Boot 2.7/Spring Framework 5 已无法覆盖当前 Trivy 数据库中需要 Spring 6.2.x 的修复项；没有降低扫描阈值，也没有添加漏洞忽略规则。
 - 为保持 Java 17，完成 `javax.validation`/`javax.servlet` 到 Jakarta API 的源码与测试迁移，并切换 `mybatis-plus-spring-boot3-starter`；MyBatis-Plus 3.5.17 分页插件显式依赖 `mybatis-plus-jsqlparser`。
 - 兼容性修复：MyBatis-Plus 3.5 的 `selectCount` 返回 `Long`，服务层计数和 DTO 转换已显式处理；Mockito 对重载 `insert` 使用显式泛型 matcher，避免测试编译歧义；Jackson/Micrometer 使用 Boot 支持的 BOM 属性锁定修复版本。
-- Review 结果：`mvn -Dmaven.repo.local=/private/tmp/pms-m2 -q test` 通过（112 tests，退出码 0）；下一步必须在 GitHub Actions 新提交上完成镜像 Trivy 扫描。
+- Review 结果：`mvn -q test` 通过（186 tests，0 failures、0 errors、1 skipped，退出码 0）；下一步必须在 GitHub Actions 新提交上完成跨仓库集成和镜像 Trivy 扫描。
 
 ### Task 3：生产配置核查
 

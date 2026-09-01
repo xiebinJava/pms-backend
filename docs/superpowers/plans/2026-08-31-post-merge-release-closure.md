@@ -10,10 +10,10 @@
 
 **Spec:** `docs/operations/infrastructure-status.md`、`docs/operations/release-checklist.md`、`docs/operations/enterprise-upgrade-runbook.md`、`/Users/fs/Desktop/Project/pms-front/docs/frontend-design-system.md`
 
-## 当前执行状态（2026-08-31）
+## 当前执行状态（2026-09-01）
 
-- Task 1：已完成。后端 `v1.0.0`=`7cc2820`、前端 `v1.0.0`=`1519e88736d2d9fe19c1e436b8a96cd66b1457bf`；标签之后仅追加文档收口提交，后端集成工作流固定前端 `main` 发布提交。
-- Task 2：后端/前端本地门禁与后端 CI 已完成；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。跨仓库集成 `33352990811` 仍等待 `PMS_FRONT_REPO_READ_TOKEN`。
+- Task 1：本地收口完成。不可变 `v1.0.0` 标签仍为后端 `7cc2820`、前端 `1519e88736d2d9fe19c1e436b8a96cd66b1457bf`；当前本地 `main` 提交为后端 `88e06d9c1d8be8385420fd193267d332f38ebfe1`、前端 `eb8e4e8eb78057097b1b4441d3df499b88727b7b`，待远程凭据可用后推送。
+- Task 2：后端/前端本地门禁与后端 CI 已完成；当前后端 186 个用例（0 失败、0 错误、1 跳过），前端 111 项通过，类型检查和构建通过。跨仓库集成仍等待 `PMS_FRONT_REPO_READ_TOKEN`。
 - Task 3：配置、Compose、密钥材料和安全启动校验已完成自动化核查；生产密钥注入必须在目标企业环境执行。
 - Task 4：已在本机真实 OceanBase 完成 V1–V7 幂等升级、逻辑备份、SHA-256、隔离空库恢复、数据比对和停库恢复演练。
 - Task 5：已在本机真实前后端完成邮箱登录、项目入口和桌面/390px Playwright 冒烟；生产目标环境仍需用企业账号复验。
