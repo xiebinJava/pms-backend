@@ -31,3 +31,5 @@ pnpm build
 - Keep secrets, JWT keys, and database passwords out of Git.
 - Backend permission checks stay on the server; frontend only hides controls.
 - Match existing CQRS naming: Cmd / Qry / DTO / Service.
+- Keep OIDC/LDAP behind `PMS_OIDC_ENABLED` / `PMS_LDAP_ENABLED`. Do not auto-create users from a directory.
+- Keep object storage and webhooks behind `PMS_STORAGE_TYPE=s3` / `PMS_WEBHOOK_ENABLED`. Default local disk and no outbound events.

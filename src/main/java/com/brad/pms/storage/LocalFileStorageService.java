@@ -3,6 +3,7 @@ package com.brad.pms.storage;
 import com.brad.pms.common.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -20,17 +21,14 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 /** Secure local implementation used by the default self-hosted deployment. */
 @Service
+@ConditionalOnProperty(name = "pms.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorageService implements FileStorageService {
 
-    public static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
-    private static final Set<String> IMAGE_TYPES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
+    public static final long MAX_FILE_SIZE = UploadFiles.MAX_FILE_SIZE;
     private static final Duration TEMP_FILE_MAX_AGE = Duration.ofHours(1);
     private final Path root;
     private final long quotaBytes;
@@ -62,36 +60,16 @@ public class LocalFileStorageService implements FileStorageService {
 
     @Override
     public synchronized StoredFile store(MultipartFile file) {
-        if (file == null || file.isEmpty()) throw BusinessException.error("请选择要上传的图片");
-        if (file.getSize() > MAX_FILE_SIZE) throw BusinessException.error("图片大小不能超过 5MB");
-        String declaredType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        String actualType = detectImageType(file);
-        if (!IMAGE_TYPES.contains(actualType) || !actualType.equals(declaredType)) {
-            throw BusinessException.error("文件类型与图片内容不匹配");
-        }
-        return persist(file, actualType, "图片保存失败，请稍后重试");
+        return persist(file, UploadFiles.requireImage(file), "图片保存失败，请稍后重试");
     }
 
     @Override
     public synchronized StoredFile storeAttachment(MultipartFile file) {
-        if (file == null || file.isEmpty()) throw BusinessException.error("请选择要上传的附件");
-        if (file.getSize() > MAX_FILE_SIZE) throw BusinessException.error("附件大小不能超过 5MB");
-        String declaredType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        String actualType = detectImageType(file);
-        if (actualType.isEmpty() && isPdf(file) && "application/pdf".equals(declaredType)) {
-            actualType = "application/pdf";
-        }
-        if (actualType.isEmpty() || (!IMAGE_TYPES.contains(actualType) && !"application/pdf".equals(actualType))) {
-            throw BusinessException.error("附件仅支持图片或 PDF");
-        }
-        if (!actualType.equals(declaredType)) {
-            throw BusinessException.error("文件类型与内容不匹配");
-        }
-        return persist(file, actualType, "附件保存失败，请稍后重试");
+        return persist(file, UploadFiles.requireAttachment(file), "附件保存失败，请稍后重试");
     }
 
     private StoredFile persist(MultipartFile file, String actualType, String saveError) {
-        String key = UUID.randomUUID() + extensionOf(actualType);
+        String key = UploadFiles.newKey(actualType);
         try {
             Files.createDirectories(root);
             Path storageRoot = verifiedRoot();
@@ -135,7 +113,7 @@ public class LocalFileStorageService implements FileStorageService {
         if (key == null || key.isBlank() || key.contains("/") || key.contains("\\") || key.indexOf('\0') >= 0) {
             throw BusinessException.error("文件不存在");
         }
-        if (!isSafeStorageKey(key)) {
+        if (!UploadFiles.isSafeStorageKey(key)) {
             throw BusinessException.error("文件不存在");
         }
         try {
@@ -158,7 +136,7 @@ public class LocalFileStorageService implements FileStorageService {
         if (key == null || key.isBlank() || key.contains("/") || key.contains("\\") || key.indexOf('\0') >= 0) {
             return;
         }
-        if (!isSafeStorageKey(key)) return;
+        if (!UploadFiles.isSafeStorageKey(key)) return;
         try {
             Path storageRoot = verifiedRoot();
             Path target = storageRoot.resolve(key).normalize();
@@ -166,39 +144,6 @@ public class LocalFileStorageService implements FileStorageService {
             Files.deleteIfExists(target);
         } catch (IOException ignored) {
             // Soft-delete in the database still hides the file from the API.
-        }
-    }
-
-    private static boolean isSafeStorageKey(String key) {
-        return key.matches("[0-9a-fA-F-]{36}\\.(png|jpg|gif|webp|pdf)");
-    }
-
-    private boolean isPdf(MultipartFile file) {
-        try (InputStream input = file.getInputStream()) {
-            byte[] header = input.readNBytes(5);
-            return header.length >= 5
-                    && header[0] == '%' && header[1] == 'P' && header[2] == 'D'
-                    && header[3] == 'F' && header[4] == '-';
-        } catch (IOException ex) {
-            throw BusinessException.error("无法读取上传文件");
-        }
-    }
-
-    private String detectImageType(MultipartFile file) {
-        try (InputStream input = file.getInputStream()) {
-            byte[] header = input.readNBytes(12);
-            if (header.length >= 8
-                    && (header[0] & 0xff) == 0x89 && header[1] == 'P' && header[2] == 'N' && header[3] == 'G'
-                    && (header[4] & 0xff) == 0x0d && (header[5] & 0xff) == 0x0a
-                    && (header[6] & 0xff) == 0x1a && (header[7] & 0xff) == 0x0a) return "image/png";
-            if (header.length >= 3 && (header[0] & 0xff) == 0xff && (header[1] & 0xff) == 0xd8 && (header[2] & 0xff) == 0xff) return "image/jpeg";
-            if (header.length >= 6 && header[0] == 'G' && header[1] == 'I' && header[2] == 'F'
-                    && header[3] == '8' && (header[4] == '7' || header[4] == '9') && header[5] == 'a') return "image/gif";
-            if (header.length >= 12 && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F'
-                    && header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P') return "image/webp";
-            return "";
-        } catch (IOException ex) {
-            throw BusinessException.error("无法读取上传文件");
         }
     }
 
@@ -250,13 +195,5 @@ public class LocalFileStorageService implements FileStorageService {
         }
     }
 
-    private String extensionOf(String contentType) {
-        return switch (contentType) {
-            case "image/png" -> ".png";
-            case "image/gif" -> ".gif";
-            case "image/webp" -> ".webp";
-            case "application/pdf" -> ".pdf";
-            default -> ".jpg";
-        };
-    }
 }
+

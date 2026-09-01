@@ -6,6 +6,9 @@
 - Add task detail: subtasks, per-task comments, and image/PDF attachments.
 - Add in-app notifications for task assignment and comments, plus scoped global search.
 - Add a contributor-only MySQL 8 start path (`docker-compose.mysql.yml` + Flyway). Enterprise runtime stays on OceanBase / `brad_pms`.
+- Add an opt-in OIDC / LDAP AuthProvider. Local email login stays the default; SSO only signs in invited accounts.
+- Add optional S3-compatible attachment storage (MinIO or a cloud bucket). The default remains the local upload volume.
+- Add an opt-in signed webhook for task assignment and comment events. Delivery failures do not roll back the inbox.
 
 ## 1.0.0
 

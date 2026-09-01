@@ -9,6 +9,8 @@ import com.brad.pms.entity.UserNotificationDO;
 import com.brad.pms.mapper.UserNotificationMapper;
 import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.webhook.WebhookEvent;
+import com.brad.pms.webhook.WebhookPublisher;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.AfterEach;
@@ -36,6 +38,7 @@ class NotificationServiceTest {
     @Mock UserNotificationMapper notificationMapper;
     @Mock ProjectService projectService;
     @Mock UserService userService;
+    @Mock WebhookPublisher webhookPublisher;
 
     @InjectMocks NotificationService notificationService;
 
@@ -69,6 +72,12 @@ class NotificationServiceTest {
         assertThat(captor.getValue().getType()).isEqualTo(NotificationService.TASK_ASSIGNED);
         assertThat(captor.getValue().getTitle()).isEqualTo("任务已指派给你");
         assertThat(captor.getValue().getTaskId()).isEqualTo(3L);
+
+        ArgumentCaptor<WebhookEvent> webhook = ArgumentCaptor.forClass(WebhookEvent.class);
+        verify(webhookPublisher).publish(webhook.capture());
+        assertThat(webhook.getValue().type()).isEqualTo(NotificationService.TASK_ASSIGNED);
+        assertThat(webhook.getValue().recipientIds()).containsExactly(8L);
+        assertThat(webhook.getValue().projectId()).isEqualTo(9L);
     }
 
     @Test
@@ -116,6 +125,10 @@ class NotificationServiceTest {
         assertThat(captor.getValue().getUserId()).isEqualTo(8L);
         assertThat(captor.getValue().getType()).isEqualTo(NotificationService.TASK_COMMENTED);
         assertThat(captor.getValue().getTitle()).contains("张伟");
+        ArgumentCaptor<WebhookEvent> webhook = ArgumentCaptor.forClass(WebhookEvent.class);
+        verify(webhookPublisher).publish(webhook.capture());
+        assertThat(webhook.getValue().type()).isEqualTo(NotificationService.TASK_COMMENTED);
+        assertThat(webhook.getValue().recipientIds()).containsExactly(7L, 8L);
     }
 
     private static UserNotificationDO row(Long id, Long projectId, LocalDateTime readAt) {

@@ -16,7 +16,9 @@ abort "openapi must be 3.x" unless spec.fetch("openapi").start_with?("3.")
 paths = spec["paths"]
 abort "paths missing" unless paths.is_a?(Hash) && !paths.empty?
 expected = {
-  "/auth/login" => ["post"], "/auth/refresh" => ["post"], "/auth/logout" => ["post"],
+  "/auth/login" => ["post"], "/auth/providers" => ["get"],
+  "/auth/oidc/start" => ["get"], "/auth/oidc/callback" => ["post"], "/auth/ldap/login" => ["post"],
+  "/auth/refresh" => ["post"], "/auth/logout" => ["post"],
   "/auth/me" => ["get"], "/auth/password/change" => ["post"], "/auth/activate" => ["post"],
   "/auth/password-reset/request" => ["post"], "/auth/password-reset/confirm" => ["post"],
   "/users/search" => ["get"], "/workbench" => ["get"],
@@ -70,7 +72,9 @@ with open(sys.argv[1], encoding="utf-8") as handle:
 if not str(value.get("openapi", "")).startswith("3.") or not value.get("paths"):
     raise SystemExit("invalid OpenAPI contract")
 expected = {
-    "/auth/login": {"post"}, "/auth/refresh": {"post"}, "/auth/logout": {"post"},
+    "/auth/login": {"post"}, "/auth/providers": {"get"},
+    "/auth/oidc/start": {"get"}, "/auth/oidc/callback": {"post"}, "/auth/ldap/login": {"post"},
+    "/auth/refresh": {"post"}, "/auth/logout": {"post"},
     "/auth/me": {"get"}, "/auth/password/change": {"post"}, "/auth/activate": {"post"},
     "/auth/password-reset/request": {"post"}, "/auth/password-reset/confirm": {"post"},
     "/users/search": {"get"}, "/workbench": {"get"},

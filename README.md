@@ -124,6 +124,10 @@ mvn spring-boot:run -Dspring-boot.run.profiles=oceanbase
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/auth/login` | 登录，返回 JWT |
+| GET | `/auth/providers` | 当前启用的登录方式（本地 / OIDC / LDAP） |
+| GET | `/auth/oidc/start` | 开始 OIDC 授权码登录 |
+| POST | `/auth/oidc/callback` | 用授权码换取本系统会话 |
+| POST | `/auth/ldap/login` | 目录账号登录 |
 | GET | `/auth/me` | 当前用户 |
 | GET | `/users/search?keyword=` | 用户搜索 |
 | GET | `/workbench` | 当前用户工作台聚合（任务、参与项目、最近动态） |
@@ -160,7 +164,19 @@ PMS_JWT_SECRET=<生产环境请设置强随机密钥>
 ```
 
 其他企业部署参数：`PMS_ACCESS_EXPIRE_MINUTES`、`PMS_REFRESH_EXPIRE_DAYS`、
-`PMS_PASSWORD_RESET_EXPOSE_TOKEN=false`。完整备份、Flyway 迁移、预检和验收步骤见
+`PMS_PASSWORD_RESET_EXPOSE_TOKEN=false`。
+
+OIDC / LDAP 默认关闭。打开后只给**已经邀请过的邮箱**建会话，不会自动开新账号。
+常用开关：`PMS_OIDC_ENABLED`、`PMS_OIDC_ISSUER`、`PMS_OIDC_CLIENT_ID`、`PMS_OIDC_CLIENT_SECRET`、
+`PMS_OIDC_REDIRECT_URI`，以及 `PMS_LDAP_ENABLED`、`PMS_LDAP_URL`、`PMS_LDAP_BASE_DN`。
+
+附件默认写本地上传卷。需要对象存储时设 `PMS_STORAGE_TYPE=s3`，并配置
+`PMS_S3_ENDPOINT`（例如内网 `http://minio.example.com:9000`）、`PMS_S3_BUCKET`、
+`PMS_S3_ACCESS_KEY`、`PMS_S3_SECRET_KEY`。不配则继续用本地盘。
+出站 Webhook 默认关闭。打开 `PMS_WEBHOOK_ENABLED` 后，任务指派和评论会向
+`PMS_WEBHOOK_URL` POST 一条带 `X-PMS-Signature` 的 JSON；生产环境必须是 HTTPS，
+且 `PMS_WEBHOOK_SECRET` 至少 16 位。投递失败只记日志，不影响站内通知。
+完整备份、Flyway 迁移、预检和验收步骤见
 [`docs/operations/enterprise-upgrade-runbook.md`](docs/operations/enterprise-upgrade-runbook.md)。
 正式发布前请逐项执行 [`docs/operations/release-checklist.md`](docs/operations/release-checklist.md)。
 

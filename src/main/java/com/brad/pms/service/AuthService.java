@@ -1,12 +1,18 @@
 package com.brad.pms.service;
 
+import com.brad.pms.auth.AuthenticatedIdentity;
+import com.brad.pms.auth.AuthProviderCatalog;
+import com.brad.pms.auth.LdapAuthProvider;
+import com.brad.pms.auth.OidcAuthProvider;
 import com.brad.pms.common.enums.UserStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.config.EnterpriseDataMigration;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.LoginRequest;
 import com.brad.pms.dto.request.PasswordChangeRequest;
+import com.brad.pms.dto.response.AuthProviderDTO;
 import com.brad.pms.dto.response.LoginResponse;
+import com.brad.pms.dto.response.OidcStartDTO;
 import com.brad.pms.dto.response.UserDTO;
 import com.brad.pms.entity.AuthSessionDO;
 import com.brad.pms.entity.LoginLogDO;
@@ -29,6 +35,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.List;
 
 /** Local account authentication with short-lived access JWTs and revocable refresh sessions. */
 @Service
@@ -40,6 +47,9 @@ public class AuthService {
     private final LoginLogMapper loginLogMapper;
     private final JwtTokenProvider tokenProvider;
     private final AuthorizationService authorizationService;
+    private final AuthProviderCatalog authProviderCatalog;
+    private final OidcAuthProvider oidcAuthProvider;
+    private final LdapAuthProvider ldapAuthProvider;
 
     @Value("${pms.auth.refresh-expire-days:30}")
     private long refreshExpireDays;
@@ -86,9 +96,83 @@ public class AuthService {
             throw BusinessException.unauthorized("邮箱或密码错误");
         }
 
+        return establishSession(user, normalized, "LOGIN_SUCCESS", ip, userAgent, true);
+    }
+
+    public List<AuthProviderDTO> listProviders() {
+        return authProviderCatalog.list();
+    }
+
+    public OidcStartDTO startOidc() {
+        return oidcAuthProvider.start();
+    }
+
+    @Transactional(noRollbackFor = BusinessException.class)
+    public LoginResponse loginOidc(String code, String state, String ip, String userAgent) {
+        AuthenticatedIdentity identity = oidcAuthProvider.exchange(code, state);
+        return completeExternalLogin(identity, ip, userAgent);
+    }
+
+    @Transactional(noRollbackFor = BusinessException.class)
+    public LoginResponse loginLdap(LoginRequest request, String ip, String userAgent) {
+        boolean emailLogin = request.getEmail() != null && !request.getEmail().isBlank();
+        String rawIdentifier = emailLogin ? request.getEmail() : request.getUsername();
+        UserDO existing = lookupLocalUser(emailLogin, rawIdentifier);
+        try {
+            AuthenticatedIdentity identity = ldapAuthProvider.authenticate(rawIdentifier, request.getPassword());
+            return completeExternalLogin(identity, ip, userAgent);
+        } catch (BusinessException exception) {
+            if (existing != null && exception.getCode() == 401) {
+                registerFailure(existing, LocalDateTime.now());
+                recordLoginAttempt(existing, EnterpriseDataMigration.normalizeEmail(rawIdentifier),
+                        "FAILURE", "INVALID_CREDENTIALS", ip, userAgent);
+            } else if (existing == null && exception.getCode() == 401) {
+                recordLoginAttempt(null, rawIdentifier == null ? "" : rawIdentifier.trim().toLowerCase(),
+                        "FAILURE", "INVALID_CREDENTIALS", ip, userAgent);
+            }
+            throw exception;
+        }
+    }
+
+    LoginResponse completeExternalLogin(AuthenticatedIdentity identity, String ip, String userAgent) {
+        UserDO user = userMapper.findByEmailNormalized(identity.emailNormalized());
+        if (user == null) {
+            recordLoginAttempt(null, identity.loginName(), "FAILURE", "ACCOUNT_NOT_PROVISIONED", ip, userAgent);
+            throw BusinessException.unauthorized("账号未开通，请联系管理员邀请");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (UserStatus.DISABLED.name().equals(user.getStatus())) {
+            recordLoginAttempt(user, identity.loginName(), "FAILURE", "ACCOUNT_DISABLED", ip, userAgent);
+            throw BusinessException.unauthorized("账号已停用");
+        }
+        if (UserStatus.LOCKED.name().equals(user.getStatus())
+                && user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
+            recordLoginAttempt(user, identity.loginName(), "FAILURE", "ACCOUNT_LOCKED", ip, userAgent);
+            throw BusinessException.unauthorized("账号已暂时锁定，请稍后重试");
+        }
+        if (UserStatus.PENDING_ACTIVATION.name().equals(user.getStatus())) {
+            recordLoginAttempt(user, identity.loginName(), "FAILURE", "ACCOUNT_PENDING", ip, userAgent);
+            throw BusinessException.unauthorized("账号未激活，请先打开邀请链接");
+        }
+        return establishSession(user, identity.loginName(), identity.providerType().toUpperCase() + "_LOGIN_SUCCESS",
+                ip, userAgent, false);
+    }
+
+    private UserDO lookupLocalUser(boolean emailLogin, String rawIdentifier) {
+        if (rawIdentifier == null || rawIdentifier.isBlank()) return null;
+        return emailLogin
+                ? userMapper.findByEmailNormalized(EnterpriseDataMigration.normalizeEmail(rawIdentifier))
+                : userMapper.findByUsernameNormalized(EnterpriseDataMigration.normalizeUsername(rawIdentifier));
+    }
+
+    private LoginResponse establishSession(UserDO user, String loginName, String successReason,
+                                           String ip, String userAgent, boolean activateOnSuccess) {
+        LocalDateTime now = LocalDateTime.now();
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
-        user.setStatus(UserStatus.ACTIVE.name());
+        if (activateOnSuccess) {
+            user.setStatus(UserStatus.ACTIVE.name());
+        }
         user.setLastLoginAt(now);
         userMapper.updateById(user);
 
@@ -100,7 +184,7 @@ public class AuthService {
         session.setIp(ip);
         session.setUserAgent(userAgent == null ? null : userAgent.substring(0, Math.min(userAgent.length(), 500)));
         authSessionMapper.insert(session);
-        recordLoginAttempt(user, normalized, "SUCCESS", "LOGIN_SUCCESS", ip, userAgent);
+        recordLoginAttempt(user, loginName, "SUCCESS", successReason, ip, userAgent);
 
         LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname(), user.getSystemRole(),
                 user.getNameZh(), Convertors.userDisplayName(user), session.getId());

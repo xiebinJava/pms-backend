@@ -34,6 +34,7 @@
         <micrometer.version>1.15.12</micrometer.version>
         <logback.version>1.5.18</logback.version>
         <mysql-connector-j.version>9.4.0</mysql-connector-j.version>
+        <aws.sdk.version>2.31.78</aws.sdk.version>
     </properties>
 
     <dependencies>
@@ -132,6 +133,17 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-csv</artifactId>
             <version>1.13.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+            <version>${aws.sdk.version}</version>
         </dependency>
 
         <dependency>

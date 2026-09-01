@@ -16,6 +16,74 @@ tags:
   - name: 导入与审计
   - name: 健康检查
 paths:
+  /auth/providers:
+    get:
+      tags: [认证]
+      security: []
+      summary: 当前部署启用的登录方式
+      responses:
+        '200':
+          description: 登录方式列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /auth/oidc/start:
+    get:
+      tags: [认证]
+      security: []
+      summary: 开始 OIDC 授权码登录
+      responses:
+        '200':
+          description: 返回授权地址
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+  /auth/oidc/callback:
+    post:
+      tags: [认证]
+      security: []
+      summary: 用 OIDC 授权码换取本系统会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/ldap/login:
+    post:
+      tags: [认证]
+      security: []
+      summary: 目录账号登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/BusinessError'
   /auth/login:
     post:
       tags: [认证]

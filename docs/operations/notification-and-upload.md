@@ -32,6 +32,17 @@ export PMS_INVITATION_EXPOSE_TOKEN=false
 - `pms-uploads` 卷必须纳入宿主机/卷级备份；数据库恢复和图片卷恢复应作为同一批次演练，否则图片 URL 可能存在但文件缺失。
 
 对象存储接入时只需实现 `FileStorageService` 并替换本地 Bean，无需修改项目图片接口。
+默认 `PMS_STORAGE_TYPE=local`。设为 `s3` 时使用 S3 兼容实现（内网 MinIO 或云厂商桶），
+并注入 `PMS_S3_ENDPOINT`、`PMS_S3_BUCKET`、`PMS_S3_ACCESS_KEY`、`PMS_S3_SECRET_KEY`。
+`PMS_S3_PATH_STYLE` 默认 true，适配 MinIO。对象存储侧的容量由桶策略管理，本地配额不生效。
+
+## 出站 Webhook
+
+任务指派和评论在写入站内收件箱后，可额外向企业自己的接收地址 POST 一条 JSON。
+默认关闭。打开 `PMS_WEBHOOK_ENABLED=true` 后必须配置 `PMS_WEBHOOK_URL` 与至少 16 位的
+`PMS_WEBHOOK_SECRET`。生产环境 URL 必须是 HTTPS。请求头包含 `X-PMS-Event`、
+`X-PMS-Delivery` 和 `X-PMS-Signature: sha256=<HMAC-SHA256(body)>`。
+接收方应以 2xx 应答；非 2xx 或超时只写日志，不回滚站内通知。
 
 ## 运维检查
 

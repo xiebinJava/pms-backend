@@ -10,10 +10,13 @@ import com.brad.pms.entity.UserDO;
 import com.brad.pms.entity.UserNotificationDO;
 import com.brad.pms.mapper.UserNotificationMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.webhook.WebhookEvent;
+import com.brad.pms.webhook.WebhookPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,10 +42,14 @@ public class NotificationService {
     private final UserNotificationMapper notificationMapper;
     private final ProjectService projectService;
     private final UserService userService;
+    private final WebhookPublisher webhookPublisher;
 
     public void notifyTaskAssigned(Long projectId, Long taskId, String taskTitle, Long assigneeId) {
-        emit(assigneeId, TASK_ASSIGNED, "任务已指派给你", truncate(taskTitle, SNIPPET),
-                projectId, taskId, UserContext.userId());
+        Long actorId = UserContext.userId();
+        String snippet = truncate(taskTitle, SNIPPET);
+        emit(assigneeId, TASK_ASSIGNED, "任务已指派给你", snippet, projectId, taskId, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                TASK_ASSIGNED, projectId, taskId, actorId, recipients(assigneeId), "任务已指派给你", snippet));
     }
 
     public void notifyComment(Long projectId, Long taskId, String content, Long assigneeId, Long managerId) {
@@ -54,9 +61,15 @@ public class NotificationService {
             if (!Objects.equals(assigneeId, managerId)) {
                 emit(managerId, TASK_COMMENTED, actorName + " 评论了任务", snippet, projectId, taskId, actorId);
             }
+            webhookPublisher.publish(WebhookEvent.of(
+                    TASK_COMMENTED, projectId, taskId, actorId, recipients(assigneeId, managerId),
+                    actorName + " 评论了任务", snippet));
             return;
         }
         emit(managerId, PROJECT_COMMENTED, actorName + " 评论了项目", snippet, projectId, null, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                PROJECT_COMMENTED, projectId, null, actorId, recipients(managerId),
+                actorName + " 评论了项目", snippet));
     }
 
     public void emit(Long userId, String type, String title, String content,
@@ -171,5 +184,12 @@ public class NotificationService {
     static int clamp(int limit, int fallback, int max) {
         if (limit < 1) return fallback;
         return Math.min(limit, max);
+    }
+
+    private static List<Long> recipients(Long... ids) {
+        return Arrays.stream(ids == null ? new Long[0] : ids)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
     }
 }

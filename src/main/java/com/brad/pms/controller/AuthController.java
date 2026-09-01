@@ -2,13 +2,16 @@ package com.brad.pms.controller;
 
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.LoginRequest;
+import com.brad.pms.dto.request.OidcCallbackRequest;
 import com.brad.pms.dto.request.RefreshTokenRequest;
 import com.brad.pms.dto.request.ActivationRequest;
 import com.brad.pms.dto.request.PasswordResetRequest;
 import com.brad.pms.dto.request.PasswordResetConfirmRequest;
 import com.brad.pms.dto.request.PasswordChangeRequest;
+import com.brad.pms.dto.response.AuthProviderDTO;
 import com.brad.pms.dto.response.ResetTokenResponse;
 import com.brad.pms.dto.response.LoginResponse;
+import com.brad.pms.dto.response.OidcStartDTO;
 import com.brad.pms.dto.response.UserDTO;
 import com.brad.pms.security.IgnoreAuth;
 import com.brad.pms.security.UserContext;
@@ -25,6 +28,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
+import java.util.List;
 
 @RestController
 @RequestMapping("/auth")
@@ -41,6 +45,39 @@ public class AuthController {
                                                HttpServletRequest httpRequest,
                                                HttpServletResponse httpResponse) {
         LoginResponse response = authService.login(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+        setRefreshCookie(httpResponse, response.getRefreshToken(), httpRequest.isSecure());
+        return ResponseResult.success(response);
+    }
+
+    @GetMapping("/providers")
+    @IgnoreAuth
+    public ResponseResult<List<AuthProviderDTO>> providers() {
+        return ResponseResult.success(authService.listProviders());
+    }
+
+    @GetMapping("/oidc/start")
+    @IgnoreAuth
+    public ResponseResult<OidcStartDTO> startOidc() {
+        return ResponseResult.success(authService.startOidc());
+    }
+
+    @PostMapping("/oidc/callback")
+    @IgnoreAuth
+    public ResponseResult<LoginResponse> oidcCallback(@Validated @RequestBody OidcCallbackRequest request,
+                                                      HttpServletRequest httpRequest,
+                                                      HttpServletResponse httpResponse) {
+        LoginResponse response = authService.loginOidc(request.getCode(), request.getState(),
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+        setRefreshCookie(httpResponse, response.getRefreshToken(), httpRequest.isSecure());
+        return ResponseResult.success(response);
+    }
+
+    @PostMapping("/ldap/login")
+    @IgnoreAuth
+    public ResponseResult<LoginResponse> ldapLogin(@Validated @RequestBody LoginRequest request,
+                                                   HttpServletRequest httpRequest,
+                                                   HttpServletResponse httpResponse) {
+        LoginResponse response = authService.loginLdap(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         setRefreshCookie(httpResponse, response.getRefreshToken(), httpRequest.isSecure());
         return ResponseResult.success(response);
     }

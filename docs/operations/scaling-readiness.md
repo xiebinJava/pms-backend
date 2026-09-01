@@ -8,7 +8,7 @@
 
 | 能力 | 当前实现 | V1.0 结论 |
 | --- | --- | --- |
-| 文件/图片 | `FileStorageService` 抽象 + `LocalFileStorageService`，Compose 使用 `pms-uploads` 持久卷 | 单节点可用；数据库备份必须和上传卷成对快照 |
+| 文件/图片 | `FileStorageService` 抽象 + 默认 `LocalFileStorageService`；`PMS_STORAGE_TYPE=s3` 时走 S3/MinIO | 单节点默认本地卷；对象存储用于多副本或跨节点读 |
 | 限流 | `RequestRateLimitInterceptor` 进程内按 IP、账号和接口窗口限流 | 单节点可用；多副本前必须迁移到网关或 Redis 共享计数 |
 | 监控 | 私有 Actuator `health`/`metrics`、请求耗时指标、UTC JSON 日志、request id | 已具备基础观测；生产需接入 Prometheus/Grafana 或企业监控平台 |
 | 数据库 | OceanBase MySQL 兼容模式，`pms_app`/`pms_migrator` 分权，V1–V7 版本化升级 | 单企业主库可用；生产需启用慢查询、备份介质和告警 |
@@ -16,7 +16,7 @@
 
 ## 触发式升级路线
 
-1. **对象存储**：当需要多副本、跨节点访问或图片容量超过单卷运维能力时，实现 `S3FileStorageService`（兼容 S3/MinIO），保留 `FileStorageService` 接口；迁移期间双写并校验 ETag，完成后再切读。
+1. **对象存储**：`S3FileStorageService` 已可通过 `PMS_STORAGE_TYPE=s3` 启用（兼容 S3/MinIO）。从本地卷迁到桶时，先双写并校验对象，再切读；未配置时继续使用 `pms-uploads`。
 2. **分布式限流**：当部署两副本或入口经过负载均衡时，将登录、刷新、邀请、导入和上传的计数迁移到 Redis 或 API Gateway；必须保留 `Retry-After` 和 429 错误合同，并以压测验证窗口一致性。
 3. **监控告警**：生产至少采集存活/就绪、HTTP 5xx/401/403/429、P95/P99 延迟、连接池占用、OceanBase CPU/内存/事务延迟和磁盘空间；告警通过企业现有平台发送，不把 SMTP 密钥写入仓库。
 4. **慢查询治理**：打开 OceanBase 慢查询日志或审计平台，先以查询指纹聚合；超过 500ms 的接口查询进入优化队列，超过 2s 触发告警。每次索引变更都通过 `EXPLAIN`、回归测试和迁移脚本评审。

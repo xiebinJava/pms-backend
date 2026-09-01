@@ -1,5 +1,8 @@
 package com.brad.pms.service;
 
+import com.brad.pms.auth.AuthProviderCatalog;
+import com.brad.pms.auth.LdapAuthProvider;
+import com.brad.pms.auth.OidcAuthProvider;
 import com.brad.pms.dto.request.LoginRequest;
 import com.brad.pms.dto.request.PasswordChangeRequest;
 import com.brad.pms.dto.response.LoginResponse;
@@ -41,12 +44,16 @@ class AuthServiceTest {
     @Mock LoginLogMapper loginLogMapper;
     @Mock JwtTokenProvider tokenProvider;
     @Mock AuthorizationService authorizationService;
+    @Mock AuthProviderCatalog authProviderCatalog;
+    @Mock OidcAuthProvider oidcAuthProvider;
+    @Mock LdapAuthProvider ldapAuthProvider;
     private AuthService authService;
     private UserDO user;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userMapper, sessionMapper, loginLogMapper, tokenProvider, authorizationService);
+        authService = new AuthService(userMapper, sessionMapper, loginLogMapper, tokenProvider, authorizationService,
+                authProviderCatalog, oidcAuthProvider, ldapAuthProvider);
         when(authorizationService.effectivePermissionCodes(anyLong())).thenReturn(java.util.List.of("admin:user:read"));
         ReflectionTestUtils.setField(authService, "maxFailedLogins", 5);
         ReflectionTestUtils.setField(authService, "lockMinutes", 15L);
@@ -214,5 +221,30 @@ class AuthServiceTest {
 
         verify(sessionMapper).revokeById(99L, 7L, "USER_LOGOUT");
         verify(sessionMapper, never()).revokeAllByUserId(anyLong(), anyString());
+    }
+
+    @Test
+    void oidcLoginLinksAnExistingActiveUser() {
+        user.setEmailNormalized("alex.zhang@example.com");
+        when(oidcAuthProvider.exchange("code-1", "state-1"))
+                .thenReturn(new com.brad.pms.auth.AuthenticatedIdentity("alex.zhang@example.com", "alex.zhang@example.com", "oidc"));
+        when(userMapper.findByEmailNormalized("alex.zhang@example.com")).thenReturn(user);
+
+        LoginResponse response = authService.loginOidc("code-1", "state-1", "10.0.0.8", "test-agent");
+
+        assertThat(response.getAccessToken()).isEqualTo("access");
+        verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
+                "SUCCESS".equals(log.getResult()) && "OIDC_LOGIN_SUCCESS".equals(log.getReason())));
+    }
+
+    @Test
+    void oidcLoginDoesNotCreateMissingUsers() {
+        when(oidcAuthProvider.exchange("code-1", "state-1"))
+                .thenReturn(new com.brad.pms.auth.AuthenticatedIdentity("unknown@example.com", "unknown@example.com", "oidc"));
+        when(userMapper.findByEmailNormalized("unknown@example.com")).thenReturn(null);
+
+        assertThatThrownBy(() -> authService.loginOidc("code-1", "state-1", "10.0.0.8", "test-agent"))
+                .hasMessage("账号未开通，请联系管理员邀请");
+        verify(sessionMapper, never()).insert(any(AuthSessionDO.class));
     }
 }

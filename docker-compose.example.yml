@@ -127,6 +127,8 @@ services:
       PMS_CORS_ALLOWED_ORIGINS: ${PMS_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       PMS_UPLOAD_DIR: /var/lib/pms/uploads
       PMS_UPLOAD_QUOTA_BYTES: ${PMS_UPLOAD_QUOTA_BYTES:-524288000}
+      PMS_STORAGE_TYPE: ${PMS_STORAGE_TYPE:-local}
+      PMS_WEBHOOK_ENABLED: ${PMS_WEBHOOK_ENABLED:-false}
       # The example runs without SMTP. Production must enable the check and configure SMTP.
       PMS_NOTIFICATION_STARTUP_CHECK: ${PMS_NOTIFICATION_STARTUP_CHECK:-false}
       PMS_MAIL_ENABLED: ${PMS_MAIL_ENABLED:-false}
