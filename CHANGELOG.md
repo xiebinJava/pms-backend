@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Release-closure snapshot (2026-09-01): `mvn -q test` 186 cases passed (0 failures, 0 errors, 1 skipped). Local `main` commit: `88e06d9c1d8be8385420fd193267d332f38ebfe1`.
 - Add `GET /workbench` so the home page loads my tasks, participating projects, and recent comments in one request.
 - Add task detail: subtasks, per-task comments, and image/PDF attachments.
 - Add in-app notifications for task assignment and comments, plus scoped global search across projects, tasks, milestones, and comments.
