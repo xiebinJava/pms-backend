@@ -38,11 +38,11 @@ class EnterpriseRegressionTest {
     @Test
     void disabledProjectMemberCannotUseExistingSessionButHistoryRemainsVisibleToAdministrator() throws Exception {
         UserDO admin = userMapper.findByUsernameNormalized("admin");
-        UserDO member = userMapper.findByUsernameNormalized("brad.xie");
+        UserDO member = userMapper.findByUsernameNormalized("alex.zhang");
         assertThat(admin).isNotNull();
         assertThat(member).isNotNull();
 
-        LoginResponse memberSession = authService.login(login("Brad.Xie", "admin123"));
+        LoginResponse memberSession = authService.login(login("Alex.Zhang", "admin123"));
         UserContext.set(new LoginUser(admin.getId(), admin.getUsername(), admin.getNickname(), 1));
         UserDisableCmd disable = new UserDisableCmd();
         disable.setReason("离职回归测试");

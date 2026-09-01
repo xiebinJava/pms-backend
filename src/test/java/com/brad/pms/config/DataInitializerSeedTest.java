@@ -21,7 +21,7 @@ class DataInitializerSeedTest {
         List<UserDO> users = userMapper.selectList(null);
 
         assertThat(users).hasSizeGreaterThanOrEqualTo(21);
-        assertThat(users).anyMatch(user -> "谢斌".equals(user.getNameZh()) && "Brad.Xie".equals(user.getUsername()));
+        assertThat(users).anyMatch(user -> "张伟".equals(user.getNameZh()) && "Alex.Zhang".equals(user.getUsername()));
         assertThat(users).noneMatch(user -> List.of("张三", "李四", "王五").contains(user.getNameZh()));
     }
 }

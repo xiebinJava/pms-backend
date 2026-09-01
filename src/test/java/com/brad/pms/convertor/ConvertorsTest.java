@@ -17,18 +17,18 @@ class ConvertorsTest {
     @Test
     void displayNameUsesAvailableChineseNameWithoutAddingEmptyEnglishSuffix() {
         UserDO user = new UserDO();
-        user.setNameZh("谢斌");
-        user.setEmail("brad@example.com");
+        user.setNameZh("张伟");
+        user.setEmail("alex.zhang@example.com");
 
-        assertThat(Convertors.userDisplayName(user)).isEqualTo("谢斌");
+        assertThat(Convertors.userDisplayName(user)).isEqualTo("张伟");
     }
 
     @Test
     void displayNameUsesAvailableEnglishNameButHidesGeneratedCompatibilityAlias() {
         UserDO named = new UserDO();
-        named.setUsername("Brad.Xie");
-        named.setEmail("brad@example.com");
-        assertThat(Convertors.userDisplayName(named)).isEqualTo("Brad.Xie");
+        named.setUsername("Alex.Zhang");
+        named.setEmail("alex.zhang@example.com");
+        assertThat(Convertors.userDisplayName(named)).isEqualTo("Alex.Zhang");
 
         UserDO generated = new UserDO();
         generated.setUsername("user-0123456789abcdef");

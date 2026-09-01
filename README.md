@@ -146,6 +146,7 @@ OpenAPI 合同位于 `src/main/resources/openapi/pms-api.yaml`，本地校验：
 
 ```bash
 ./scripts/validate-openapi.sh
+./scripts/check-privacy.sh
 ```
 
 企业级基础设施（数据库账号隔离、备份恢复、升级、容器、可观测性、CI 和开源交付）的当前状态见

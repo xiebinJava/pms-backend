@@ -61,8 +61,8 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 ```bash
 export PMS_BOOTSTRAP_ADMIN_EMAIL='admin@example.com'
 # Optional display names; keep the legacy username only when old clients need it.
-export PMS_BOOTSTRAP_ADMIN_NAME_ZH='谢斌'
-export PMS_BOOTSTRAP_ADMIN_USERNAME='brad.xie'
+export PMS_BOOTSTRAP_ADMIN_NAME_ZH='张伟'
+export PMS_BOOTSTRAP_ADMIN_USERNAME='alex.zhang'
 export PMS_BOOTSTRAP_ADMIN_PASSWORD='至少 12 位的随机密码'
 ```
 
@@ -134,9 +134,9 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 ## 9. 私有仓库集成测试凭据
 
-后端的 `.github/workflows/integration.yml` 会检出私有前端仓库并执行 OceanBase + Playwright
+后端的 `.github/workflows/integration.yml` 会检出同一 GitHub Owner 下的 `pms-front` 并执行 OceanBase + Playwright
 集成测试。由于 GitHub Actions 的默认 `GITHUB_TOKEN` 只能读取当前仓库，必须在
-`xiebinJava/pms-backend` 的 Settings → Secrets and variables → Actions 中创建仓库级 secret
-`PMS_FRONT_REPO_READ_TOKEN`。该 Token 只授予 `xiebinJava/pms-front` 的 Contents: Read 权限，
+后端仓库的 Settings → Secrets and variables → Actions 中创建仓库级 secret
+`PMS_FRONT_REPO_READ_TOKEN`。该 Token 只授予同 Owner 下 `pms-front` 的 Contents: Read 权限，
 不要复用管理员个人 Token，也不要把 Token 写入 workflow、日志或 `.env`。未配置该 secret 时，
 工作流会在检出前给出明确错误并停止，不会误报为 OceanBase 或应用故障。

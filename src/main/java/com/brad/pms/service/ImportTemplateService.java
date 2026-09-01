@@ -11,6 +11,6 @@ public class ImportTemplateService {
     }
 
     public byte[] userCsvTemplate() {
-        return "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级邮箱\n谢斌,Brad.Xie,brad@example.com,,HQ,EMPLOYEE,MEMBER,\n".getBytes(StandardCharsets.UTF_8);
+        return "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级邮箱\n张伟,Alex.Zhang,alex.zhang@example.com,,HQ,EMPLOYEE,MEMBER,\n".getBytes(StandardCharsets.UTF_8);
     }
 }

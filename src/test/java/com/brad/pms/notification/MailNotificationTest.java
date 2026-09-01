@@ -18,7 +18,7 @@ class MailNotificationTest {
         JavaMailSender sender = mock(JavaMailSender.class);
         MailInvitationNotifier notifier = new MailInvitationNotifier(sender, "pms@example.com", "https://pms.example.com/");
         UserDO user = new UserDO();
-        user.setEmail("brad@example.com");
+        user.setEmail("user@example.com");
         LocalDateTime expiresAt = LocalDateTime.of(2026, 8, 30, 12, 0);
 
         notifier.send(user, "/auth/activate?token=raw-token", expiresAt);
@@ -27,7 +27,7 @@ class MailNotificationTest {
         verify(sender).send(captor.capture());
         SimpleMailMessage message = captor.getValue();
         assertThat(message.getFrom()).isEqualTo("pms@example.com");
-        assertThat(message.getTo()).containsExactly("brad@example.com");
+        assertThat(message.getTo()).containsExactly("user@example.com");
         assertThat(message.getText()).contains("https://pms.example.com/auth/activate?token=raw-token");
     }
 

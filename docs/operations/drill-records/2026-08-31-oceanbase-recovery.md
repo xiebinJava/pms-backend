@@ -9,12 +9,12 @@
 | 检查 | 结果 | 证据 |
 | --- | --- | --- |
 | 读取 `.env.oceanbase.local` | 通过 | 仅确认变量名存在，未输出任何密码或 JWT |
-| 通过已有 OceanBase 容器执行 `SELECT 1` | 通过 | `fsclaw-oceanbase` 内 `/usr/bin/obclient` 返回 `1` |
+| 通过已有 OceanBase 容器执行 `SELECT 1` | 通过 | `pms-oceanbase` 内 `/usr/bin/obclient` 返回 `1` |
 | `enterprise-preflight.sh` | 通过 | 使用 OceanBase 官方镜像内 `/usr/bin/obclient` 对 `brad_pms` 执行只读预检 |
 | `verify-enterprise-migration.sh` | 通过 | 结构、索引、外键、邮箱唯一性、组织路径和项目归属全部通过 |
 | `backup-oceanbase.sh` | 通过 | `/u01/obclient/bin/mysqldump` 生成 `brad_pms-20260831T094114Z-v7.sql.gz`；SHA-256=`ff7439275e34939ac78775511faf1d36dbbb8ff2e10f0fe3ffb27220f740f5af`，元数据使用精确行数 |
 | 空库恢复与数据比对 | 通过 | 恢复到隔离库 `brad_pms_restore_20260831b` 后结构校验通过；源库/恢复库用户、组织、项目、任务、审计行数均为 21/9/2/6/18；验收后已删除本次演练创建的临时恢复库 |
-| 故障/就绪演练 | 通过 | 短暂停止并恢复 `fsclaw-oceanbase`；期间 liveness 0.13 秒返回 200，readiness 3.02 秒返回 503；恢复后 readiness 返回 200 且 migration=7 |
+| 故障/就绪演练 | 通过 | 短暂停止并恢复 `pms-oceanbase`；期间 liveness 0.13 秒返回 200，readiness 3.02 秒返回 503；恢复后 readiness 返回 200 且 migration=7 |
 
 ## 阻塞与后续动作
 

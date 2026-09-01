@@ -99,7 +99,7 @@
 
 ### Task 4：OceanBase 备份恢复与故障演练
 
-- 已通过现有 `fsclaw-oceanbase` 容器内的 `obclient` 完成只读 `SELECT 1` 连通性确认。
+- 已通过现有 `pms-oceanbase` 容器内的 `obclient` 完成只读 `SELECT 1` 连通性确认。
 - `enterprise-preflight.sh` 和 `verify-enterprise-migration.sh` 已在同一 OceanBase 容器内通过；使用官方镜像内 `/u01/obclient/bin/mysqldump` 完成 gzip 备份、SHA-256 校验、精确行数元数据和隔离空库恢复，源库/恢复库关键表行数一致。
 - 详细证据和安全边界见 [`drill-records/2026-08-31-oceanbase-recovery.md`](drill-records/2026-08-31-oceanbase-recovery.md) 与 [`drill-records/2026-08-31-migration-v7.md`](drill-records/2026-08-31-migration-v7.md)。在具备客户端/镜像缓存和明确空目标库前，不对现有 `brad_pms` 执行恢复。
 

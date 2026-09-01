@@ -53,10 +53,10 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(authService, "refreshExpireDays", 30L);
         user = new UserDO();
         user.setId(7L);
-        user.setUsername("Brad.Xie");
-        user.setUsernameNormalized("brad.xie");
-        user.setNameZh("谢斌");
-        user.setNickname("谢斌");
+        user.setUsername("Alex.Zhang");
+        user.setUsernameNormalized("alex.zhang");
+        user.setNameZh("张伟");
+        user.setNickname("张伟");
         user.setPassword(new BCryptPasswordEncoder().encode("CorrectPassword1!"));
         user.setStatus("ACTIVE");
         user.setFailedLoginCount(0);
@@ -72,7 +72,7 @@ class AuthServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"brad.xie", "Brad.Xie", "BRAD.XIE"})
+    @ValueSource(strings = {"alex.zhang", "Alex.Zhang", "ALEX.ZHANG"})
     void loginUsesNormalizedEnglishName(String loginName) {
         LoginRequest request = new LoginRequest();
         request.setUsername(loginName);
@@ -80,24 +80,24 @@ class AuthServiceTest {
 
         LoginResponse response = authService.login(request);
 
-        assertThat(response.getUser().getDisplayName()).isEqualTo("谢斌（Brad.Xie）");
+        assertThat(response.getUser().getDisplayName()).isEqualTo("张伟（Alex.Zhang）");
         verify(userMapper).findByUsernameNormalized(loginName.toLowerCase());
     }
 
     @Test
     void loginUsesNormalizedEmailAsPrimaryIdentity() {
-        user.setEmail("Brad.Xie@Example.com");
-        user.setEmailNormalized("brad.xie@example.com");
-        when(userMapper.findByEmailNormalized("brad.xie@example.com")).thenReturn(user);
+        user.setEmail("Alex.Zhang@Example.com");
+        user.setEmailNormalized("alex.zhang@example.com");
+        when(userMapper.findByEmailNormalized("alex.zhang@example.com")).thenReturn(user);
 
         LoginRequest request = new LoginRequest();
-        request.setEmail("  BRAD.XIE@EXAMPLE.COM ");
+        request.setEmail("  ALEX.ZHANG@EXAMPLE.COM ");
         request.setPassword("CorrectPassword1!");
 
         LoginResponse response = authService.login(request);
 
-        assertThat(response.getUser().getEmail()).isEqualTo("Brad.Xie@Example.com");
-        verify(userMapper).findByEmailNormalized("brad.xie@example.com");
+        assertThat(response.getUser().getEmail()).isEqualTo("Alex.Zhang@Example.com");
+        verify(userMapper).findByEmailNormalized("alex.zhang@example.com");
         verify(userMapper, never()).findByUsernameNormalized(anyString());
     }
 
@@ -117,7 +117,7 @@ class AuthServiceTest {
     @Test
     void invalidPasswordPersistsFailureAuditWithoutCredentials() {
         LoginRequest request = new LoginRequest();
-        request.setUsername("Brad.Xie");
+        request.setUsername("Alex.Zhang");
         request.setPassword("WrongPassword1!");
 
         assertThatThrownBy(() -> authService.login(request, "10.0.0.8", "test-agent"))
@@ -127,7 +127,7 @@ class AuthServiceTest {
         verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
                 "FAILURE".equals(log.getResult())
                         && Long.valueOf(7L).equals(log.getUserId())
-                        && "brad.xie".equals(log.getLoginName())
+                        && "alex.zhang".equals(log.getLoginName())
                         && "INVALID_CREDENTIALS".equals(log.getReason())
                         && "10.0.0.8".equals(log.getIp())
                         && "test-agent".equals(log.getUserAgent())));
@@ -136,7 +136,7 @@ class AuthServiceTest {
     @Test
     void successfulLoginPersistsSuccessAudit() {
         LoginRequest request = new LoginRequest();
-        request.setUsername("Brad.Xie");
+        request.setUsername("Alex.Zhang");
         request.setPassword("CorrectPassword1!");
 
         authService.login(request, "10.0.0.8", "test-agent");
@@ -194,7 +194,7 @@ class AuthServiceTest {
 
     @Test
     void passwordChangeUpdatesHashAndRevokesSessions() {
-        UserContext.set(new LoginUser(7L, "Brad.Xie", "谢斌", 0, "谢斌", "谢斌（Brad.Xie）", 99L));
+        UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟", 0, "张伟", "张伟（Alex.Zhang）", 99L));
         PasswordChangeRequest request = new PasswordChangeRequest();
         request.setCurrentPassword("CorrectPassword1!");
         request.setNewPassword("NewCorrectPassword2!");

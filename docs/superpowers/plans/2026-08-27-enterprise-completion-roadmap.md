@@ -65,7 +65,7 @@
 - [ ] **Step 4:** 运行后端认证测试、前端 store 测试和 `pnpm typecheck`，review 不得把密码、令牌或哈希写入日志。
 - [ ] **Step 5:** 提交 `feat: complete enterprise account lifecycle`。
 
-**验收：** 输入 `brad.xie`、`Brad.Xie`、`BRAD.XIE` 均能登录；禁用或改密后旧会话立即失效；所有展示为 `中文名（English.Name）`。
+**验收：** 输入 `alex.zhang`、`Alex.Zhang`、`ALEX.ZHANG` 均能登录；禁用或改密后旧会话立即失效；所有展示为 `中文名（English.Name）`。
 
 ### Task 3: RBAC、数据范围与管理页面权限闭环
 

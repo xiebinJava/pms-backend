@@ -51,7 +51,7 @@ class OceanbaseSqlImporterTest {
     void countsEnterpriseSnapshotTablesIncludingFlywayHistory() throws Exception {
         Path snapshot = Files.createTempFile("pms-enterprise-snapshot", ".sql");
         Files.writeString(snapshot,
-                "INSERT INTO sys_user VALUES (1, 'brad.xie'), (2, 'terry.li');\n"
+                "INSERT INTO sys_user VALUES (1, 'alex.zhang'), (2, 'terry.li');\n"
                         + "INSERT INTO sys_org_unit VALUES (1, NULL, 1, 'HQ', '公司总部');\n"
                         + "INSERT INTO flyway_schema_history VALUES (-1, NULL, '<< Flyway Schema History table created >>');\n");
 

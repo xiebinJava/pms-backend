@@ -167,7 +167,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private List<UserDO> createDemoUsers() {
         String[][] seeds = {
-                {"谢斌", "Brad.Xie"}, {"李强", "Terry.Li"}, {"周岚", "Linda.Zhou"}, {"陈宇", "Kevin.Chen"},
+                {"张伟", "Alex.Zhang"}, {"李强", "Terry.Li"}, {"周岚", "Linda.Zhou"}, {"陈宇", "Kevin.Chen"},
                 {"王璇", "Claire.Wang"}, {"赵晨", "Ethan.Zhao"}, {"刘洋", "Andy.Liu"}, {"孙悦", "Nina.Sun"},
                 {"黄凯", "Kyle.Huang"}, {"吴倩", "Grace.Wu"}, {"徐凡", "Frank.Xu"}, {"何敏", "Mia.He"},
                 {"高远", "Owen.Gao"}, {"郑琳", "Alice.Zheng"}, {"林浩", "Leo.Lin"}, {"郭婷", "Tina.Guo"},

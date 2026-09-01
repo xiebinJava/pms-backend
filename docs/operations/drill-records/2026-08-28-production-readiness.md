@@ -14,7 +14,7 @@
 | OpenAPI | 通过 | `./scripts/validate-openapi.sh` |
 | Shell 与差异检查 | 通过 | `bash -n scripts/*.sh docker/*.sh`、`git diff --check` |
 | Compose 静态解析 | 通过 | `docker compose ... config --quiet`（注入临时示例变量） |
-| 现有 OceanBase 只读预检 | 通过 | 使用本地 `fsclaw-oceanbase` 实例执行 `enterprise-preflight.sh` 与 `verify-enterprise-migration.sh`；未写入业务数据 |
+| 现有 OceanBase 只读预检 | 通过 | 使用本地 `pms-oceanbase` 实例执行 `enterprise-preflight.sh` 与 `verify-enterprise-migration.sh`；未写入业务数据 |
 | 现有 `brad_pms` V6 迁移 | 通过 | 使用 `pms_migrator` 应用 `V6__audit_retention_indexes.sql`，第二次执行输出 `No pending migrations`；未删除或覆盖业务数据 |
 | CI YAML 解析 | 通过 | Ruby YAML parser 检查 backend/frontend workflow 与 Dependabot |
 | 浏览器用例编译 | 通过/跳过 | Playwright 用例可加载；无测试凭据时 2 项按设计跳过 |

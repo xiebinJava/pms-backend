@@ -30,6 +30,8 @@ jobs:
             echo 'credential material detected in repository' >&2
             exit 1
           fi
+      - name: Check repository for company and personal identifiers
+        run: ./scripts/check-privacy.sh
       - name: Build backend image for security scan
         run: docker build --tag pms-backend:ci .
       - name: Scan backend image (high and critical)

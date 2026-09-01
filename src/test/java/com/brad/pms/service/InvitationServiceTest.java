@@ -39,7 +39,7 @@ class InvitationServiceTest {
     void sendsActivationLinkWithoutReturningRawTokenInProductionMode() {
         UserContext.set(new LoginUser(1L, "admin", "管理员"));
         OrgUnitDO org = new OrgUnitDO(); org.setId(10L); org.setStatus("ACTIVE");
-        when(userMapper.findByUsernameNormalized("brad.xie")).thenReturn(null);
+        when(userMapper.findByUsernameNormalized("alex.zhang")).thenReturn(null);
         when(orgUnitMapper.selectById(10L)).thenReturn(org);
         when(notifierProvider.getIfAvailable()).thenReturn(notifier);
         doAnswer(invocation -> { invocation.<UserDO>getArgument(0).setId(22L); return 1; }).when(userMapper).insert(any(UserDO.class));
@@ -48,7 +48,7 @@ class InvitationServiceTest {
                 positionMapper, roleMapper, userRoleMapper, userPositionMapper, authService,
                 operationLogService, notifierProvider);
         UserInviteCmd command = new UserInviteCmd();
-        command.setNameZh("谢斌"); command.setUsername("Brad.Xie"); command.setEmail("brad@example.com"); command.setOrgUnitId(10L);
+        command.setNameZh("张伟"); command.setUsername("Alex.Zhang"); command.setEmail("alex.zhang@example.com"); command.setOrgUnitId(10L);
 
         var response = service.invite(command);
 

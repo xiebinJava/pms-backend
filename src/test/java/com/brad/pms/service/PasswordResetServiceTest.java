@@ -28,13 +28,13 @@ class PasswordResetServiceTest {
     @Test
     void productionModeSendsResetLinkWithoutReturningRawToken() {
         UserDO user = new UserDO();
-        user.setId(7L); user.setUsername("Brad.Xie"); user.setUsernameNormalized("brad.xie"); user.setNameZh("谢斌");
-        when(userMapper.findByUsernameNormalized("brad.xie")).thenReturn(user);
+        user.setId(7L); user.setUsername("Alex.Zhang"); user.setUsernameNormalized("alex.zhang"); user.setNameZh("张伟");
+        when(userMapper.findByUsernameNormalized("alex.zhang")).thenReturn(user);
         when(notifierProvider.getIfAvailable()).thenReturn(notifier);
 
         PasswordResetService service = new PasswordResetService(userMapper, tokenMapper, authService, operationLogService, notifierProvider);
         ReflectionTestUtils.setField(service, "exposeToken", false);
-        PasswordResetRequest request = new PasswordResetRequest(); request.setUsername("BRAD.XIE");
+        PasswordResetRequest request = new PasswordResetRequest(); request.setUsername("ALEX.ZHANG");
 
         ResetTokenResponse response = service.request(request);
 

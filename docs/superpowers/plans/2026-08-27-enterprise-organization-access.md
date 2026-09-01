@@ -197,10 +197,10 @@ git commit -m "feat: migrate legacy users into enterprise identity model"
 
 ```java
 @ParameterizedTest
-@ValueSource(strings = {"brad.xie", "Brad.Xie", "BRAD.XIE"})
+@ValueSource(strings = {"alex.zhang", "Alex.Zhang", "ALEX.ZHANG"})
 void loginUsesNormalizedEnglishName(String loginName) {
     LoginResponse response = authService.login(new LoginRequest(loginName, "CorrectPassword1!"));
-    assertThat(response.getUser().getDisplayName()).isEqualTo("谢斌（Brad.Xie）");
+    assertThat(response.getUser().getDisplayName()).isEqualTo("张伟（Alex.Zhang）");
 }
 
 @Test
@@ -482,7 +482,7 @@ git commit -m "feat: manage roles and invited accounts"
 ```java
 @Test
 void previewRejectsCaseInsensitiveDuplicateEnglishNamesWithoutWrites() {
-    ImportPreviewDTO preview = importService.previewUsers(csv("谢斌,Brad.Xie,...\n李强,brad.xie,..."));
+    ImportPreviewDTO preview = importService.previewUsers(csv("张伟,Alex.Zhang,...\n李强,alex.zhang,..."));
     assertThat(preview.getErrors()).extracting(ImportRowErrorDTO::getField).contains("英文名");
     assertThat(userMapper.selectCount(null)).isEqualTo(existingUserCount);
 }
@@ -555,7 +555,7 @@ void projectMemberCanReadCrossOrganizationProjectButCannotBrowseUnrelatedProject
 
 @Test
 void projectMemberDisplayNameUsesChineseAndEnglishName() {
-    assertThat(projectService.members(projectId).get(0).getDisplayName()).isEqualTo("谢斌（Brad.Xie）");
+    assertThat(projectService.members(projectId).get(0).getDisplayName()).isEqualTo("张伟（Alex.Zhang）");
 }
 ```
 
@@ -611,8 +611,8 @@ git commit -m "feat: scope projects by organization and membership"
 
 ```javascript
 test('user display name is used after login', async () => {
-  await store.login('Brad.Xie', 'CorrectPassword1!')
-  assert.equal(store.user.displayName, '谢斌（Brad.Xie）')
+  await store.login('Alex.Zhang', 'CorrectPassword1!')
+  assert.equal(store.user.displayName, '张伟（Alex.Zhang）')
   assert.equal(localStorage.getItem('pms_token'), null)
 })
 ```
