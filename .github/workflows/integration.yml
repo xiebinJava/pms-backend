@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate frontend repository read token
         env:
           FRONTEND_REPO_READ_TOKEN: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
@@ -20,7 +20,7 @@ jobs:
             echo "::error::Configure PMS_FRONT_REPO_READ_TOKEN with read-only Contents access to the sibling pms-front repository before running integration-and-e2e."
             exit 1
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/pms-front
           path: pms-front
