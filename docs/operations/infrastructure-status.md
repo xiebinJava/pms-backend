@@ -9,7 +9,7 @@
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
 | OceanBase `brad_pms` | V1–V10 已执行并复核 | 使用 `pms_migrator` 连续执行两次版本升级，均完成 checksum 校验并返回无待执行版本；V7 邮箱唯一索引、V8 任务附件、V9 站内通知、V10 通知节点标识及关键表结构、外键和数据范围预检通过 |
-| 后端回归 | 已通过 | `mvn -q test`，186 个用例通过（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试；健康检查期望迁移版本已与 V10 对齐 |
+| 后端回归 | 已通过 | `mvn -q test`，187 个用例通过（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试；健康检查期望迁移版本已与 V10 对齐 |
 | 前端回归 | 已通过 | `pnpm test`，111 项通过（当前本地 `main` 含验收 locale 稳定性和验收快照提交 `777e481`） |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
@@ -49,7 +49,7 @@
 
 | 任务 | 状态 | Review 证据 |
 | --- | --- | --- |
-| Task 0：基线盘点与文档状态对齐 | 已完成 | 当前后端 `mvn -q test` 186 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 111 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 和隐私扫描通过；本地提交为后端 `88e06d9`、前端 `eb8e4e8`。 |
+| Task 0：基线盘点与文档状态对齐 | 已完成 | 当前后端 `mvn -q test` 187 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 111 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 和隐私扫描通过；本地提交为后端 `88e06d9`、前端 `eb8e4e8`。 |
 | Task 1：OceanBase 运行账号隔离 | 已完成 | 配置测试通过；Compose 解析通过；本地 OceanBase 已创建 `pms_app` / `pms_migrator`；应用账号建表被拒绝、迁移账号 DDL 通过；探针表已清理。 |
 | Task 2：OceanBase 备份、恢复与版本升级 | 已完成本机演练 | 2026-09-01 重新执行 V1–V10 checksum/幂等、精确行数逻辑备份、SHA-256、隔离空库恢复和关键表比对；备份版本标记与全表元数据问题已修复；详见最新演练记录。 |
 | Task 3：统一安全边界、错误响应和请求链路 | 已完成 | 后端全量测试、前端 111 项 Node 测试、`pnpm typecheck`、`pnpm build` 通过；覆盖 400/401/403/409/422/500/429、requestId、刷新失败跳转、代理转发和敏感接口限流；提交见安全边界提交。 |
@@ -90,7 +90,7 @@
 - 选择 Spring Boot 3.5.14 是因为 Spring Boot 2.7/Spring Framework 5 已无法覆盖当前 Trivy 数据库中需要 Spring 6.2.x 的修复项；没有降低扫描阈值，也没有添加漏洞忽略规则。
 - 为保持 Java 17，完成 `javax.validation`/`javax.servlet` 到 Jakarta API 的源码与测试迁移，并切换 `mybatis-plus-spring-boot3-starter`；MyBatis-Plus 3.5.17 分页插件显式依赖 `mybatis-plus-jsqlparser`。
 - 兼容性修复：MyBatis-Plus 3.5 的 `selectCount` 返回 `Long`，服务层计数和 DTO 转换已显式处理；Mockito 对重载 `insert` 使用显式泛型 matcher，避免测试编译歧义；Jackson/Micrometer 使用 Boot 支持的 BOM 属性锁定修复版本。
-- Review 结果：`mvn -q test` 通过（186 tests，0 failures、0 errors、1 skipped，退出码 0）；下一步必须在 GitHub Actions 新提交上完成跨仓库集成和镜像 Trivy 扫描。
+- Review 结果：`mvn -q test` 通过（187 tests，0 failures、0 errors、1 skipped，退出码 0）；下一步必须在 GitHub Actions 新提交上完成跨仓库集成和镜像 Trivy 扫描。
 
 ### Task 3：生产配置核查
 

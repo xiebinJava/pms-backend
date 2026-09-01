@@ -267,6 +267,7 @@ public class EnterpriseImportService {
     private List<ImportRowErrorDTO> validate(String type, List<Map<String, String>> rows, List<String> headers) {
         List<ImportRowErrorDTO> errors = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        Set<String> seenUsernames = new HashSet<>();
         for (int i = 0; i < rows.size(); i++) {
             Map<String, String> row = rows.get(i);
             int number = i + 2;
@@ -282,7 +283,13 @@ public class EnterpriseImportService {
             String duplicateKey = "ORGANIZATIONS".equals(type) ? normalizeCode(key) : key;
             if (duplicateKey != null && !duplicateKey.isBlank() && !seen.add(duplicateKey)) errors.add(new ImportRowErrorDTO(number, "ORGANIZATIONS".equals(type) ? "组织编码" : "邮箱", "批次内重复"));
             String username = EnterpriseDataMigration.normalizeUsername(row.get("英文名"));
-            if ("USERS".equals(type) && username != null && !username.isBlank() && !username.matches("^[a-z][a-z0-9._-]{1,49}$")) errors.add(new ImportRowErrorDTO(number, "英文名", "英文名格式不正确"));
+            if ("USERS".equals(type) && username != null && !username.isBlank()) {
+                if (!username.matches("^[a-z][a-z0-9._-]{1,49}$")) {
+                    errors.add(new ImportRowErrorDTO(number, "英文名", "英文名格式不正确"));
+                } else if (!seenUsernames.add(username)) {
+                    errors.add(new ImportRowErrorDTO(number, "英文名", "批次内重复"));
+                }
+            }
         }
         if ("ORGANIZATIONS".equals(type)) {
             Set<String> codes = rows.stream().map(row -> normalizeCode(row.get("组织编码"))).collect(Collectors.toSet());
@@ -317,6 +324,10 @@ public class EnterpriseImportService {
                 Map<String, String> row = rows.get(i);
                 String email = EnterpriseDataMigration.normalizeEmail(row.get("邮箱"));
                 if (email != null && existingEmails.contains(email)) errors.add(new ImportRowErrorDTO(i + 2, "邮箱", "邮箱已存在"));
+                String username = EnterpriseDataMigration.normalizeUsername(row.get("英文名"));
+                if (username != null && !username.isBlank() && existingUsernames.contains(username)) {
+                    errors.add(new ImportRowErrorDTO(i + 2, "英文名", "英文名已存在"));
+                }
                 String orgCode = row.get("主组织编码");
                 if (orgCode == null || orgCode.isBlank() || !orgs.containsKey(normalizeCode(orgCode)) || !"ACTIVE".equals(orgs.get(normalizeCode(orgCode)).getStatus())) errors.add(new ImportRowErrorDTO(i + 2, "主组织编码", "主组织不存在或已停用"));
                 String positionCode = row.get("岗位编码");

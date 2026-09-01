@@ -60,3 +60,9 @@ PMS_OCEANBASE_VERIFY=true bash scripts/verify-oceanbase.sh
 1. 跨仓库 CI：后端工作流已固定前端提交 `777e481f30a2be1f46a8ae253f19121012c865ec`，但本机 GitHub CLI 凭据已失效且当前网络无法解析 GitHub，无法配置 `PMS_FRONT_REPO_READ_TOKEN` 或重跑远程工作流。恢复 GitHub 认证后，在后端仓库添加仅 `pms-front` Contents: Read 的 Secret 并重跑 `integration-and-e2e`。
 2. 生产配置：仍需目标企业注入强 JWT、OceanBase 应用/迁移密码、SMTP、HTTPS、受限 CORS、对象存储和监控告警，并保存 RPO/RTO、备份介质和故障联系人。
 3. 本记录是本机演练证据；生产环境必须按同一命令和清单重新执行，不能直接把本机通过视为生产通过。
+
+## 发布审阅遗留项
+
+- `sys_user.email` 的历史 V1 列定义仍小于业务规范允许的 320 字符上限。正式扩大列长度需要单独的后续迁移（并同步健康检查、升级脚本和回滚说明），本次不隐式修改 V1–V10 基线。
+- `enterprise-preflight.sh` 当前依赖 V7 之后的归一化字段；从旧库升级时，必须先执行只读的 V7 前置检查或调整 runbook 顺序，不能在 V6 库上直接把现有 preflight 当作全量前置条件。
+- 本次已补充导入预览的批次内英文名（不区分大小写）重复校验，并由后端全量测试回归覆盖。

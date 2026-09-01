@@ -57,6 +57,18 @@ class EnterpriseImportServiceTest {
     }
 
     @Test
+    void previewRejectsCaseInsensitiveDuplicateEnglishNames() {
+        String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
+                + "测试甲,Import.Reviewer,reviewer.one@example.com,,HQ,EMPLOYEE,MEMBER,\n"
+                + "测试乙,IMPORT.REVIEWER,reviewer.two@example.com,,HQ,EMPLOYEE,MEMBER,\n";
+
+        ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
+                "file", "duplicate-usernames.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(preview.getErrors()).anyMatch(error -> "英文名".equals(error.getField()) && "批次内重复".equals(error.getMessage()));
+    }
+
+    @Test
     void previewRequiresEmailEvenWhenPhoneIsPresent() {
         String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
                 + "测试丙,Import.Phone,,13800000000,HQ,EMPLOYEE,MEMBER,\n";

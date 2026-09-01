@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Release-closure snapshot (2026-09-01): `mvn -q test` 186 cases passed (0 failures, 0 errors, 1 skipped); live OceanBase readiness returned `migration=10`; V1–V10 backup/recovery and key-table row-count comparison passed.
+- Release-closure snapshot (2026-09-01): `mvn -q test` 187 cases passed (0 failures, 0 errors, 1 skipped); live OceanBase readiness returned `migration=10`; V1–V10 backup/recovery and key-table row-count comparison passed.
 - Align readiness with the V10 migration baseline and make backup metadata sort migration versions numerically and record every table's exact row count.
 - Add `GET /workbench` so the home page loads my tasks, participating projects, and recent comments in one request.
 - Add task detail: subtasks, per-task comments, and image/PDF attachments.
