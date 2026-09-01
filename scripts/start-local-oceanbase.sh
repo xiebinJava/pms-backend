@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-JAR_PATH="${PMS_JAR_PATH:-$PROJECT_DIR/target/pms-backend-0.1.0.jar}"
+JAR_PATH="${PMS_JAR_PATH:-$PROJECT_DIR/target/pms-backend-1.0.0.jar}"
 RUN_DIR="${PMS_RUN_DIR:-$PROJECT_DIR/.run}"
 PID_FILE="$RUN_DIR/pms-backend.pid"
 LOG_FILE="$RUN_DIR/pms-backend.log"

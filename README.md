@@ -1,6 +1,6 @@
 # PMS Backend — 项目管理系统后端
 
-基于 Spring Boot + MyBatis-Plus 的开源项目管理系统后端，采用 Cmd/Qry/DTO + Service 编排的 CQRS 风格分层，单模块组织，便于开源维护。
+基于 Spring Boot + MyBatis-Plus 的开源项目管理系统后端，采用 Cmd/Qry/DTO + Service 编排的 CQRS 风格分层，单模块组织，便于开源维护。许可证为 Apache-2.0，贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 技术栈
 
@@ -39,7 +39,7 @@ export OCEANBASE_PASSWORD=<业务密码>
 
 mvn spring-boot:run
 # 或
-mvn package -DskipTests && java -jar target/pms-backend-0.1.0.jar
+mvn package -DskipTests && java -jar target/pms-backend-1.0.0.jar
 ```
 
 启动后访问 `http://localhost:8080/api`。OceanBase profile 不在运行时启用 Flyway（OceanBase 4.x 对外报告 MySQL 5.7，而 Flyway Community 不支持该版本）；首次部署或升级请先执行仓库中的迁移脚本，再启动应用。

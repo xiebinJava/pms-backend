@@ -16,13 +16,35 @@ abort "openapi must be 3.x" unless spec.fetch("openapi").start_with?("3.")
 paths = spec["paths"]
 abort "paths missing" unless paths.is_a?(Hash) && !paths.empty?
 expected = {
-  "/auth/login" => ["post"], "/auth/refresh" => ["post"], "/auth/me" => ["get"],
+  "/auth/login" => ["post"], "/auth/refresh" => ["post"], "/auth/logout" => ["post"],
+  "/auth/me" => ["get"], "/auth/password/change" => ["post"], "/auth/activate" => ["post"],
+  "/auth/password-reset/request" => ["post"], "/auth/password-reset/confirm" => ["post"],
+  "/users/search" => ["get"],
   "/projects/page" => ["post"], "/projects" => ["post"], "/projects/{id}" => ["get", "put", "delete"],
-  "/admin/org/tree" => ["get"], "/org/tree" => ["get"], "/admin/org" => ["post"], "/admin/users" => ["get"],
-  "/admin/users/invite" => ["post"], "/admin/roles" => ["get"],
+  "/projects/stats" => ["get"], "/projects/{id}/terminate" => ["post"], "/projects/{id}/restore" => ["post"],
+  "/projects/{projectId}/tasks" => ["get", "post"], "/tasks/{id}" => ["put", "delete"], "/tasks/{id}/move" => ["put"],
+  "/projects/{projectId}/nodes" => ["get"],
+  "/projects/{projectId}/nodes/{nodeId}/complete" => ["post"],
+  "/projects/{projectId}/nodes/{nodeId}/rollback" => ["post"],
+  "/projects/{projectId}/nodes/{nodeId}/owner" => ["put"],
+  "/projects/{projectId}/nodes/{nodeId}/schedule" => ["put"],
+  "/projects/{projectId}/milestones" => ["get", "post"], "/projects/{projectId}/milestones/{id}" => ["put", "delete"],
+  "/projects/{projectId}/members" => ["get", "post"], "/projects/{projectId}/members/{memberId}" => ["delete"],
+  "/projects/{projectId}/followers" => ["get"],
+  "/projects/{projectId}/comments" => ["get", "post"], "/comments/{id}" => ["delete"],
+  "/projects/images" => ["post"], "/projects/images/{filename}" => ["get"],
+  "/admin/org/tree" => ["get"], "/org/tree" => ["get"], "/admin/org" => ["post"],
+  "/admin/org/{id}" => ["put", "delete"], "/admin/org/{id}/move" => ["put"],
+  "/admin/users" => ["get"], "/admin/users/invite" => ["post"], "/admin/users/page" => ["get"],
+  "/admin/users/{id}/primary-position" => ["put"], "/admin/users/{id}/part-time-positions" => ["post"],
+  "/admin/users/{id}/part-time-positions/{positionId}" => ["delete"],
+  "/admin/users/{id}/roles/{roleId}" => ["post", "delete"], "/admin/users/{id}/disable" => ["post"],
+  "/admin/roles" => ["get", "post"], "/admin/roles/{id}" => ["put", "delete"],
   "/admin/import/preview/organizations" => ["post"], "/admin/import/preview/users" => ["post"],
-  "/admin/import/{jobId}/commit" => ["post"], "/admin/audit" => ["get"],
-  "/health" => ["get"], "/health/live" => ["get"]
+  "/admin/import/{jobId}/commit" => ["post"],
+  "/admin/import/template/organizations.csv" => ["get"], "/admin/import/template/users.csv" => ["get"],
+  "/admin/audit" => ["get"],
+  "/health" => ["get"], "/healthz" => ["get"], "/health/ready" => ["get"], "/health/live" => ["get"]
 }
 expected.each do |route, methods|
   abort "route missing: #{route}" unless paths.key?(route)
@@ -43,13 +65,35 @@ with open(sys.argv[1], encoding="utf-8") as handle:
 if not str(value.get("openapi", "")).startswith("3.") or not value.get("paths"):
     raise SystemExit("invalid OpenAPI contract")
 expected = {
-    "/auth/login": {"post"}, "/auth/refresh": {"post"}, "/auth/me": {"get"},
+    "/auth/login": {"post"}, "/auth/refresh": {"post"}, "/auth/logout": {"post"},
+    "/auth/me": {"get"}, "/auth/password/change": {"post"}, "/auth/activate": {"post"},
+    "/auth/password-reset/request": {"post"}, "/auth/password-reset/confirm": {"post"},
+    "/users/search": {"get"},
     "/projects/page": {"post"}, "/projects": {"post"}, "/projects/{id}": {"get", "put", "delete"},
-    "/admin/org/tree": {"get"}, "/org/tree": {"get"}, "/admin/org": {"post"}, "/admin/users": {"get"},
-    "/admin/users/invite": {"post"}, "/admin/roles": {"get"},
+    "/projects/stats": {"get"}, "/projects/{id}/terminate": {"post"}, "/projects/{id}/restore": {"post"},
+    "/projects/{projectId}/tasks": {"get", "post"}, "/tasks/{id}": {"put", "delete"}, "/tasks/{id}/move": {"put"},
+    "/projects/{projectId}/nodes": {"get"},
+    "/projects/{projectId}/nodes/{nodeId}/complete": {"post"},
+    "/projects/{projectId}/nodes/{nodeId}/rollback": {"post"},
+    "/projects/{projectId}/nodes/{nodeId}/owner": {"put"},
+    "/projects/{projectId}/nodes/{nodeId}/schedule": {"put"},
+    "/projects/{projectId}/milestones": {"get", "post"}, "/projects/{projectId}/milestones/{id}": {"put", "delete"},
+    "/projects/{projectId}/members": {"get", "post"}, "/projects/{projectId}/members/{memberId}": {"delete"},
+    "/projects/{projectId}/followers": {"get"},
+    "/projects/{projectId}/comments": {"get", "post"}, "/comments/{id}": {"delete"},
+    "/projects/images": {"post"}, "/projects/images/{filename}": {"get"},
+    "/admin/org/tree": {"get"}, "/org/tree": {"get"}, "/admin/org": {"post"},
+    "/admin/org/{id}": {"put", "delete"}, "/admin/org/{id}/move": {"put"},
+    "/admin/users": {"get"}, "/admin/users/invite": {"post"}, "/admin/users/page": {"get"},
+    "/admin/users/{id}/primary-position": {"put"}, "/admin/users/{id}/part-time-positions": {"post"},
+    "/admin/users/{id}/part-time-positions/{positionId}": {"delete"},
+    "/admin/users/{id}/roles/{roleId}": {"post", "delete"}, "/admin/users/{id}/disable": {"post"},
+    "/admin/roles": {"get", "post"}, "/admin/roles/{id}": {"put", "delete"},
     "/admin/import/preview/organizations": {"post"}, "/admin/import/preview/users": {"post"},
-    "/admin/import/{jobId}/commit": {"post"}, "/admin/audit": {"get"},
-    "/health": {"get"}, "/health/live": {"get"},
+    "/admin/import/{jobId}/commit": {"post"},
+    "/admin/import/template/organizations.csv": {"get"}, "/admin/import/template/users.csv": {"get"},
+    "/admin/audit": {"get"},
+    "/health": {"get"}, "/healthz": {"get"}, "/health/ready": {"get"}, "/health/live": {"get"},
 }
 for route, methods in expected.items():
     if route not in value["paths"]:

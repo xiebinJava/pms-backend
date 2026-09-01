@@ -1,15 +1,20 @@
 openapi: 3.0.3
 info:
   title: PMS 项目管理 API
-  version: 0.1.0
+  version: 1.0.0
   description: 单企业私有化部署的项目、组织和权限管理接口。
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
 servers:
   - url: /api
 tags:
   - name: 认证
   - name: 项目
+  - name: 任务与节点
   - name: 组织与权限
   - name: 导入与审计
+  - name: 健康检查
 paths:
   /auth/login:
     post:
@@ -47,6 +52,25 @@ paths:
                 $ref: '#/components/schemas/ApiResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [认证]
+      summary: 退出并撤销当前刷新会话
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/password/change:
+    post:
+      tags: [认证]
+      summary: 修改当前用户密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /auth/me:
     get:
       tags: [认证]
@@ -56,6 +80,56 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /auth/activate:
+    post:
+      tags: [认证]
+      security: []
+      summary: 使用邀请令牌激活账号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /auth/password-reset/request:
+    post:
+      tags: [认证]
+      security: []
+      summary: 申请密码重置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/password-reset/confirm:
+    post:
+      tags: [认证]
+      security: []
+      summary: 确认密码重置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /users/search:
+    get:
+      tags: [组织与权限]
+      summary: 按姓名或邮箱搜索用户
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /projects/page:
     post:
       tags: [项目]
@@ -112,6 +186,281 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/stats:
+    get:
+      tags: [项目]
+      summary: 项目统计
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /projects/{id}/terminate:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [项目]
+      summary: 终止项目
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [项目]
+      summary: 恢复已终止项目
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [任务与节点]
+      summary: 项目任务列表
+      parameters:
+        - name: nodeId
+          in: query
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [任务与节点]
+      summary: 新建任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [任务与节点]
+      summary: 更新任务
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [任务与节点]
+      summary: 删除任务
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}/move:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [任务与节点]
+      summary: 拖拽变更任务状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/nodes:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [任务与节点]
+      summary: 项目节点列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/nodes/{nodeId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 完成节点
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/rollback:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 回滚节点
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/owner:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    put:
+      tags: [任务与节点]
+      summary: 设置节点负责人
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/nodes/{nodeId}/schedule:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    put:
+      tags: [任务与节点]
+      summary: 更新节点排期
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/milestones:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [任务与节点]
+      summary: 里程碑列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [任务与节点]
+      summary: 新建里程碑
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/milestones/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [任务与节点]
+      summary: 更新里程碑
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [任务与节点]
+      summary: 删除里程碑
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/members:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [项目]
+      summary: 项目成员列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [项目]
+      summary: 添加项目成员
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/members/{memberId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: memberId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [项目]
+      summary: 移除项目成员
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/followers:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [项目]
+      summary: 项目关注人列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [项目]
+      summary: 项目动态列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [项目]
+      summary: 发布项目动态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /comments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [项目]
+      summary: 删除动态
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/images:
+    post:
+      tags: [项目]
+      summary: 上传项目图片
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /projects/images/{filename}:
+    parameters:
+      - name: filename
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [项目]
+      summary: 读取项目图片
+      responses:
+        '200': { description: 图片二进制 }
+        '404': { $ref: '#/components/responses/NotFound' }
   /admin/org/tree:
     get:
       tags: [组织与权限]
@@ -138,6 +487,36 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/org/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 更新组织单元
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [组织与权限]
+      summary: 停用组织单元
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/org/{id}/move:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 移动组织节点
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
   /admin/users:
     get:
       tags: [组织与权限]
@@ -157,10 +536,109 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /admin/users/page:
+    get:
+      tags: [组织与权限]
+      summary: 人员分页
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users/{id}/primary-position:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 设置主归属
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/part-time-positions:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [组织与权限]
+      summary: 添加兼职归属
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/part-time-positions/{positionId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: positionId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [组织与权限]
+      summary: 移除兼职归属
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/roles/{roleId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: roleId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      tags: [组织与权限]
+      summary: 授予角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [组织与权限]
+      summary: 撤销角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/disable:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [组织与权限]
+      summary: 停用账号并撤销会话
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
   /admin/roles:
     get:
       tags: [组织与权限]
       summary: 查询角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [组织与权限]
+      summary: 创建角色
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/roles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 更新角色
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [组织与权限]
+      summary: 删除角色
       responses:
         '200': { $ref: '#/components/responses/Success' }
   /admin/import/preview/organizations:
@@ -207,6 +685,18 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /admin/import/template/organizations.csv:
+    get:
+      tags: [导入与审计]
+      summary: 下载组织导入模板
+      responses:
+        '200': { description: CSV 模板 }
+  /admin/import/template/users.csv:
+    get:
+      tags: [导入与审计]
+      summary: 下载员工导入模板
+      responses:
+        '200': { description: CSV 模板 }
   /admin/audit:
     get:
       tags: [导入与审计]
@@ -216,7 +706,23 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
   /health:
     get:
-      tags: [认证]
+      tags: [健康检查]
+      security: []
+      summary: 就绪探针
+      responses:
+        '200': { description: 数据库和迁移就绪 }
+        '503': { description: 服务未就绪 }
+  /healthz:
+    get:
+      tags: [健康检查]
+      security: []
+      summary: 就绪探针别名
+      responses:
+        '200': { description: 数据库和迁移就绪 }
+        '503': { description: 服务未就绪 }
+  /health/ready:
+    get:
+      tags: [健康检查]
       security: []
       summary: 就绪探针
       responses:
@@ -224,7 +730,7 @@ paths:
         '503': { description: 服务未就绪 }
   /health/live:
     get:
-      tags: [认证]
+      tags: [健康检查]
       security: []
       summary: 存活探针
       responses:
@@ -238,6 +744,16 @@ components:
   parameters:
     Id:
       name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    NodeId:
+      name: nodeId
       in: path
       required: true
       schema: { type: integer, format: int64 }

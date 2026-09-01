@@ -15,7 +15,7 @@ RUN apt-get update \
     && useradd --system --uid 10001 --create-home pms \
     && mkdir -p /var/lib/pms/uploads \
     && chown -R 10001:10001 /var/lib/pms
-COPY --from=build /workspace/target/pms-backend-0.1.0.jar /app/pms-backend.jar
+COPY --from=build /workspace/target/pms-backend-1.0.0.jar /app/pms-backend.jar
 COPY docker/healthcheck-backend.sh /usr/local/bin/healthcheck-backend.sh
 RUN chmod 0755 /usr/local/bin/healthcheck-backend.sh
 USER 10001
