@@ -79,6 +79,8 @@ class OceanbaseUpgradeScriptTest {
         assertThat(backup).contains("skip-add-drop-table");
         assertThat(backup).contains("skip-lock-tables");
         assertThat(backup).contains("SELECT COUNT(*) FROM");
+        assertThat(backup).contains("ORDER BY CAST(version AS UNSIGNED) DESC");
+        assertThat(backup).contains("--execute \"$1\" < /dev/null");
         assertThat(backup).doesNotContain("table_rows");
         assertThat(restore).contains("--allow-empty-target");
         assertThat(restore).contains("verify-backup.sh");

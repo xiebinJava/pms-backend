@@ -2,6 +2,21 @@
 
 适用于单企业本地部署的正式发布。发布前复制本清单，在目标环境逐项记录结果。
 
+## 2026-09-01 本机目标实例执行快照
+
+以下是本次本机 OceanBase `brad_pms` 演练的实际结果，不替代目标企业生产签字：
+
+- [x] 后端 `mvn -q test`：186 个用例通过，0 失败、0 错误、1 跳过。
+- [x] 前端 `pnpm test`：111 项通过；`pnpm typecheck`、`pnpm build` 通过。
+- [x] OceanBase V1–V10 两次幂等升级、企业迁移校验和完整性预检通过。
+- [x] v10 逻辑备份、压缩流、SHA-256 和全表精确行数元数据通过；恢复到隔离空库并完成 5 张关键表行数比对。
+- [x] 后端 liveness/readiness 均返回 200；readiness `database=UP`、`migration=10`。
+- [x] 本地邮箱登录、Playwright 桌面主流程、390px 窄屏和使用手册录制通过。
+- [ ] 跨仓库 CI：待恢复 GitHub 认证并配置后端 Secret `PMS_FRONT_REPO_READ_TOKEN` 后重跑。
+- [ ] 生产环境注入强 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储、监控告警，并记录 RPO/RTO 和故障联系人。
+
+详细命令、校验值和行数证据见 [`drill-records/2026-09-01-release-acceptance.md`](drill-records/2026-09-01-release-acceptance.md)。
+
 ## 代码与构建
 
 - [ ] 后端使用 Java 17，执行 `mvn -q test` 全部通过。

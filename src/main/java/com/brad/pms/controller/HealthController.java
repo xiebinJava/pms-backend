@@ -17,7 +17,8 @@ import java.util.Map;
 /** Minimal liveness/readiness probe for self-hosted deployments. */
 @RestController
 public class HealthController {
-    private static final int LATEST_MIGRATION_VERSION = 7;
+    /** Keep readiness aligned with the highest checked-in OceanBase migration. */
+    private static final int LATEST_MIGRATION_VERSION = 10;
 
     private final DataSource dataSource;
     private final int expectedMigrationVersion;

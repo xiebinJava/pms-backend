@@ -9,20 +9,20 @@
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
 | OceanBase `brad_pms` | V1–V10 已执行并复核 | 使用 `pms_migrator` 连续执行两次版本升级，均完成 checksum 校验并返回无待执行版本；V7 邮箱唯一索引、V8 任务附件、V9 站内通知、V10 通知节点标识及关键表结构、外键和数据范围预检通过 |
-| 后端回归 | 已通过 | `mvn -q test`，186 个用例通过（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试 |
-| 前端回归 | 已通过 | `pnpm test`，111 项通过（当前 `main` 提交 `eb8e4e8`） |
+| 后端回归 | 已通过 | `mvn -q test`，186 个用例通过（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试；健康检查期望迁移版本已与 V10 对齐 |
+| 前端回归 | 已通过 | `pnpm test`，111 项通过（当前本地 `main` 含验收 locale 稳定性和验收快照提交 `777e481`） |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 发布基线 | 本地已收口，远程集成待凭据 | `v1.0.0` 标签仍指向后端 `7cc2820` / 前端 `1519e887`；当前本地 `main` 为后端 `88e06d9`、前端 `eb8e4e8`，均已提交但尚未推送；远程不使用 `master` |
+| 发布基线 | 本地已收口，远程集成待凭据 | `v1.0.0` 标签仍指向后端 `7cc2820` / 前端 `1519e887`；当前本地 `main` 已包含 V10 健康检查、备份修复和 Playwright locale 稳定性提交，均已提交但尚未推送；远程不使用 `master` |
 
 ## 仍需完成
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
 | P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V10 升级幂等、preflight、verify、逻辑备份、隔离空库恢复、数据比对和停库恢复演练；生产仍需按企业 RPO/RTO 保存介质与联系人 |
-| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | checkout 已更新为当前前端 `main` 提交 `47577fe`；需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务，该 Secret 不能由代码代填 |
+| P1 | CI、E2E、镜像扫描和 SBOM 已配置；本次集成流水线仍缺跨仓库只读凭据 | checkout 已更新为当前前端 `main` 提交 `777e481`；需要在后端仓库配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑集成任务，该 Secret 不能由代码代填 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 已收口能力
@@ -51,13 +51,13 @@
 | --- | --- | --- |
 | Task 0：基线盘点与文档状态对齐 | 已完成 | 当前后端 `mvn -q test` 186 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 111 项、`pnpm typecheck`、`pnpm build` 通过；脚本 `bash -n` 和隐私扫描通过；本地提交为后端 `88e06d9`、前端 `eb8e4e8`。 |
 | Task 1：OceanBase 运行账号隔离 | 已完成 | 配置测试通过；Compose 解析通过；本地 OceanBase 已创建 `pms_app` / `pms_migrator`；应用账号建表被拒绝、迁移账号 DDL 通过；探针表已清理。 |
-| Task 2：OceanBase 备份、恢复与版本升级 | 已完成本机演练 | 升级脚本 V1–V10 checksum、逐语句检查点、命名锁、现有 `brad_pms` 二次幂等运行、精确行数逻辑备份、SHA-256、隔离空库恢复、源库/恢复库数据比对和停库恢复均通过；详见演练记录。 |
+| Task 2：OceanBase 备份、恢复与版本升级 | 已完成本机演练 | 2026-09-01 重新执行 V1–V10 checksum/幂等、精确行数逻辑备份、SHA-256、隔离空库恢复和关键表比对；备份版本标记与全表元数据问题已修复；详见最新演练记录。 |
 | Task 3：统一安全边界、错误响应和请求链路 | 已完成 | 后端全量测试、前端 111 项 Node 测试、`pnpm typecheck`、`pnpm build` 通过；覆盖 400/401/403/409/422/500/429、requestId、刷新失败跳转、代理转发和敏感接口限流；提交见安全边界提交。 |
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
-| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 本地门禁通过，跨仓库集成待凭据 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 和 SPDX SBOM；本机 Playwright 桌面/390px 各 1 条通过；远程集成仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库。 |
-| Task 8：生产演练与开源交付 | 本机演练完成，生产注入待目标企业 | OceanBase V1–V10、备份/恢复/故障演练和本机应用验收已记录；生产 JWT、SMTP、HTTPS、CORS、对象存储与监控告警需由部署企业注入并复验。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 本地门禁通过，跨仓库集成待凭据 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；后端 CI `33352990972` 已通过测试、Trivy HIGH/CRITICAL 和 SPDX SBOM；2026-09-01 本机 Playwright 桌面/390px 2 项及使用手册录制 1 项通过；远程集成仍需要后端 secret `PMS_FRONT_REPO_READ_TOKEN` 读取私有前端仓库。 |
+| Task 8：生产演练与开源交付 | 本机演练完成，生产注入待目标企业 | OceanBase V1–V10、备份/恢复、应用健康检查、邮箱登录和本机 Playwright 验收已记录；生产 JWT、SMTP、HTTPS、CORS、对象存储与监控告警需由部署企业注入并复验。 |
 
 ## 2026-08-31 合并后收口执行记录
 
@@ -73,7 +73,7 @@
 
 - 后端 `v1.0.0` 标签：`7cc2820`，已合并 `codex/oceanbase-migration`；标签之后仅追加文档收口提交。
 - 前端 `v1.0.0` 标签：`1519e88736d2d9fe19c1e436b8a96cd66b1457bf`，已合并 `codex/pms-design-system`，并包含邮箱身份 E2E 修正。
-- 后端集成工作流已固定本次前端发布提交 `47577fe47030dce8b15217a00168c937a28e49f2`；远程主分支名称为 `main`，没有 `master`。
+- 后端集成工作流已固定本次前端验收提交 `777e481f30a2be1f46a8ae253f19121012c865ec`；远程主分支名称为 `main`，没有 `master`。
 
 ### Task 2：本地门禁与远程 CI
 
@@ -82,7 +82,7 @@
 - H2 运行配置扫描和私钥材料扫描：通过。
 - 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
 - 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端升级后 CI `33352990972` 已通过单元测试、OpenAPI、H2/密钥扫描、后端镜像 Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。
-- 最新集成运行 `33350901997` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代；本次代码已将前端 checkout 更新为当前提交 `47577fe`，配置 Secret 后需重新运行。
+- 最新集成运行 `33350901997` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代；本次代码已将前端 checkout 更新为当前提交 `777e481`，配置 Secret 后需重新运行。
 - 后端镜像扫描已完成受控修复：Spring Boot 3.5.14、Spring Framework 6.2.19、Tomcat 11.0.22、MyBatis-Plus 3.5.17、Jackson 2.21.4、Micrometer 1.15.12、Logback 1.5.18、Connector/J 9.4.0，并迁移到 Jakarta Servlet/Validation；本地完整测试与远程 Trivy/SBOM 均通过。
 
 #### 依赖安全升级 Review（2026-08-31）
@@ -102,9 +102,9 @@
 
 - 已通过现有 `pms-oceanbase` 容器内的 `obclient` 完成只读 `SELECT 1` 连通性确认。
 - `enterprise-preflight.sh` 和 `verify-enterprise-migration.sh` 已在同一 OceanBase 容器内通过；使用官方镜像内 `/u01/obclient/bin/mysqldump` 完成 gzip 备份、SHA-256 校验、精确行数元数据和隔离空库恢复，源库/恢复库关键表行数一致。
-- 详细证据和安全边界见 [`drill-records/2026-08-31-oceanbase-recovery.md`](drill-records/2026-08-31-oceanbase-recovery.md) 与 [`drill-records/2026-08-31-migration-v7.md`](drill-records/2026-08-31-migration-v7.md)。在具备客户端/镜像缓存和明确空目标库前，不对现有 `brad_pms` 执行恢复。
+- 详细证据和安全边界见最新 [`drill-records/2026-09-01-release-acceptance.md`](drill-records/2026-09-01-release-acceptance.md) 以及历史记录。恢复仅写入明确空目标库，不对现有 `brad_pms` 执行覆盖式恢复。
 
 ### Task 5：目标环境应用验收
 
-- 本机后端 `8080`、前端 `57979` 已启动并使用非生产测试账号完成邮箱登录；Playwright 桌面和 390px 窄屏冒烟均通过，健康检查返回 migration=7。详细证据见 [`drill-records/2026-08-31-application-acceptance.md`](drill-records/2026-08-31-application-acceptance.md)。
+- 本机后端 `8080`、前端 `57979` 已启动并使用非生产演示账号完成邮箱登录；Playwright 桌面主流程、390px 窄屏和使用手册录制均通过，健康检查返回 migration=10。历史验收记录中的 migration=7 保留不变。详细证据见 [`drill-records/2026-09-01-release-acceptance.md`](drill-records/2026-09-01-release-acceptance.md)。
 - 生产目标环境仍需使用企业测试账号、正式 HTTPS/CORS/SMTP 配置复验；本地账号密码不写入文档或 CI。

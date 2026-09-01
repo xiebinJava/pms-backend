@@ -46,9 +46,9 @@ container_mysql() {
 }
 sql() {
   if [[ "$SQL_CLIENT" == "container" ]]; then
-    container_mysql --execute "$1"
+    container_mysql --execute "$1" < /dev/null
   else
-    MYSQL_PWD="$OCEANBASE_PASSWORD" "$SQL_CLIENT" "${mysql_base[@]}" --execute "$1"
+    MYSQL_PWD="$OCEANBASE_PASSWORD" "$SQL_CLIENT" "${mysql_base[@]}" --execute "$1" < /dev/null
   fi
 }
 
@@ -61,7 +61,9 @@ else
   exit 2
 fi
 
-schema_version="$(sql "SELECT COALESCE(MAX(version), 'baseline') FROM pms_schema_migration_history;" 2>/dev/null || sql "SELECT COALESCE(MAX(version), 'baseline') FROM flyway_schema_history WHERE success=1;" 2>/dev/null || echo unknown)"
+# Migration versions are stored as strings (for example, 9 and 10). Sort by
+# their numeric value so a V10 backup is never mislabeled as V9 by lexical MAX.
+schema_version="$(sql "SELECT COALESCE((SELECT version FROM pms_schema_migration_history ORDER BY CAST(version AS UNSIGNED) DESC LIMIT 1), 'baseline');" 2>/dev/null || sql "SELECT COALESCE((SELECT version FROM flyway_schema_history WHERE success=1 ORDER BY CAST(version AS UNSIGNED) DESC LIMIT 1), 'baseline');" 2>/dev/null || echo unknown)"
 schema_version="$(printf '%s' "$schema_version" | tr -cd 'A-Za-z0-9._-')"
 schema_version="${schema_version:-unknown}"
 backup_dir="${PMS_BACKUP_DIR:-$PROJECT_DIR/backups}"

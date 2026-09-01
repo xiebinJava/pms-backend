@@ -15,12 +15,12 @@ import static org.mockito.Mockito.when;
 class HealthControllerTest {
 
     @Test
-    void defaultReadinessExpectsLatestEmailIdentityMigration() throws Exception {
+    void defaultReadinessExpectsLatestEnterpriseMigration() throws Exception {
         HealthController controller = new HealthController(mock(DataSource.class));
         Field field = HealthController.class.getDeclaredField("expectedMigrationVersion");
         field.setAccessible(true);
 
-        assertThat(field.getInt(controller)).isEqualTo(7);
+        assertThat(field.getInt(controller)).isEqualTo(10);
     }
 
     @Test
