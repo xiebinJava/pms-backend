@@ -10,6 +10,7 @@ public record WebhookEvent(
         Instant occurredAt,
         Long projectId,
         Long taskId,
+        Long nodeId,
         Long actorId,
         List<Long> recipientIds,
         String title,
@@ -17,12 +18,18 @@ public record WebhookEvent(
 ) {
     public static WebhookEvent of(String type, Long projectId, Long taskId, Long actorId,
                                   List<Long> recipientIds, String title, String content) {
+        return of(type, projectId, taskId, null, actorId, recipientIds, title, content);
+    }
+
+    public static WebhookEvent of(String type, Long projectId, Long taskId, Long nodeId, Long actorId,
+                                  List<Long> recipientIds, String title, String content) {
         return new WebhookEvent(
                 UUID.randomUUID().toString(),
                 type,
                 Instant.now(),
                 projectId,
                 taskId,
+                nodeId,
                 actorId,
                 recipientIds == null ? List.of() : List.copyOf(recipientIds),
                 title,

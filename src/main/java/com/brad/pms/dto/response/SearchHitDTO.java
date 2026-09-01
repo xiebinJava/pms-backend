@@ -11,4 +11,5 @@ public class SearchHitDTO {
     private String title;
     private String snippet;
     private Long taskId;
+    private Long milestoneId;
 }

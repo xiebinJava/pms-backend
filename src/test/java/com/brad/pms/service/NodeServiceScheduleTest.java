@@ -30,6 +30,7 @@ class NodeServiceScheduleTest {
     @Mock UserService userService;
     @Mock ProjectPermissionService permissionService;
     @Mock ProjectLifecycleLogMapper lifecycleLogMapper;
+    @Mock NotificationService notificationService;
 
     @InjectMocks NodeService nodeService;
 

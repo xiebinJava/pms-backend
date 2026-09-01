@@ -5,9 +5,11 @@ import com.brad.pms.dto.response.SearchHitDTO;
 import com.brad.pms.dto.response.SearchResultDTO;
 import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.ProjectDO;
+import com.brad.pms.entity.ProjectMilestoneDO;
 import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectMapper;
+import com.brad.pms.mapper.ProjectMilestoneMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,7 @@ public class SearchService {
     private final ProjectService projectService;
     private final ProjectMapper projectMapper;
     private final ProjectTaskMapper taskMapper;
+    private final ProjectMilestoneMapper milestoneMapper;
     private final ProjectCommentMapper commentMapper;
 
     public SearchResultDTO search(String query, int limit) {
@@ -52,13 +55,19 @@ public class SearchService {
                         .or().like(ProjectTaskDO::getDescription, keyword))
                 .orderByDesc(ProjectTaskDO::getUpdatedAt)
                 .last("LIMIT " + size));
+        List<ProjectMilestoneDO> milestones = milestoneMapper.selectList(new LambdaQueryWrapper<ProjectMilestoneDO>()
+                .in(ProjectMilestoneDO::getProjectId, projectIds)
+                .and(wrapper -> wrapper.like(ProjectMilestoneDO::getTitle, keyword)
+                        .or().like(ProjectMilestoneDO::getDescription, keyword))
+                .orderByDesc(ProjectMilestoneDO::getUpdatedAt)
+                .last("LIMIT " + size));
         List<ProjectCommentDO> comments = commentMapper.selectList(new LambdaQueryWrapper<ProjectCommentDO>()
                 .in(ProjectCommentDO::getProjectId, projectIds)
                 .like(ProjectCommentDO::getContent, keyword)
                 .orderByDesc(ProjectCommentDO::getCreatedAt)
                 .last("LIMIT " + size));
 
-        Map<Long, ProjectDO> names = projectNames(projectIds, projects, tasks, comments);
+        Map<Long, ProjectDO> names = projectNames(projectIds, projects, tasks, milestones, comments);
         result.setProjects(projects.stream().map(project -> {
             SearchHitDTO hit = new SearchHitDTO();
             hit.setId(project.getId());
@@ -78,6 +87,18 @@ public class SearchService {
             hit.setTaskId(task.getId());
             return hit;
         }).collect(Collectors.toList()));
+        result.setMilestones(milestones.stream().map(milestone -> {
+            SearchHitDTO hit = new SearchHitDTO();
+            hit.setId(milestone.getId());
+            hit.setProjectId(milestone.getProjectId());
+            hit.setProjectName(nameOf(names, milestone.getProjectId()));
+            hit.setTitle(milestone.getTitle());
+            hit.setSnippet(milestone.getDueDate() != null
+                    ? milestone.getDueDate().toString()
+                    : NotificationService.truncate(milestone.getDescription(), 80));
+            hit.setMilestoneId(milestone.getId());
+            return hit;
+        }).collect(Collectors.toList()));
         result.setComments(comments.stream().map(comment -> {
             SearchHitDTO hit = new SearchHitDTO();
             hit.setId(comment.getId());
@@ -94,10 +115,13 @@ public class SearchService {
     private Map<Long, ProjectDO> projectNames(List<Long> readableIds,
                                               List<ProjectDO> matchedProjects,
                                               List<ProjectTaskDO> tasks,
+                                              List<ProjectMilestoneDO> milestones,
                                               List<ProjectCommentDO> comments) {
-        List<Long> extra = Stream.concat(
+        List<Long> extra = Stream.of(
                         tasks.stream().map(ProjectTaskDO::getProjectId),
+                        milestones.stream().map(ProjectMilestoneDO::getProjectId),
                         comments.stream().map(ProjectCommentDO::getProjectId))
+                .flatMap(stream -> stream)
                 .filter(Objects::nonNull)
                 .distinct()
                 .filter(id -> matchedProjects.stream().noneMatch(project -> Objects.equals(project.getId(), id)))

@@ -38,11 +38,15 @@ export PMS_INVITATION_EXPOSE_TOKEN=false
 
 ## 出站 Webhook
 
-任务指派和评论在写入站内收件箱后，可额外向企业自己的接收地址 POST 一条 JSON。
+任务指派、评论、节点完成和节点回滚在写入站内收件箱后，可额外向企业自己的接收地址 POST 一条 JSON。项目评论和节点事件会发给项目经理、相关节点负责人和关注人。
 默认关闭。打开 `PMS_WEBHOOK_ENABLED=true` 后必须配置 `PMS_WEBHOOK_URL` 与至少 16 位的
 `PMS_WEBHOOK_SECRET`。生产环境 URL 必须是 HTTPS。请求头包含 `X-PMS-Event`、
 `X-PMS-Delivery` 和 `X-PMS-Signature: sha256=<HMAC-SHA256(body)>`。
 接收方应以 2xx 应答；非 2xx 或超时只写日志，不回滚站内通知。
+
+事件 JSON 会同时携带 `projectId`、`taskId` 和 `nodeId`（没有对应对象时为 `null`）。
+`NODE_COMPLETED` 与 `NODE_ROLLED_BACK` 必须使用 `nodeId` 定位项目流程节点，接收方可用它生成节点详情深链；
+旧事件类型仍按原字段处理。`recipientIds` 是站内通知收件人 ID 列表，不代表 Webhook 接收方权限。
 
 ## 运维检查
 

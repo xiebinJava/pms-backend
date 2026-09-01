@@ -13,6 +13,7 @@ public class UserNotificationDTO {
     private String content;
     private Long projectId;
     private Long taskId;
+    private Long nodeId;
     private Long actorId;
     private String actorName;
     private LocalDateTime readAt;

@@ -10,5 +10,6 @@ public class SearchResultDTO {
 
     private List<SearchHitDTO> projects = new ArrayList<>();
     private List<SearchHitDTO> tasks = new ArrayList<>();
+    private List<SearchHitDTO> milestones = new ArrayList<>();
     private List<SearchHitDTO> comments = new ArrayList<>();
 }

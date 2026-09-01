@@ -31,6 +31,15 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 ./scripts/verify-enterprise-migration.sh
 ```
 
+需要一次性完成“升级两次 + 完整预检”时，显式开启实时校验入口：
+
+```bash
+export PMS_OCEANBASE_VERIFY=true
+./scripts/verify-oceanbase.sh
+```
+
+该入口不会删除数据库或表；第二次升级必须输出所有版本 checksum 校验通过且无待执行迁移。
+
 `oceanbase-upgrade.sh` 会：
 
 1. 创建迁移历史、逐语句检查点和带 `pms-schema-upgrade` 名称的租约锁（默认 30 分钟），同一时间只允许一个升级进程；释放锁时校验 owner token，避免误清理其他进程的锁。
@@ -58,7 +67,7 @@ export PMS_BACKUP_DIR=/var/backups/pms
 备份使用一致性事务快照、跳过表锁/删除表语句和十六进制二进制值，不记录密码；默认使用迁移账号读取结构并支持恢复所需的建表权限。备份目录权限应为 `700`，并按企业策略加密、异地复制和定期清理。生成后必须执行：
 
 ```bash
-./scripts/verify-backup.sh /var/backups/pms/brad_pms-<UTC时间>-v7.sql.gz
+./scripts/verify-backup.sh /var/backups/pms/brad_pms-<UTC时间>-v10.sql.gz
 ```
 
 项目图片不在数据库备份文件中。生产环境还必须对 Compose 的 `pms-uploads` 卷或
@@ -74,7 +83,7 @@ export OCEANBASE_DATABASE=brad_pms_restore_YYYYMMDD
 export OCEANBASE_USER=pms_migrator
 export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 ./scripts/restore-oceanbase.sh --allow-empty-target \
-  /var/backups/pms/brad_pms-<UTC时间>-v7.sql.gz
+  /var/backups/pms/brad_pms-<UTC时间>-v10.sql.gz
 ./scripts/verify-enterprise-migration.sh
 ```
 
@@ -86,8 +95,8 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 
 本地 OceanBase 4.3.5 演练已验证：
 
-- 现有 `brad_pms` 的 V1–V7 被记录并可重复校验；第二次升级无待执行版本。
-- 备份压缩流和 SHA-256 校验通过，文件名带 `v7` 版本标识，元数据使用逐表 `COUNT(*)` 精确行数。
+- 现有 `brad_pms` 的 V1–V10 被记录并可重复校验；第二次升级无待执行版本。
+- 备份压缩流和 SHA-256 校验通过，文件名带 `v10` 版本标识，元数据使用逐表 `COUNT(*)` 精确行数。
 - 备份恢复到隔离空库后，企业迁移校验通过；源库与恢复库关键数据一致（2 个项目、21 个用户、9 个组织、6 个任务、18 条审计日志）。
 
 另外，在专用临时库 `brad_pms_upgrade_smoke_20260828` 中使用 `pms_migrator` 完成了从空库执行 V1–V6、再次执行升级（输出 `No pending migrations`）和清理临时库的回归；共生成 28 张表，未触碰现有 `brad_pms`。备份元数据使用逐表 `COUNT(*)` 精确行数，不使用 OceanBase 的估算 `table_rows`。

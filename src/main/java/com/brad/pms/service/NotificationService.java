@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -33,6 +34,8 @@ public class NotificationService {
     public static final String TASK_ASSIGNED = "TASK_ASSIGNED";
     public static final String TASK_COMMENTED = "TASK_COMMENTED";
     public static final String PROJECT_COMMENTED = "PROJECT_COMMENTED";
+    public static final String NODE_COMPLETED = "NODE_COMPLETED";
+    public static final String NODE_ROLLED_BACK = "NODE_ROLLED_BACK";
 
     static final int DEFAULT_LIMIT = 20;
     static final int MAX_LIMIT = 50;
@@ -42,12 +45,13 @@ public class NotificationService {
     private final UserNotificationMapper notificationMapper;
     private final ProjectService projectService;
     private final UserService userService;
+    private final FollowerService followerService;
     private final WebhookPublisher webhookPublisher;
 
     public void notifyTaskAssigned(Long projectId, Long taskId, String taskTitle, Long assigneeId) {
         Long actorId = UserContext.userId();
         String snippet = truncate(taskTitle, SNIPPET);
-        emit(assigneeId, TASK_ASSIGNED, "任务已指派给你", snippet, projectId, taskId, actorId);
+        emit(assigneeId, TASK_ASSIGNED, "任务已指派给你", snippet, projectId, taskId, null, actorId);
         webhookPublisher.publish(WebhookEvent.of(
                 TASK_ASSIGNED, projectId, taskId, actorId, recipients(assigneeId), "任务已指派给你", snippet));
     }
@@ -57,23 +61,61 @@ public class NotificationService {
         String actorName = actorDisplayName(actorId);
         String snippet = truncate(content, SNIPPET);
         if (taskId != null) {
-            emit(assigneeId, TASK_COMMENTED, actorName + " 评论了任务", snippet, projectId, taskId, actorId);
-            if (!Objects.equals(assigneeId, managerId)) {
-                emit(managerId, TASK_COMMENTED, actorName + " 评论了任务", snippet, projectId, taskId, actorId);
-            }
+            String title = actorName + " 评论了任务";
+            List<Long> targets = mergeRecipients(assigneeId, managerId);
+            targets.addAll(followerIds(projectId));
+            emitAll(targets, TASK_COMMENTED, title, snippet, projectId, taskId, null, actorId);
             webhookPublisher.publish(WebhookEvent.of(
-                    TASK_COMMENTED, projectId, taskId, actorId, recipients(assigneeId, managerId),
-                    actorName + " 评论了任务", snippet));
+                    TASK_COMMENTED, projectId, taskId, actorId, recipients(targets.toArray(Long[]::new)),
+                    title, snippet));
             return;
         }
-        emit(managerId, PROJECT_COMMENTED, actorName + " 评论了项目", snippet, projectId, null, actorId);
+        String title = actorName + " 评论了项目";
+        List<Long> targets = mergeRecipients(managerId);
+        targets.addAll(followerIds(projectId));
+        emitAll(targets, PROJECT_COMMENTED, title, snippet, projectId, null, null, actorId);
         webhookPublisher.publish(WebhookEvent.of(
-                PROJECT_COMMENTED, projectId, null, actorId, recipients(managerId),
-                actorName + " 评论了项目", snippet));
+                PROJECT_COMMENTED, projectId, null, actorId, recipients(targets.toArray(Long[]::new)),
+                title, snippet));
+    }
+
+    public void notifyNodeCompleted(Long projectId, Long nodeId, String nodeName,
+                                    Long managerId, Long ownerId, Long nextOwnerId) {
+        Long actorId = UserContext.userId();
+        String title = actorDisplayName(actorId) + " 完成了节点";
+        String snippet = truncate(nodeName, SNIPPET);
+        List<Long> targets = mergeRecipients(managerId, ownerId, nextOwnerId);
+        targets.addAll(followerIds(projectId));
+        emitAll(targets, NODE_COMPLETED, title, snippet, projectId, null, nodeId, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                NODE_COMPLETED, projectId, null, nodeId, actorId, recipients(targets.toArray(Long[]::new)),
+                title, snippet));
+    }
+
+    public void notifyNodeRolledBack(Long projectId, Long nodeId, String nodeName,
+                                     Long managerId, Long ownerId, String reason) {
+        Long actorId = UserContext.userId();
+        String title = actorDisplayName(actorId) + " 回滚了节点";
+        String detail = nodeName == null || nodeName.isBlank() ? "" : nodeName.trim();
+        if (reason != null && !reason.isBlank()) {
+            detail = detail.isEmpty() ? reason.trim() : detail + "：" + reason.trim();
+        }
+        String snippet = truncate(detail, SNIPPET);
+        List<Long> targets = mergeRecipients(managerId, ownerId);
+        targets.addAll(followerIds(projectId));
+        emitAll(targets, NODE_ROLLED_BACK, title, snippet, projectId, null, nodeId, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                NODE_ROLLED_BACK, projectId, null, nodeId, actorId, recipients(targets.toArray(Long[]::new)),
+                title, snippet));
     }
 
     public void emit(Long userId, String type, String title, String content,
                      Long projectId, Long taskId, Long actorId) {
+        emit(userId, type, title, content, projectId, taskId, null, actorId);
+    }
+
+    public void emit(Long userId, String type, String title, String content,
+                     Long projectId, Long taskId, Long nodeId, Long actorId) {
         if (userId == null || Objects.equals(userId, actorId)) return;
         UserNotificationDO row = new UserNotificationDO();
         row.setUserId(userId);
@@ -82,6 +124,7 @@ public class NotificationService {
         row.setContent(content);
         row.setProjectId(projectId);
         row.setTaskId(taskId);
+        row.setNodeId(nodeId);
         row.setActorId(actorId);
         notificationMapper.insert(row);
     }
@@ -158,6 +201,7 @@ public class NotificationService {
             dto.setContent(row.getContent());
             dto.setProjectId(row.getProjectId());
             dto.setTaskId(row.getTaskId());
+            dto.setNodeId(row.getNodeId());
             dto.setActorId(row.getActorId());
             dto.setActorName(Convertors.userDisplayName(actors.get(row.getActorId())));
             dto.setReadAt(row.getReadAt());
@@ -184,6 +228,22 @@ public class NotificationService {
     static int clamp(int limit, int fallback, int max) {
         if (limit < 1) return fallback;
         return Math.min(limit, max);
+    }
+
+    private void emitAll(List<Long> userIds, String type, String title, String content,
+                         Long projectId, Long taskId, Long nodeId, Long actorId) {
+        LinkedHashSet<Long> unique = new LinkedHashSet<>();
+        if (userIds != null) unique.addAll(userIds);
+        unique.forEach(userId -> emit(userId, type, title, content, projectId, taskId, nodeId, actorId));
+    }
+
+    private List<Long> followerIds(Long projectId) {
+        List<Long> ids = followerService.listUserIds(projectId);
+        return ids == null ? List.of() : ids;
+    }
+
+    private static List<Long> mergeRecipients(Long... ids) {
+        return new ArrayList<>(recipients(ids));
     }
 
     private static List<Long> recipients(Long... ids) {

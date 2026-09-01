@@ -17,7 +17,7 @@
 - [ ] 已完成数据库备份与恢复演练，并保存校验值。
 - [ ] 备份文件包含 schema 版本、`.sha256` 校验文件和元数据，恢复仅使用显式空目标库。
 - [ ] 执行 `scripts/enterprise-preflight.sh` 通过。
-- [ ] 按 V1–V7 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引以及 V7 的 `email_normalized` 唯一索引已落库。
+- [ ] 按 V1–V10 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知以及 V10 的通知节点标识已落库。
 - [ ] 执行迁移后 `scripts/verify-enterprise-migration.sh` 通过。
 - [ ] 生产应用只使用 `oceanbase` profile；H2 仅存在于测试配置。
 - [ ] 迁移失败时不直接删除业务表，按升级手册恢复到新数据库。

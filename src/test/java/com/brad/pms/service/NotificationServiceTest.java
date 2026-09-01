@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +39,7 @@ class NotificationServiceTest {
     @Mock UserNotificationMapper notificationMapper;
     @Mock ProjectService projectService;
     @Mock UserService userService;
+    @Mock FollowerService followerService;
     @Mock WebhookPublisher webhookPublisher;
 
     @InjectMocks NotificationService notificationService;
@@ -129,6 +131,76 @@ class NotificationServiceTest {
         verify(webhookPublisher).publish(webhook.capture());
         assertThat(webhook.getValue().type()).isEqualTo(NotificationService.TASK_COMMENTED);
         assertThat(webhook.getValue().recipientIds()).containsExactly(7L, 8L);
+    }
+
+    @Test
+    void notifyCommentAlsoWritesInboxForProjectFollowers() {
+        UserDO actor = new UserDO();
+        actor.setId(7L);
+        actor.setUsername("Alex.Zhang");
+        actor.setNameZh("张伟");
+        when(userService.listByIds(any())).thenReturn(List.of(actor));
+        when(followerService.listUserIds(9L)).thenReturn(List.of(8L, 11L, 7L));
+
+        notificationService.notifyComment(9L, null, "先对齐接口", null, 8L);
+
+        ArgumentCaptor<UserNotificationDO> captor = ArgumentCaptor.forClass(UserNotificationDO.class);
+        verify(notificationMapper, times(2)).insert(captor.capture());
+        assertThat(captor.getAllValues()).extracting(UserNotificationDO::getUserId).containsExactly(8L, 11L);
+        assertThat(captor.getAllValues()).extracting(UserNotificationDO::getType)
+                .containsOnly(NotificationService.PROJECT_COMMENTED);
+        ArgumentCaptor<WebhookEvent> webhook = ArgumentCaptor.forClass(WebhookEvent.class);
+        verify(webhookPublisher).publish(webhook.capture());
+        assertThat(webhook.getValue().recipientIds()).containsExactly(8L, 11L, 7L);
+    }
+
+    @Test
+    void notifyNodeCompletedWritesInboxForManagerOwnerAndFollowers() {
+        UserDO actor = new UserDO();
+        actor.setId(7L);
+        actor.setUsername("Alex.Zhang");
+        actor.setNameZh("张伟");
+        when(userService.listByIds(any())).thenReturn(List.of(actor));
+        when(followerService.listUserIds(9L)).thenReturn(List.of(11L));
+
+        notificationService.notifyNodeCompleted(9L, 4L, "需求澄清与范围基线", 8L, 8L, 12L);
+
+        ArgumentCaptor<UserNotificationDO> captor = ArgumentCaptor.forClass(UserNotificationDO.class);
+        verify(notificationMapper, times(3)).insert(captor.capture());
+        assertThat(captor.getAllValues()).extracting(UserNotificationDO::getUserId)
+                .containsExactly(8L, 12L, 11L);
+        assertThat(captor.getAllValues()).extracting(UserNotificationDO::getType)
+                .containsOnly(NotificationService.NODE_COMPLETED);
+        assertThat(captor.getAllValues()).extracting(UserNotificationDO::getNodeId).containsOnly(4L);
+        ArgumentCaptor<WebhookEvent> webhook = ArgumentCaptor.forClass(WebhookEvent.class);
+        verify(webhookPublisher).publish(webhook.capture());
+        assertThat(webhook.getValue().type()).isEqualTo(NotificationService.NODE_COMPLETED);
+        assertThat(webhook.getValue().recipientIds()).containsExactly(8L, 12L, 11L);
+        assertThat(webhook.getValue().nodeId()).isEqualTo(4L);
+    }
+
+    @Test
+    void notifyNodeRolledBackKeepsTheReasonSnippet() {
+        UserDO actor = new UserDO();
+        actor.setId(7L);
+        actor.setUsername("Alex.Zhang");
+        actor.setNameZh("张伟");
+        when(userService.listByIds(any())).thenReturn(List.of(actor));
+        when(followerService.listUserIds(9L)).thenReturn(List.of());
+
+        notificationService.notifyNodeRolledBack(9L, 4L, "需求澄清与范围基线", 8L, 8L, "范围需要重评");
+
+        ArgumentCaptor<UserNotificationDO> captor = ArgumentCaptor.forClass(UserNotificationDO.class);
+        verify(notificationMapper).insert(captor.capture());
+        assertThat(captor.getValue().getUserId()).isEqualTo(8L);
+        assertThat(captor.getValue().getType()).isEqualTo(NotificationService.NODE_ROLLED_BACK);
+        assertThat(captor.getValue().getContent()).contains("范围需要重评");
+        assertThat(captor.getValue().getNodeId()).isEqualTo(4L);
+
+        ArgumentCaptor<WebhookEvent> webhook = ArgumentCaptor.forClass(WebhookEvent.class);
+        verify(webhookPublisher).publish(webhook.capture());
+        assertThat(webhook.getValue().type()).isEqualTo(NotificationService.NODE_ROLLED_BACK);
+        assertThat(webhook.getValue().nodeId()).isEqualTo(4L);
     }
 
     private static UserNotificationDO row(Long id, Long projectId, LocalDateTime readAt) {

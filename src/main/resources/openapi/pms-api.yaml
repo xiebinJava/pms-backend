@@ -247,7 +247,7 @@ paths:
   /search:
     get:
       tags: [项目]
-      summary: 在可读范围内搜索项目、任务和评论
+      summary: 在可读范围内搜索项目、任务、里程碑和评论
       parameters:
         - name: q
           in: query

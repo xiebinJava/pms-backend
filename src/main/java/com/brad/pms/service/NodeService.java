@@ -15,6 +15,8 @@ import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectLifecycleLogMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,12 @@ public class NodeService {
     private final UserService userService;
     private final ProjectPermissionService permissionService;
     private final ProjectLifecycleLogMapper lifecycleLogMapper;
+    private NotificationService notificationService;
+
+    @Autowired
+    public void setNotificationService(@Lazy NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
 
     /**
      * 项目默认节点（参考项目管理全景图：9 个阶段节点）
@@ -171,6 +179,13 @@ public class NodeService {
                 projectMapper.updateById(project);
             }
         }
+        notificationService.notifyNodeCompleted(
+                projectId,
+                node.getId(),
+                node.getName(),
+                project == null ? null : project.getProjectManagerId(),
+                node.getOwnerId(),
+                next == null ? null : next.getOwnerId());
         return list(projectId);
     }
 
@@ -243,6 +258,13 @@ public class NodeService {
             lifecycleLogMapper.insert(log);
         }
         refreshProgress(projectId);
+        notificationService.notifyNodeRolledBack(
+                projectId,
+                target.getId(),
+                target.getName(),
+                project == null ? null : project.getProjectManagerId(),
+                target.getOwnerId(),
+                reason);
         return list(projectId);
     }
 

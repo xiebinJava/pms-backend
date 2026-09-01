@@ -13,6 +13,7 @@ class OceanbaseUpgradeScriptTest {
 
     private static final List<String> SCRIPTS = List.of(
             "scripts/oceanbase-upgrade.sh",
+            "scripts/verify-oceanbase.sh",
             "scripts/backup-oceanbase.sh",
             "scripts/restore-oceanbase.sh",
             "scripts/verify-backup.sh"
@@ -54,6 +55,17 @@ class OceanbaseUpgradeScriptTest {
         assertThat(script).contains("PMS_MYSQL_TOOL_CLIENT");
         assertThat(script).contains("--entrypoint");
         assertThat(script).contains("\"$TOOL_CLIENT\"");
+    }
+
+    @Test
+    void verifyWorkflowRunsTheLiveOceanbaseChecksTwiceForIdempotency() throws Exception {
+        String script = Files.readString(Path.of("scripts/verify-oceanbase.sh"));
+
+        assertThat(script).contains("oceanbase-upgrade.sh");
+        assertThat(script).contains("enterprise-preflight.sh");
+        assertThat(script).contains("verify-enterprise-migration.sh");
+        assertThat(script).contains("PMS_OCEANBASE_VERIFY");
+        assertThat(script).contains("No database or table was dropped");
     }
 
     @Test

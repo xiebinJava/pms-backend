@@ -24,6 +24,8 @@ public class UserNotificationDO {
 
     private Long taskId;
 
+    private Long nodeId;
+
     private Long actorId;
 
     private LocalDateTime readAt;
