@@ -1,0 +1,26 @@
+PMS is a single-tenant chart. It does not install OceanBase.
+
+1. Build and load your own images before install:
+
+   docker build -t {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }} .
+   docker build -t {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }} ../pms-front
+
+2. Point backend.env.oceanbaseHost at an existing MySQL-compatible OceanBase
+   and inject secrets with --set-file or --set existingSecret=...
+
+3. The frontend image proxies /api to Service "{{ .Values.frontend.apiProxyHost }}".
+   Only one PMS release should use that name in a namespace.
+
+4. Actuator lives on ClusterIP port {{ .Values.backend.management.port }}.
+   Do not put that Service on an Ingress. Enable serviceMonitor only when
+   prometheus-operator is already in the cluster.
+
+{{- if .Values.ingress.enabled }}
+
+Browse https://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+
+Port-forward the frontend Service to try the UI:
+
+  kubectl port-forward svc/{{ include "pms.fullname" . }}-frontend 5173:{{ .Values.frontend.service.port }}
+{{- end }}

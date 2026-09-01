@@ -33,3 +33,4 @@ pnpm build
 - Match existing CQRS naming: Cmd / Qry / DTO / Service.
 - Keep OIDC/LDAP behind `PMS_OIDC_ENABLED` / `PMS_LDAP_ENABLED`. Do not auto-create users from a directory.
 - Keep object storage and webhooks behind `PMS_STORAGE_TYPE=s3` / `PMS_WEBHOOK_ENABLED`. Default local disk and no outbound events.
+- Helm and the Prometheus/Grafana overlay are optional. Do not change the default Actuator bind (`PMS_MANAGEMENT_ADDRESS=127.0.0.1`). Chart values stay on `example.com` hosts and placeholder secrets.

@@ -1,0 +1,101 @@
+# Chart ships backend + frontend only. Bring your own OceanBase
+# (MySQL-compatible) and point backend.env.oceanbaseHost at it.
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+backend:
+  replicaCount: 1
+  image:
+    repository: pms-backend
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  management:
+    port: 8081
+    service:
+      enabled: true
+      type: ClusterIP
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  env:
+    springProfilesActive: oceanbase
+    oceanbaseHost: oceanbase.example.com
+    oceanbasePort: "2881"
+    oceanbaseDatabase: brad_pms
+    oceanbaseUser: pms_app
+    corsAllowedOrigins: https://pms.example.com
+    publicBaseUrl: https://pms.example.com
+    deploymentEnv: production
+    storageType: local
+    uploadDir: /var/lib/pms/uploads
+    webhookEnabled: "false"
+    oidcEnabled: "false"
+    ldapEnabled: "false"
+    notificationStartupCheck: "true"
+    passwordResetExposeToken: "false"
+    invitationExposeToken: "false"
+  extraEnv: []
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: pms-front
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  # Baked nginx.conf proxies /api to this in-cluster DNS name.
+  apiProxyHost: backend
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: pms.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Prometheus Operator scrape of the private management port.
+# Leave off unless the cluster already runs prometheus-operator.
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+# Production should set existingSecret and leave these placeholders unused.
+# Required keys: jwtSecret, oceanbasePassword, bootstrapAdminEmail,
+# bootstrapAdminPassword, bootstrapAdminNameZh
+existingSecret: ""
+secret:
+  jwtSecret: replace_with_a_random_secret_at_least_32_bytes
+  oceanbasePassword: replace_with_pms_app_password
+  bootstrapAdminEmail: alex.zhang@example.com
+  bootstrapAdminPassword: replace_with_bootstrap_password_12_chars
+  bootstrapAdminNameZh: 张伟

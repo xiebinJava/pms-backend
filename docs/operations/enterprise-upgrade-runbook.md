@@ -117,7 +117,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
 `{"status":"UP","database":"UP"}`，数据库不可用返回 HTTP 503 与 `DOWN`。响应不包含
 连接串、SQL、密码或令牌。另有 `/api/health/live`（仅进程存活）和 `/api/health/ready`（数据库与迁移就绪），
-以及仅绑定管理地址/端口（默认容器内 `127.0.0.1:8081`）的 `/actuator/health`、`/actuator/metrics`。它们不会经过前端 `/api/**` 代理；如需内网监控，显式设置 `PMS_MANAGEMENT_ADDRESS` 与 `PMS_MANAGEMENT_PORT`，并只在内网发布该端口。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
+以及仅绑定管理地址/端口（默认容器内 `127.0.0.1:8081`）的 `/actuator/health`、`/actuator/metrics`、`/actuator/prometheus`。它们不会经过前端 `/api/**` 代理。本机可用 `docker-compose.observability.yml` 叠一层 Prometheus/Grafana（只绑 127.0.0.1）；集群用 Helm 的 ClusterIP 管理口，需要时再开 ServiceMonitor，不要把 8081 挂到 Ingress。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
 可用于串联一次请求的前后端日志。
 
 发布前的完整代码、迁移、安全、浏览器冒烟与回滚清单见
