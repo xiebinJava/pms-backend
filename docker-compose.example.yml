@@ -2,14 +2,15 @@ services:
   oceanbase:
     image: oceanbase/oceanbase-ce:4.3.5-lts
     environment:
-      MODE: mini
+      MODE: ${OCEANBASE_MODE:-mini}
+      OB_SYS_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
       OB_TENANT_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
     ports:
       - "127.0.0.1:2881:2881"
     volumes:
       - oceanbase-data:/home/admin/oceanbase/store
     healthcheck:
-      test: ["CMD-SHELL", "obclient -h127.0.0.1 -P2881 -uroot@sys -p$${OB_TENANT_PASSWORD} -e 'SELECT 1' >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "obclient -h127.0.0.1 -P2881 -uroot@sys -p$${OB_SYS_PASSWORD} -e 'SELECT 1' >/dev/null 2>&1"]
       interval: 10s
       timeout: 10s
       start_period: 60s

@@ -1,4 +1,11 @@
 services:
+  oceanbase:
+    # GitHub-hosted runners do not have enough disk/memory for a full mini
+    # deployment. Slim uses OceanBase fastboot while preserving SQL behavior
+    # needed by the migration and API integration checks.
+    environment:
+      MODE: slim
+
   frontend:
     build:
       context: ./pms-front
