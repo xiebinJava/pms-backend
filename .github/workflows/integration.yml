@@ -41,6 +41,9 @@ jobs:
           migrator_password="$(openssl rand -hex 24)"
           jwt_secret="$(openssl rand -hex 32)"
           admin_password="$(openssl rand -hex 16)"
+          for secret in "$root_password" "$app_password" "$migrator_password" "$jwt_secret" "$admin_password"; do
+            echo "::add-mask::$secret"
+          done
           {
             echo "OCEANBASE_ROOT_PASSWORD=$root_password"
             echo "PMS_APP_PASSWORD=$app_password"

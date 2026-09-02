@@ -1,6 +1,6 @@
 services:
   oceanbase:
-    image: oceanbase/oceanbase-ce:4.3.5.1
+    image: oceanbase/oceanbase-ce:4.3.5-lts
     environment:
       MODE: mini
       OB_TENANT_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
