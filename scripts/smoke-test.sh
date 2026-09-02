@@ -12,9 +12,13 @@ curl "${curl_args[@]}" "$BASE_URL/health/ready" | grep -q '"status":"UP"'
 
 if [[ -n "${PMS_SMOKE_USERNAME:-}" && -n "${PMS_SMOKE_PASSWORD:-}" ]]; then
   echo "Checking login"
+  login_identity_field=username
+  if [[ "$PMS_SMOKE_USERNAME" == *@* ]]; then
+    login_identity_field=email
+  fi
   curl "${curl_args[@]}" \
     -H 'Content-Type: application/json' \
-    --data "$(printf '{\"username\":\"%s\",\"password\":\"%s\"}' "$PMS_SMOKE_USERNAME" "$PMS_SMOKE_PASSWORD")" \
+    --data "$(printf '{\"%s\":\"%s\",\"password\":\"%s\"}' "$login_identity_field" "$PMS_SMOKE_USERNAME" "$PMS_SMOKE_PASSWORD")" \
     "$BASE_URL/auth/login" >/dev/null
 fi
 

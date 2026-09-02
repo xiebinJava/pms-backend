@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-02
+
+- Production-readiness phase 1 local verification: production configuration gate tests passed; OceanBase V1–V10 idempotency, backup checksum, isolated restore and refusal boundaries passed; the smoke test now sends email-first login payloads while retaining username compatibility; current backend test report is 190 tests (0 failures, 0 errors, 1 skipped), frontend is 112/112, and local desktop/mobile Playwright acceptance passed. Enterprise production credentials and infrastructure remain deployment-owned inputs.
+
 ## Unreleased
 
 - Release-closure snapshot (2026-09-01): `mvn -q test` 187 cases passed (0 failures, 0 errors, 1 skipped); live OceanBase readiness returned `migration=10`; V1–V10 backup/recovery and key-table row-count comparison passed.

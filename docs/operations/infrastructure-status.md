@@ -9,7 +9,7 @@
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
 | OceanBase `brad_pms` | V1–V10 已执行并复核 | 使用 `pms_migrator` 连续执行两次版本升级，均完成 checksum 校验并返回无待执行版本；V7 邮箱唯一索引、V8 任务附件、V9 站内通知、V10 通知节点标识及关键表结构、外键和数据范围预检通过 |
-| 后端回归 | 已通过 | `mvn -q test`，187 个用例通过（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试；健康检查期望迁移版本已与 V10 对齐 |
+| 后端回归 | 已通过 | `mvn -q test`，当前报告汇总 190 个用例（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试；健康检查期望迁移版本已与 V10 对齐 |
 | 前端回归 | 已通过 | `pnpm test`，112 项通过（当前 `main` 提交 `a8977d4`） |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
@@ -46,6 +46,13 @@
 详细步骤见 [`../superpowers/plans/2026-08-28-enterprise-infrastructure-hardening.md`](../superpowers/plans/2026-08-28-enterprise-infrastructure-hardening.md)。
 
 ## 执行记录
+
+### 2026-09-02 第一阶段生产就绪执行记录
+
+- T1 配置门禁：新增 `scripts/validate-production-config.sh`、`scripts/validate-production-config.test.sh` 和 `.env.production.example`。合成生产配置通过；缺失/弱 JWT、root 数据库账号、通配或非 HTTPS CORS、HTTP 公网地址、token 回显和不完整 SMTP 均安全拒绝。`bash -n`、配置测试、后端配置测试、OpenAPI 校验、隐私扫描和 `git diff --check` 通过。
+- T2 OceanBase 演练：本机 OceanBase CE 4.3.5 上以 `pms_migrator` 完成 V1–V10 两次幂等校验，以 `pms_app` 完成只读企业预检；v10 zstd 备份、SHA-256、35 张表精确行数元数据、隔离空库恢复及关键表行数 `21/9/2/7/21` 比对通过。篡改 checksum 和指向现有 `brad_pms` 的恢复均按预期拒绝；详见 [`drill-records/2026-09-02-production-readiness.md`](drill-records/2026-09-02-production-readiness.md)。
+- T3 应用验收：后端 liveness/readiness 与 API 冒烟通过；邮箱优先的冒烟请求已修正并由 `scripts/smoke-test.test.sh` 覆盖，旧英文账号格式保持兼容。当前后端 `mvn -q test` 为 190 tests（0 失败、0 错误、1 跳过），前端 `pnpm test` 为 112 项，类型检查与构建通过；本机 Playwright 桌面、390px 窄屏和使用手册录制共 3 项通过。验收使用本机演示账号，不代表企业生产签字。
+- T1/T2/T3 Review：通过。没有把本机开发凭据、临时备份或真实企业配置提交到仓库；生产签字仍需目标企业完成注入与复验。
 
 | 任务 | 状态 | Review 证据 |
 | --- | --- | --- |
