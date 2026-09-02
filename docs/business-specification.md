@@ -56,6 +56,9 @@ sys_user
   ├─< sys_auth_session
   ├─< sys_login_log
   └─< sys_operation_log (operator_id)
+
+sys_org_unit
+  └─< sys_org_unit_history (append-only before/after snapshots)
 ```
 
 主要表职责：
@@ -65,6 +68,7 @@ sys_user
 | `sys_user` | 账号邮箱、可选中文名/英文名、认证状态 | `email_normalized` 唯一；`username_normalized` 为兼容字段且唯一；`ACTIVE/LOCKED/DISABLED/PENDING_ACTIVATION` |
 | `sys_user_position` | 用户与组织的主归属、兼职归属、直属上级 | `user_id/org_unit_id/is_primary/assignment_type/status` |
 | `sys_org_unit` | 可视化组织树和业务线 | `parent_id/path/type_id/leader_user_id/status` |
+| `sys_org_unit_history` | 组织层级、负责人和状态的不可变变更记录 | `org_unit_id/action/before_json/after_json/operator_id/request_id/created_at`；只允许追加，不提供更新或删除接口 |
 | `sys_position` | 岗位字典 | 编码唯一，可停用 |
 | `sys_role` | 角色和数据范围类型 | 内置角色不可随意删除 |
 | `sys_permission` | 细粒度功能权限点 | 以 `admin:*`、`project:*` 编码 |
@@ -166,7 +170,7 @@ project
 | 组织 | `GET /org/tree`（项目选择器）、`/admin/org/tree` 及组织 CRUD/移动 |
 | 人员 | `/admin/users` 分页、邀请、主归属、兼职归属、角色、停用 |
 | 角色 | `/admin/roles` CRUD 和权限/数据范围 |
-| 导入 | 组织/用户预览、提交、CSV 模板 |
+| 导入 | 组织/用户预览、提交、CSV 模板、错误报告下载 |
 | 审计 | `GET /admin/audit`，按动作、资源、人员、时间和分页筛选 |
 
 写接口应做到幂等或明确返回冲突；删除、停用、终止等危险动作必须在服务端再次校验当前状态和权限。
@@ -181,12 +185,13 @@ project
 4. 提交阶段使用导入任务 ID，在事务内写入组织、用户、归属和角色，并写入 `sys_import_job` 与操作日志；失败应整体回滚，不产生半批数据。
 5. 同一规范化邮箱、组织编码或角色编码重复时必须明确报错；英文名如填写也必须唯一；已存在记录只能按产品定义的更新策略处理，不能静默覆盖。
 6. 导入完成后可在审计日志中通过 `IMPORT_COMMITTED` 和导入任务 ID 追踪；预览结果过期后不可再次提交。
+7. 提交接口以导入任务 ID 做幂等键：同一任务已成功时返回成功结果，不重复写入；任务状态与请求冲突时拒绝提交。失败任务记录原因和时间，可通过 `/admin/import/{jobId}/errors.csv` 下载服务端保存的逐行错误。
 
 ## 10. OceanBase 与部署
 
 - 默认 profile 为 `oceanbase`，使用 MySQL 兼容模式和 2881 端口，数据库名为 `brad_pms`。
 - 生产连接参数通过 `OCEANBASE_HOST`、`OCEANBASE_PORT`、`OCEANBASE_DATABASE`、`OCEANBASE_USER`、`OCEANBASE_PASSWORD` 注入。
-- 表结构按 V1–V10 版本化迁移顺序执行：V1–V7 完成基础企业模型与邮箱身份，V8 增加任务附件，V9 增加站内通知，V10 增加通知节点标识。
+- 表结构按 V1–V11 版本化迁移顺序执行：V1–V7 完成基础企业模型与邮箱身份，V8 增加任务附件，V9 增加站内通知，V10 增加通知节点标识，V11 增加组织变更历史和导入失败状态字段。
 - V5 为现有业务表补充逻辑删除标记、乐观锁版本号、关键唯一索引和跨表外键；应用查询必须遵守逻辑删除条件，关键更新必须携带版本号。
 - OceanBase profile 运行时不依赖 Flyway 自动执行；升级前先执行预检、备份策略和迁移脚本，再启动应用。
 - `application-h2.yml` 和 H2 快照只服务自动化测试/一次性迁移工具；文档、示例和上线脚本不得引导用户用 H2 运行生产。

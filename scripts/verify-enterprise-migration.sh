@@ -15,13 +15,17 @@ DB_PORT="${PMS_DB_PORT:-${MYSQL_PORT:-${OCEANBASE_PORT:-3306}}}"
 DB_NAME="${PMS_DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-${OCEANBASE_DATABASE:-brad_pms}}}}"
 DB_USER="${PMS_DB_USER:-${MYSQL_USER:-${OCEANBASE_USER:-}}}"
 DB_PASSWORD="${PMS_DB_PASSWORD:-${MYSQL_PASSWORD:-${OCEANBASE_PASSWORD:-}}}"
+TOOL_IMAGE="${PMS_MYSQL_TOOL_IMAGE:-mysql:8.4}"
+TOOL_CLIENT="${PMS_MYSQL_TOOL_CLIENT:-mysql}"
 
 if command -v mysql >/dev/null 2>&1; then
   SQL_CLIENT=mysql
 elif command -v obclient >/dev/null 2>&1; then
   SQL_CLIENT=obclient
+elif command -v docker >/dev/null 2>&1; then
+  SQL_CLIENT=container
 else
-  echo "mysql or obclient client is required (MySQL 8 or OceanBase MySQL mode)" >&2
+  echo "mysql/obclient client or Docker is required (MySQL 8 or OceanBase MySQL mode)" >&2
   exit 2
 fi
 if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
@@ -30,8 +34,16 @@ if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
 fi
 
 mysql_cmd=("$SQL_CLIENT" --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names --raw)
+container_mysql() {
+  MYSQL_PWD="$DB_PASSWORD" docker run --rm --network host -e MYSQL_PWD \
+    --entrypoint "$TOOL_CLIENT" "$TOOL_IMAGE" "${mysql_cmd[@]:1}" "$@"
+}
 run_sql() {
-  MYSQL_PWD="$DB_PASSWORD" "${mysql_cmd[@]}" --execute "$1"
+  if [[ "$SQL_CLIENT" == "container" ]]; then
+    container_mysql --execute "$1"
+  else
+    MYSQL_PWD="$DB_PASSWORD" "${mysql_cmd[@]}" --execute "$1"
+  fi
 }
 
 assert_zero() {
@@ -64,7 +76,7 @@ assert_exact() {
   echo "PASS: $label"
 }
 
-required_tables=(sys_company_profile sys_org_unit_type sys_org_unit sys_position sys_user_position sys_role sys_permission sys_role_permission sys_user_role sys_role_org_scope sys_invitation sys_auth_session sys_password_reset_token sys_login_log sys_operation_log sys_import_job)
+required_tables=(sys_company_profile sys_org_unit_type sys_org_unit sys_position sys_user_position sys_role sys_permission sys_role_permission sys_user_role sys_role_org_scope sys_invitation sys_auth_session sys_password_reset_token sys_login_log sys_operation_log sys_import_job sys_org_unit_history)
 for table_name in "${required_tables[@]}"; do
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='$table_name';" | tr -d '[:space:]')"
   if [[ "$count" != "1" ]]; then echo "FAIL: table $table_name is missing" >&2; exit 1; fi
@@ -81,14 +93,14 @@ for column_check in \
 done
 echo "PASS: required enterprise columns"
 
-for index_name in uk_user_username_normalized uk_user_email_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted; do
+for index_name in uk_user_username_normalized uk_user_email_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted idx_org_unit_history_org_created idx_org_unit_history_operator_created; do
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND index_name='$index_name';" | tr -d '[:space:]')"
   if [[ "$count" == "0" ]]; then echo "FAIL: index $index_name is missing" >&2; exit 1; fi
 done
 echo "PASS: required enterprise indexes"
 
 for foreign_key_check in \
-  "project|project_org_unit_fk" "project_task|task_project_fk" "sys_user_position|user_position_user_fk"; do
+  "project|project_org_unit_fk" "project_task|task_project_fk" "sys_user_position|user_position_user_fk" "sys_org_unit_history|org_unit_history_org_fk"; do
   table_name="${foreign_key_check%%|*}"; constraint_name="${foreign_key_check##*|}"
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='$table_name' AND constraint_name='$constraint_name' AND constraint_type='FOREIGN KEY';" | tr -d '[:space:]')"
   if [[ "$count" != "1" ]]; then echo "FAIL: foreign key $table_name.$constraint_name is missing" >&2; exit 1; fi

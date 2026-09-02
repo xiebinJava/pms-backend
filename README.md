@@ -93,7 +93,7 @@ cp .env.oceanbase.example .env
 docker compose -f docker-compose.example.yml up --build
 ```
 
-前端 `http://localhost:5173`，后端只绑 `127.0.0.1:8080`。Compose 按顺序跑 `accounts-init` → `schema-init`（V1–V10）→ `uploads-init`，再启动应用。健康检查：`/api/health/live`、`/api/health/ready`。
+前端 `http://localhost:5173`，后端只绑 `127.0.0.1:8080`。Compose 按顺序跑 `accounts-init` → `schema-init`（V1–V11）→ `uploads-init`，再启动应用。健康检查：`/api/health/live`、`/api/health/ready`。
 
 示例默认是 `development`：SMTP 校验关闭，响应里可能带回本地重置/邀请 token。生产必须改成 HTTPS 公网地址、打开 SMTP 校验，并关掉 token 回显。已有业务库不要直接套这份 Compose，走升级手册。
 

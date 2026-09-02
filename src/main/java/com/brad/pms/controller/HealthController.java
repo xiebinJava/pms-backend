@@ -18,7 +18,7 @@ import java.util.Map;
 @RestController
 public class HealthController {
     /** Keep readiness aligned with the highest checked-in OceanBase migration. */
-    private static final int LATEST_MIGRATION_VERSION = 10;
+    private static final int LATEST_MIGRATION_VERSION = 11;
 
     private final DataSource dataSource;
     private final int expectedMigrationVersion;

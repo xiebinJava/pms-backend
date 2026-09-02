@@ -690,6 +690,15 @@ paths:
             schema: { type: object }
       responses:
         '200': { $ref: '#/components/responses/Success' }
+  /admin/org/{id}/history:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [组织与权限]
+      summary: 查询组织变更历史
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /admin/users:
     get:
       tags: [组织与权限]
@@ -851,13 +860,25 @@ paths:
       - name: jobId
         in: path
         required: true
-        schema: { type: integer, format: int64 }
+        schema: { type: string, format: uuid }
     post:
       tags: [导入与审计]
       summary: 提交导入任务
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /admin/import/{jobId}/errors.csv:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [导入与审计]
+      summary: 下载导入错误报告
+      responses:
+        '200': { description: CSV 错误报告 }
+        '404': { $ref: '#/components/responses/NotFound' }
   /admin/import/template/organizations.csv:
     get:
       tags: [导入与审计]

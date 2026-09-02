@@ -2,11 +2,11 @@
 
 适用于单企业本地部署的正式发布。发布前复制本清单，在目标环境逐项记录结果。
 
-## 2026-09-02 第一阶段当前状态
+## 2026-09-02 第二阶段当前状态
 
 - [x] 生产配置静态门禁已加入：`bash scripts/validate-production-config.test.sh` 通过；不会打印密钥。
-- [x] 本机 OceanBase V1–V10 幂等、v10 备份/校验、隔离恢复和故障边界演练通过，详见 [`drill-records/2026-09-02-production-readiness.md`](drill-records/2026-09-02-production-readiness.md)。
-- [x] 当前代码回归：后端 `mvn -q test` 190 个用例（0 失败、0 错误、1 跳过），前端 `pnpm test` 112 项，类型检查、构建和本机 Playwright 桌面/390px 通过。
+- [x] 本机 OceanBase V1–V11 幂等升级、迁移校验和完整性预检通过，详见 [`drill-records/2026-09-02-organization-import-reliability.md`](drill-records/2026-09-02-organization-import-reliability.md)。
+- [x] 当前代码回归：后端 `mvn -q test` 194 个用例（0 失败、0 错误、1 跳过），前端 `pnpm test` 112 项，类型检查和构建通过。
 - [ ] 目标企业仍需注入真实 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储和监控，并记录 RPO/RTO 与故障联系人。
 
 ## 2026-09-01 本机目标实例执行快照
@@ -39,8 +39,8 @@
 - [ ] 已完成数据库备份与恢复演练，并保存校验值。
 - [ ] 备份文件包含 schema 版本、`.sha256` 校验文件和元数据，恢复仅使用显式空目标库。
 - [ ] 执行 `scripts/enterprise-preflight.sh` 通过。
-- [ ] 按 V1–V10 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知以及 V10 的通知节点标识已落库。
-- [ ] 执行迁移后 `scripts/verify-enterprise-migration.sh` 通过。
+- [x] 按 V1–V11 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知、V10 的通知节点标识以及 V11 的组织历史/导入失败字段已落库。
+- [x] 执行迁移后 `scripts/verify-enterprise-migration.sh` 和 `scripts/enterprise-preflight.sh` 通过。
 - [ ] 生产应用只使用 `oceanbase` profile；H2 仅存在于测试配置。
 - [ ] 迁移失败时不直接删除业务表，按升级手册恢复到新数据库。
 
@@ -58,9 +58,9 @@
 
 - [ ] 邮箱登录不区分大小写；中文名和英文名可选，页面优先展示 `中文名（English.Name）`，缺少姓名时展示邮箱。
 - [ ] 组织画布可以缩放、拖拽，节点连线、负责人和组织层级正确。
-- [ ] 员工主归属与组织负责人关系独立，兼职/项目归属可追溯。
+- [x] 员工主归属与组织负责人关系独立，兼职/项目归属可追溯；组织变更历史可查询。
 - [ ] 角色权限和数据范围在页面与直接 API 调用中均生效。
-- [ ] Excel/CSV 导入可预览、下载错误行、事务提交且重复提交幂等。
+- [x] Excel/CSV 导入可预览、下载服务端错误报告、事务提交且重复提交幂等；失败批次整体回滚。
 - [ ] 项目列表与详情的项目经理、业务线、成员、周期、状态和进度一致。
 - [ ] 项目终止后写操作被拒绝，任务删除、节点排期和业务线负责人联动正常。
 

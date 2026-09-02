@@ -11,6 +11,7 @@ import com.brad.pms.security.UserContext;
 import com.brad.pms.mapper.UserMapper;
 import com.brad.pms.mapper.UserPositionMapper;
 import com.brad.pms.mapper.OrgUnitMapper;
+import com.brad.pms.mapper.ImportJobMapper;
 
 import java.nio.charset.StandardCharsets;
 
@@ -32,6 +33,9 @@ class EnterpriseImportServiceTest {
 
     @Autowired
     private OrgUnitMapper orgUnitMapper;
+
+    @Autowired
+    private ImportJobMapper importJobMapper;
 
     @org.junit.jupiter.api.BeforeEach
     void setUserContext() {
@@ -80,6 +84,29 @@ class EnterpriseImportServiceTest {
     }
 
     @Test
+    void invalidEmailIsReportedOncePerRow() {
+        String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
+                + "测试戊,Import.Invalid,not-an-email,,HQ,EMPLOYEE,MEMBER,\n";
+
+        ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
+                "file", "invalid-email.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(preview.getErrors().stream().filter(error -> "邮箱".equals(error.getField())
+                && "邮箱格式不正确".equals(error.getMessage())).count()).isEqualTo(1);
+    }
+
+    @Test
+    void errorReportIsGeneratedFromPersistedPreview() {
+        String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
+                + "错误用户,Import.Error,not-an-email,,HQ,EMPLOYEE,MEMBER,\n";
+        ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
+                "file", "error-report.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
+
+        String report = new String(importService.errorCsv(preview.getJobId()), StandardCharsets.UTF_8);
+        assertThat(report).contains("行号,字段,错误信息", "邮箱格式不正确");
+    }
+
+    @Test
     void previewAcceptsEmailWithoutChineseOrEnglishNames() {
         String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
                 + ",,email.only@example.com,,HQ,EMPLOYEE,MEMBER,\n";
@@ -103,6 +130,22 @@ class EnterpriseImportServiceTest {
         Long userId = userMapper.findByUsernameNormalized("import.managerchild").getId();
         assertThat(userPositionMapper.findActiveByUserId(userId)).anyMatch(position -> Long.valueOf(1L).equals(position.getManagerUserId()));
         assertThatCode(() -> importService.commit(preview.getJobId())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void failedCommitRollsBackUsersAndMarksJobFailed() {
+        String email = "rollback-" + System.nanoTime() + "@example.com";
+        String csv = "中文名,英文名,邮箱,手机号,主组织编码,岗位编码,角色编码,直属上级英文名\n"
+                + "回滚用户,Import.Rollback," + email + ",,HQ,EMPLOYEE,MEMBER," + email + "\n";
+
+        ImportPreviewDTO preview = importService.previewUsers(new MockMultipartFile(
+                "file", "rollback.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)));
+        assertThat(preview.getErrors()).isEmpty();
+
+        assertThatThrownBy(() -> importService.commit(preview.getJobId()))
+                .hasMessage("直属上级不能是本人: " + email);
+        assertThat(userMapper.findByEmailNormalized(email)).isNull();
+        assertThat(importJobMapper.selectById(preview.getJobId()).getStatus()).isEqualTo("FAILED");
     }
 
     @Test

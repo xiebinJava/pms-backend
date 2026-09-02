@@ -16,7 +16,8 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -41,6 +42,8 @@ public class EnterpriseImportService {
     private final UserPositionMapper userPositionMapper;
     private final UserRoleMapper userRoleMapper;
     private final OperationLogService operationLogService;
+    private final ImportJobStateService importJobStateService;
+    private final PlatformTransactionManager transactionManager;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final SecureRandom random = new SecureRandom();
     private final org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
@@ -85,8 +88,19 @@ public class EnterpriseImportService {
         return dto;
     }
 
-    @Transactional
     public void commit(String jobId) {
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> commitInTransaction(jobId));
+        } catch (BusinessException e) {
+            importJobStateService.markFailed(jobId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            importJobStateService.markFailed(jobId, e.getMessage());
+            throw BusinessException.error("导入失败，已回滚全部变更");
+        }
+    }
+
+    private void commitInTransaction(String jobId) {
         ImportJobDO job = importJobMapper.selectByIdForUpdate(jobId);
         if (job == null) throw BusinessException.error("导入预览不存在、已失效或包含错误");
         if ("SUCCESS".equals(job.getStatus())) return;
@@ -108,6 +122,31 @@ public class EnterpriseImportService {
         } catch (Exception e) {
             throw BusinessException.error("导入失败，已回滚全部变更");
         }
+    }
+
+    /** Export the persisted preview errors so the report remains available after page refresh. */
+    public byte[] errorCsv(String jobId) {
+        ImportJobDO job = importJobMapper.selectById(jobId);
+        if (job == null) throw BusinessException.error("导入预览不存在、已失效或包含错误");
+        try {
+            List<ImportRowErrorDTO> errors = job.getErrorJson() == null || job.getErrorJson().isBlank()
+                    ? List.of()
+                    : objectMapper.readValue(job.getErrorJson(), new TypeReference<List<ImportRowErrorDTO>>() { });
+            StringBuilder csv = new StringBuilder("行号,字段,错误信息\n");
+            for (ImportRowErrorDTO error : errors) {
+                csv.append(csvCell(error.getRow())).append(',')
+                        .append(csvCell(error.getField())).append(',')
+                        .append(csvCell(error.getMessage())).append('\n');
+            }
+            return ("\uFEFF" + csv).getBytes(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw BusinessException.error("无法生成导入错误报告");
+        }
+    }
+
+    private String csvCell(Object value) {
+        String text = value == null ? "" : String.valueOf(value);
+        return "\"" + text.replace("\"", "\"\"") + "\"";
     }
 
     private void commitOrganizations(List<Map<String, String>> rows) {
