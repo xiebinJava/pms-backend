@@ -98,6 +98,7 @@ jobs:
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 oceanbase || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 accounts-init || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 schema-init || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 uploads-init || true
 
       - name: Stop integration stack
         if: ${{ always() && hashFiles('.env') != '' }}
