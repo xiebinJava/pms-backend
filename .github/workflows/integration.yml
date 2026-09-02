@@ -79,6 +79,23 @@ jobs:
         run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm --entrypoint /bin/bash schema-init /usr/local/bin/verify-enterprise-migration.sh
       - name: Run API smoke test
         run: ./scripts/smoke-test.sh
+      - name: Verify browser login proxy
+        env:
+          E2E_USERNAME: alex.zhang@example.com
+          E2E_PASSWORD: ${{ env.E2E_PASSWORD }}
+        run: |
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --max-time 10 \
+            -H 'Content-Type: application/json' \
+            --data "$(printf '{\"email\":\"%s\",\"password\":\"%s\"}' "$E2E_USERNAME" "$E2E_PASSWORD")" \
+            -o "$response_file" -w '%{http_code}' \
+            http://127.0.0.1:5173/api/auth/login)"
+          echo "Browser login proxy HTTP status: $status"
+          if [[ "$status" != "200" ]] || ! grep -q '"code":200' "$response_file"; then
+            echo "Browser login proxy did not return a successful API envelope"
+            sed -E 's/(accessToken|refreshToken|token|password)[^,}]*/\1=REDACTED/g' "$response_file"
+            exit 1
+          fi
       - name: Install Playwright browser
         working-directory: pms-front
         run: |
@@ -99,6 +116,8 @@ jobs:
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 accounts-init || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 schema-init || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 uploads-init || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=300 backend || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 frontend || true
 
       - name: Stop integration stack
         if: ${{ always() && hashFiles('.env') != '' }}
