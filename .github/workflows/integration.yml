@@ -29,7 +29,7 @@ jobs:
           # Keep backend integration tests paired with the current reviewed
           # frontend commit. Update this immutable SHA for every release.
           ref: a8977d4852b6bf0eb172b812645cbc4fc94a4f65
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9.15.9
       - name: Prepare ephemeral integration environment
