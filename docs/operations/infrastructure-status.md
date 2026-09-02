@@ -10,19 +10,19 @@
 | --- | --- | --- |
 | OceanBase `brad_pms` | V1–V10 已执行并复核 | 使用 `pms_migrator` 连续执行两次版本升级，均完成 checksum 校验并返回无待执行版本；V7 邮箱唯一索引、V8 任务附件、V9 站内通知、V10 通知节点标识及关键表结构、外键和数据范围预检通过 |
 | 后端回归 | 已通过 | `mvn -q test`，187 个用例通过（0 失败、0 错误、1 跳过），包含错误契约、鉴权和限流测试；健康检查期望迁移版本已与 V10 对齐 |
-| 前端回归 | 已通过 | `pnpm test`，111 项通过（当前本地 `main` 追加浏览器验收稳定性修复提交 `f289a38`） |
+| 前端回归 | 已通过 | `pnpm test`，112 项通过（当前 `main` 提交 `a8977d4`） |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 发布基线 | 本地已收口，远程集成待凭据 | `v1.0.0` 标签仍指向后端 `7cc2820` / 前端 `1519e887`；当前本地 `main` 已包含 V10 健康检查、备份修复和 Playwright locale 稳定性提交，均已提交但尚未推送；远程不使用 `master` |
+| 发布基线 | 本地与远程集成均已收口 | `v1.0.0` 标签仍指向后端 `7cc2820` / 前端 `1519e887`；当前后端 `main` 已包含 CI 与 OceanBase 兼容性修复，前端 `main` 为 `a8977d4`；远程不使用 `master` |
 
 ## 仍需完成
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
 | P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V10 升级幂等、preflight、verify、逻辑备份、隔离空库恢复、数据比对和停库恢复演练；生产仍需按企业 RPO/RTO 保存介质与联系人 |
-| P1 | CI、E2E、镜像扫描和 SBOM 已配置；跨仓库集成需在推送后重跑 | 前端 `main` 提交 `f289a38` 的本地门禁已通过；后端工作流已增加隔离浏览器验收项目夹具并锁定该提交，配置 `PMS_FRONT_REPO_READ_TOKEN` 后重跑 `integration-and-e2e`，该 Secret 不能由代码代填 |
+| P1 | CI、E2E、镜像扫描和 SBOM 已配置并通过 | 前端 `main` 提交 `a8977d4` 的本地门禁已通过；后端跨仓库运行 `33596130518` 已完成 OceanBase 启动、V1–V10 幂等、API 冒烟、项目夹具、桌面/移动端 Playwright 和清理步骤 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 已收口能力
@@ -56,7 +56,7 @@
 | Task 4：通知服务和上传文件生产化 | 已完成 | 后端 `mvn -q test`、脚本语法、Compose 配置校验通过；上传魔数/MIME/配额/路径穿越、图片接口和邀请通知测试通过；SMTP 通知启动检查与 `pms-uploads` 持久卷已接入。 |
 | Task 5：容器与 Compose 运行时加固 | 已完成 | `ContainerHardeningTest`、后端全量测试、Compose 配置、脚本语法和 diff 检查通过；后端 UID 10001、非 root Nginx、健康检查、只读根文件系统、资源上限、网络隔离和安全响应头已接入。 |
 | Task 6：可观测性、审计保留和 API 合同 | 已完成（静态/自动化验证） | `mvn -q test`、OpenAPI 校验通过；存活/就绪探针、私有 Actuator 端口、有限路由指标、UTC JSON 日志、审计脱敏与无长事务批量清理任务已接入。 |
-| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 前端本地门禁通过，后端跨仓库集成待重跑 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；前端 `f289a38` 的 `pnpm test`、类型检查和构建均通过；本次修复为干净 OceanBase 增加隔离浏览器验收项目，并让项目详情 E2E 使用夹具 ID、手册 E2E 固定中文 locale 与更长等待；远程集成需配置后端 secret `PMS_FRONT_REPO_READ_TOKEN` 后重跑。 |
+| Task 7：集成 CI/CD、安全扫描与浏览器冒烟 | 已完成 | Trivy Action 已固定为有效的 `v0.36.0`；前端 `package.json` 与 CI/集成工作流统一使用 `pnpm@9.15.9`；前端 `a8977d4` 的 `pnpm test`（112 项）、类型检查和构建均通过；后端跨仓库运行 `33596130518` 已通过 OceanBase、迁移幂等、API 冒烟、浏览器代理、项目夹具及桌面/移动端 Playwright 验收；浏览器用例改为应用内导航，避免把内存会话误测成刷新令牌流程 |
 | Task 8：生产演练与开源交付 | 本机演练完成，生产注入待目标企业 | OceanBase V1–V10、备份/恢复、应用健康检查、邮箱登录和本机 Playwright 验收已记录；生产 JWT、SMTP、HTTPS、CORS、对象存储与监控告警需由部署企业注入并复验。 |
 
 ## 2026-08-31 合并后收口执行记录
@@ -73,16 +73,16 @@
 
 - 后端 `v1.0.0` 标签：`7cc2820`，已合并 `codex/oceanbase-migration`；标签之后仅追加文档收口提交。
 - 前端 `v1.0.0` 标签：`1519e88736d2d9fe19c1e436b8a96cd66b1457bf`，已合并 `codex/pms-design-system`，并包含邮箱身份 E2E 修正。
-- 后端集成工作流已固定本次前端验收提交 `f289a38cba838c01665405821f34accd36d71f4f`；远程主分支名称为 `main`，没有 `master`。
+- 后端集成工作流已固定本次前端验收提交 `a8977d4852b6bf0eb172b812645cbc4fc94a4f65`；远程主分支名称为 `main`，没有 `master`。
 
 ### Task 2：本地门禁与远程 CI
 
 - 后端 `mvn -q test`：通过；`./scripts/validate-openapi.sh`：通过；`bash -n scripts/*.sh docker/*.sh`：通过。
-- 前端 `pnpm test`：111 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
+- 前端 `pnpm test`：112 项通过；`pnpm typecheck`：通过；`pnpm build`：通过。
 - H2 运行配置扫描和私钥材料扫描：通过。
-- 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`。
+- 远程 CI 的失败原因已定位并修正：Trivy Action 版本固定为有效的 `v0.36.0`；前端容器构建固定 `pnpm@9.15.9`，避免 pnpm 11 忽略构建脚本；后端单仓库测试不再因未检出前端而报 `NoSuchFileException`；浏览器冒烟测试改用应用内导航，避免整页跳转清空内存会话。
 - 前端 CI `33351102816` 已通过（测试、类型检查、构建、Nginx 镜像 Trivy 和 SPDX SBOM）。后端升级后 CI `33352990972` 已通过单元测试、OpenAPI、H2/密钥扫描、后端镜像 Trivy HIGH/CRITICAL 扫描和 SPDX SBOM。
-- 最新集成运行 `33498567095` 在凭据预检处按设计停止。后端仓库尚未配置 `PMS_FRONT_REPO_READ_TOKEN`，不能使用个人令牌替代；本次代码已将前端 checkout 更新为当前提交 `f289a38`，并增加干净数据库的浏览器项目夹具，配置 Secret 后需重新运行。
+- 最新集成运行 `33596130518` 已通过。后端工作流使用只读 `PMS_FRONT_REPO_READ_TOKEN` 检出前端 `a8977d4`，并在干净 OceanBase 上创建浏览器验收项目夹具；旧的凭据预检失败记录保留在历史演练文档中。
 - 后端镜像扫描已完成受控修复：Spring Boot 3.5.14、Spring Framework 6.2.19、Tomcat 11.0.22、MyBatis-Plus 3.5.17、Jackson 2.21.4、Micrometer 1.15.12、Logback 1.5.18、Connector/J 9.4.0，并迁移到 Jakarta Servlet/Validation；本地完整测试与远程 Trivy/SBOM 均通过。
 
 #### 依赖安全升级 Review（2026-08-31）
