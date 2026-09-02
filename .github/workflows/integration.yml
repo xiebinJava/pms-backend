@@ -28,7 +28,7 @@ jobs:
           token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
           # Keep backend integration tests paired with the current reviewed
           # frontend commit. Update this immutable SHA for every release.
-          ref: 73714231bb6794126b96c3b0c14fe0b5715455f7
+          ref: f289a38cba838c01665405821f34accd36d71f4f
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
@@ -82,6 +82,68 @@ jobs:
         run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm --entrypoint /bin/bash schema-init /usr/local/bin/verify-enterprise-migration.sh
       - name: Run API smoke test
         run: ./scripts/smoke-test.sh
+      - name: Create browser acceptance project fixture
+        env:
+          E2E_USERNAME: alex.zhang@example.com
+          E2E_PASSWORD: ${{ env.E2E_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          login_response="$(mktemp)"
+          project_response="$(mktemp)"
+          trap 'rm -f "$login_response" "$project_response"' EXIT
+
+          login_status="$(curl --silent --show-error --max-time 10 \
+            -H 'Content-Type: application/json' \
+            --data "$(printf '{\"email\":\"%s\",\"password\":\"%s\"}' "$E2E_USERNAME" "$E2E_PASSWORD")" \
+            -o "$login_response" -w '%{http_code}' \
+            http://127.0.0.1:8080/api/auth/login)"
+          if [[ "$login_status" != "200" ]]; then
+            echo "Browser fixture login failed with HTTP $login_status"
+            exit 1
+          fi
+
+          access_token="$(python3 - "$login_response" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+          token = payload.get("data", {}).get("accessToken")
+          if not token:
+              raise SystemExit("login response did not contain an access token")
+          print(token)
+          PY
+          )"
+          echo "::add-mask::$access_token"
+
+          create_status="$(curl --silent --show-error --max-time 10 \
+            -H "Authorization: Bearer $access_token" \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"CI 浏览器验收项目","description":"仅用于 CI 浏览器验收","priority":1,"startDate":"2026-09-02","endDate":"2026-09-30"}' \
+            -o "$project_response" -w '%{http_code}' \
+            http://127.0.0.1:8080/api/projects)"
+          if [[ "$create_status" != "200" ]]; then
+            echo "Browser fixture project creation failed with HTTP $create_status"
+            sed -E 's/(accessToken|refreshToken|token|password)[^,}]*/\1=REDACTED/g' "$project_response"
+            exit 1
+          fi
+
+          project_id="$(python3 - "$project_response" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+          if payload.get("code") != 200:
+              raise SystemExit(payload.get("msg", "project fixture response was not successful"))
+          project_id = payload.get("data", {}).get("id")
+          if not isinstance(project_id, int):
+              raise SystemExit("project fixture response did not contain a numeric id")
+          print(project_id)
+          PY
+          )"
+          echo "E2E_PROJECT_ID=$project_id" >> "$GITHUB_ENV"
       - name: Verify browser login proxy
         env:
           E2E_USERNAME: alex.zhang@example.com
