@@ -77,6 +77,10 @@ public class ProjectService {
         project.setStartDate(cmd.getStartDate());
         project.setEndDate(cmd.getEndDate());
         project.setProgress(0);
+        // OceanBase enforces project.code as NOT NULL. Insert a unique,
+        // internal placeholder first, then replace it with the human-readable
+        // PRJ-xxxxxx code after the auto-increment ID has been assigned.
+        project.setCode("TMP-" + UUID.randomUUID());
         projectMapper.insert(project);
 
         project.setCode("PRJ-" + String.format("%06d", project.getId()));
