@@ -1,181 +1,255 @@
-# PMS Backend — 项目管理系统后端
+# PMS（Project Management System）后端
 
-单企业、本地部署的开源项目管理后端。一个实例只服务一家企业，没有 `tenant_id`，也不拆微服务。许可证 Apache-2.0，贡献前请读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时数据库只支持 OceanBase 的 MySQL 兼容模式；H2 仅用于自动化测试，不用于开发或生产运行。
 
-兄弟仓库是 [`pms-front`](../pms-front)。演示身份只用 `张伟` / `Alex.Zhang` / `alex.zhang@example.com`。
+如果你第一次接触这个项目，先看下面的“5 分钟启动”。如果你要把系统部署到企业环境，再看“生产部署”和运维文档。
 
-## 现在能做什么
+## 5 分钟启动（推荐）
 
-- 邮箱登录、组织树、RBAC、数据范围、审计日志
-- 项目、任务看板、里程碑、成员、动态
-- 工作台、任务详情（子任务 / 评论 / 附件）、站内通知、范围内搜索
-- 可选 OIDC / LDAP（默认关；只给已经邀请且已激活的邮箱建会话）
-- 可选 S3/MinIO 附件与签名 Webhook（默认本地盘、不出站）
-- 企业运行时：OceanBase MySQL 兼容模式，库名 `brad_pms`
-- 贡献者本机：MySQL 8 轻量路径，库名 `pms`（不要拿它替换企业库）
+### 1. 准备环境
 
-完整业务约定见 [`docs/business-specification.md`](docs/business-specification.md)。OpenAPI 合同在 `src/main/resources/openapi/pms-api.yaml`。
+- Docker 20+ 和 Docker Compose v2
+- Git
+- 至少 4 GB 可用内存（OceanBase CE 启动需要一定时间和内存）
 
-## 技术栈
-
-- Java 17 + Maven
-- Spring Boot 3.5.14、MyBatis-Plus 3.5.17、JWT（jjwt）
-- OceanBase（企业默认）或 MySQL 8（仅贡献者）
-- Actuator 管理口默认 `127.0.0.1:8081`（`health` / `metrics` / `prometheus`）
-
-## 模块
-
-```
-com.brad.pms
-├── auth        OIDC / LDAP / 本地登录提供者（默认只开本地）
-├── common      统一返回 / 分页 / 异常 / 枚举
-├── config      MyBatis-Plus、CORS、种子数据、观测
-├── security    JWT、登录拦截、用户上下文、数据范围
-├── storage     本地盘或 S3 兼容对象存储
-├── webhook     可选签名出站事件
-├── controller  REST
-├── service     业务编排
-├── mapper      MyBatis-Plus Mapper
-├── entity      DataObject
-├── dto         request（Cmd/Qry）/ response（DTO）
-└── convertor   实体 <-> DTO
-```
-
-## 本机启动
-
-先准备一份本地 env（不要提交）：
+前后端需要放在同一个父目录，Compose 才能找到前端构建上下文：
 
 ```bash
-cp .env.oceanbase.example .env.oceanbase.local   # 企业 / 本机 OceanBase
-# 或
-cp .env.mysql.example .env.mysql.local           # 仅贡献者
+mkdir pms && cd pms
+# 将下面两个占位符替换成你实际使用的仓库地址
+git clone YOUR_BACKEND_REPO_URL pms-backend
+git clone YOUR_FRONTEND_REPO_URL pms-front
+cd pms-backend
 ```
 
-至少填入数据库密码、至少 32 字节的 `PMS_JWT_SECRET`，以及至少 12 位的 `PMS_BOOTSTRAP_ADMIN_PASSWORD`。空库首次启动会创建演示管理员 `alex.zhang@example.com` / 张伟。之后用邀请或 Excel/CSV 加人，不要在文档里写测试用的共享口令。
-
-### 贡献者：MySQL 8
-
-只起一个本机 MySQL 8.4 容器。`mysql` profile 会用 Flyway 把空库升到当前迁移（含附件 V8、通知 V9）。库名是 `pms`，不是 `brad_pms`。
-
-```bash
-./scripts/start-local-mysql.sh
-```
-
-前端在 `pms-front` 执行 `pnpm dev`，代理到 `http://localhost:8080`。停止：`./scripts/stop-local-mysql.sh`；连容器一起关（保留数据卷）：`./scripts/stop-local-mysql.sh --down`。
-
-默认绑定 `127.0.0.1:3306`。端口冲突时改 `.env.mysql.local` 里的 `MYSQL_PORT`。
-
-### 企业默认：OceanBase
-
-本机已有 `brad_pms` 时：
-
-```bash
-PMS_ENV_FILE=.env.oceanbase.local ./scripts/start-local-oceanbase.sh
-```
-
-OceanBase profile **不会**在运行时开 Flyway（OceanBase 4.x 对外报告 MySQL 5.7）。升表用 `./scripts/oceanbase-upgrade.sh`，账号必须是 **`pms_migrator`**。应用运行用 `pms_app`。步骤见 [`docs/operations/enterprise-upgrade-runbook.md`](docs/operations/enterprise-upgrade-runbook.md)。
-
-没有启动脚本、只想直接跑 jar 时，自行导出 `OCEANBASE_*` 后：
-
-```bash
-mvn package -DskipTests && java -jar target/pms-backend-1.0.0.jar
-```
-
-启动后 API 前缀是 `http://localhost:8080/api`。
-
-## Docker Compose
-
-单机试用（会拉起 OceanBase、迁移、后端、前端）：
+### 2. 创建本地配置
 
 ```bash
 cp .env.oceanbase.example .env
-# 编辑 .env：OceanBase 密码、32 字节以上 JWT、引导管理员密码
-docker compose -f docker-compose.example.yml up --build
+openssl rand -hex 32
 ```
 
-前端 `http://localhost:5173`，后端只绑 `127.0.0.1:8080`。Compose 按顺序跑 `accounts-init` → `schema-init`（V1–V11）→ `uploads-init`，再启动应用。健康检查：`/api/health/live`、`/api/health/ready`。
+编辑 `.env`，至少替换下面 5 个占位值。`.env` 只在本机使用，永远不要提交：
 
-示例默认是 `development`：SMTP 校验关闭，响应里可能带回本地重置/邀请 token。生产必须改成 HTTPS 公网地址、打开 SMTP 校验，并关掉 token 回显。已有业务库不要直接套这份 Compose，走升级手册。
+| 配置                           | 用途                             |
+| ------------------------------ | -------------------------------- |
+| `OCEANBASE_ROOT_PASSWORD`      | Compose 初始化 OceanBase 租户    |
+| `PMS_APP_PASSWORD`             | 后端运行账号（业务读写，无 DDL） |
+| `PMS_MIGRATOR_PASSWORD`        | 迁移账号（执行数据库升级）       |
+| `PMS_JWT_SECRET`               | JWT 签名密钥，至少 32 字节随机值 |
+| `PMS_BOOTSTRAP_ADMIN_PASSWORD` | 首次创建管理员的密码，至少 12 位 |
 
-可选观察栈（本机 loopback，不强迫上 Kubernetes）：
+本地示例的管理员邮箱由 `PMS_BOOTSTRAP_ADMIN_EMAIL` 指定，默认是 `alex.zhang@example.com`。登录时使用邮箱，不区分大小写；中文名和英文名只是展示信息。
+
+### 3. 启动完整系统
 
 ```bash
-# .env 里还要有 GRAFANA_ADMIN_PASSWORD
-docker compose -f docker-compose.example.yml -f docker-compose.observability.yml up --build
+docker compose -f docker-compose.example.yml up -d --build
+docker compose -f docker-compose.example.yml ps
 ```
 
-Prometheus `http://127.0.0.1:9090`，Grafana `http://127.0.0.1:3000`。叠层会把容器内管理口改成 `0.0.0.0:8081` 供刮取，对外仍只发布 `127.0.0.1:8081`。默认 jar / 未叠层的 Compose **不会**把 8081 暴露到公网。
+首次启动会按以下顺序完成 OceanBase、账号、V1–V11 数据库迁移、附件目录、后端和前端：
 
-自动化测试用嵌入式库，不动 OceanBase：
+```text
+OceanBase → accounts-init → schema-init（V1–V11）→ uploads-init → backend → frontend
+```
+
+打开 <http://localhost:5173>。后端健康检查地址：
+
+```text
+http://127.0.0.1:8080/api/health/live
+http://127.0.0.1:8080/api/health/ready
+```
+
+查看日志：
 
 ```bash
-mvn test
+docker compose -f docker-compose.example.yml logs -f backend
+```
+
+停止服务但保留数据卷：
+
+```bash
+docker compose -f docker-compose.example.yml down
+```
+
+只有确认要删除本地数据库和附件时，才使用 `down -v`。
+
+## 系统结构
+
+```text
+浏览器
+  ↓ http://localhost:5173
+pms-front（Vue 3 + Nginx/Vite）
+  ↓ /api 代理
+pms-backend（Spring Boot，8080）
+  ↓
+OceanBase brad_pms（MySQL 兼容模式，2881）
+```
+
+后端主要职责：
+
+- 登录、JWT 会话、邮箱身份和账号生命周期
+- RBAC 权限、数据范围和统一错误响应
+- 组织架构、组织负责人、员工主归属/兼职归属
+- 项目、任务、里程碑、成员、评论、附件和通知
+- Excel/CSV 预览、校验、幂等提交、错误报告和事务回滚
+- 审计日志、请求追踪、健康检查和 Prometheus 指标
+
+前端页面和操作说明见兄弟仓库 [`pms-front`](../pms-front) 以及 [使用手册](../pms-front/docs/user-manual.md)。
+
+## 数据库与账号
+
+运行时只使用 OceanBase 数据库 `brad_pms`，数据库账号必须分离：
+
+| 账号               | 用途               | 是否允许 DDL |
+| ------------------ | ------------------ | ------------ |
+| `pms_app`          | 后端业务读写       | 否           |
+| `pms_migrator`     | 版本升级、结构校验 | 是           |
+| OceanBase 管理账号 | 仅初始化账号和租户 | 按企业策略   |
+
+组织负责人和员工主归属是两套关系：
+
+- `sys_org_unit.leader_user_id`：某个组织由谁负责；
+- `sys_user_position.is_primary`：员工的主归属组织；
+- 同一员工还可以有多个兼职或项目归属。
+
+不要通过修改组织负责人来替代员工归属调整，也不要让应用账号执行迁移。
+
+### 已有 OceanBase 的升级
+
+已有企业数据库时，不要重新套用示例 Compose，也不要删除或重建业务库。使用迁移账号执行版本化脚本：
+
+```bash
+set -a
+source .env.oceanbase.local
+set +a
+export OCEANBASE_USER="$PMS_MIGRATOR_USERNAME"
+export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
+
+./scripts/oceanbase-upgrade.sh
+./scripts/verify-enterprise-migration.sh
+./scripts/enterprise-preflight.sh
+```
+
+脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V11，详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+
+## 本地直接启动后端（已有 OceanBase 时）
+
+不使用 Compose、只启动本地 JAR 时：
+
+```bash
+mvn -q -DskipTests package
+PMS_ENV_FILE=.env.oceanbase.local ./scripts/start-local-oceanbase.sh
+```
+
+后端 API：`http://127.0.0.1:8080/api`；管理和就绪端口默认只监听 `127.0.0.1:8081`。
+
+停止本地后端：
+
+```bash
+./scripts/stop-local-oceanbase.sh
+```
+
+本地文件 `.env.oceanbase.local` 不会被 Git 跟踪。启动前必须提供非空的 `PMS_JWT_SECRET`；生产环境还必须关闭 token 回显并启用 HTTPS、受限 CORS 和 SMTP 校验。
+
+## 开发与验证
+
+后端不需要先启动数据库即可运行大部分自动化测试：
+
+```bash
+mvn -q test
 ./scripts/validate-openapi.sh
+bash -n scripts/*.sh docker/*.sh
 ./scripts/check-privacy.sh
 ```
 
-## Kubernetes（可选）
+测试会使用测试配置中的嵌入式数据库；这不代表运行时支持 H2。真实数据库验收使用：
 
-单机继续用 Compose。已经有集群时，用 [`deploy/helm/pms`](deploy/helm/pms/README.md)：
+```bash
+set -a
+source .env.oceanbase.local
+set +a
+export OCEANBASE_USER="$PMS_MIGRATOR_USERNAME"
+export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
+export PMS_DB_USER="$PMS_MIGRATOR_USERNAME"
+export PMS_DB_PASSWORD="$PMS_MIGRATOR_PASSWORD"
+PMS_OCEANBASE_VERIFY=true ./scripts/verify-oceanbase.sh
 
-- 只部署后端 + 前端，**不内置 OceanBase**
-- 镜像自己 build（`pms-backend:1.0.0` / `pms-front:1.0.0`）
-- 密钥用 `existingSecret`，values 里只有占位符
-- Ingress 默认关；管理口只有 ClusterIP，不要挂到 Ingress
-- 集群里已有 prometheus-operator 时再 `--set serviceMonitor.enabled=true`
+PMS_SMOKE_USERNAME=admin PMS_SMOKE_PASSWORD='<本地测试密码>' \
+  ./scripts/smoke-test.sh
+```
 
-## 身份与账号
+不要把密码、JWT、SMTP、对象存储密钥或导入文件放进仓库。提交前可执行隐私扫描：
 
-邮箱是唯一核心身份，登录不区分大小写。展示优先 `中文名（English.Name）`，缺姓名时回退邮箱。每名员工一个主归属，可以有多个兼职/项目归属。
+```bash
+./scripts/check-privacy.sh
+```
 
-OIDC / LDAP 默认关闭。打开后**不会**从目录自动开账号。常用开关：`PMS_OIDC_ENABLED`、`PMS_OIDC_ISSUER`、`PMS_OIDC_CLIENT_ID`、`PMS_OIDC_CLIENT_SECRET`、`PMS_OIDC_REDIRECT_URI`；以及 `PMS_LDAP_ENABLED`、`PMS_LDAP_URL`、`PMS_LDAP_BASE_DN`。文档主机用 `idp.example.com`、`dc=example,dc=com`。
+## 目录速览
 
-## 存储与 Webhook
+```text
+src/main/java/com/brad/pms/
+├── controller/  REST API 与权限注解
+├── service/     业务规则、事务和数据范围
+├── mapper/      MyBatis-Plus 数据访问
+├── entity/      数据库对象
+├── dto/         请求命令与响应对象
+├── security/    JWT、会话、RBAC、数据范围
+├── config/      数据源、初始化、CORS、观测
+├── storage/     本地盘或 S3 兼容对象存储
+└── webhook/     可选签名出站事件
 
-附件默认写 `PMS_UPLOAD_DIR`。对象存储：`PMS_STORAGE_TYPE=s3`，再配 `PMS_S3_ENDPOINT`（例如 `http://minio.example.com:9000`）、`PMS_S3_BUCKET`、`PMS_S3_ACCESS_KEY`、`PMS_S3_SECRET_KEY`。
+src/main/resources/
+├── db/migration/  V1–V11 OceanBase 迁移脚本
+└── openapi/       pms-api.yaml 接口合同
 
-出站 Webhook 默认关。`PMS_WEBHOOK_ENABLED=true` 后，任务指派和评论会向 `PMS_WEBHOOK_URL` POST，带头 `X-PMS-Signature`。生产必须 HTTPS，`PMS_WEBHOOK_SECRET` 至少 16 位。投递失败只记日志，不回滚站内通知。
+docs/
+├── business-specification.md       业务规则和数据关系
+└── operations/                     升级、备份、发布和故障演练
+```
 
-## 核心接口
+## 常用接口
 
-除登录与健康检查外，请求头带 `Authorization: Bearer <token>`。完整合同以 OpenAPI 为准。
+除登录和健康检查外，请求头都需要 `Authorization: Bearer <JWT>`。完整接口以 [OpenAPI 合同](src/main/resources/openapi/pms-api.yaml) 为准。
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| POST | `/auth/login` | 邮箱登录，返回 JWT |
-| GET | `/auth/providers` | 当前启用的登录方式 |
-| GET | `/auth/oidc/start` | 开始 OIDC 授权码登录 |
-| POST | `/auth/oidc/callback` | 用授权码换本系统会话 |
-| POST | `/auth/ldap/login` | 目录账号登录 |
-| GET | `/auth/me` | 当前用户 |
-| GET | `/users/search?keyword=` | 用户搜索 |
-| GET | `/workbench` | 工作台（我的任务、参与项目、最近动态） |
-| GET | `/notifications` | 站内通知；另有 unread-count / read / read-all |
-| GET | `/search?q=` | 可读范围内搜索项目、任务、评论 |
-| POST | `/projects/page` | 项目分页 |
-| POST | `/projects` | 新建项目 |
-| GET/PUT/DELETE | `/projects/{id}` | 项目详情 / 更新 / 删除 |
-| GET/POST | `/projects/{id}/tasks` | 任务列表 / 新建 |
-| GET | `/tasks/{id}` | 任务详情（子任务、评论、附件） |
-| PUT/DELETE | `/tasks/{id}` | 任务更新 / 删除 |
-| POST/GET/DELETE | `/tasks/{id}/attachments` | 附件上传 / 下载 / 删除 |
-| PUT | `/tasks/{id}/move` | 拖拽改状态 |
-| GET/POST | `/projects/{id}/milestones` | 里程碑 |
-| GET/POST | `/projects/{id}/members` | 成员 |
-| GET/POST | `/projects/{id}/comments` | 动态 |
-| GET/POST/PUT/DELETE | `/admin/org`… | 组织树 |
-| GET/POST | `/admin/users`… | 人员、邀请、禁用 |
-| GET/POST/PUT/DELETE | `/admin/roles`… | 角色与数据范围 |
-| POST | `/admin/import/…` | Excel/CSV 导入 |
-| GET | `/admin/audit` | 审计日志 |
-| GET | `/health`、`/healthz`、`/health/live`、`/health/ready` | 存活 / 就绪（无需登录） |
-| GET | `/actuator/health`、`/actuator/metrics`、`/actuator/prometheus` | 管理口，默认 `127.0.0.1:8081` |
+| 方法   | 路径                                   | 用途                 |
+| ------ | -------------------------------------- | -------------------- |
+| `POST` | `/api/auth/login`                      | 邮箱登录             |
+| `GET`  | `/api/auth/me`                         | 当前登录用户         |
+| `GET`  | `/api/workbench`                       | 我的任务、项目和动态 |
+| `POST` | `/api/projects/page`                   | 项目分页             |
+| `GET`  | `/api/projects/{id}`                   | 项目详情             |
+| `GET`  | `/api/org/tree`                        | 项目页可用的组织树   |
+| `GET`  | `/api/admin/org/tree`                  | 管理组织树           |
+| `GET`  | `/api/admin/org/{id}/history`          | 组织变更历史         |
+| `POST` | `/api/admin/import/preview/{type}`     | Excel/CSV 预览和校验 |
+| `POST` | `/api/admin/import/{jobId}/commit`     | 幂等提交导入任务     |
+| `GET`  | `/api/admin/import/{jobId}/errors.csv` | 下载服务端错误报告   |
+| `GET`  | `/api/health/live`                     | 存活检查             |
+| `GET`  | `/api/health/ready`                    | 数据库就绪检查       |
 
-## 运维文档
+## 生产部署前必须完成
 
-- 升级与预检：[`docs/operations/enterprise-upgrade-runbook.md`](docs/operations/enterprise-upgrade-runbook.md)
-- 发布清单：[`docs/operations/release-checklist.md`](docs/operations/release-checklist.md)
-- 扩展边界（限流、多副本、对象存储）：[`docs/operations/scaling-readiness.md`](docs/operations/scaling-readiness.md)
-- 基础设施状态：[`docs/operations/infrastructure-status.md`](docs/operations/infrastructure-status.md)
+本 README 只解决本地快速启动；生产上线前请逐项完成 [发布验收清单](docs/operations/release-checklist.md)：
 
-生产覆盖：`PMS_JWT_SECRET`、`PMS_ACCESS_EXPIRE_MINUTES`、`PMS_REFRESH_EXPIRE_DAYS`、`PMS_PASSWORD_RESET_EXPOSE_TOKEN=false`、`PMS_INVITATION_EXPOSE_TOKEN=false`。
+- 使用企业自己的 OceanBase、`pms_app` 和 `pms_migrator` 凭据；
+- `PMS_JWT_SECRET` 使用密钥管理器注入，至少 32 字节且不出现在日志；
+- `PMS_DEPLOYMENT_ENV=production`，关闭密码重置/邀请 token 回显；
+- 使用 HTTPS 反向代理，`PMS_CORS_ALLOWED_ORIGINS` 只允许正式前端来源；
+- 配置 SMTP、备份恢复、RPO/RTO、对象存储和监控告警；
+- 首次登录后更换演示管理员密码，并执行完整桌面端/移动端验收。
+
+更多内容：
+
+- [业务规范](docs/business-specification.md)
+- [OceanBase 升级与预检](docs/operations/enterprise-upgrade-runbook.md)
+- [备份与恢复](docs/operations/oceanbase-backup-restore.md)
+- [扩展与观测](docs/operations/scaling-readiness.md)
+- [基础设施状态](docs/operations/infrastructure-status.md)
+- [贡献指南](CONTRIBUTING.md)
+- [安全策略](SECURITY.md)
+
+## 许可证
+
+Apache-2.0。贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
