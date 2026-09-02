@@ -43,6 +43,7 @@ class ContainerHardeningTest {
         assertThat(compose).contains("127.0.0.1:8080:8080");
         assertThat(compose).contains("uploads-init:");
         assertThat(compose).contains("chown -R 10001:10001");
+        assertThat(compose).contains("cap_add: [CHOWN, FOWNER]");
         assertThat(compose).contains("PMS_NOTIFICATION_STARTUP_CHECK:-false");
         assertThat(compose).contains("PMS_DEPLOYMENT_ENV:-development");
         assertThat(compose).contains("pms-data:", "pms-edge:", "networks: [pms-data, pms-edge]");
