@@ -94,6 +94,7 @@ jobs:
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml ps
           docker inspect --format='{{json .State.Health}}' pms-backend-oceanbase-1 || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 oceanbase || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 accounts-init || true
 
       - name: Stop integration stack
         if: ${{ always() && hashFiles('.env') != '' }}
