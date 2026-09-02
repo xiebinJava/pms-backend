@@ -34,8 +34,11 @@ services:
       OCEANBASE_PORT: 2881
       OCEANBASE_DATABASE: brad_pms
       OCEANBASE_ROOT_USER: ${OCEANBASE_ROOT_USER:-root@test}
+      OCEANBASE_TENANT: ${OCEANBASE_TENANT:-test}
       OCEANBASE_ROOT_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
+      PMS_APP_USERNAME: ${PMS_APP_USERNAME:-pms_app@test}
       PMS_APP_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}
+      PMS_MIGRATOR_USERNAME: ${PMS_MIGRATOR_USERNAME:-pms_migrator@test}
       PMS_MIGRATOR_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}
       PMS_ROTATE_ACCOUNT_PASSWORDS: ${PMS_ROTATE_ACCOUNT_PASSWORDS:-false}
     volumes:
@@ -57,7 +60,7 @@ services:
       OCEANBASE_HOST: oceanbase
       OCEANBASE_PORT: 2881
       OCEANBASE_DATABASE: brad_pms
-      OCEANBASE_USER: pms_migrator
+      OCEANBASE_USER: ${PMS_MIGRATOR_USERNAME:-pms_migrator@test}
       OCEANBASE_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}
       PMS_MIGRATIONS_DIR: /migrations
     volumes:
@@ -120,7 +123,7 @@ services:
       OCEANBASE_HOST: oceanbase
       OCEANBASE_PORT: 2881
       OCEANBASE_DATABASE: brad_pms
-      OCEANBASE_USER: pms_app
+      OCEANBASE_USER: ${PMS_APP_USERNAME:-pms_app@test}
       OCEANBASE_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}
       PMS_JWT_SECRET: ${PMS_JWT_SECRET:?set a random PMS_JWT_SECRET of at least 32 bytes}
       # The example stack is for local evaluation. Production deployments must

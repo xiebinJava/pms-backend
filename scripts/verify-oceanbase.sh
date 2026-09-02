@@ -38,7 +38,7 @@ fi
 # The integrity preflight may use a separate, read-only runtime account. If
 # it is not provided, intentionally fall back to the migration account so a
 # local installation can run one command without duplicating credentials.
-export PMS_DB_USER="${PMS_DB_USER:-${OCEANBASE_USER:-pms_migrator}}"
+export PMS_DB_USER="${PMS_DB_USER:-${OCEANBASE_USER:-pms_migrator@test}}"
 export PMS_DB_PASSWORD="${PMS_DB_PASSWORD:-$OCEANBASE_PASSWORD}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

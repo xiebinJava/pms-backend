@@ -18,7 +18,7 @@ if [[ $# -ne 0 ]]; then usage >&2; exit 2; fi
 DB_HOST="${OCEANBASE_HOST:-127.0.0.1}"
 DB_PORT="${OCEANBASE_PORT:-2881}"
 DB_NAME="${OCEANBASE_DATABASE:-brad_pms}"
-DB_USER="${OCEANBASE_BACKUP_USER:-${OCEANBASE_USER:-pms_migrator}}"
+DB_USER="${OCEANBASE_BACKUP_USER:-${OCEANBASE_USER:-pms_migrator@test}}"
 if [[ -z "${OCEANBASE_PASSWORD:-}" ]]; then
   OCEANBASE_PASSWORD="${PMS_MIGRATOR_PASSWORD:-${PMS_APP_PASSWORD:-}}"
 fi

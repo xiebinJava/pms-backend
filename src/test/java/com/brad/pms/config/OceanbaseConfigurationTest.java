@@ -52,9 +52,9 @@ class OceanbaseConfigurationTest {
     void composeSeparatesRuntimeAndMigrationDatabaseAccounts() throws Exception {
         String compose = Files.readString(Path.of("docker-compose.example.yml"));
 
-        assertThat(compose).contains("OCEANBASE_USER: pms_app");
+        assertThat(compose).contains("OCEANBASE_USER: ${PMS_APP_USERNAME:-pms_app@test}");
         assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}");
-        assertThat(compose).contains("OCEANBASE_USER: pms_migrator");
+        assertThat(compose).contains("OCEANBASE_USER: ${PMS_MIGRATOR_USERNAME:-pms_migrator@test}");
         assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}");
         assertThat(compose).doesNotContain("OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}");
     }

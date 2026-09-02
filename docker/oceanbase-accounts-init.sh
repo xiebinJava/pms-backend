@@ -5,6 +5,9 @@ set -eu
 : "${OCEANBASE_PORT:=2881}"
 : "${OCEANBASE_DATABASE:=brad_pms}"
 : "${OCEANBASE_ROOT_USER:=root@sys}"
+: "${OCEANBASE_TENANT:=test}"
+: "${PMS_APP_USERNAME:=pms_app@$OCEANBASE_TENANT}"
+: "${PMS_MIGRATOR_USERNAME:=pms_migrator@$OCEANBASE_TENANT}"
 if [ -z "${OCEANBASE_ROOT_PASSWORD+x}" ]; then
   echo "OCEANBASE_ROOT_PASSWORD must be set explicitly" >&2
   exit 2
@@ -88,11 +91,11 @@ create_account "pms_migrator" "$PMS_MIGRATOR_PASSWORD"
 run_root --execute "GRANT SELECT, INSERT, UPDATE, DELETE ON \`$OCEANBASE_DATABASE\`.* TO 'pms_app'@'%'"
 run_root --execute "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES, CREATE VIEW, TRIGGER ON \`$OCEANBASE_DATABASE\`.* TO 'pms_migrator'@'%'"
 
-if ! MYSQL_PWD="$PMS_APP_PASSWORD" "$SQL_CLIENT" --protocol=tcp --host="$OCEANBASE_HOST" --port="$OCEANBASE_PORT" --user=pms_app --database="$OCEANBASE_DATABASE" --execute "SELECT 1" >/dev/null 2>&1; then
+if ! MYSQL_PWD="$PMS_APP_PASSWORD" "$SQL_CLIENT" --protocol=tcp --host="$OCEANBASE_HOST" --port="$OCEANBASE_PORT" --user="$PMS_APP_USERNAME" --database="$OCEANBASE_DATABASE" --execute "SELECT 1" >/dev/null 2>&1; then
   echo "pms_app was created but the supplied password cannot authenticate; set PMS_ROTATE_ACCOUNT_PASSWORDS=true to rotate it" >&2
   exit 1
 fi
-if ! MYSQL_PWD="$PMS_MIGRATOR_PASSWORD" "$SQL_CLIENT" --protocol=tcp --host="$OCEANBASE_HOST" --port="$OCEANBASE_PORT" --user=pms_migrator --database="$OCEANBASE_DATABASE" --execute "SELECT 1" >/dev/null 2>&1; then
+if ! MYSQL_PWD="$PMS_MIGRATOR_PASSWORD" "$SQL_CLIENT" --protocol=tcp --host="$OCEANBASE_HOST" --port="$OCEANBASE_PORT" --user="$PMS_MIGRATOR_USERNAME" --database="$OCEANBASE_DATABASE" --execute "SELECT 1" >/dev/null 2>&1; then
   echo "pms_migrator was created but the supplied password cannot authenticate; set PMS_ROTATE_ACCOUNT_PASSWORDS=true to rotate it" >&2
   exit 1
 fi
