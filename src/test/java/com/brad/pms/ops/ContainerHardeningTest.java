@@ -77,4 +77,11 @@ class ContainerHardeningTest {
         assertThat(application).contains("port: ${PMS_MANAGEMENT_PORT:8081}");
         assertThat(application).contains("address: ${PMS_MANAGEMENT_ADDRESS:127.0.0.1}");
     }
+
+    @Test
+    void ciAllowsTheFrontendProxyOriginForBrowserLogin() throws Exception {
+        String workflow = Files.readString(Path.of(".github/workflows/integration.yml"));
+        assertThat(workflow).contains(
+                "PMS_CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173");
+    }
 }

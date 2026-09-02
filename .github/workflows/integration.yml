@@ -54,6 +54,9 @@ jobs:
             echo "OCEANBASE_PASSWORD=$app_password"
             echo "PMS_JWT_SECRET=$jwt_secret"
             echo "PMS_DEPLOYMENT_ENV=development"
+            # The browser talks to the backend through the frontend container
+            # at 127.0.0.1:5173, so include that explicit Origin in CI.
+            echo "PMS_CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173"
             echo "PMS_BOOTSTRAP_ADMIN_EMAIL=alex.zhang@example.com"
             echo "PMS_BOOTSTRAP_ADMIN_USERNAME=alex.zhang"
             echo "PMS_BOOTSTRAP_ADMIN_NAME_ZH=张伟"
