@@ -58,6 +58,15 @@ class OceanbaseUpgradeScriptTest {
     }
 
     @Test
+    void upgradeWorkflowAppliesVersionedMigrationsInNumericOrder() throws Exception {
+        String script = Files.readString(Path.of("scripts/oceanbase-upgrade.sh"));
+
+        assertThat(script)
+                .contains("sort -n -k1,1")
+                .contains("while IFS=$'\\t' read -r _ file");
+    }
+
+    @Test
     void verifyWorkflowRunsTheLiveOceanbaseChecksTwiceForIdempotency() throws Exception {
         String script = Files.readString(Path.of("scripts/verify-oceanbase.sh"));
 

@@ -174,8 +174,8 @@ apply_migration_file() {
   fi
 }
 
-for file in "$MIGRATION_DIR"/V*.sql; do
-  [[ -f "$file" ]] || continue
+while IFS=$'\t' read -r _ file; do
+  [[ -n "$file" && -f "$file" ]] || continue
   filename="$(basename "$file")"
   version="${filename#V}"
   version="${version%%__*}"
@@ -212,7 +212,19 @@ for file in "$MIGRATION_DIR"/V*.sql; do
   sql "INSERT INTO pms_schema_migration_history (version, description, checksum) VALUES ('$version', '$description', '$checksum')"
   echo "V${version} applied"
   pending=1
-done
+done < <(
+  for file in "$MIGRATION_DIR"/V*.sql; do
+    [[ -f "$file" ]] || continue
+    filename="$(basename "$file")"
+    version="${filename#V}"
+    version="${version%%__*}"
+    if ! [[ "$version" =~ ^[0-9]+$ ]]; then
+      echo "migration filename has a non-numeric version: $filename" >&2
+      exit 1
+    fi
+    printf '%s\t%s\n' "$version" "$file"
+  done | sort -n -k1,1 -k2,2
+)
 
 if [[ "$pending" == "0" ]]; then
   echo "No pending migrations. All migration checksums verified."
