@@ -3,14 +3,18 @@ services:
     image: oceanbase/oceanbase-ce:4.3.5-lts
     environment:
       MODE: ${OCEANBASE_MODE:-mini}
-      OB_SYS_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
+      # The official CE image provisions the MySQL-compatible tenant root
+      # through OB_TENANT_PASSWORD. The sys tenant password is not changed by
+      # the image bootstrap script, so the compose stack uses root@test by
+      # default and keeps the account configurable for an existing cluster.
       OB_TENANT_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
+      OCEANBASE_ROOT_USER: ${OCEANBASE_ROOT_USER:-root@test}
     ports:
       - "127.0.0.1:2881:2881"
     volumes:
       - oceanbase-data:/home/admin/oceanbase/store
     healthcheck:
-      test: ["CMD-SHELL", "obclient -h127.0.0.1 -P2881 -uroot@sys -p$${OB_SYS_PASSWORD} -e 'SELECT 1' >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "obclient -h127.0.0.1 -P2881 -u$${OCEANBASE_ROOT_USER} -p$${OB_TENANT_PASSWORD} -e 'SELECT 1' >/dev/null 2>&1"]
       interval: 10s
       timeout: 10s
       start_period: 60s
@@ -29,7 +33,7 @@ services:
       OCEANBASE_HOST: oceanbase
       OCEANBASE_PORT: 2881
       OCEANBASE_DATABASE: brad_pms
-      OCEANBASE_ROOT_USER: root@sys
+      OCEANBASE_ROOT_USER: ${OCEANBASE_ROOT_USER:-root@test}
       OCEANBASE_ROOT_PASSWORD: ${OCEANBASE_ROOT_PASSWORD:?set OCEANBASE_ROOT_PASSWORD}
       PMS_APP_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}
       PMS_MIGRATOR_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}
