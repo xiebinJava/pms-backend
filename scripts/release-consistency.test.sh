@@ -31,7 +31,7 @@ if [[ "$CHECK_FRONTEND" == true ]]; then
 fi
 for readme in "${readmes[@]}"; do
   [[ -f "$readme" ]] || fail "README does not exist: $readme"
-  if rg -n -- 'V1[–-]V11' "$readme" >/dev/null; then
+  if grep -nE -- 'V1[–-]V11' "$readme" >/dev/null; then
     fail "README contains stale V1–V11 current-baseline wording: $readme"
   fi
 done
@@ -42,7 +42,7 @@ for route in \
   '/feedback/tickets/assignees:' \
   '/feedback/tickets/{id}:' \
   '/feedback/tickets/{id}/reopen:'; do
-  rg -F -- "$route" "$openapi" >/dev/null || fail "feedback route missing from OpenAPI contract: $route"
+  grep -F -- "$route" "$openapi" >/dev/null || fail "feedback route missing from OpenAPI contract: $route"
 done
 
 echo "Release consistency checks passed: migration=V1–V12, READMEs=current, feedback routes=documented"
