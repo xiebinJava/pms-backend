@@ -8,7 +8,7 @@
 - [x] 本机 OceanBase V1–V12 幂等升级、迁移校验和完整性预检通过，反馈中心表结构已落库。
 - [x] 当前代码回归：后端 `mvn -q test`（206 个用例，0 失败、0 错误、1 跳过）、前端 `pnpm test`（121 项）、类型检查和构建通过。
 - [x] 本机最新后端 JAR 已使用 OceanBase profile 重启；`/api/health/live` 与 `/api/health/ready` 返回 200，ready 迁移版本为 V12。
-- [x] OpenAPI、生产配置门禁、脚本语法和当前发布一致性检查通过；本次本地变更尚未推送远程。
+- [x] OpenAPI、生产配置门禁、脚本语法和当前发布一致性检查通过；本次后端提交已推送至远程 `main`/`release`，前端提交同步推送。
 - [ ] 目标企业仍需注入真实 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储和监控，并记录 RPO/RTO 与故障联系人。
 - [x] 本机 V12 备份生成、SHA-256/元数据校验和隔离空库恢复已完成；恢复后结构、预检和精确行数比对通过。不得以历史 V5 备份代替 V12 演练。
 - [x] 跨仓库 GitHub Actions 已确认 `PMS_FRONT_REPO_READ_TOKEN` 可读 sibling `pms-front`；最近一次远程运行 `33609929924` 的 OceanBase、API、桌面/移动端 Playwright 全通过。
