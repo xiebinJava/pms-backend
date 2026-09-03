@@ -133,6 +133,11 @@ management:
       probes:
         enabled: true
   health:
+    # An unconfigured JavaMailSender otherwise makes Actuator readiness DOWN
+    # even when application mail notifications are intentionally disabled.
+    # Enable explicitly only when the deployment has a verified SMTP target.
+    mail:
+      enabled: ${PMS_MAIL_HEALTH_ENABLED:false}
     livenessstate:
       enabled: true
     readinessstate:

@@ -26,6 +26,8 @@
 | 项目经理 | 项目级负责人，保存在 `project.project_manager_id`；未设置时前端显示“待分配”。 |
 | 项目成员 | 项目协作范围内的人员，角色包括负责人、管理员、成员。 |
 | 数据范围 | 角色在组织和项目数据上的可见范围，不等同于功能权限。 |
+| 反馈工单 | 用户提交的可追踪问题、建议或咨询，具有状态、优先级、处理人和处理历史。 |
+| 分诊 | 反馈进入“待初步处理”后，由具备 `feedback:manage` 的人员确认类型、优先级、负责人和处理路径。 |
 
 用户展示遵循“中文名（英文名）”优先、邮箱兜底的规则，例如“张伟（Alex.Zhang）”。邮箱是新账号的唯一核心身份，登录时对邮箱执行 trim + 小写规范化并按 `email_normalized` 查询；中文名和英文名均可选。历史 `username` 字段保留为兼容字段，旧英文名登录在兼容期内仍可用，并继续以 `username_normalized` 保证唯一。
 
@@ -43,6 +45,7 @@
 8. 所有会改变人员、组织、角色、项目生命周期、导入结果或认证状态的写操作都要留下可追踪审计记录。
 9. 已完成、已终止或已删除的项目/节点按只读处理；恢复项目必须通过明确的恢复操作和原因，不得靠普通编辑绕过生命周期。
 10. 项目列表和项目详情必须读取同一套项目聚合字段：项目经理、业务线完整路径、负责人、状态、优先级、周期和进度不能出现两套解释。
+11. 反馈工单以 `client_request_id + reporter_id` 保证提交幂等；状态只能按允许的状态机流转，每次处理、分派、重开或关闭都必须追加历史并携带乐观锁版本。
 
 ## 4. 数据模型与关系
 
@@ -91,6 +94,25 @@ project
 
 `project.org_unit_id` 是项目主业务线/主组织；`project_node.owner_id` 是节点负责人；`project_task.assignee_id` 是任务执行人。这三者不可混用。
 
+### 4.3 反馈中心
+
+```text
+feedback_ticket
+  ├─< feedback_history
+  ├─> sys_user (reporter_id)
+  ├─> sys_user (assignee_id, nullable)
+  ├─> project (project_id, nullable)
+  ├─> project_task (task_id, nullable)
+  └─> project_node (node_id, nullable)
+```
+
+| 表 | 职责 | 关键字段/约束 |
+| --- | --- | --- |
+| `feedback_ticket` | 当前反馈内容、上下文、状态、优先级、提交人和负责人 | `ticket_no` 唯一；`reporter_id + client_request_id` 幂等唯一（请求 ID 为空时不参与幂等）；`version` 乐观锁；软删除；上下文外键可为空 |
+| `feedback_history` | 反馈创建、分诊、状态/优先级/负责人变更、重开和处理说明的追加式记录 | 只允许插入；保存前后状态/优先级/负责人、操作人、请求 ID 和时间；不得通过普通接口更新或删除 |
+
+反馈上下文遵循“项目 → 任务/节点”的层级约束：任务和节点必须属于所选项目，节点与任务不一致时拒绝提交。反馈权限与项目/组织数据范围叠加：提交人只能读取自己提交的工单；具备 `feedback:manage` 的处理人员可按其授权范围查看和处理工单，只有全公司范围可读取全量工单；提交人始终保留自己的读取权。反馈权限族内部 `manage → write → read` 继承，其他权限族仍精确匹配。
+
 ## 5. 状态与生命周期
 
 ### 5.1 用户状态
@@ -113,6 +135,20 @@ project
 
 前端显示使用中文标签；接口和数据库使用稳定的英文枚举/整数编码。未知编码不得被静默映射成“已完成”，应保留原值并返回可诊断错误。
 
+### 5.3 反馈工单
+
+| 状态 | 中文显示 | 可流转到 | 说明 |
+| --- | --- | --- | --- |
+| `PENDING_TRIAGE` | 待初步处理 | `ASSIGNED`、`REJECTED`、`DUPLICATE`、`UNREPRODUCIBLE` | 新提交的默认状态，等待分诊 |
+| `ASSIGNED` | 已分派 | `IN_PROGRESS`、`REJECTED`、`DUPLICATE`、`UNREPRODUCIBLE` | 已确定负责人 |
+| `IN_PROGRESS` | 处理中 | `PENDING_CONFIRMATION`、`REJECTED`、`DUPLICATE`、`UNREPRODUCIBLE` | 负责人正在调查或修复 |
+| `PENDING_CONFIRMATION` | 待确认 | `RESOLVED`、`IN_PROGRESS` | 等待提交人确认结果 |
+| `RESOLVED` | 已解决 | `CLOSED`、`IN_PROGRESS` | 解决说明已填写，仍可重开 |
+| `CLOSED` | 已关闭 | `IN_PROGRESS` | 完成归档，必要时可重开 |
+| `REJECTED` / `DUPLICATE` / `UNREPRODUCIBLE` | 已拒绝 / 重复反馈 / 无法复现 | `IN_PROGRESS` | 异常结论必须填写处理说明 |
+
+进入 `RESOLVED`、`CLOSED` 或异常结论状态时必须填写处理说明；进入 `ASSIGNED`/`IN_PROGRESS` 时必须指定有效的启用用户。所有状态变更都校验 `version`，冲突返回 409，前端需提示刷新后重试。
+
 ## 6. 权限与数据范围
 
 ### 6.1 功能权限
@@ -127,6 +163,9 @@ project
 | `admin:role:read` / `admin:role:write` | 角色、权限点和数据范围 |
 | `admin:import:write` | 组织与员工导入 |
 | `admin:audit:read` | 审计日志查看 |
+| `feedback:read` | 查看本人可见的反馈工单和处理历史 |
+| `feedback:write` | 提交反馈、查看自己的工单并重开可重开状态的工单 |
+| `feedback:manage` | 分诊、分派、调整优先级、填写处理说明和推进反馈状态 |
 
 系统管理员（`system_role = 1`）拥有管理端绕过权限，但仍然必须经过认证、记录审计并遵守不可破坏的数据约束。普通管理员的能力来自实时角色授权，而不是前端隐藏菜单。
 
@@ -172,6 +211,7 @@ project
 | 角色 | `/admin/roles` CRUD 和权限/数据范围 |
 | 导入 | 组织/用户预览、提交、CSV 模板、错误报告下载 |
 | 审计 | `GET /admin/audit`，按动作、资源、人员、时间和分页筛选 |
+| 反馈 | `POST /feedback/tickets`、`GET /feedback/tickets`、`GET /feedback/tickets/assignees`、`GET /feedback/tickets/{id}`、`PATCH /feedback/tickets/{id}`、`POST /feedback/tickets/{id}/reopen` |
 
 写接口应做到幂等或明确返回冲突；删除、停用、终止等危险动作必须在服务端再次校验当前状态和权限。
 
@@ -191,7 +231,7 @@ project
 
 - 默认 profile 为 `oceanbase`，使用 MySQL 兼容模式和 2881 端口，数据库名为 `brad_pms`。
 - 生产连接参数通过 `OCEANBASE_HOST`、`OCEANBASE_PORT`、`OCEANBASE_DATABASE`、`OCEANBASE_USER`、`OCEANBASE_PASSWORD` 注入。
-- 表结构按 V1–V11 版本化迁移顺序执行：V1–V7 完成基础企业模型与邮箱身份，V8 增加任务附件，V9 增加站内通知，V10 增加通知节点标识，V11 增加组织变更历史和导入失败状态字段。
+- 表结构按 V1–V12 版本化迁移顺序执行：V1–V7 完成基础企业模型与邮箱身份，V8 增加任务附件，V9 增加站内通知，V10 增加通知节点标识，V11 增加组织变更历史和导入失败状态字段，V12 增加反馈工单及追加式处理历史。
 - V5 为现有业务表补充逻辑删除标记、乐观锁版本号、关键唯一索引和跨表外键；应用查询必须遵守逻辑删除条件，关键更新必须携带版本号。
 - OceanBase profile 运行时不依赖 Flyway 自动执行；升级前先执行预检、备份策略和迁移脚本，再启动应用。
 - `application-h2.yml` 和 H2 快照只服务自动化测试/一次性迁移工具；文档、示例和上线脚本不得引导用户用 H2 运行生产。
@@ -207,6 +247,7 @@ project
 - 迁移脚本在目标 OceanBase 实例上执行并验证表、索引、种子角色和健康检查。
 - 对匿名访问、401/403、主归属唯一性、组织负责人独立关系、项目列表/详情一致性进行验收。
 - 检查日志不包含密码、JWT、刷新令牌、重置令牌和数据库连接密码。
+- 反馈中心至少验收：普通用户只能看到自己的工单；处理人员可按授权范围分诊且候选负责人不越界；重复 `clientRequestId` 不重复建单；非法状态流转、版本冲突和越权上下文均被拒绝；关闭时间和重开说明符合生命周期规则；审计不包含正文、来源 URL、幂等键或处理说明原文，历史记录完整可追溯。
 
 ## 12. 变更规则
 

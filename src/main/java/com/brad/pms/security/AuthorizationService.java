@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,7 +19,7 @@ public class AuthorizationService {
         if (current == null) return false;
         if (UserContext.isAdministrator()) return true;
         return permissionMapper.findLiveByUserId(current.getId()).stream()
-                .anyMatch(permission -> Objects.equals(permission.getCode(), permissionCode));
+                .anyMatch(permission -> PermissionCode.isSatisfiedBy(permissionCode, permission.getCode()));
     }
 
     public void require(String permissionCode) {

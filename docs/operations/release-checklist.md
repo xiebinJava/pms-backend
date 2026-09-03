@@ -2,12 +2,17 @@
 
 适用于单企业本地部署的正式发布。发布前复制本清单，在目标环境逐项记录结果。
 
-## 2026-09-02 第二阶段当前状态
+## 2026-09-03 发布准备当前状态
 
 - [x] 生产配置静态门禁已加入：`bash scripts/validate-production-config.test.sh` 通过；不会打印密钥。
-- [x] 本机 OceanBase V1–V11 幂等升级、迁移校验和完整性预检通过，详见 [`drill-records/2026-09-02-organization-import-reliability.md`](drill-records/2026-09-02-organization-import-reliability.md)。
-- [x] 当前代码回归：后端 `mvn -q test` 194 个用例（0 失败、0 错误、1 跳过），前端 `pnpm test` 112 项，类型检查和构建通过。
+- [x] 本机 OceanBase V1–V12 幂等升级、迁移校验和完整性预检通过，反馈中心表结构已落库。
+- [x] 当前代码回归：后端 `mvn -q test`（206 个用例，0 失败、0 错误、1 跳过）、前端 `pnpm test`（121 项）、类型检查和构建通过。
+- [x] 本机最新后端 JAR 已使用 OceanBase profile 重启；`/api/health/live` 与 `/api/health/ready` 返回 200，ready 迁移版本为 V12。
+- [x] OpenAPI、生产配置门禁、脚本语法和当前发布一致性检查通过；本次本地变更尚未推送远程。
 - [ ] 目标企业仍需注入真实 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储和监控，并记录 RPO/RTO 与故障联系人。
+- [x] 本机 V12 备份生成、SHA-256/元数据校验和隔离空库恢复已完成；恢复后结构、预检和精确行数比对通过。不得以历史 V5 备份代替 V12 演练。
+- [x] 跨仓库 GitHub Actions 已确认 `PMS_FRONT_REPO_READ_TOKEN` 可读 sibling `pms-front`；最近一次远程运行 `33609929924` 的 OceanBase、API、桌面/移动端 Playwright 全通过。
+- [ ] 目标企业仍需使用真实测试账号和自己的配置重新执行桌面/移动端 Playwright，并由企业验收人签字。
 
 ## 2026-09-01 本机目标实例执行快照
 
@@ -39,7 +44,7 @@
 - [ ] 已完成数据库备份与恢复演练，并保存校验值。
 - [ ] 备份文件包含 schema 版本、`.sha256` 校验文件和元数据，恢复仅使用显式空目标库。
 - [ ] 执行 `scripts/enterprise-preflight.sh` 通过。
-- [x] 按 V1–V11 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知、V10 的通知节点标识以及 V11 的组织历史/导入失败字段已落库。
+- [x] 按 V1–V12 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知、V10 的通知节点标识、V11 的组织历史/导入失败字段以及 V12 的反馈工单/历史表已落库。
 - [x] 执行迁移后 `scripts/verify-enterprise-migration.sh` 和 `scripts/enterprise-preflight.sh` 通过。
 - [ ] 生产应用只使用 `oceanbase` profile；H2 仅存在于测试配置。
 - [ ] 迁移失败时不直接删除业务表，按升级手册恢复到新数据库。
@@ -72,6 +77,7 @@
 - [ ] API 响应包含 `X-Request-Id`，审计日志保存相同 request id。
 - [ ] 审计页可按动作、资源、操作人和时间分页检索，敏感字段已脱敏。
 - [ ] 已配置日志保留、磁盘空间、数据库连接池和告警负责人。
+- [ ] 若启用 SMTP，已设置 `PMS_MAIL_HEALTH_ENABLED=true` 并验证邮件健康检查；未启用 SMTP 时保持默认 `false`。
 
 ## 发布后
 

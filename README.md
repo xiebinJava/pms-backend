@@ -48,10 +48,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 OceanBase、账号、V1–V11 数据库迁移、附件目录、后端和前端：
+首次启动会按以下顺序完成 OceanBase、账号、V1–V12 数据库迁移、附件目录、后端和前端：
 
 ```text
-OceanBase → accounts-init → schema-init（V1–V11）→ uploads-init → backend → frontend
+OceanBase → accounts-init → schema-init（V1–V12）→ uploads-init → backend → frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -132,7 +132,7 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 ./scripts/enterprise-preflight.sh
 ```
 
-脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V11，详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V12，详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
 ## 本地直接启动后端（已有 OceanBase 时）
 
@@ -201,7 +201,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V11 OceanBase 迁移脚本
+├── db/migration/  V1–V12 OceanBase 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/
@@ -223,9 +223,12 @@ docs/
 | `GET`  | `/api/org/tree`                        | 项目页可用的组织树   |
 | `GET`  | `/api/admin/org/tree`                  | 管理组织树           |
 | `GET`  | `/api/admin/org/{id}/history`          | 组织变更历史         |
-| `POST` | `/api/admin/import/preview/{type}`     | Excel/CSV 预览和校验 |
+| `POST` | `/api/admin/import/preview/organizations` | 组织 Excel/CSV 预览和校验 |
+| `POST` | `/api/admin/import/preview/users`       | 员工 Excel/CSV 预览和校验 |
 | `POST` | `/api/admin/import/{jobId}/commit`     | 幂等提交导入任务     |
 | `GET`  | `/api/admin/import/{jobId}/errors.csv` | 下载服务端错误报告   |
+| `GET`  | `/api/feedback/tickets`               | 查询反馈工单         |
+| `POST` | `/api/feedback/tickets`               | 提交反馈工单         |
 | `GET`  | `/api/health/live`                     | 存活检查             |
 | `GET`  | `/api/health/ready`                    | 数据库就绪检查       |
 

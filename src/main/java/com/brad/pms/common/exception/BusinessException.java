@@ -31,6 +31,10 @@ public class BusinessException extends RuntimeException {
         return new BusinessException(403, message);
     }
 
+    public static BusinessException conflict(String message) {
+        return new BusinessException(ResponseCode.CONFLICT, message);
+    }
+
     public static class ResponseCode {
         public static final int ERROR = 500;
         public static final int UNAUTHORIZED = 401;

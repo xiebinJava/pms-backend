@@ -18,6 +18,12 @@ jobs:
         run: mvn -q test
       - name: Validate OpenAPI contract
         run: ./scripts/validate-openapi.sh
+      - name: Validate current release contract
+        run: bash scripts/release-consistency.test.sh --backend-only
+      - name: Validate production configuration guards
+        run: bash scripts/validate-production-config.test.sh
+      - name: Check shell scripts
+        run: bash -n scripts/*.sh docker/*.sh
       - name: Check runtime configuration does not enable H2
         run: |
           if git grep -nE 'h2:|jdbc:h2|org\.h2' -- src/main/resources/application*.yml; then

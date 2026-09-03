@@ -14,6 +14,7 @@ tags:
   - name: 任务与节点
   - name: 组织与权限
   - name: 导入与审计
+  - name: 反馈
   - name: 健康检查
 paths:
   /auth/providers:
@@ -606,6 +607,102 @@ paths:
       summary: 删除动态
       responses:
         '200': { $ref: '#/components/responses/Success' }
+  /feedback/tickets:
+    get:
+      tags: [反馈]
+      summary: 查询反馈工单
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 160 }
+        - name: feedbackType
+          in: query
+          schema: { type: string, description: 反馈类型编码 }
+        - name: priority
+          in: query
+          schema: { type: string, description: 优先级编码 }
+        - name: status
+          in: query
+          schema: { type: string, description: 状态编码 }
+        - name: currPage
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [反馈]
+      summary: 提交反馈工单
+      description: 已登录用户提交反馈；clientRequestId 与提交人组合用于幂等保护。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreateRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /feedback/tickets/assignees:
+    get:
+      tags: [反馈]
+      summary: 查询反馈负责人候选人
+      description: 仅返回当前处理人数据范围内、处于启用状态的人员。
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /feedback/tickets/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [反馈]
+      summary: 查看反馈详情和处理历史
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [反馈]
+      summary: 分诊并更新反馈工单
+      description: 处理人必须携带 version；服务端按数据范围和状态机校验状态、优先级、负责人及处理说明。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackUpdateRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /feedback/tickets/{id}/reopen:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [反馈]
+      summary: 重新打开反馈工单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackReopenRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessError' }
   /projects/images:
     post:
       tags: [项目]
@@ -959,6 +1056,35 @@ components:
         email: { type: string, format: email, description: 登录邮箱，不区分大小写 }
         username: { type: string, deprecated: true, description: 兼容旧客户端的英文名，不区分大小写 }
         password: { type: string, format: password }
+    FeedbackCreateRequest:
+      type: object
+      required: [title, content, feedbackType]
+      properties:
+        title: { type: string, maxLength: 160 }
+        content: { type: string, maxLength: 5000 }
+        feedbackType: { type: string, description: QUESTION、BUG、FEATURE、UX、DATA、PERMISSION 或 OTHER }
+        priority: { type: string, description: LOW、NORMAL、HIGH 或 URGENT }
+        projectId: { type: integer, format: int64 }
+        taskId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        contextModule: { type: string, maxLength: 80 }
+        sourceUrl: { type: string, maxLength: 1000 }
+        clientRequestId: { type: string, maxLength: 80, description: 与提交人组合的幂等请求号 }
+    FeedbackUpdateRequest:
+      type: object
+      required: [version]
+      properties:
+        status: { type: string }
+        priority: { type: string }
+        assigneeId: { type: integer, format: int64, nullable: true }
+        resolutionNote: { type: string, maxLength: 2000 }
+        version: { type: integer, minimum: 0 }
+    FeedbackReopenRequest:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 0 }
+        note: { type: string, maxLength: 2000 }
     ApiResponse:
       type: object
       properties:

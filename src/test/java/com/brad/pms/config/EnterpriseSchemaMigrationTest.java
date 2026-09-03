@@ -24,6 +24,8 @@ class EnterpriseSchemaMigrationTest {
             assertThat(tableExists(connection, "sys_role")).isTrue();
             assertThat(tableExists(connection, "sys_auth_session")).isTrue();
             assertThat(tableExists(connection, "sys_org_unit_history")).isTrue();
+            assertThat(tableExists(connection, "feedback_ticket")).isTrue();
+            assertThat(tableExists(connection, "feedback_history")).isTrue();
             assertThat(columnExists(connection, "sys_user", "username_normalized")).isTrue();
             assertThat(columnExists(connection, "sys_user", "email_normalized")).isTrue();
             assertThat(columnExists(connection, "sys_user", "name_zh")).isTrue();
@@ -32,6 +34,11 @@ class EnterpriseSchemaMigrationTest {
             assertThat(columnExists(connection, "project_node", "end_date")).isTrue();
             assertThat(columnExists(connection, "sys_org_unit_history", "before_json")).isTrue();
             assertThat(columnExists(connection, "sys_org_unit_history", "after_json")).isTrue();
+            assertThat(columnExists(connection, "feedback_ticket", "client_request_id")).isTrue();
+            assertThat(columnExists(connection, "feedback_ticket", "resolution_note")).isTrue();
+            assertThat(columnExists(connection, "feedback_history", "from_status")).isTrue();
+            assertThat(columnExists(connection, "feedback_history", "to_status")).isTrue();
+            assertThat(indexExists(connection, "feedback_ticket", "feedback_ticket_reporter_created_idx")).isTrue();
         }
     }
 
@@ -51,6 +58,19 @@ class EnterpriseSchemaMigrationTest {
                 try (var result = connection.getMetaData().getColumns(
                         connection.getCatalog(), connection.getSchema(), tableCandidate, columnCandidate)) {
                     if (result.next()) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean indexExists(Connection connection, String table, String index) throws Exception {
+        for (String tableCandidate : new String[]{table, table.toUpperCase()}) {
+            try (var result = connection.getMetaData().getIndexInfo(
+                    connection.getCatalog(), connection.getSchema(), tableCandidate, false, false)) {
+                while (result.next()) {
+                    String candidate = result.getString("INDEX_NAME");
+                    if (candidate != null && candidate.equalsIgnoreCase(index)) return true;
                 }
             }
         }

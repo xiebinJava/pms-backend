@@ -1,6 +1,6 @@
 # 基础设施就绪状态
 
-更新时间：2026-09-02
+更新时间：2026-09-03
 
 本文件只记录企业级基础设施状态，不代表业务功能已经完成生产验收。每完成一个基础设施任务，必须补充验证命令、结果和对应提交。
 
@@ -8,22 +8,29 @@
 
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
-| OceanBase `brad_pms` | V1–V11 已执行并复核 | 使用 `pms_migrator` 连续执行两次版本升级，均完成 checksum 校验；V11 组织变更历史、导入失败状态字段、关键表结构、外键、索引和数据范围预检通过 |
-| 后端回归 | 已通过 | `mvn -q test`，当前报告汇总 194 个用例（0 失败、0 错误、1 跳过），包含组织负责人/主归属独立、导入幂等、错误报告和回滚测试；健康检查期望迁移版本已与 V11 对齐 |
-| 前端回归 | 已通过 | `pnpm test`，112 项通过（含组织历史和导入错误下载 UI 契约） |
+| OceanBase `brad_pms` | V1–V12 已执行并复核 | 使用 `pms_migrator` 连续执行版本升级，均完成 checksum 校验；V12 反馈工单/历史表、关键表结构、外键、索引和数据范围预检通过 |
+| 后端回归 | 已通过 | `mvn -q test`（206 个用例，0 失败、0 错误、1 跳过），反馈中心状态机、幂等、乐观锁、权限和审计测试与既有企业回归全部通过；健康检查期望迁移版本已与 V12 对齐 |
+| 前端回归 | 已通过 | `pnpm test`（121 个用例，0 失败），反馈中心页面契约与既有模块测试通过 |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 发布基线 | 本地与远程集成均已收口 | `v1.0.0` 标签仍指向后端 `7cc2820` / 前端 `1519e887`；当前后端 `main` 已包含 CI 与 OceanBase 兼容性修复，前端 `main` 为 `a8977d4`；远程不使用 `master` |
+| 发布基线 | 代码与门禁已更新，生产发布未签字 | 当前本地工作树在后端 `main` 上；远程基线为后端 `c20f17b`、前端 `74f4ccb`。本次变更尚未推送；`v1.0.0` 历史标签保持不变，远程不使用 `master` |
 
 ## 仍需完成
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
-| P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V11 升级幂等、preflight、verify；生产仍需按企业 RPO/RTO 保存备份介质与联系人 |
-| P1 | 目标组织的 CI 凭据轮换、分支保护和镜像发布权限仍需确认 | 前端 `main` 提交 `a8977d4` 的本地门禁已通过；后端跨仓库运行 `33596130518` 已完成 OceanBase 启动、V1–V11 幂等、API 冒烟、项目夹具、桌面/移动端 Playwright 和清理步骤；部署组织仍需按自身策略轮换凭据并限制发布权限 |
+| P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V12 升级校验；生产仍需按企业 RPO/RTO 保存备份介质与联系人 |
+| P1 | 目标组织的 CI 凭据轮换、分支保护和镜像发布权限仍需确认 | 集成 CI 已覆盖 V1–V12 迁移、API 冒烟和浏览器验收；部署组织仍需按自身策略轮换凭据并限制发布权限 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
+
+## 2026-09-03 发布准备执行记录
+
+- 后端已重建并以 OceanBase profile 重启；`GET /api/health/live` 与 `GET /api/health/ready` 均返回 200，ready body 为 `database=UP`、`migration=12`。此前 8080 进程使用旧 JAR，已停止并替换为包含 V12 的构建。
+- 本机真实 OceanBase 已完成 V1–V12 双次幂等升级、企业结构校验、完整性预检、V12 备份校验和隔离库恢复；详细证据与生产边界见 [`drill-records/2026-09-03-release-readiness.md`](drill-records/2026-09-03-release-readiness.md)。
+- 当前后端 `mvn -q test` 为 206 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 为 121 项，`pnpm typecheck` 与 `pnpm build` 通过；OpenAPI、生产配置门禁、脚本语法和隐私扫描均需在最终收口时再次执行。
+- 本机未注入真实企业 E2E 账号；桌面/移动端 Playwright 由跨仓库 GitHub Actions 使用临时账号执行，最近一次远程运行 `33609929924` 在 release 分支全通过。没有把密码、JWT、访问令牌或备份文件写入仓库。
 
 ## 已收口能力
 
@@ -58,7 +65,7 @@
 
 - T1 组织关系：`sys_org_unit.leader_user_id` 与 `sys_user_position.is_primary` 保持独立；组织创建、更新、移动和停用写入 `sys_org_unit_history`，记录前后快照、操作人、请求 ID 和时间。
 - T2 导入可靠性：导入提交以 job ID 幂等；成功任务重复提交不重复写入，失败提交整体回滚并记录 `failure_reason`/`failed_at`；逐行错误可通过 `/admin/import/{jobId}/errors.csv` 下载。
-- T3 数据库：本机 OceanBase CE 4.3.5 的 `brad_pms` 使用 `pms_migrator` 完成 V1–V11 两次升级；第二次输出 `No pending migrations. All migration checksums verified.`，未删除数据库或业务表。
+- T3 数据库：本机 OceanBase CE 4.3.5 的 `brad_pms` 使用 `pms_migrator` 完成 V1–V12 升级复核；重复执行输出 `No pending migrations. All migration checksums verified.`，未删除数据库或业务表。
 - T4 只读校验：`bash scripts/verify-oceanbase.sh`（复用 OceanBase 镜像内 `obclient`）通过，企业迁移校验和完整性预检全部通过；组织历史表、索引、外键、单根组织、归属关系和项目关联均无异常。
 - T5 Review：后端 `mvn -q test` 194 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 112 项、`pnpm typecheck`、`pnpm build`、OpenAPI 校验和脚本语法检查通过。初次工具镜像拉取因网络超时，已改用本地已有 OceanBase 镜像，不影响迁移结果。
 

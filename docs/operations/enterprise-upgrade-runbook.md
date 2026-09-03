@@ -34,7 +34,7 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 V1–V11 迁移脚本顺序校验并只执行缺失版本；其中 V8 增加任务附件、V9 增加站内通知、V10 增加通知节点标识、V11 增加组织变更历史和导入失败状态字段。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
+3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 V1–V12 迁移脚本顺序校验并只执行缺失版本；其中 V8 增加任务附件、V9 增加站内通知、V10 增加通知节点标识、V11 增加组织变更历史和导入失败状态字段、V12 增加反馈工单及追加式处理历史。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
 
    ```bash
    export OCEANBASE_USER=pms_migrator
@@ -111,7 +111,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 ## 8. 容器化与健康检查
 
 开源试用可从 `docker-compose.example.yml` 启动 OceanBase、后端和前端。示例仅适用于新建
-空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V11 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
+空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V12 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
 必须使用本手册的备份、预检和升级流程；检测到旧 Flyway 历史时，需先核对发布包并显式设置 `PMS_ACCEPT_FLYWAY_BASELINE=true`。
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
@@ -119,6 +119,10 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 连接串、SQL、密码或令牌。另有 `/api/health/live`（仅进程存活）和 `/api/health/ready`（数据库与迁移就绪），
 以及仅绑定管理地址/端口（默认容器内 `127.0.0.1:8081`）的 `/actuator/health`、`/actuator/metrics`、`/actuator/prometheus`。它们不会经过前端 `/api/**` 代理。本机可用 `docker-compose.observability.yml` 叠一层 Prometheus/Grafana（只绑 127.0.0.1）；集群用 Helm 的 ClusterIP 管理口，需要时再开 ServiceMonitor，不要把 8081 挂到 Ingress。所有 API 响应都会带 `X-Request-Id`，该值也会写入操作审计日志，
 可用于串联一次请求的前后端日志。
+
+未启用 SMTP 时，Actuator 默认关闭邮件健康检查（`PMS_MAIL_HEALTH_ENABLED=false`），避免空的
+JavaMailSender 把就绪状态误判为 DOWN。启用正式 SMTP 后，可将该变量设为 `true`，再把 SMTP
+连通性纳入监控告警。
 
 发布前的完整代码、迁移、安全、浏览器冒烟与回滚清单见
 [`release-checklist.md`](release-checklist.md)。
@@ -140,3 +144,9 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 `PMS_FRONT_REPO_READ_TOKEN`。该 Token 只授予同 Owner 下 `pms-front` 的 Contents: Read 权限，
 不要复用管理员个人 Token，也不要把 Token 写入 workflow、日志或 `.env`。未配置该 secret 时，
 工作流会在检出前给出明确错误并停止，不会误报为 OceanBase 或应用故障。
+
+设置完成后，在后端仓库进入 Actions → `integration-and-e2e`，点击 **Run workflow**，
+选择 `main`（或输入已经审核过的前端分支、标签或提交 SHA）后运行。普通 push/PR 会自动使用
+前端远程 `main`，手动发布验收可以通过 `frontend_ref` 固定不可变提交。工作流成功后，重点查看
+`oceanbase-and-browser` 作业中的迁移幂等、API 冒烟、登录代理和桌面/移动端 Playwright 步骤；
+不要仅凭“工作流已启动”判断通过。

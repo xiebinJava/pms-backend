@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      frontend_ref:
+        description: 'Reviewed pms-front branch, tag, or commit SHA (defaults to main)'
+        required: false
+        type: string
+        default: main
 
 jobs:
   oceanbase-and-browser:
@@ -26,9 +32,9 @@ jobs:
           repository: ${{ github.repository_owner }}/pms-front
           path: pms-front
           token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
-          # Keep backend integration tests paired with the current reviewed
-          # frontend commit. Update this immutable SHA for every release.
-          ref: a8977d4852b6bf0eb172b812645cbc4fc94a4f65
+          # Push/PR runs use the current remote main. A manual dispatch may
+          # pin a reviewed branch, tag, or immutable commit SHA for release.
+          ref: ${{ inputs.frontend_ref || 'main' }}
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
@@ -72,6 +78,14 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Start OceanBase, backend and frontend
         run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml up -d --build frontend
+      - name: Validate current release contract
+        env:
+          PMS_FRONTEND_DIR: ${{ github.workspace }}/pms-front
+        run: bash scripts/release-consistency.test.sh
+      - name: Validate production configuration guards
+        run: bash scripts/validate-production-config.test.sh
+      - name: Check shell scripts
+        run: bash -n scripts/*.sh docker/*.sh
       - name: Run read-only migration preflight
         run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm --entrypoint /bin/bash schema-init /usr/local/bin/enterprise-preflight.sh
       - name: Re-run migrations to verify idempotency
