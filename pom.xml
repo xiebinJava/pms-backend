@@ -33,6 +33,8 @@
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <micrometer.version>1.15.12</micrometer.version>
         <logback.version>1.5.18</logback.version>
+        <!-- Keep AWS SDK's Netty transport on the latest patched 4.1 line. -->
+        <netty.version>4.1.136.Final</netty.version>
         <mysql-connector-j.version>9.4.0</mysql-connector-j.version>
         <aws.sdk.version>2.31.78</aws.sdk.version>
     </properties>
