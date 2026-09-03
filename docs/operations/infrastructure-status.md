@@ -15,7 +15,7 @@
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 发布基线 | 代码与门禁已更新，生产发布未签字 | 后端与前端 `main`/`release` 已同步；跨仓库集成运行 `33702403246` 全部通过；两个仓库的 `v1.0.2` 正式标签已推送，远程不使用 `master` |
+| 发布基线 | 代码与门禁已更新，生产发布未签字 | 后端与前端 `main`/`release` 已同步；跨仓库集成运行 `33703454221` 全部通过；两个仓库的 `v1.0.3` 正式标签已推送，远程不使用 `master` |
 
 ## 仍需完成
 
@@ -30,7 +30,7 @@
 - 后端已重建并以 OceanBase profile 重启；`GET /api/health/live` 与 `GET /api/health/ready` 均返回 200，ready body 为 `database=UP`、`migration=12`。此前 8080 进程使用旧 JAR，已停止并替换为包含 V12 的构建。
 - 本机真实 OceanBase 已完成 V1–V12 双次幂等升级、企业结构校验、完整性预检、V12 备份校验和隔离库恢复；详细证据与生产边界见 [`drill-records/2026-09-03-release-readiness.md`](drill-records/2026-09-03-release-readiness.md)。
 - 当前后端 `mvn -q test` 为 206 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 为 121 项，`pnpm typecheck` 与 `pnpm build` 通过；OpenAPI、生产配置门禁、脚本语法和隐私扫描均需在最终收口时再次执行。
-- 本机未注入真实企业 E2E 账号；桌面/移动端 Playwright 由跨仓库 GitHub Actions 使用临时账号执行，最新远程运行 `33702403246` 在 release 分支全通过（前端验收提交为 `577899d`）。没有把密码、JWT、访问令牌或备份文件写入仓库。
+- 本机未注入真实企业 E2E 账号；桌面/移动端 Playwright 由跨仓库 GitHub Actions 使用临时账号执行，最新远程运行 `33703454221` 在 release 分支全通过（前端验收提交为 `05f241f`）。前端独立 CI `33703279912` 也已通过隐私扫描、121 项测试、类型检查、构建、镜像扫描和 SPDX SBOM。没有把密码、JWT、访问令牌或备份文件写入仓库。
 
 ## 已收口能力
 
