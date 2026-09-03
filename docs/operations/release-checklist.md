@@ -11,7 +11,8 @@
 - [x] OpenAPI、生产配置门禁、脚本语法和当前发布一致性检查通过；后端 `29392be`、前端 `577899d` 已推送至远程 `main`/`release`。
 - [ ] 目标企业仍需注入真实 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储和监控，并记录 RPO/RTO 与故障联系人。
 - [x] 本机 V12 备份生成、SHA-256/元数据校验和隔离空库恢复已完成；恢复后结构、预检和精确行数比对通过。不得以历史 V5 备份代替 V12 演练。
-- [x] 跨仓库 GitHub Actions 已确认 `PMS_FRONT_REPO_READ_TOKEN` 可读 sibling `pms-front`；远程运行 `33701569446` 的 OceanBase、API、桌面/移动端 Playwright 全通过。
+- [x] 跨仓库 GitHub Actions 已确认 `PMS_FRONT_REPO_READ_TOKEN` 可读 sibling `pms-front`；最终远程运行 `33702403246` 的 OceanBase、API、桌面/移动端 Playwright 全通过。
+- [x] 已在两个仓库当前发布基线上创建并推送 `v1.0.2` 标签；`v1.0.1` 历史标签保持不变。
 - [ ] 目标企业仍需使用真实测试账号和自己的配置重新执行桌面/移动端 Playwright，并由企业验收人签字。
 
 ## 2026-09-01 本机目标实例执行快照
