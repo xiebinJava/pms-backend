@@ -15,14 +15,14 @@
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
 | 请求追踪/基础审计 | 已具备 | `X-Request-Id`、登录日志、操作日志；错误响应携带 requestId |
-| 发布基线 | 代码与门禁已更新，生产发布未签字 | 后端 `main`/`release` 已推送至 `0d7c4ce`，前端 `main`/`release` 已推送至 `a976454`；`v1.0.0` 历史标签保持不变，远程不使用 `master` |
+| 发布基线 | 代码与门禁已更新，生产发布未签字 | 后端 `main`/`release` 已推送至 `29392be`，前端 `main`/`release` 已推送至 `577899d`；跨仓库集成运行 `33701569446` 全部通过；`v1.0.0` 历史标签保持不变，远程不使用 `master` |
 
 ## 仍需完成
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
 | P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V12 升级校验；生产仍需按企业 RPO/RTO 保存备份介质与联系人 |
-| P1 | 目标组织的 CI 凭据轮换、分支保护和镜像发布权限仍需确认 | 集成 CI 已覆盖 V1–V12 迁移、API 冒烟和浏览器验收；部署组织仍需按自身策略轮换凭据并限制发布权限 |
+| P1 | GitHub `main` 分支保护仍未启用，当前私有仓库套餐的保护 API 返回 403 | 跨仓库 CI 已覆盖 V1–V12 迁移、API 冒烟和浏览器验收；需升级 GitHub 套餐或将仓库公开后配置 PR 审查和必需检查，凭据轮换与镜像发布权限仍按部署组织策略执行 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 2026-09-03 发布准备执行记录
@@ -30,7 +30,7 @@
 - 后端已重建并以 OceanBase profile 重启；`GET /api/health/live` 与 `GET /api/health/ready` 均返回 200，ready body 为 `database=UP`、`migration=12`。此前 8080 进程使用旧 JAR，已停止并替换为包含 V12 的构建。
 - 本机真实 OceanBase 已完成 V1–V12 双次幂等升级、企业结构校验、完整性预检、V12 备份校验和隔离库恢复；详细证据与生产边界见 [`drill-records/2026-09-03-release-readiness.md`](drill-records/2026-09-03-release-readiness.md)。
 - 当前后端 `mvn -q test` 为 206 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 为 121 项，`pnpm typecheck` 与 `pnpm build` 通过；OpenAPI、生产配置门禁、脚本语法和隐私扫描均需在最终收口时再次执行。
-- 本机未注入真实企业 E2E 账号；桌面/移动端 Playwright 由跨仓库 GitHub Actions 使用临时账号执行，最近一次远程运行 `33609929924` 在 release 分支全通过。本次提交已推送到 main/release，需以新提交重新触发 CI。没有把密码、JWT、访问令牌或备份文件写入仓库。
+- 本机未注入真实企业 E2E 账号；桌面/移动端 Playwright 由跨仓库 GitHub Actions 使用临时账号执行，最新远程运行 `33701569446` 在 release 分支全通过（前端验收提交为 `577899d`）。没有把密码、JWT、访问令牌或备份文件写入仓库。
 
 ## 已收口能力
 
