@@ -1,5 +1,6 @@
 package com.brad.pms.controller;
 
+import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import org.junit.jupiter.api.Test;
 
@@ -9,15 +10,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ProjectPermissionAnnotationTest {
     @Test
-    void projectEndpointsDeclareReadOrWritePermission() throws Exception {
-        assertPermission("create", "project:write");
-        assertPermission("update", "project:write");
-        assertPermission("delete", "project:write");
-        assertPermission("terminate", "project:write");
-        assertPermission("restore", "project:write");
-        assertPermission("stats", "project:read");
-        assertPermission("page", "project:read");
-        assertPermission("detail", "project:read");
+    void projectEndpointsUseCreateForCreationAndReadAsResourceBaseline() throws Exception {
+        assertPermission("create", PermissionCode.PROJECT_CREATE);
+        assertPermission("update", PermissionCode.PROJECT_READ);
+        assertPermission("delete", PermissionCode.PROJECT_READ);
+        assertPermission("terminate", PermissionCode.PROJECT_READ);
+        assertPermission("restore", PermissionCode.PROJECT_READ);
+        assertPermission("stats", PermissionCode.PROJECT_READ);
+        assertPermission("page", PermissionCode.PROJECT_READ);
+        assertPermission("detail", PermissionCode.PROJECT_READ);
     }
 
     private void assertPermission(String methodName, String expected) throws Exception {

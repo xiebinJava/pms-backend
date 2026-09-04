@@ -11,12 +11,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TaskPermissionAnnotationTest {
 
     @Test
-    void taskDetailAndAttachmentsDeclareReadOrWritePermission() throws Exception {
+    void taskResponsibleWritesUseProjectReadBaselineAndGovernanceWritesStayProtected() throws Exception {
         assertPermission("detail", PermissionCode.PROJECT_READ);
         assertPermission("list", PermissionCode.PROJECT_READ);
-        assertPermission("uploadAttachment", PermissionCode.PROJECT_WRITE);
+        assertPermission("create", PermissionCode.PROJECT_READ);
+        assertPermission("update", PermissionCode.PROJECT_READ);
+        assertPermission("uploadAttachment", PermissionCode.PROJECT_READ);
         assertPermission("downloadAttachment", PermissionCode.PROJECT_READ);
-        assertPermission("deleteAttachment", PermissionCode.PROJECT_WRITE);
+        assertPermission("deleteAttachment", PermissionCode.PROJECT_READ);
+        assertPermission("move", PermissionCode.PROJECT_WRITE);
+        assertPermission("delete", PermissionCode.PROJECT_WRITE);
     }
 
     private void assertPermission(String methodName, String expected) throws Exception {

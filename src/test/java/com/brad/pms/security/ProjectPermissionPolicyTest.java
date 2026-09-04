@@ -50,6 +50,24 @@ class ProjectPermissionPolicyTest {
     }
 
     @Test
+    void readAndOperationalLifecycleStatesAreDistinct() {
+        assertTrue(ProjectPermissionPolicy.isProjectReadable(
+                project(10L, 20L, ProjectStatus.ACTIVE.getCode())));
+        assertTrue(ProjectPermissionPolicy.isProjectReadable(
+                project(10L, 20L, ProjectStatus.TERMINATED.getCode())));
+        assertFalse(ProjectPermissionPolicy.isProjectReadable(
+                project(10L, 20L, ProjectStatus.DELETED.getCode())));
+        assertTrue(ProjectPermissionPolicy.isProjectOperational(
+                project(10L, 20L, ProjectStatus.ACTIVE.getCode())));
+        assertFalse(ProjectPermissionPolicy.isProjectOperational(
+                project(10L, 20L, ProjectStatus.TERMINATED.getCode())));
+        assertTrue(ProjectPermissionPolicy.isProjectRestorable(
+                project(10L, 20L, ProjectStatus.TERMINATED.getCode())));
+        assertTrue(ProjectPermissionPolicy.isProjectRestorable(
+                project(10L, 20L, ProjectStatus.DELETED.getCode())));
+    }
+
+    @Test
     void nodeOwnerCanOperateOpenNodeButCannotControlProjectLifecycle() {
         ProjectDO project = project(10L, 20L, ProjectStatus.ACTIVE.getCode());
         ProjectNodeDO node = node(100L, 10L, 30L, NodeStatus.IN_PROGRESS.getCode());

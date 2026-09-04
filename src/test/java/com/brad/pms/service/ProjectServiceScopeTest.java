@@ -48,6 +48,7 @@ class ProjectServiceScopeTest {
     @Mock UserPositionMapper userPositionMapper;
     @Mock DataScopeResolver dataScopeResolver;
     @Mock OrgUnitMapper orgUnitMapper;
+    @Mock OperationLogService operationLogService;
 
     @InjectMocks ProjectService projectService;
 
@@ -69,10 +70,12 @@ class ProjectServiceScopeTest {
         UserContext.set(new LoginUser(1L, "admin", "管理员", 1));
         ProjectCreateCmd command = new ProjectCreateCmd();
         command.setName("CI 验收项目");
+        command.setProjectLevel(2);
 
         when(projectMapper.insert(any(ProjectDO.class))).thenAnswer(invocation -> {
             ProjectDO project = invocation.getArgument(0);
             assertThat(project.getCode()).startsWith("TMP-");
+            assertThat(project.getProjectLevel()).isEqualTo(2);
             project.setId(99L);
             return 1;
         });
@@ -97,6 +100,26 @@ class ProjectServiceScopeTest {
         assertThat(result.getCode()).isEqualTo("PRJ-000099");
         verify(projectMapper).updateById(org.mockito.ArgumentMatchers.<ProjectDO>argThat(
                 project -> "PRJ-000099".equals(project.getCode())));
+                verify(operationLogService).record(org.mockito.ArgumentMatchers.argThat(event ->
+                "PROJECT_CREATED".equals(event.action())
+                        && "PROJECT".equals(event.resourceType())
+                        && Long.valueOf(99L).equals(event.projectId())));
+    }
+
+    @Test
+    void deleteMarksTheProjectSoftDeletedAndKeepsTheAuditContext() {
+        UserContext.set(new LoginUser(1L, "admin", "管理员", 1));
+        ProjectDO project = new ProjectDO();
+        project.setId(100L);
+        project.setStatus(1);
+        project.setDeleted(false);
+        when(permissionService.requireProjectManageable(100L, "删除项目")).thenReturn(project);
+
+        projectService.delete(100L);
+
+        verify(projectMapper).softDeleteProject(100L, 4);
+        verify(operationLogService).record(org.mockito.ArgumentMatchers.argThat(event ->
+                "PROJECT_DELETED".equals(event.action()) && Long.valueOf(100L).equals(event.projectId())));
     }
 
     @Test

@@ -2,18 +2,24 @@ package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.common.enums.NodeStatus;
+import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.audit.AuditAction;
+import com.brad.pms.audit.AuditEvent;
+import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.dto.request.NodeScheduleUpdateCmd;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectLifecycleLogDO;
 import com.brad.pms.entity.ProjectMemberDO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectLifecycleLogMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
+import com.brad.pms.mapper.ProjectTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -37,6 +43,10 @@ public class NodeService {
     private final UserService userService;
     private final ProjectPermissionService permissionService;
     private final ProjectLifecycleLogMapper lifecycleLogMapper;
+    private final ProjectTaskMapper taskMapper;
+    private final OperationLogService operationLogService;
+    private final NodeRequirementScopeService requirementScopeService;
+    private final NodeSolutionDesignService solutionDesignService;
     private NotificationService notificationService;
 
     @Autowired
@@ -110,7 +120,7 @@ public class NodeService {
 
     @Transactional
     public ProjectNodeDTO updateOwner(Long projectId, Long nodeId, Long ownerId) {
-        ProjectDO project = permissionService.requireManageableProject(projectId, "分配节点负责人");
+        ProjectDO project = permissionService.requireProjectManageable(projectId, "分配节点负责人");
         ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
         if (NodeStatus.isReadOnly(node.getStatus())) {
             throw BusinessException.forbidden("节点已锁定，回滚后才可以分配节点负责人");
@@ -123,8 +133,14 @@ public class NodeService {
                 throw BusinessException.error("节点负责人必须是项目成员");
             }
         }
+        Long previousOwnerId = node.getOwnerId();
         node.setOwnerId(ownerId);
         nodeMapper.updateById(node);
+        if (!java.util.Objects.equals(previousOwnerId, ownerId)) {
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.NODE_OWNER_CHANGED.name(), AuditResourceType.PROJECT_NODE.name(), nodeId, projectId,
+                    null, personSnapshot(previousOwnerId), personSnapshot(ownerId)));
+        }
         UserDO owner = ownerId == null ? null : userService.listByIds(java.util.Collections.singletonList(ownerId))
                 .stream().findFirst().orElse(null);
         return toDTO(node, owner, project);
@@ -132,8 +148,8 @@ public class NodeService {
 
     @Transactional
     public ProjectNodeDTO updateSchedule(Long projectId, Long nodeId, NodeScheduleUpdateCmd cmd) {
-        ProjectDO project = permissionService.requireManageableProject(projectId, "编辑节点排期");
-        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        ProjectDO project = permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireManageableNode(projectId, nodeId, "编辑节点排期");
         if (NodeStatus.isReadOnly(node.getStatus())) {
             throw BusinessException.forbidden("节点已锁定，回滚后才可以编辑节点排期");
         }
@@ -141,9 +157,19 @@ public class NodeService {
                 && cmd.getStartDate().isAfter(cmd.getEndDate())) {
             throw BusinessException.error("节点排期开始日期不能晚于结束日期");
         }
+        java.time.LocalDate previousStartDate = node.getStartDate();
+        java.time.LocalDate previousEndDate = node.getEndDate();
         node.setStartDate(cmd.getStartDate());
         node.setEndDate(cmd.getEndDate());
         nodeMapper.updateById(node);
+        if (!java.util.Objects.equals(previousStartDate, node.getStartDate())
+                || !java.util.Objects.equals(previousEndDate, node.getEndDate())) {
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.NODE_SCHEDULE_CHANGED.name(), AuditResourceType.PROJECT_NODE.name(), nodeId, projectId,
+                    null,
+                    java.util.Map.of("startDate", String.valueOf(previousStartDate), "endDate", String.valueOf(previousEndDate)),
+                    java.util.Map.of("startDate", String.valueOf(node.getStartDate()), "endDate", String.valueOf(node.getEndDate()))));
+        }
         UserDO owner = node.getOwnerId() == null ? null : userService.listByIds(java.util.Collections.singletonList(node.getOwnerId()))
                 .stream().findFirst().orElse(null);
         return toDTO(node, owner, project);
@@ -160,8 +186,25 @@ public class NodeService {
         if (node.getOwnerId() == null) {
             throw BusinessException.error("请先分配节点负责人");
         }
+        Long unfinished = taskMapper.selectCount(new LambdaQueryWrapper<ProjectTaskDO>()
+                .eq(ProjectTaskDO::getProjectId, projectId)
+                .eq(ProjectTaskDO::getNodeId, nodeId)
+                .ne(ProjectTaskDO::getStatus, TaskStatus.DONE.getCode()));
+        if (unfinished != null && unfinished > 0) {
+            throw BusinessException.error("请先完成当前节点的未完成任务（" + unfinished + "）");
+        }
+        if ("requirement".equals(node.getNodeKey())) {
+            requirementScopeService.requireConfirmed(projectId, nodeId);
+        }
+        if ("design".equals(node.getNodeKey())) {
+            solutionDesignService.requireConfirmed(projectId, nodeId);
+        }
         node.setStatus(NodeStatus.COMPLETED.getCode());
         nodeMapper.updateById(node);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.NODE_COMPLETED.name(), AuditResourceType.PROJECT_NODE.name(), nodeId, projectId,
+                null, java.util.Map.of("status", NodeStatus.IN_PROGRESS.name()),
+                java.util.Map.of("status", NodeStatus.COMPLETED.name())));
 
         ProjectNodeDO next = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId)
@@ -257,6 +300,10 @@ public class NodeService {
             log.setOperatorId(com.brad.pms.security.UserContext.userId());
             lifecycleLogMapper.insert(log);
         }
+        operationLogService.record(AuditEvent.success(
+                AuditAction.NODE_ROLLED_BACK.name(), AuditResourceType.PROJECT_NODE.name(), nodeId, projectId,
+                reason, java.util.Map.of("status", NodeStatus.COMPLETED.name()),
+                java.util.Map.of("status", NodeStatus.IN_PROGRESS.name())));
         refreshProgress(projectId);
         notificationService.notifyNodeRolledBack(
                 projectId,
@@ -281,6 +328,10 @@ public class NodeService {
         int progress = total == null || total == 0 ? 0 : (int) Math.round(done * 100.0 / total);
         project.setProgress(progress);
         projectMapper.updateById(project);
+    }
+
+    private java.util.Map<String, Object> personSnapshot(Long userId) {
+        return java.util.Map.of("userId", userId == null ? "UNASSIGNED" : userId);
     }
 
     private ProjectNodeDTO toDTO(ProjectNodeDO node, UserDO owner, ProjectDO project) {

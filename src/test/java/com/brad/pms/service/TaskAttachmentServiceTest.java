@@ -38,6 +38,7 @@ class TaskAttachmentServiceTest {
     @Mock ProjectPermissionService permissionService;
     @Mock UserService userService;
     @Mock FileStorageService fileStorageService;
+    @Mock OperationLogService operationLogService;
 
     @InjectMocks TaskAttachmentService attachmentService;
 
@@ -72,6 +73,60 @@ class TaskAttachmentServiceTest {
         assertThat(captor.getValue().getOriginalName()).isEqualTo("设计稿.pdf");
         assertThat(dto.getUrl()).startsWith("/api/tasks/1/attachments/");
         assertThat(dto.getOriginalName()).isEqualTo("设计稿.pdf");
+        assertThat(dto.isCanDelete()).isTrue();
+    }
+
+    @Test
+    void attachmentOwnerCanDeleteWithoutTaskOrProjectWritePermission() {
+        UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟", 0));
+        ProjectTaskAttachmentDO row = new ProjectTaskAttachmentDO();
+        row.setId(5L);
+        row.setTaskId(1L);
+        row.setProjectId(9L);
+        row.setCreatedBy(7L);
+        row.setFileKey("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.pdf");
+        ProjectDO project = openProject();
+        project.setCreatedBy(99L);
+        ProjectNodeDO node = openNode();
+        node.setOwnerId(99L);
+        ProjectTaskDO task = openTask();
+        task.setAssigneeId(99L);
+        when(taskMapper.selectById(1L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(project);
+        when(permissionService.requireNode(9L, 3L)).thenReturn(node);
+        when(permissionService.canWriteProject(project)).thenReturn(false);
+        when(attachmentMapper.selectById(5L)).thenReturn(row);
+
+        attachmentService.delete(1L, 5L);
+
+        verify(attachmentMapper).deleteById(5L);
+        verify(fileStorageService).delete(row.getFileKey());
+    }
+
+    @Test
+    void listMarksAttachmentOwnerAsDeletable() {
+        UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟", 0));
+        ProjectTaskAttachmentDO row = new ProjectTaskAttachmentDO();
+        row.setId(5L);
+        row.setTaskId(1L);
+        row.setProjectId(9L);
+        row.setCreatedBy(7L);
+        ProjectDO project = openProject();
+        project.setCreatedBy(99L);
+        ProjectNodeDO node = openNode();
+        node.setOwnerId(99L);
+        ProjectTaskDO task = openTask();
+        task.setAssigneeId(99L);
+        when(taskMapper.selectById(1L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(project);
+        when(permissionService.requireNode(9L, 3L)).thenReturn(node);
+        when(permissionService.canWriteProject(project)).thenReturn(false);
+        when(attachmentMapper.selectList(any())).thenReturn(List.of(row));
+        when(userService.listByIds(any())).thenReturn(List.of());
+
+        List<TaskAttachmentDTO> result = attachmentService.listByTask(1L);
+
+        assertThat(result).singleElement().extracting(TaskAttachmentDTO::isCanDelete).isEqualTo(true);
     }
 
     @Test

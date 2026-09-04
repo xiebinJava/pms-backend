@@ -1,8 +1,11 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.TaskCreateCmd;
+import com.brad.pms.dto.request.TaskMoveCmd;
+import com.brad.pms.dto.request.TaskUpdateCmd;
 import com.brad.pms.dto.response.ProjectTaskDTO;
 import com.brad.pms.dto.response.TaskAttachmentDTO;
 import com.brad.pms.dto.response.TaskDetailDTO;
@@ -26,12 +29,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +49,7 @@ class TaskServiceTest {
     @Mock ProjectPermissionService permissionService;
     @Mock TaskAttachmentService attachmentService;
     @Mock NotificationService notificationService;
+    @Mock OperationLogService operationLogService;
 
     @InjectMocks TaskService taskService;
 
@@ -93,6 +100,25 @@ class TaskServiceTest {
     }
 
     @Test
+    void createRejectsSubtasksUnderCompletedParents() {
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireManageableNode(9L, 3L, "创建任务")).thenReturn(openNode());
+        ProjectTaskDO parent = task(1L, null);
+        parent.setStatus(TaskStatus.DONE.getCode());
+        when(taskMapper.selectById(1L)).thenReturn(parent);
+
+        TaskCreateCmd cmd = new TaskCreateCmd();
+        cmd.setProjectId(9L);
+        cmd.setNodeId(3L);
+        cmd.setParentId(1L);
+        cmd.setTitle("已完成父任务下的新子任务");
+
+        assertThatThrownBy(() -> taskService.create(cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("父任务已完成");
+    }
+
+    @Test
     void getDetailAssemblesSubtasksCommentsAndAttachments() {
         when(taskMapper.selectById(1L)).thenReturn(task(1L, null));
         when(permissionService.requireProject(9L)).thenReturn(openProject());
@@ -129,6 +155,82 @@ class TaskServiceTest {
         verify(taskMapper).deleteById(2L);
         verify(attachmentService).deleteAllForTask(1L);
         verify(taskMapper).deleteById(1L);
+    }
+
+    @Test
+    void completingParentCompletesChildrenAndBackfillsOnlyMissingDueDates() {
+        ProjectTaskDO parent = task(1L, null);
+        ProjectTaskDO missingDateChild = task(2L, 1L);
+        ProjectTaskDO datedChild = task(3L, 1L);
+        datedChild.setDueDate(LocalDate.of(2026, 9, 8));
+        when(taskMapper.selectById(1L)).thenReturn(parent);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+        when(taskMapper.selectList(any())).thenReturn(List.of(missingDateChild, datedChild));
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setStatus(TaskStatus.DONE.getCode());
+
+        taskService.update(1L, cmd);
+
+        assertThat(missingDateChild.getStatus()).isEqualTo(TaskStatus.DONE.getCode());
+        assertThat(missingDateChild.getDueDate()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Shanghai")));
+        assertThat(datedChild.getStatus()).isEqualTo(TaskStatus.DONE.getCode());
+        assertThat(datedChild.getDueDate()).isEqualTo(LocalDate.of(2026, 9, 8));
+        verify(taskMapper, times(3)).updateById(any(ProjectTaskDO.class));
+    }
+
+    @Test
+    void completedParentRejectsReopeningChild() {
+        ProjectTaskDO child = task(2L, 1L);
+        ProjectTaskDO parent = task(1L, null);
+        parent.setStatus(TaskStatus.DONE.getCode());
+        when(taskMapper.selectById(2L)).thenReturn(child);
+        when(taskMapper.selectById(1L)).thenReturn(parent);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setStatus(TaskStatus.DOING.getCode());
+
+        assertThatThrownBy(() -> taskService.update(2L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("父任务已完成");
+    }
+
+    @Test
+    void updateCanExplicitlyClearDueDate() {
+        ProjectTaskDO task = task(2L, 1L);
+        task.setDueDate(LocalDate.of(2026, 9, 8));
+        when(taskMapper.selectById(2L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setClearDueDate(true);
+
+        taskService.update(2L, cmd);
+
+        assertThat(task.getDueDate()).isNull();
+    }
+
+    @Test
+    void movingParentToDoneAlsoCompletesChildren() {
+        ProjectTaskDO parent = task(1L, null);
+        ProjectTaskDO child = task(2L, 1L);
+        when(taskMapper.selectById(1L)).thenReturn(parent);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+        when(permissionService.taskPermissions(any(), any(), any())).thenReturn(new TaskPermissionsDTO());
+        when(taskMapper.selectList(any())).thenReturn(List.of(child));
+
+        TaskMoveCmd cmd = new TaskMoveCmd();
+        cmd.setStatus(TaskStatus.DONE.getCode());
+
+        taskService.move(1L, cmd);
+
+        assertThat(child.getStatus()).isEqualTo(TaskStatus.DONE.getCode());
+        assertThat(child.getDueDate()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Shanghai")));
+        verify(taskMapper, times(2)).updateById(any(ProjectTaskDO.class));
     }
 
     private static ProjectDO openProject() {

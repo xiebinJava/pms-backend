@@ -22,33 +22,33 @@ public class ProjectController {
     private final ProjectService projectService;
 
     @PostMapping
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_CREATE)
     public ResponseResult<ProjectDTO> create(@Validated @RequestBody ProjectCreateCmd cmd) {
         return ResponseResult.success(projectService.create(cmd));
     }
 
     @PutMapping("/{id}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectDTO> update(@PathVariable Long id, @Validated @RequestBody ProjectUpdateCmd cmd) {
         return ResponseResult.success(projectService.update(id, cmd));
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<Void> delete(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseResult.success();
     }
 
     @PostMapping("/{id}/terminate")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectDTO> terminate(@PathVariable Long id,
                                                 @Validated @RequestBody ProjectLifecycleCmd cmd) {
         return ResponseResult.success(projectService.terminate(id, cmd.getReason()));
     }
 
     @PostMapping("/{id}/restore")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectDTO> restore(@PathVariable Long id,
                                               @Validated @RequestBody ProjectLifecycleCmd cmd) {
         return ResponseResult.success(projectService.restore(id, cmd.getReason()));

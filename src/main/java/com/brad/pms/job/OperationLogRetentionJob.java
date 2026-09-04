@@ -1,5 +1,6 @@
 package com.brad.pms.job;
 
+import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.mapper.LoginLogMapper;
 import com.brad.pms.mapper.OperationLogMapper;
 import com.brad.pms.service.OperationLogService;
@@ -66,9 +67,9 @@ public class OperationLogRetentionJob {
                 deleted += loginBatch;
             } while (loginBatch > 0);
         }
-        operationLogService.record("AUDIT_RETENTION_RUN", "AUDIT", null, null,
-                Map.of("retentionDays", retentionDays, "dryRun", dryRun,
-                        "candidates", candidates, "deleted", deleted));
+        operationLogService.record(AuditEvent.success("AUDIT_RETENTION_RUN", "AUDIT", null, null,
+                "audit retention", Map.of("retentionDays", retentionDays, "dryRun", dryRun),
+                Map.of("candidates", candidates, "deleted", deleted)));
         return new Result(cutoff, dryRun, candidates, deleted);
     }
 

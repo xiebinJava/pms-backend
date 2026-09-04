@@ -3,6 +3,7 @@ package com.brad.pms.job;
 import com.brad.pms.mapper.LoginLogMapper;
 import com.brad.pms.mapper.OperationLogMapper;
 import com.brad.pms.service.OperationLogService;
+import com.brad.pms.audit.AuditEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -39,11 +40,12 @@ class OperationLogRetentionJobTest {
         assertThat(result.getDeleted()).isZero();
         verify(operations, never()).deleteExpiredBatch(any(LocalDateTime.class), anyInt());
         verify(logins, never()).deleteExpiredSuccessfulBatch(any(LocalDateTime.class), anyInt());
-        var metadata = org.mockito.ArgumentCaptor.forClass(Object.class);
-        verify(audit).record(org.mockito.ArgumentMatchers.eq("AUDIT_RETENTION_RUN"),
-                org.mockito.ArgumentMatchers.eq("AUDIT"), org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.isNull(), metadata.capture());
-        assertThat(metadata.getValue().toString()).contains("candidates=20", "deleted=0", "dryRun=true");
+        var event = org.mockito.ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).record(event.capture());
+        assertThat(event.getValue().action()).isEqualTo("AUDIT_RETENTION_RUN");
+        assertThat(event.getValue().reason()).isEqualTo("audit retention");
+        assertThat(event.getValue().before().toString()).contains("retentionDays=180", "dryRun=true");
+        assertThat(event.getValue().after().toString()).contains("candidates=20", "deleted=0");
     }
 
     @Test
@@ -62,6 +64,7 @@ class OperationLogRetentionJobTest {
 
         assertThat(result.isDryRun()).isFalse();
         assertThat(result.getDeleted()).isEqualTo(5);
+        verify(audit).record(any(AuditEvent.class));
         verify(operations, times(2)).deleteExpiredBatch(any(LocalDateTime.class), eq(500));
         verify(logins, times(2)).deleteExpiredSuccessfulBatch(any(LocalDateTime.class), eq(500));
     }

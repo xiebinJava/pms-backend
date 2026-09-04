@@ -8,6 +8,7 @@ import com.brad.pms.mapper.ProjectLifecycleLogMapper;
 import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
+import com.brad.pms.mapper.ProjectTaskMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,7 +31,9 @@ class NodeServiceScheduleTest {
     @Mock UserService userService;
     @Mock ProjectPermissionService permissionService;
     @Mock ProjectLifecycleLogMapper lifecycleLogMapper;
+    @Mock ProjectTaskMapper taskMapper;
     @Mock NotificationService notificationService;
+    @Mock OperationLogService operationLogService;
 
     @InjectMocks NodeService nodeService;
 
@@ -43,8 +46,8 @@ class NodeServiceScheduleTest {
         node.setProjectId(1L);
         node.setStatus(1);
         node.setSort(0);
-        when(permissionService.requireManageableProject(1L, "编辑节点排期")).thenReturn(project);
-        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        when(permissionService.requireProjectReadable(1L)).thenReturn(project);
+        when(permissionService.requireManageableNode(1L, 10L, "编辑节点排期")).thenReturn(node);
         NodeScheduleUpdateCmd cmd = new NodeScheduleUpdateCmd();
         cmd.setStartDate(LocalDate.of(2026, 9, 1));
         cmd.setEndDate(LocalDate.of(2026, 9, 20));
@@ -54,6 +57,10 @@ class NodeServiceScheduleTest {
         assertThat(result.getStartDate()).isEqualTo(cmd.getStartDate());
         assertThat(result.getEndDate()).isEqualTo(cmd.getEndDate());
         verify(nodeMapper).updateById(node);
+        verify(operationLogService).record(org.mockito.ArgumentMatchers.argThat(event ->
+                "NODE_SCHEDULE_CHANGED".equals(event.action())
+                        && Long.valueOf(1L).equals(event.projectId())
+                        && Long.valueOf(10L).equals(event.resourceId())));
     }
 
     @Test
@@ -64,8 +71,8 @@ class NodeServiceScheduleTest {
         node.setId(10L);
         node.setProjectId(1L);
         node.setStatus(1);
-        when(permissionService.requireManageableProject(1L, "编辑节点排期")).thenReturn(project);
-        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        when(permissionService.requireProjectReadable(1L)).thenReturn(project);
+        when(permissionService.requireManageableNode(1L, 10L, "编辑节点排期")).thenReturn(node);
 
         NodeScheduleUpdateCmd cmd = new NodeScheduleUpdateCmd();
         cmd.setStartDate(LocalDate.of(2026, 9, 20));

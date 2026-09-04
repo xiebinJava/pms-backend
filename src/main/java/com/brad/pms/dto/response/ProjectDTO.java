@@ -14,6 +14,7 @@ public class ProjectDTO {
     private String description;
     private Integer status;
     private Integer priority;
+    private Integer projectLevel;
     private Long ownerId;
     private String ownerName;
     private Long createdBy;

@@ -13,6 +13,7 @@ class NotificationPermissionAnnotationTest {
     @Test
     void inboxEndpointsRequireProjectRead() throws Exception {
         assertPermission("list", PermissionCode.PROJECT_READ);
+        assertPermission("page", PermissionCode.PROJECT_READ);
         assertPermission("unreadCount", PermissionCode.PROJECT_READ);
         assertPermission("markRead", PermissionCode.PROJECT_READ);
         assertPermission("markAllRead", PermissionCode.PROJECT_READ);

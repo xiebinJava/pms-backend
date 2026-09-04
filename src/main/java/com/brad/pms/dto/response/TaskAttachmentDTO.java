@@ -17,4 +17,5 @@ public class TaskAttachmentDTO {
     private Long createdBy;
     private String createdByName;
     private LocalDateTime createdAt;
+    private boolean canDelete;
 }

@@ -60,6 +60,28 @@ class OceanbaseConfigurationTest {
     }
 
     @Test
+    void composePassesTaskReminderSettingsToTheBackendContainer() throws Exception {
+        String compose = Files.readString(Path.of("docker-compose.example.yml"));
+
+        assertThat(compose).contains(
+                "PMS_NOTIFICATION_TASK_REMINDER_ENABLED: ${PMS_NOTIFICATION_TASK_REMINDER_ENABLED:-false}",
+                "PMS_NOTIFICATION_TASK_REMINDER_CRON: \"${PMS_NOTIFICATION_TASK_REMINDER_CRON:-0 0 9 * * *}\"",
+                "PMS_NOTIFICATION_TASK_REMINDER_ZONE: ${PMS_NOTIFICATION_TASK_REMINDER_ZONE:-Asia/Shanghai}",
+                "PMS_NOTIFICATION_TASK_REMINDER_DUE_SOON_DAYS: ${PMS_NOTIFICATION_TASK_REMINDER_DUE_SOON_DAYS:-7}");
+    }
+
+    @Test
+    void localOceanbaseExampleDeclaresSafeTaskReminderDefaults() throws Exception {
+        String example = Files.readString(Path.of(".env.oceanbase.example"));
+
+        assertThat(example).contains(
+                "PMS_NOTIFICATION_TASK_REMINDER_ENABLED=false",
+                "PMS_NOTIFICATION_TASK_REMINDER_CRON=\"0 0 9 * * *\"",
+                "PMS_NOTIFICATION_TASK_REMINDER_ZONE=Asia/Shanghai",
+                "PMS_NOTIFICATION_TASK_REMINDER_DUE_SOON_DAYS=7");
+    }
+
+    @Test
     void mysqlProfileAlsoRequiresExplicitCredentials() throws Exception {
         List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
                 "mysql", new ClassPathResource("application-mysql.yml"));

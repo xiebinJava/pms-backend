@@ -48,10 +48,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 OceanBase、账号、V1–V12 数据库迁移、附件目录、后端和前端：
+首次启动会按以下顺序完成 OceanBase、账号、V1–V18 数据库迁移、附件目录、后端和前端：
 
 ```text
-OceanBase → accounts-init → schema-init（V1–V12）→ uploads-init → backend → frontend
+OceanBase → accounts-init → schema-init（V1–V18）→ uploads-init → backend → frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -132,7 +132,7 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 ./scripts/enterprise-preflight.sh
 ```
 
-脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V12，详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V18，V16 增加项目等级字段 `project.project_level`，V17 增加需求澄清节点的范围基线和需求清单，V18 增加方案设计、评审与决策节点工作台；详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
 ## 本地直接启动后端（已有 OceanBase 时）
 
@@ -201,7 +201,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V12 OceanBase 迁移脚本
+├── db/migration/  V1–V18 OceanBase 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/

@@ -11,7 +11,7 @@
 | 文件/图片 | `FileStorageService` 抽象 + 默认 `LocalFileStorageService`；`PMS_STORAGE_TYPE=s3` 时走 S3/MinIO | 单节点默认本地卷；对象存储用于多副本或跨节点读 |
 | 限流 | `RequestRateLimitInterceptor` 进程内按 IP、账号和接口窗口限流 | 单节点可用；多副本前必须迁移到网关或 Redis 共享计数 |
 | 监控 | 私有 Actuator `health`/`metrics`/`prometheus`（默认 `127.0.0.1:8081`）；可选 Compose 叠层与 Helm ServiceMonitor | 单机可不配观察栈；生产把刮取接到已有 Prometheus，或打开 `serviceMonitor.enabled` |
-| 数据库 | OceanBase MySQL 兼容模式，`pms_app`/`pms_migrator` 分权，V1–V12 版本化升级 | 单企业主库可用；生产需启用慢查询、备份介质和告警 |
+| 数据库 | OceanBase MySQL 兼容模式，`pms_app`/`pms_migrator` 分权，V1–V18 版本化升级 | 单企业主库可用；生产需启用慢查询、备份介质和告警 |
 | 异步任务 | 当前请求内完成导入、通知和文件处理 | 小规模可用；大文件/大批量导入达到 SLA 阈值后再引入队列 |
 
 ## 触发式升级路线

@@ -100,6 +100,11 @@ pms:
       email-attribute: ${PMS_LDAP_EMAIL_ATTRIBUTE:mail}
   notification:
     startup-check-enabled: ${PMS_NOTIFICATION_STARTUP_CHECK:true}
+    task-reminder:
+      enabled: ${PMS_NOTIFICATION_TASK_REMINDER_ENABLED:false}
+      cron: ${PMS_NOTIFICATION_TASK_REMINDER_CRON:0 0 9 * * *}
+      zone: ${PMS_NOTIFICATION_TASK_REMINDER_ZONE:Asia/Shanghai}
+      due-soon-days: ${PMS_NOTIFICATION_TASK_REMINDER_DUE_SOON_DAYS:7}
     mail:
       enabled: ${PMS_MAIL_ENABLED:false}
       base-url: ${PMS_PUBLIC_BASE_URL:http://localhost:57979}

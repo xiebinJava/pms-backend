@@ -4,7 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.common.enums.ProjectLevel;
 import com.brad.pms.common.enums.ProjectStatus;
+import com.brad.pms.audit.AuditAction;
+import com.brad.pms.audit.AuditEvent;
+import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.common.page.PageResult;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.ProjectCreateCmd;
@@ -29,6 +33,7 @@ import com.brad.pms.security.UserContext;
 import com.brad.pms.security.ProjectPermissionPolicy;
 import com.brad.pms.security.DataScopeResolver;
 import com.brad.pms.security.LoginUser;
+import com.brad.pms.security.PermissionCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +60,7 @@ public class ProjectService {
     private final UserPositionMapper userPositionMapper;
     private final DataScopeResolver dataScopeResolver;
     private final OrgUnitMapper orgUnitMapper;
+    private final OperationLogService operationLogService;
 
     @Transactional
     public ProjectDTO create(ProjectCreateCmd cmd) {
@@ -65,10 +71,11 @@ public class ProjectService {
         // 新建项目统一从“进行中”开始，项目经理在首节点确认后再落库。
         project.setStatus(ProjectStatus.ACTIVE.getCode());
         project.setPriority(cmd.getPriority());
+        project.setProjectLevel(requireProjectLevel(cmd.getProjectLevel()));
         // owner_id 为历史兼容字段，真实项目创建人统一取当前登录用户。
         project.setOwnerId(creatorId);
         project.setCreatedBy(creatorId);
-        Long orgUnitId = cmd.getOrgUnitId();
+        Long orgUnitId = permissionService.requireProjectCreateOrgUnit(cmd.getOrgUnitId());
         if (orgUnitId == null) {
             var primary = userPositionMapper.findActivePrimary(creatorId);
             orgUnitId = primary == null ? null : primary.getOrgUnitId();
@@ -91,18 +98,34 @@ public class ProjectService {
 
         // 创建人自动成为项目成员，项目经理在首节点确认后再设置。
         memberService.add(project.getId(), creatorId, 0);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.PROJECT_CREATED.name(), AuditResourceType.PROJECT.name(), project.getId(), project.getId(),
+                null, null, projectAuditSnapshot(project)));
         return detail(project.getId());
     }
 
     @Transactional
     public ProjectDTO update(Long id, ProjectUpdateCmd cmd) {
-        ProjectDO project = permissionService.requireManageableProject(id, "编辑项目");
+        ProjectDO project = permissionService.requireProjectWritable(id, "编辑项目");
+        Map<String, Object> before = projectAuditSnapshot(project);
+        Long previousProjectManagerId = project.getProjectManagerId();
         project.setName(cmd.getName());
         project.setDescription(cmd.getDescription());
         if (cmd.getPriority() != null) project.setPriority(cmd.getPriority());
-        if (cmd.getOrgUnitId() != null) project.setOrgUnitId(cmd.getOrgUnitId());
+        if (cmd.getProjectLevel() != null) project.setProjectLevel(requireProjectLevel(cmd.getProjectLevel()));
+        if (cmd.getOrgUnitId() != null) {
+            if (!permissionService.canWriteProjectOrg(project, cmd.getOrgUnitId())) {
+                throw BusinessException.forbidden("项目组织不在当前用户的写入范围内");
+            }
+            project.setOrgUnitId(cmd.getOrgUnitId());
+        }
         project.setStartDate(cmd.getStartDate());
         project.setEndDate(cmd.getEndDate());
+        boolean managesProjectComposition = cmd.getMemberIds() != null
+                || cmd.getFollowerIds() != null || cmd.getProjectManagerId() != null;
+        if (managesProjectComposition) {
+            permissionService.requireProjectManageable(id, "维护项目成员或项目经理");
+        }
         if (cmd.getMemberIds() != null) {
             memberService.replace(id, project.getCreatedBy() == null ? project.getOwnerId() : project.getCreatedBy(),
                     cmd.getMemberIds());
@@ -112,6 +135,18 @@ public class ProjectService {
             project.setProjectManagerId(cmd.getProjectManagerId());
         }
         projectMapper.updateById(project);
+        Map<String, Object> after = projectAuditSnapshot(project);
+        if (!before.equals(after)) {
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.PROJECT_UPDATED.name(), AuditResourceType.PROJECT.name(), id, id,
+                    null, before, after));
+        }
+        if (!Objects.equals(previousProjectManagerId, project.getProjectManagerId())) {
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.PROJECT_MANAGER_CHANGED.name(), AuditResourceType.PROJECT.name(), id, id,
+                    null, Map.of("projectManagerId", previousProjectManagerId == null ? "UNASSIGNED" : previousProjectManagerId),
+                    Map.of("projectManagerId", project.getProjectManagerId() == null ? "UNASSIGNED" : project.getProjectManagerId())));
+        }
         if (cmd.getFollowerIds() != null) {
             followerService.replace(id, cmd.getFollowerIds());
         }
@@ -120,18 +155,21 @@ public class ProjectService {
 
     @Transactional
     public void delete(Long id) {
-        ProjectDO project = permissionService.requireManageableProject(id, "删除项目");
+        ProjectDO project = permissionService.requireProjectManageable(id, "删除项目");
         int fromStatus = ProjectStatus.normalize(project.getStatus());
-        project.setStatus(ProjectStatus.DELETED.getCode());
-        projectMapper.updateById(project);
+        projectMapper.softDeleteProject(id, ProjectStatus.DELETED.getCode());
         recordLifecycle(id, "DELETE", "删除项目", fromStatus, ProjectStatus.DELETED.getCode());
+        operationLogService.record(AuditEvent.success(
+                AuditAction.PROJECT_DELETED.name(), AuditResourceType.PROJECT.name(), id, id,
+                "删除项目", Map.of("status", fromStatus), Map.of("status", ProjectStatus.DELETED.getCode())));
     }
 
     @Transactional
     public ProjectDTO terminate(Long id, String reason) {
-        ProjectDO project = permissionService.requireProject(id);
-        if (!ProjectPermissionPolicy.canTerminateProject(project, UserContext.userId(), UserContext.isAdministrator())) {
-            throw BusinessException.forbidden("仅进行中的项目可以终止，且仅项目创建人或项目经理可以操作");
+        ProjectDO project = permissionService.requireProjectManageable(id, "终止项目");
+        if (!ProjectPermissionPolicy.canTerminateProject(project, UserContext.userId(), UserContext.isAdministrator(),
+                permissionService.canManageProject(project))) {
+            throw BusinessException.forbidden("仅进行中的项目可以终止，且当前用户没有项目治理权限");
         }
         int fromStatus = ProjectStatus.normalize(project.getStatus());
         project.setStatus(ProjectStatus.TERMINATED.getCode());
@@ -147,19 +185,19 @@ public class ProjectService {
             nodeMapper.updateById(current);
         }
         recordLifecycle(id, "TERMINATE", reason, fromStatus, ProjectStatus.TERMINATED.getCode());
+        operationLogService.record(AuditEvent.success(
+                AuditAction.PROJECT_TERMINATED.name(), AuditResourceType.PROJECT.name(), id, id,
+                reason, Map.of("status", fromStatus), Map.of("status", ProjectStatus.TERMINATED.getCode())));
         return detail(id);
     }
 
     @Transactional
     public ProjectDTO restore(Long id, String reason) {
-        ProjectDO project = permissionService.requireProject(id);
-        Long userId = UserContext.userId();
-        if (!Objects.equals(project.getStatus(), ProjectStatus.TERMINATED.getCode())
-                || !ProjectPermissionPolicy.hasProjectControl(project, userId, UserContext.isAdministrator())) {
-            throw BusinessException.forbidden("仅项目创建人或项目经理可以恢复已终止项目");
-        }
+        ProjectDO project = permissionService.requireProjectForRestore(id);
+        int fromStatus = ProjectStatus.normalize(project.getStatus());
         project.setStatus(ProjectStatus.ACTIVE.getCode());
-        projectMapper.updateById(project);
+        project.setDeleted(false);
+        projectMapper.restoreProject(id, ProjectStatus.ACTIVE.getCode());
 
         ProjectNodeDO terminated = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, id)
@@ -170,13 +208,17 @@ public class ProjectService {
             terminated.setStatus(1);
             nodeMapper.updateById(terminated);
         }
-        recordLifecycle(id, "RESTORE", reason, ProjectStatus.TERMINATED.getCode(), ProjectStatus.ACTIVE.getCode());
+        recordLifecycle(id, "RESTORE", reason, fromStatus, ProjectStatus.ACTIVE.getCode());
+        operationLogService.record(AuditEvent.success(
+                AuditAction.PROJECT_RESTORED.name(), AuditResourceType.PROJECT.name(), id, id,
+                reason, Map.of("status", fromStatus), Map.of("status", ProjectStatus.ACTIVE.getCode())));
         return detail(id);
     }
 
     public PageResult<ProjectDTO> page(ProjectPageQry qry) {
         LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
                 .like(StringUtils.hasText(qry.getKeyword()), ProjectDO::getName, qry.getKeyword())
+                .ne(ProjectDO::getStatus, ProjectStatus.DELETED.getCode())
                 .orderByDesc(ProjectDO::getUpdatedAt);
         applyReadScope(wrapper);
         if (qry.getStatus() != null) {
@@ -228,8 +270,15 @@ public class ProjectService {
                 .collect(Collectors.toList());
     }
 
+    public boolean hasAllCompanyProjectRead() {
+        LoginUser current = UserContext.get();
+        return current != null && (UserContext.isAdministrator()
+                || dataScopeResolver.hasAllCompanyScope(current, PermissionCode.PROJECT_READ));
+    }
+
     public Map<String, Object> stats() {
-        LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
+                .ne(ProjectDO::getStatus, ProjectStatus.DELETED.getCode());
         applyReadScope(wrapper);
         List<ProjectDO> all = projectMapper.selectList(wrapper);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -254,9 +303,9 @@ public class ProjectService {
         LoginUser current = UserContext.get();
         if (current == null || UserContext.isAdministrator()) return;
 
-        List<Long> allowedOrgIds = dataScopeResolver.resolveOrgUnitIds(current, "project:read");
-        boolean allCompany = dataScopeResolver.hasAllCompanyScope(current, "project:read");
+        boolean allCompany = dataScopeResolver.hasAllCompanyScope(current, PermissionCode.PROJECT_READ);
         if (allCompany) return;
+        List<Long> allowedOrgIds = dataScopeResolver.resolveOrgUnitIds(current, PermissionCode.PROJECT_READ);
 
         List<Long> memberProjectIds = memberMapper.selectList(new LambdaQueryWrapper<ProjectMemberDO>()
                         .eq(ProjectMemberDO::getUserId, current.getId())).stream()
@@ -343,6 +392,24 @@ public class ProjectService {
         if (nodes == null || nodes.isEmpty()) return storedProgress == null ? 0 : storedProgress;
         long completed = nodes.stream().filter(node -> Integer.valueOf(2).equals(node.getStatus())).count();
         return (int) Math.round(completed * 100.0 / nodes.size());
+    }
+
+    private Map<String, Object> projectAuditSnapshot(ProjectDO project) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("name", project.getName());
+        snapshot.put("priority", project.getPriority());
+        snapshot.put("projectLevel", project.getProjectLevel());
+        snapshot.put("orgUnitId", project.getOrgUnitId());
+        snapshot.put("startDate", project.getStartDate());
+        snapshot.put("endDate", project.getEndDate());
+        snapshot.put("status", project.getStatus());
+        return snapshot;
+    }
+
+    private int requireProjectLevel(Integer projectLevel) {
+        int value = projectLevel == null ? ProjectLevel.ROUTINE.getCode() : projectLevel;
+        if (!ProjectLevel.isValid(value)) throw BusinessException.error("项目等级不合法");
+        return value;
     }
 
     private void recordLifecycle(Long projectId, String action, String reason, int fromStatus, int toStatus) {

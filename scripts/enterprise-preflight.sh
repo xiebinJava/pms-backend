@@ -103,11 +103,11 @@ echo "Checking PMS database $DB_HOST:$DB_PORT/$DB_NAME (read-only)"
 for table_name in sys_login_log sys_auth_session sys_password_reset_token sys_operation_log sys_import_job sys_org_unit_history; do
   assert_table "$table_name"
 done
-for index_name in uk_user_username_normalized uk_user_email_normalized idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted idx_org_unit_history_org_created idx_org_unit_history_operator_created; do
+for index_name in uk_user_username_normalized uk_user_email_normalized idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted idx_org_unit_history_org_created idx_org_unit_history_operator_created uk_user_notification_dedupe; do
   assert_index "$index_name"
 done
 for column_check in \
-  "sys_user|deleted" "sys_user|version" "sys_user|email_normalized" \
+  "sys_user|deleted" "sys_user|version" "sys_user|email_normalized" "user_notification|dedupe_key" \
   "project|deleted" "project|version" \
   "project_node|deleted" "project_node|version"; do
   table_name="${column_check%%|*}"; column_name="${column_check##*|}"

@@ -41,7 +41,7 @@ expected = {
   "/projects/{projectId}/comments" => ["get", "post"], "/comments/{id}" => ["delete"],
   "/feedback/tickets" => ["get", "post"], "/feedback/tickets/assignees" => ["get"],
   "/feedback/tickets/{id}" => ["get", "patch"], "/feedback/tickets/{id}/reopen" => ["post"],
-  "/projects/images" => ["post"], "/projects/images/{filename}" => ["get"],
+  "/projects/{projectId}/images" => ["post"], "/projects/{projectId}/images/{filename}" => ["get", "delete"],
   "/admin/org/tree" => ["get"], "/org/tree" => ["get"], "/admin/org" => ["post"],
   "/admin/org/{id}" => ["put", "delete"], "/admin/org/{id}/move" => ["put"], "/admin/org/{id}/history" => ["get"],
   "/admin/users" => ["get"], "/admin/users/invite" => ["post"], "/admin/users/page" => ["get"],
@@ -53,6 +53,7 @@ expected = {
   "/admin/import/{jobId}/commit" => ["post"], "/admin/import/{jobId}/errors.csv" => ["get"],
   "/admin/import/template/organizations.csv" => ["get"], "/admin/import/template/users.csv" => ["get"],
   "/admin/audit" => ["get"],
+  "/admin/audit/{id}" => ["get"],
   "/health" => ["get"], "/healthz" => ["get"], "/health/ready" => ["get"], "/health/live" => ["get"]
 }
 expected.each do |route, methods|
@@ -99,7 +100,7 @@ expected = {
     "/projects/{projectId}/comments": {"get", "post"}, "/comments/{id}": {"delete"},
     "/feedback/tickets": {"get", "post"}, "/feedback/tickets/assignees": {"get"},
     "/feedback/tickets/{id}": {"get", "patch"}, "/feedback/tickets/{id}/reopen": {"post"},
-    "/projects/images": {"post"}, "/projects/images/{filename}": {"get"},
+    "/projects/{projectId}/images": {"post"}, "/projects/{projectId}/images/{filename}": {"get", "delete"},
     "/admin/org/tree": {"get"}, "/org/tree": {"get"}, "/admin/org": {"post"},
     "/admin/org/{id}": {"put", "delete"}, "/admin/org/{id}/move": {"put"}, "/admin/org/{id}/history": {"get"},
     "/admin/users": {"get"}, "/admin/users/invite": {"post"}, "/admin/users/page": {"get"},
@@ -111,6 +112,7 @@ expected = {
     "/admin/import/{jobId}/commit": {"post"}, "/admin/import/{jobId}/errors.csv": {"get"},
     "/admin/import/template/organizations.csv": {"get"}, "/admin/import/template/users.csv": {"get"},
     "/admin/audit": {"get"},
+    "/admin/audit/{id}": {"get"},
     "/health": {"get"}, "/healthz": {"get"}, "/health/ready": {"get"}, "/health/live": {"get"},
 }
 for route, methods in expected.items():

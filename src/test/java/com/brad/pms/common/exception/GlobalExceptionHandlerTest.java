@@ -38,12 +38,16 @@ class GlobalExceptionHandlerTest {
                 BusinessException.forbidden("无权执行此操作"));
         ResponseEntity<ResponseResult<Void>> conflict = handler.handleBusiness(
                 new BusinessException(ResponseResult.CONFLICT, "资源已存在"));
+        ResponseEntity<ResponseResult<Void>> notFound = handler.handleBusiness(
+                BusinessException.notFound("资源不存在"));
         ResponseEntity<ResponseResult<Void>> validation = handler.handleBusiness(
                 BusinessException.error("业务校验失败"));
 
         assertThat(forbidden.getStatusCodeValue()).isEqualTo(403);
         assertThat(conflict.getStatusCodeValue()).isEqualTo(409);
         assertThat(Objects.requireNonNull(conflict.getBody()).getCode()).isEqualTo(409);
+        assertThat(notFound.getStatusCodeValue()).isEqualTo(404);
+        assertThat(Objects.requireNonNull(notFound.getBody()).getCode()).isEqualTo(404);
         assertThat(validation.getStatusCodeValue()).isEqualTo(422);
         assertThat(Objects.requireNonNull(validation.getBody()).getCode()).isEqualTo(422);
     }

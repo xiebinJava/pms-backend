@@ -31,6 +31,10 @@ public class BusinessException extends RuntimeException {
         return new BusinessException(403, message);
     }
 
+    public static BusinessException notFound(String message) {
+        return new BusinessException(ResponseCode.NOT_FOUND, message);
+    }
+
     public static BusinessException conflict(String message) {
         return new BusinessException(ResponseCode.CONFLICT, message);
     }
@@ -39,6 +43,7 @@ public class BusinessException extends RuntimeException {
         public static final int ERROR = 500;
         public static final int UNAUTHORIZED = 401;
         public static final int FORBIDDEN = 403;
+        public static final int NOT_FOUND = 404;
         public static final int CONFLICT = 409;
         public static final int UNPROCESSABLE_ENTITY = 422;
     }

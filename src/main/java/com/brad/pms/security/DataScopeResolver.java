@@ -33,9 +33,12 @@ public class DataScopeResolver {
         if (SystemRole.isAdministrator(user.getSystemRole())) {
             return List.of();
         }
-        if (permissionCode != null && permissionMapper.findLiveByUserId(user.getId()).stream()
-                .noneMatch(permission -> permissionCode.equals(permission.getCode()))) return List.of();
-        Set<Long> permissionRoleIds = permissionCode == null ? Set.of() : new HashSet<>(permissionMapper.findLiveRoleIdsByUserAndPermission(user.getId(), permissionCode));
+        if (!hasPermission(user, permissionCode)) return List.of();
+        // Project visibility is intentionally company-wide for every role that
+        // has project:read. Keep this override local to the project permission
+        // family so other permissions retain their configured data scope.
+        if (PermissionCode.PROJECT_READ.equals(permissionCode)) return List.of();
+        Set<Long> permissionRoleIds = permissionRoleIds(user, permissionCode);
         Set<Long> result = new LinkedHashSet<>();
         List<UserPositionDO> positions = userPositionMapper.findActiveByUserId(user.getId());
         for (UserRoleDO grant : userRoleMapper.findLiveByUserId(user.getId())) {
@@ -76,12 +79,71 @@ public class DataScopeResolver {
         return new ArrayList<>(result);
     }
 
+    /**
+     * Resolves the organization boundary used when creating a project.
+     * Unlike generic SELF resource scope, project creation treats SELF as the
+     * user's exact active primary organization.
+     */
+    public List<Long> resolveProjectCreateOrgUnitIds(LoginUser user, String permissionCode) {
+        if (user == null || !hasPermission(user, permissionCode)) return List.of();
+        if (SystemRole.isAdministrator(user.getSystemRole())) return List.of();
+        Set<Long> permissionRoleIds = permissionRoleIds(user, permissionCode);
+        Set<Long> result = new LinkedHashSet<>();
+        List<UserPositionDO> positions = userPositionMapper.findActiveByUserId(user.getId());
+        for (UserRoleDO grant : userRoleMapper.findLiveByUserId(user.getId())) {
+            if (!permissionRoleIds.contains(grant.getRoleId())) continue;
+            RoleDO role = roleMapper.selectById(grant.getRoleId());
+            if (role == null || !Boolean.TRUE.equals(role.getEnabled())) continue;
+            DataScopeType scope;
+            try {
+                scope = DataScopeType.valueOf(role.getDataScopeType());
+            } catch (Exception ignored) {
+                scope = DataScopeType.SELF;
+            }
+            if (grant.getScopeOrgUnitId() != null && scope == DataScopeType.CUSTOM_ORGS) {
+                result.add(grant.getScopeOrgUnitId());
+            }
+            if (scope == DataScopeType.ALL) return List.of();
+            Set<Long> ownOrgIds = new LinkedHashSet<>();
+            for (UserPositionDO position : positions) {
+                if (position.getOrgUnitId() == null) continue;
+                if (scope == DataScopeType.SELF) {
+                    if (Boolean.TRUE.equals(position.getIsPrimary())) ownOrgIds.add(position.getOrgUnitId());
+                } else {
+                    ownOrgIds.add(position.getOrgUnitId());
+                }
+            }
+            if (scope == DataScopeType.CUSTOM_ORGS) {
+                result.addAll(roleOrgScopeMapper.findOrgUnitIds(role.getId()));
+            } else if (scope == DataScopeType.SELF || scope == DataScopeType.ORG) {
+                result.addAll(ownOrgIds);
+            } else if (scope == DataScopeType.ORG_AND_DESCENDANTS) {
+                for (Long orgId : ownOrgIds) {
+                    var org = orgUnitMapper.selectById(orgId);
+                    if (org != null) result.addAll(orgUnitMapper.findDescendantIds(org.getPath(), org.getId()));
+                }
+            } else if (scope == DataScopeType.SELF_AND_SUBORDINATES) {
+                result.addAll(ownOrgIds);
+                collectReportOrgIds(user.getId(), result, new HashSet<>());
+            }
+        }
+        return new ArrayList<>(result);
+    }
+
+    public Long resolveActivePrimaryOrgUnitId(LoginUser user) {
+        if (user == null) return null;
+        UserPositionDO primary = userPositionMapper.findActiveByUserId(user.getId()).stream()
+                .filter(position -> Boolean.TRUE.equals(position.getIsPrimary()))
+                .findFirst().orElse(null);
+        return primary == null ? null : primary.getOrgUnitId();
+    }
+
     public boolean hasAllCompanyScope(LoginUser user, String permissionCode) {
         if (user == null) return false;
         if (SystemRole.isAdministrator(user.getSystemRole())) return true;
-        if (permissionCode != null && permissionMapper.findLiveByUserId(user.getId()).stream()
-                .noneMatch(permission -> permissionCode.equals(permission.getCode()))) return false;
-        Set<Long> permissionRoleIds = permissionCode == null ? Set.of() : new HashSet<>(permissionMapper.findLiveRoleIdsByUserAndPermission(user.getId(), permissionCode));
+        if (!hasPermission(user, permissionCode)) return false;
+        if (PermissionCode.PROJECT_READ.equals(permissionCode)) return true;
+        Set<Long> permissionRoleIds = permissionRoleIds(user, permissionCode);
         for (UserRoleDO grant : userRoleMapper.findLiveByUserId(user.getId())) {
             if (permissionCode != null && !permissionRoleIds.contains(grant.getRoleId())) continue;
             RoleDO role = roleMapper.selectById(grant.getRoleId());
@@ -93,6 +155,15 @@ public class DataScopeResolver {
             }
         }
         return false;
+    }
+
+    private boolean hasPermission(LoginUser user, String permissionCode) {
+        return permissionCode == null || permissionMapper.findLiveByUserId(user.getId()).stream()
+                .anyMatch(permission -> permissionCode.equals(permission.getCode()));
+    }
+
+    private Set<Long> permissionRoleIds(LoginUser user, String permissionCode) {
+        return permissionCode == null ? Set.of() : new HashSet<>(permissionMapper.findLiveRoleIdsByUserAndPermission(user.getId(), permissionCode));
     }
 
     private void collectReportOrgIds(Long managerId, Set<Long> result, Set<Long> visitedUsers) {

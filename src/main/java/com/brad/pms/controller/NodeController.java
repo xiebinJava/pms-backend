@@ -28,7 +28,7 @@ public class NodeController {
     }
 
     @PostMapping("/{nodeId}/complete")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<List<ProjectNodeDTO>> complete(@PathVariable Long projectId, @PathVariable Long nodeId) {
         return ResponseResult.success(nodeService.complete(projectId, nodeId));
     }
@@ -50,7 +50,7 @@ public class NodeController {
     }
 
     @PutMapping("/{nodeId}/schedule")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectNodeDTO> updateSchedule(@PathVariable Long projectId,
                                                           @PathVariable Long nodeId,
                                                           @RequestBody NodeScheduleUpdateCmd cmd) {

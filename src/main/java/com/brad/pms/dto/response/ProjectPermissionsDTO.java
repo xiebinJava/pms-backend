@@ -12,4 +12,5 @@ public class ProjectPermissionsDTO {
     private boolean canTerminateProject;
     private boolean canRestoreProject;
     private boolean canDeleteProject;
+    private boolean canWriteComment;
 }

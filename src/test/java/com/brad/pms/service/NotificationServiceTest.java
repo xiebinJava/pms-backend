@@ -1,6 +1,8 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.brad.pms.common.page.PageResult;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.UserNotificationDTO;
@@ -21,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,16 +31,18 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
     @Mock UserNotificationMapper notificationMapper;
-    @Mock ProjectService projectService;
     @Mock UserService userService;
     @Mock FollowerService followerService;
     @Mock WebhookPublisher webhookPublisher;
@@ -83,22 +88,63 @@ class NotificationServiceTest {
     }
 
     @Test
-    void listDropsNotificationsFromUnreadableProjectsAndKeepsUnreadFirst() {
+    void listUsesSqlFilteredRowsAndKeepsUnreadFirstOrderingInTheMapper() {
         UserNotificationDO unread = row(1L, 9L, null);
         UserNotificationDO read = row(2L, 9L, LocalDateTime.of(2026, 9, 1, 8, 0));
-        UserNotificationDO hidden = row(3L, 88L, null);
         unread.setCreatedAt(LocalDateTime.of(2026, 9, 1, 9, 0));
         read.setCreatedAt(LocalDateTime.of(2026, 9, 1, 10, 0));
-        hidden.setCreatedAt(LocalDateTime.of(2026, 9, 1, 11, 0));
-        when(notificationMapper.selectList(any())).thenReturn(List.of(hidden, read, unread));
-        ProjectDTO visible = new ProjectDTO();
-        visible.setId(9L);
-        when(projectService.listReadableByIds(any())).thenReturn(List.of(visible));
+        when(notificationMapper.selectVisibleList(7L, true, 20)).thenReturn(List.of(unread, read));
         when(userService.listByIds(any())).thenReturn(List.of());
 
         List<UserNotificationDTO> result = notificationService.list(true, 20);
 
         assertThat(result).extracting(UserNotificationDTO::getId).containsExactly(1L, 2L);
+        verify(notificationMapper).selectVisibleList(7L, true, 20);
+    }
+
+    @Test
+    void pageUsesSqlFilteredRowsAndPreservesPaginationMetadata() {
+        UserNotificationDO row = row(4L, 9L, null);
+        row.setType(NotificationService.TASK_OVERDUE);
+        row.setCreatedAt(LocalDateTime.of(2026, 9, 4, 9, 0));
+        Page<UserNotificationDO> page = new Page<>(2, 1);
+        page.setTotal(2);
+        page.setRecords(List.of(row));
+        when(notificationMapper.selectVisiblePage(any(), any(), eq(NotificationService.TASK_OVERDUE), eq(true)))
+                .thenReturn(page);
+        when(userService.listByIds(any())).thenReturn(List.of());
+
+        PageResult<UserNotificationDTO> result = notificationService.page(
+                NotificationService.TASK_OVERDUE, true, 2, 1);
+
+        assertThat(result.getTotal()).isEqualTo(2);
+        assertThat(result.getCurrPage()).isEqualTo(2);
+        assertThat(result.getPageSize()).isEqualTo(1);
+        assertThat(result.getList()).extracting(UserNotificationDTO::getType)
+                .containsExactly(NotificationService.TASK_OVERDUE);
+        verify(notificationMapper).selectVisiblePage(any(), eq(7L),
+                eq(NotificationService.TASK_OVERDUE), eq(true));
+    }
+
+    @Test
+    void pageRejectsUnknownNotificationType() {
+        assertThatThrownBy(() -> notificationService.page("UNKNOWN", false, 1, 20))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("通知类型");
+        verify(notificationMapper, never()).selectVisiblePage(any(), any(), any(), any(Boolean.class));
+    }
+
+    @Test
+    void reminderInsertIsInAppOnlyAndDuplicateIsNotAnError() {
+        when(notificationMapper.insert(any(UserNotificationDO.class)))
+                .thenThrow(new DuplicateKeyException("uk_user_notification_dedupe"));
+
+        assertThat(notificationService.emitInApp(8L, NotificationService.TASK_OVERDUE,
+                "任务已逾期", "研发平台 · 补齐文档", 9L, 3L, null, null,
+                "TASK_OVERDUE:3:2026-09-04")).isFalse();
+
+        verify(notificationMapper).insert(any(UserNotificationDO.class));
+        verifyNoInteractions(webhookPublisher);
     }
 
     @Test

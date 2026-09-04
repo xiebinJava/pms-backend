@@ -222,6 +222,29 @@ paths:
         '200': { $ref: '#/components/responses/Success' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /notifications/page:
+    get:
+      tags: [项目]
+      summary: 分页查询当前用户可见的站内通知
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string, enum: [TASK_DUE_SOON, TASK_OVERDUE] }
+          description: 仅支持临期或逾期提醒类型；省略表示全部类型
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - name: currPage
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /notifications/unread-count:
     get:
       tags: [项目]
@@ -287,7 +310,16 @@ paths:
         required: true
         content:
           application/json:
-            schema: { type: object }
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                priority: { type: integer, minimum: 0, maximum: 3, description: 低、中、高、紧急 }
+                projectLevel: { type: integer, enum: [0, 1, 2, 3], default: 0, description: 0常规(C)、1重要(B)、2关键(A)、3战略(S) }
+                orgUnitId: { type: integer, format: int64 }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -306,7 +338,17 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object }
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                priority: { type: integer, minimum: 0, maximum: 3, description: 低、中、高、紧急 }
+                projectLevel: { type: integer, enum: [0, 1, 2, 3], description: 0常规(C)、1重要(B)、2关键(A)、3战略(S) }
+                orgUnitId: { type: integer, format: int64 }
+                projectManagerId: { type: integer, format: int64, nullable: true }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -503,6 +545,142 @@ paths:
             schema: { type: object }
       responses:
         '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/nodes/{nodeId}/requirements-scope:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取需求澄清范围基线
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存需求澄清范围基线草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeRequirementScopeUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/requirements-scope/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 确认需求澄清范围基线
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/requirements-scope/reopen:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 重新打开需求澄清范围基线
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取方案设计评审决策工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存方案包草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionPackageUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/submit:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 提交方案包
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: integer, minimum: 0, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/reviews/{reviewType}/complete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+      - name: reviewType
+        in: path
+        required: true
+        schema: { type: string, enum: [BUSINESS_PRODUCT, TECHNICAL, TEST_RELEASE] }
+    post:
+      tags: [任务与节点]
+      summary: 完成一类方案评审
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionReviewCompleteRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/decision/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 确认方案决策
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionDecisionConfirmRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/decision/reopen:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 重新打开方案决策
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /projects/{projectId}/milestones:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -703,7 +881,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/BusinessError' }
-  /projects/images:
+  /projects/{projectId}/images:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
     post:
       tags: [项目]
       summary: 上传项目图片
@@ -719,8 +899,9 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-  /projects/images/{filename}:
+  /projects/{projectId}/images/{filename}:
     parameters:
+      - $ref: '#/components/parameters/ProjectId'
       - name: filename
         in: path
         required: true
@@ -731,6 +912,12 @@ paths:
       responses:
         '200': { description: 图片二进制 }
         '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [项目]
+      summary: 删除项目图片
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /admin/org/tree:
     get:
       tags: [组织与权限]
@@ -992,9 +1179,31 @@ paths:
     get:
       tags: [导入与审计]
       summary: 分页查询审计日志
+      parameters:
+        - { name: action, in: query, required: false, schema: { type: string } }
+        - { name: resourceType, in: query, required: false, schema: { type: string } }
+        - { name: resourceId, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: operatorId, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: projectId, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: result, in: query, required: false, schema: { type: string, enum: [SUCCESS, FAILURE] } }
+        - { name: requestId, in: query, required: false, schema: { type: string } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date-time, description: 半开区间结束时间，不包含该时刻 } }
+        - { name: currPage, in: query, required: false, schema: { type: integer, format: int64, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, required: false, schema: { type: integer, format: int64, minimum: 1, maximum: 100, default: 20 } }
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/audit/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [导入与审计]
+      summary: 查看审计日志详情
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /health:
     get:
       tags: [健康检查]
@@ -1085,6 +1294,59 @@ components:
       properties:
         version: { type: integer, minimum: 0 }
         note: { type: string, maxLength: 2000 }
+    NodeRequirementScopeUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的基线版本；版本冲突返回 409 }
+        objective: { type: string, maxLength: 2000 }
+        deliverable: { type: string, maxLength: 2000 }
+        scopeItems: { type: array, description: 纳入/不纳入范围项 }
+        requirements: { type: array, description: 需求清单；新增或修改的条目需重新确认 }
+    NodeRequirementScopeResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        baselineStatus: { type: integer, description: 0 草稿，1 已确认 }
+        objective: { type: string, nullable: true }
+        deliverable: { type: string, nullable: true }
+        confirmedBy: { type: integer, format: int64, nullable: true }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        canEdit: { type: boolean }
+        scopeItems: { type: array }
+        requirements: { type: array }
+    NodeSolutionPackageUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的方案包版本；版本冲突返回 409 }
+        packageVersion: { type: string, maxLength: 20, description: 方案包展示版本，如 v1.0 }
+        productSolution: { type: string, maxLength: 4000 }
+        technicalSolution: { type: string, maxLength: 4000 }
+        summary: { type: string, maxLength: 2000 }
+        scopeCoverage: { type: string, maxLength: 2000 }
+        rolloutPremise: { type: string, maxLength: 2000 }
+    NodeSolutionReviewCompleteRequest:
+      type: object
+      properties:
+        comment: { type: string, maxLength: 2000 }
+    NodeSolutionDecisionConfirmRequest:
+      type: object
+      required: [result, reason]
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的决策版本；版本冲突返回 409 }
+        result: { type: string, enum: [PASS, CONDITIONAL_PASS, RETURN_FOR_CHANGES] }
+        reason: { type: string, maxLength: 2000 }
+        conditions: { type: string, maxLength: 2000, description: 有条件通过时必填 }
+    NodeSolutionDesignResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        upstreamBaseline: { type: object, description: 需求范围基线只读摘要 }
+        solutionPackage: { type: object, description: 单个方案包 }
+        reviews: { type: array, description: 固定三类必要评审 }
+        decision: { type: object, description: 方案决策及锁定状态 }
     ApiResponse:
       type: object
       properties:

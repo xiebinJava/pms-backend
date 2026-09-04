@@ -1,6 +1,6 @@
 # 基础设施就绪状态
 
-更新时间：2026-09-03
+更新时间：2026-09-05
 
 本文件只记录企业级基础设施状态，不代表业务功能已经完成生产验收。每完成一个基础设施任务，必须补充验证命令、结果和对应提交。
 
@@ -8,9 +8,9 @@
 
 | 检查项 | 当前状态 | 证据 |
 | --- | --- | --- |
-| OceanBase `brad_pms` | V1–V12 已执行并复核 | 使用 `pms_migrator` 连续执行版本升级，均完成 checksum 校验；V12 反馈工单/历史表、关键表结构、外键、索引和数据范围预检通过 |
-| 后端回归 | 已通过 | `mvn -q test`（206 个用例，0 失败、0 错误、1 跳过），反馈中心状态机、幂等、乐观锁、权限和审计测试与既有企业回归全部通过；健康检查期望迁移版本已与 V12 对齐 |
-| 前端回归 | 已通过 | `pnpm test`（121 个用例，0 失败），反馈中心页面契约与既有模块测试通过 |
+| OceanBase `brad_pms` | V1–V18 已执行并复核 | V1–V18 已按 `pms_migrator` 流程在本机目标库完成；V18 使用本地已有 `oceanbase/oceanbase-ce:4.3.5-lts` 镜像内的 `obclient` 执行，并通过 readiness、关键表结构、外键和索引预检；正式环境仍需按发布账号执行并留存 checksum 证据 |
+| 后端回归 | 已通过 | `mvn -q test`，0 失败、0 错误；权限、通知查询/提醒、项目等级、需求范围基线、方案设计评审决策、审计查询、脱敏、迁移和既有企业回归全部通过；健康检查代码基线已更新到 V18 |
+| 前端回归 | 已通过 | `pnpm test`（173 项，0 失败）；通知中心、审计工作台、权限页面、项目等级、需求范围基线、方案设计评审决策与既有模块测试通过 |
 | 前端类型与构建 | 已通过 | `pnpm typecheck`、`pnpm build` |
 | 运行脚本语法 | 已通过 | `bash -n scripts/*.sh docker/*.sh` |
 | 后端权限注解 | 已完成基础覆盖 | 控制器接口已扫描，受保护接口使用 `@RequirePermission` 或 `@IgnoreAuth` |
@@ -21,17 +21,25 @@
 
 | 优先级 | 缺口 | 影响 |
 | --- | --- | --- |
-| P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机已完成 V1–V12 升级校验；生产仍需按企业 RPO/RTO 保存备份介质与联系人 |
-| P1 | GitHub `main` 分支保护仍未启用，当前私有仓库套餐的保护 API 返回 403 | 跨仓库 CI 已覆盖 V1–V12 迁移、API 冒烟和浏览器验收；需升级 GitHub 套餐或将仓库公开后配置 PR 审查和必需检查，凭据轮换与镜像发布权限仍按部署组织策略执行 |
+| P1 | 生产目标环境的备份介质、RPO/RTO 和故障联系人仍需确认 | 本机目标库已完成 V1–V18 升级校验；生产环境仍需按企业 RPO/RTO 保存备份介质与联系人 |
+| P1 | GitHub `main` 分支保护仍未启用，当前私有仓库套餐的保护 API 返回 403 | 跨仓库 CI 应覆盖 V1–V18 迁移、API 冒烟和浏览器验收；需升级 GitHub 套餐或将仓库公开后配置 PR 审查和必需检查，凭据轮换与镜像发布权限仍按部署组织策略执行 |
 | P2 | Java 21 升级尚未规划 | 当前保持 Java 17；Spring Boot 3.5 依赖升级已完成，Java 21 留待后续兼容性窗口 |
 
 ## 2026-09-03 发布准备执行记录
 
-- 后端已重建并以 OceanBase profile 重启；`GET /api/health/live` 与 `GET /api/health/ready` 均返回 200，ready body 为 `database=UP`、`migration=12`。此前 8080 进程使用旧 JAR，已停止并替换为包含 V12 的构建。
-- 本机真实 OceanBase 已完成 V1–V12 双次幂等升级、企业结构校验、完整性预检、V12 备份校验和隔离库恢复；详细证据与生产边界见 [`drill-records/2026-09-03-release-readiness.md`](drill-records/2026-09-03-release-readiness.md)。
-- 当前后端 `mvn -q test` 为 206 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 为 121 项，`pnpm typecheck` 与 `pnpm build` 通过；OpenAPI、生产配置门禁、脚本语法和隐私扫描均通过。
+- 后端已重建并以 OceanBase profile 重启；`GET /api/health/live` 与 `GET /api/health/ready` 均返回 200，ready body 为 `database=UP`、`migration=15`。健康检查基线已同步到 V15。
+- 本机真实 OceanBase 已完成 V1–V15 升级、企业结构校验和完整性预检；详细证据与生产边界见本次通知中心 Review。
+- 当前后端 `mvn -q test`、前端 `npm test`、`npm run typecheck` 与 `npm run build` 均通过；OpenAPI、生产配置门禁、脚本语法和隐私扫描均通过。
 - 后端独立 CI `33705799078` 已通过单元测试、OpenAPI、生产配置、H2/密钥/隐私扫描、镜像构建、Trivy HIGH/CRITICAL 扫描和 SPDX SBOM；本次将 AWS SDK 所用 Netty 从 `4.1.132.Final` 提升到已修复的 `4.1.136.Final`。
 - 本机未注入真实企业 E2E 账号；桌面/移动端 Playwright 由跨仓库 GitHub Actions 使用临时账号执行，最新远程运行 `33705799079` 在 release 分支全通过（后端 `9adbbff`、前端 `05f241f`）。前端独立 CI `33704208291` 也已通过隐私扫描、121 项测试、类型检查、构建、镜像扫描和 SPDX SBOM。没有把密码、JWT、访问令牌或备份文件写入仓库。
+
+### 2026-09-04 当前功能收口记录
+
+- 当前代码的后端 readiness 期望迁移版本为 V18；本机真实 OceanBase `brad_pms` 已复核为 V18，ready 返回 `database=UP`、`migration=18`。
+- V18 已新增方案包、三类评审和方案决策表，不删除或重建现有业务表；方案设计节点接口已完成本机启动和页面联调验收。
+- 项目等级按参考体系落为常规 C/0、重要 B/1、关键 A/2、战略 S/3；新建项目默认常规 C，项目等级与优先级（交付紧急程度）独立。
+- 需求基线工作台已接入项目详情；确认前要求目标、交付结果、纳入范围和全部需求完成确认，确认后可重新打开再修订。
+- 提醒作业仍由 `PMS_NOTIFICATION_TASK_REMINDER_ENABLED=false` 运行，项目等级、需求基线和方案决策变更不会自动开启提醒或审批流。
 
 ## 已收口能力
 
@@ -66,7 +74,7 @@
 
 - T1 组织关系：`sys_org_unit.leader_user_id` 与 `sys_user_position.is_primary` 保持独立；组织创建、更新、移动和停用写入 `sys_org_unit_history`，记录前后快照、操作人、请求 ID 和时间。
 - T2 导入可靠性：导入提交以 job ID 幂等；成功任务重复提交不重复写入，失败提交整体回滚并记录 `failure_reason`/`failed_at`；逐行错误可通过 `/admin/import/{jobId}/errors.csv` 下载。
-- T3 数据库：本机 OceanBase CE 4.3.5 的 `brad_pms` 使用 `pms_migrator` 完成 V1–V12 升级复核；重复执行输出 `No pending migrations. All migration checksums verified.`，未删除数据库或业务表。
+- T3 数据库：本机 OceanBase CE 4.3.5 的 `brad_pms` 使用 `pms_migrator` 完成 V1–V15 升级复核；重复执行输出 `No pending migrations. All migration checksums verified.`，未删除数据库或业务表。
 - T4 只读校验：`bash scripts/verify-oceanbase.sh`（复用 OceanBase 镜像内 `obclient`）通过，企业迁移校验和完整性预检全部通过；组织历史表、索引、外键、单根组织、归属关系和项目关联均无异常。
 - T5 Review：后端 `mvn -q test` 194 个用例（0 失败、0 错误、1 跳过）；前端 `pnpm test` 112 项、`pnpm typecheck`、`pnpm build`、OpenAPI 校验和脚本语法检查通过。初次工具镜像拉取因网络超时，已改用本地已有 OceanBase 镜像，不影响迁移结果。
 

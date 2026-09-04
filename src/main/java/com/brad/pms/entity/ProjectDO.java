@@ -23,6 +23,8 @@ public class ProjectDO {
 
     private Integer priority;
 
+    private Integer projectLevel;
+
     private Long ownerId;
 
     private Long projectManagerId;

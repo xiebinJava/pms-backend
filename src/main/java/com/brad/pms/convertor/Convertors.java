@@ -70,6 +70,7 @@ public final class Convertors {
         dto.setDescription(do_.getDescription());
         dto.setStatus(do_.getStatus());
         dto.setPriority(do_.getPriority());
+        dto.setProjectLevel(do_.getProjectLevel());
         dto.setOwnerId(do_.getOwnerId());
         dto.setOwnerName(userDisplayName(owner));
         dto.setCreatedBy(do_.getCreatedBy());

@@ -103,4 +103,19 @@ class SearchServiceTest {
         assertThat(result.getComments()).extracting(hit -> hit.getSnippet()).containsExactly("接口路径已确认");
         assertThat(result.getTasks().get(0).getProjectName()).isEqualTo("研发门户");
     }
+
+    @Test
+    void companyWideReadDoesNotMaterializeEveryProjectId() {
+        when(projectService.hasAllCompanyProjectRead()).thenReturn(true);
+        when(projectMapper.selectList(any())).thenReturn(List.of());
+        when(taskMapper.selectList(any())).thenReturn(List.of());
+        when(milestoneMapper.selectList(any())).thenReturn(List.of());
+        when(commentMapper.selectList(any())).thenReturn(List.of());
+
+        SearchResultDTO result = searchService.search("接口", 8);
+
+        assertThat(result.getProjects()).isEmpty();
+        verify(projectService, never()).listReadableIds();
+        verify(projectMapper).selectList(any());
+    }
 }

@@ -28,6 +28,8 @@ public class UserNotificationDO {
 
     private Long actorId;
 
+    private String dedupeKey;
+
     private LocalDateTime readAt;
 
     @TableField(fill = FieldFill.INSERT)

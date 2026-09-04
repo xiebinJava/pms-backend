@@ -48,6 +48,39 @@ export PMS_INVITATION_EXPOSE_TOKEN=false
 `NODE_COMPLETED` 与 `NODE_ROLLED_BACK` 必须使用 `nodeId` 定位项目流程节点，接收方可用它生成节点详情深链；
 旧事件类型仍按原字段处理。`recipientIds` 是站内通知收件人 ID 列表，不代表 Webhook 接收方权限。
 
+## 任务临期/逾期提醒
+
+这是现有站内通知的定时补充，不是邮件或 Webhook 推送。配置默认关闭，权限收口和通知 SQL 可见性验收完成后才允许打开：
+
+~~~yaml
+pms:
+  notification:
+    task-reminder:
+      enabled: false
+      cron: "0 0 9 * * *"
+      zone: Asia/Shanghai
+      due-soon-days: 7
+~~~
+
+也可以使用环境变量 PMS_NOTIFICATION_TASK_REMINDER_ENABLED、PMS_NOTIFICATION_TASK_REMINDER_CRON、PMS_NOTIFICATION_TASK_REMINDER_ZONE 和 PMS_NOTIFICATION_TASK_REMINDER_DUE_SOON_DAYS 覆盖。提前天数必须是 1–30；非法时区、cron 或提前天数会阻止应用启动。
+
+启用前检查：
+
+1. 项目权限收口已发布并验收：具备 project:read 的账号能读全公司未删除项目及其任务、节点、评论、附件等内容；没有该权限的账号不能进入通知中心。
+2. V15 已执行，user_notification.dedupe_key 可空字段和 uk_user_notification_dedupe 唯一索引存在；旧通知的 dedupe_key 保持 NULL。
+3. /notifications、/notifications/page、/notifications/unread-count 和顶部预览都已经验证删除项目过滤是在 SQL 中完成，不存在先取固定数量再在应用层丢弃导致缺页/错总数。
+4. 先在测试账号上手动执行作业服务测试，确认不调用 WebhookPublisher；第一期提醒只能出现在站内通知中。
+
+调度和候选规则：
+
+- 每天当地 09:00 计算 today。默认临期窗口是 [today, today + 7]，但只有 dueDate = today + 7 的任务写入一次临期通知；dueDate = today 当天不写临期。
+- 只有 dueDate = today - 1 的未完成任务写入逾期通知；历史逾期、首日历史欠账、停机漏跑不补发。
+- 新建、改期、重开任务只有在当天恰好位于上述边界时才可能写入；窗口内部不补发。
+- 只处理当前 assigneeId，过滤无负责人、DONE、已删除任务、已删除/终止项目和停用/逻辑删除员工。终止项目的历史通知仍可读，但终止后不再生成新提醒；删除项目通知不进列表和未读数。
+- 临期去重键是 TASK_DUE_SOON:taskId:dueDate；逾期去重键是 TASK_OVERDUE:taskId:today。重复执行不会增加通知；换负责人不撤回旧通知、不改旧通知已读状态。
+
+作业日志只应包含配置时区下的扫描日期、扫描结果和数量，不输出密码、令牌、Webhook secret 或通知正文。宿主机时区不是 Asia/Shanghai 时不影响作业日期；工作台 dueSoon 本期仍按 JVM 默认时区，午夜附近可能与通知相差一天。
+
 ## 运维检查
 
 1. 生产启动前确认上传目录由独立卷挂载且权限仅授予后端进程。

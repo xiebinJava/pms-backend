@@ -86,14 +86,17 @@ echo "PASS: required enterprise tables"
 for column_check in \
   "sys_user|name_zh" "sys_user|username_normalized" "sys_user|email_normalized" "sys_user|deleted" "sys_user|version" \
   "project|org_unit_id" "project|deleted" "project|version" \
-  "project_node|deleted" "project_node|version"; do
+  "user_notification|dedupe_key" \
+  "project_node|deleted" "project_node|version" \
+  "sys_operation_log|project_id" "sys_operation_log|reason" "sys_operation_log|result" \
+  "sys_operation_log|ip" "sys_operation_log|user_agent"; do
   table_name="${column_check%%|*}"; column_name="${column_check##*|}"
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='$table_name' AND column_name='$column_name';" | tr -d '[:space:]')"
   if [[ "$count" != "1" ]]; then echo "FAIL: column $table_name.$column_name is missing" >&2; exit 1; fi
 done
 echo "PASS: required enterprise columns"
 
-for index_name in uk_user_username_normalized uk_user_email_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted idx_org_unit_history_org_created idx_org_unit_history_operator_created; do
+for index_name in uk_user_username_normalized uk_user_email_normalized idx_org_unit_parent_status idx_user_position_user_status idx_user_role_user_status idx_operation_log_resource idx_operation_log_project_created idx_operation_log_operator_created idx_operation_log_action_created idx_operation_log_result_created idx_project_org_unit idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted idx_org_unit_history_org_created idx_org_unit_history_operator_created uk_user_notification_dedupe; do
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND index_name='$index_name';" | tr -d '[:space:]')"
   if [[ "$count" == "0" ]]; then echo "FAIL: index $index_name is missing" >&2; exit 1; fi
 done

@@ -27,14 +27,14 @@ public class CommentController {
     }
 
     @PostMapping("/projects/{projectId}/comments")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_COMMENT_WRITE)
     public ResponseResult<ProjectCommentDTO> add(@PathVariable Long projectId,
                                                  @Validated @RequestBody CommentCreateCmd cmd) {
         return ResponseResult.success(commentService.add(projectId, cmd));
     }
 
     @DeleteMapping("/comments/{id}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<Void> delete(@PathVariable Long id) {
         commentService.delete(id);
         return ResponseResult.success();

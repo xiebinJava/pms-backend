@@ -38,7 +38,16 @@ class EnterpriseSchemaMigrationTest {
             assertThat(columnExists(connection, "feedback_ticket", "resolution_note")).isTrue();
             assertThat(columnExists(connection, "feedback_history", "from_status")).isTrue();
             assertThat(columnExists(connection, "feedback_history", "to_status")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "project_id")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "reason")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "result")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "ip")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "user_agent")).isTrue();
             assertThat(indexExists(connection, "feedback_ticket", "feedback_ticket_reporter_created_idx")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_project_created")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_operator_created")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_action_created")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_result_created")).isTrue();
         }
     }
 

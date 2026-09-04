@@ -34,23 +34,16 @@ class DataScopeResolverTest {
     void clearContext() { UserContext.clear(); }
 
     @Test
-    void selfScopeDoesNotWidenProjectDetailToWholeOrganization() {
+    void projectReadScopeIsCompanyWideEvenWhenRoleDefaultIsSelf() {
         LoginUser user = new LoginUser(7L, "member", "成员", 0);
         UserContext.set(user);
-        RoleDO role = role("MEMBER", DataScopeType.SELF.name());
-        UserRoleDO grant = new UserRoleDO(); grant.setRoleId(11L);
-        when(userRoleMapper.findLiveByUserId(7L)).thenReturn(List.of(grant));
-        when(roleMapper.selectById(11L)).thenReturn(role);
         com.brad.pms.entity.PermissionDO permission = new com.brad.pms.entity.PermissionDO(); permission.setCode("project:read");
         when(permissionMapper.findLiveByUserId(7L)).thenReturn(List.of(permission));
-        when(permissionMapper.findLiveRoleIdsByUserAndPermission(7L, "project:read")).thenReturn(List.of(11L));
-        UserPositionDO position = new UserPositionDO(); position.setOrgUnitId(42L);
-        when(userPositionMapper.findActiveByUserId(7L)).thenReturn(List.of(position));
 
         DataScopeResolver resolver = new DataScopeResolver(userRoleMapper, roleMapper, roleOrgScopeMapper, userPositionMapper, orgUnitMapper, permissionMapper);
 
-        assertThat(resolver.resolveOrgUnitIds(user, "project:read")).isEmpty();
-        assertThat(resolver.hasAllCompanyScope(user, "project:read")).isFalse();
+        assertThat(resolver.resolveOrgUnitIds(user, PermissionCode.PROJECT_READ)).isEmpty();
+        assertThat(resolver.hasAllCompanyScope(user, PermissionCode.PROJECT_READ)).isTrue();
     }
 
     @Test
@@ -61,31 +54,50 @@ class DataScopeResolverTest {
         UserRoleDO grant = new UserRoleDO(); grant.setRoleId(11L);
         when(userRoleMapper.findLiveByUserId(7L)).thenReturn(List.of(grant));
         when(roleMapper.selectById(11L)).thenReturn(role);
-        com.brad.pms.entity.PermissionDO permission = new com.brad.pms.entity.PermissionDO(); permission.setCode("project:read");
+        com.brad.pms.entity.PermissionDO permission = new com.brad.pms.entity.PermissionDO(); permission.setCode(PermissionCode.PROJECT_WRITE);
         when(permissionMapper.findLiveByUserId(7L)).thenReturn(List.of(permission));
-        when(permissionMapper.findLiveRoleIdsByUserAndPermission(7L, "project:read")).thenReturn(List.of(11L));
+        when(permissionMapper.findLiveRoleIdsByUserAndPermission(7L, PermissionCode.PROJECT_WRITE)).thenReturn(List.of(11L));
 
         DataScopeResolver resolver = new DataScopeResolver(userRoleMapper, roleMapper, roleOrgScopeMapper, userPositionMapper, orgUnitMapper, permissionMapper);
 
-        assertThat(resolver.resolveOrgUnitIds(user, "project:read")).isEmpty();
-        assertThat(resolver.hasAllCompanyScope(user, "project:read")).isTrue();
+        assertThat(resolver.resolveOrgUnitIds(user, PermissionCode.PROJECT_WRITE)).isEmpty();
+        assertThat(resolver.hasAllCompanyScope(user, PermissionCode.PROJECT_WRITE)).isTrue();
     }
 
     @Test
-    void resolverUsesSuppliedUserRoleInsteadOfStaleThreadContext() {
+    void projectCreateSelfScopeUsesOnlyThePrimaryOrganization() {
+        LoginUser user = new LoginUser(7L, "member", "成员", 0);
+        RoleDO role = role("MEMBER", DataScopeType.SELF.name());
+        UserRoleDO grant = new UserRoleDO(); grant.setRoleId(11L);
+        when(userRoleMapper.findLiveByUserId(7L)).thenReturn(List.of(grant));
+        when(roleMapper.selectById(11L)).thenReturn(role);
+        com.brad.pms.entity.PermissionDO permission = new com.brad.pms.entity.PermissionDO(); permission.setCode(PermissionCode.PROJECT_CREATE);
+        when(permissionMapper.findLiveByUserId(7L)).thenReturn(List.of(permission));
+        when(permissionMapper.findLiveRoleIdsByUserAndPermission(7L, PermissionCode.PROJECT_CREATE)).thenReturn(List.of(11L));
+        UserPositionDO primary = new UserPositionDO(); primary.setOrgUnitId(42L); primary.setIsPrimary(true);
+        UserPositionDO secondary = new UserPositionDO(); secondary.setOrgUnitId(99L); secondary.setIsPrimary(false);
+        when(userPositionMapper.findActiveByUserId(7L)).thenReturn(List.of(primary, secondary));
+
+        DataScopeResolver resolver = new DataScopeResolver(userRoleMapper, roleMapper, roleOrgScopeMapper, userPositionMapper, orgUnitMapper, permissionMapper);
+
+        assertThat(resolver.resolveProjectCreateOrgUnitIds(user, PermissionCode.PROJECT_CREATE)).containsExactly(42L);
+    }
+
+    @Test
+    void resolverUsesSuppliedUserRoleInsteadOfStaleThreadContextForScopedWrites() {
         UserContext.set(new LoginUser(99L, "admin", "管理员", 1));
         LoginUser member = new LoginUser(7L, "member", "成员", 0);
         RoleDO role = role("MEMBER", DataScopeType.SELF.name());
         UserRoleDO grant = new UserRoleDO(); grant.setRoleId(11L);
         when(userRoleMapper.findLiveByUserId(7L)).thenReturn(List.of(grant));
         when(roleMapper.selectById(11L)).thenReturn(role);
-        com.brad.pms.entity.PermissionDO permission = new com.brad.pms.entity.PermissionDO(); permission.setCode("project:read");
+        com.brad.pms.entity.PermissionDO permission = new com.brad.pms.entity.PermissionDO(); permission.setCode(PermissionCode.PROJECT_WRITE);
         when(permissionMapper.findLiveByUserId(7L)).thenReturn(List.of(permission));
-        when(permissionMapper.findLiveRoleIdsByUserAndPermission(7L, "project:read")).thenReturn(List.of(11L));
+        when(permissionMapper.findLiveRoleIdsByUserAndPermission(7L, PermissionCode.PROJECT_WRITE)).thenReturn(List.of(11L));
 
         DataScopeResolver resolver = new DataScopeResolver(userRoleMapper, roleMapper, roleOrgScopeMapper, userPositionMapper, orgUnitMapper, permissionMapper);
 
-        assertThat(resolver.hasAllCompanyScope(member, "project:read")).isFalse();
+        assertThat(resolver.hasAllCompanyScope(member, PermissionCode.PROJECT_WRITE)).isFalse();
     }
 
     private RoleDO role(String code, String scope) {

@@ -11,6 +11,7 @@ import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMilestoneMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.common.enums.ProjectStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -41,33 +42,46 @@ public class SearchService {
         String keyword = query == null ? "" : query.trim();
         if (keyword.length() < MIN_QUERY) return result;
         int size = NotificationService.clamp(limit, DEFAULT_LIMIT, MAX_LIMIT);
-        List<Long> projectIds = projectService.listReadableIds();
-        if (projectIds.isEmpty()) return result;
+        boolean allCompany = projectService.hasAllCompanyProjectRead();
+        List<Long> projectIds = allCompany ? List.of() : projectService.listReadableIds();
+        if (!allCompany && projectIds.isEmpty()) return result;
 
-        List<ProjectDO> projects = projectMapper.selectList(new LambdaQueryWrapper<ProjectDO>()
-                .in(ProjectDO::getId, projectIds)
+        LambdaQueryWrapper<ProjectDO> projectQuery = new LambdaQueryWrapper<ProjectDO>()
+                .ne(ProjectDO::getStatus, ProjectStatus.DELETED.getCode())
                 .and(wrapper -> wrapper.like(ProjectDO::getName, keyword).or().like(ProjectDO::getCode, keyword))
                 .orderByDesc(ProjectDO::getUpdatedAt)
-                .last("LIMIT " + size));
-        List<ProjectTaskDO> tasks = taskMapper.selectList(new LambdaQueryWrapper<ProjectTaskDO>()
-                .in(ProjectTaskDO::getProjectId, projectIds)
+                .last("LIMIT " + size);
+        if (!allCompany) projectQuery.in(ProjectDO::getId, projectIds);
+        List<ProjectDO> projects = projectMapper.selectList(projectQuery);
+
+        LambdaQueryWrapper<ProjectTaskDO> taskQuery = new LambdaQueryWrapper<ProjectTaskDO>()
                 .and(wrapper -> wrapper.like(ProjectTaskDO::getTitle, keyword)
                         .or().like(ProjectTaskDO::getDescription, keyword))
                 .orderByDesc(ProjectTaskDO::getUpdatedAt)
-                .last("LIMIT " + size));
-        List<ProjectMilestoneDO> milestones = milestoneMapper.selectList(new LambdaQueryWrapper<ProjectMilestoneDO>()
-                .in(ProjectMilestoneDO::getProjectId, projectIds)
+                .last("LIMIT " + size);
+        LambdaQueryWrapper<ProjectMilestoneDO> milestoneQuery = new LambdaQueryWrapper<ProjectMilestoneDO>()
                 .and(wrapper -> wrapper.like(ProjectMilestoneDO::getTitle, keyword)
                         .or().like(ProjectMilestoneDO::getDescription, keyword))
                 .orderByDesc(ProjectMilestoneDO::getUpdatedAt)
-                .last("LIMIT " + size));
-        List<ProjectCommentDO> comments = commentMapper.selectList(new LambdaQueryWrapper<ProjectCommentDO>()
-                .in(ProjectCommentDO::getProjectId, projectIds)
+                .last("LIMIT " + size);
+        LambdaQueryWrapper<ProjectCommentDO> commentQuery = new LambdaQueryWrapper<ProjectCommentDO>()
                 .like(ProjectCommentDO::getContent, keyword)
                 .orderByDesc(ProjectCommentDO::getCreatedAt)
-                .last("LIMIT " + size));
+                .last("LIMIT " + size);
+        if (allCompany) {
+            addVisibleProjectPredicate(taskQuery, "project_task.project_id");
+            addVisibleProjectPredicate(milestoneQuery, "project_milestone.project_id");
+            addVisibleProjectPredicate(commentQuery, "project_comment.project_id");
+        } else {
+            taskQuery.in(ProjectTaskDO::getProjectId, projectIds);
+            milestoneQuery.in(ProjectMilestoneDO::getProjectId, projectIds);
+            commentQuery.in(ProjectCommentDO::getProjectId, projectIds);
+        }
+        List<ProjectTaskDO> tasks = taskMapper.selectList(taskQuery);
+        List<ProjectMilestoneDO> milestones = milestoneMapper.selectList(milestoneQuery);
+        List<ProjectCommentDO> comments = commentMapper.selectList(commentQuery);
 
-        Map<Long, ProjectDO> names = projectNames(projectIds, projects, tasks, milestones, comments);
+        Map<Long, ProjectDO> names = projectNames(projectIds, allCompany, projects, tasks, milestones, comments);
         result.setProjects(projects.stream().map(project -> {
             SearchHitDTO hit = new SearchHitDTO();
             hit.setId(project.getId());
@@ -112,7 +126,7 @@ public class SearchService {
         return result;
     }
 
-    private Map<Long, ProjectDO> projectNames(List<Long> readableIds,
+    private Map<Long, ProjectDO> projectNames(List<Long> readableIds, boolean allCompany,
                                               List<ProjectDO> matchedProjects,
                                               List<ProjectTaskDO> tasks,
                                               List<ProjectMilestoneDO> milestones,
@@ -130,12 +144,19 @@ public class SearchService {
                 .filter(project -> project.getId() != null)
                 .collect(Collectors.toMap(ProjectDO::getId, Function.identity(), (left, right) -> left));
         if (!extra.isEmpty()) {
-            projectMapper.selectList(new LambdaQueryWrapper<ProjectDO>()
-                            .in(ProjectDO::getId, extra)
-                            .in(ProjectDO::getId, readableIds))
+            LambdaQueryWrapper<ProjectDO> query = new LambdaQueryWrapper<ProjectDO>()
+                    .in(ProjectDO::getId, extra)
+                    .ne(ProjectDO::getStatus, ProjectStatus.DELETED.getCode());
+            if (!allCompany) query.in(ProjectDO::getId, readableIds);
+            projectMapper.selectList(query)
                     .forEach(project -> names.put(project.getId(), project));
         }
         return names;
+    }
+
+    private void addVisibleProjectPredicate(LambdaQueryWrapper<?> query, String projectIdColumn) {
+        query.apply("EXISTS (SELECT 1 FROM project p WHERE p.id = " + projectIdColumn
+                + " AND p.deleted = FALSE AND p.status <> {0})", ProjectStatus.DELETED.getCode());
     }
 
     private static String nameOf(Map<Long, ProjectDO> names, Long projectId) {

@@ -1,10 +1,11 @@
 package com.brad.pms.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.common.page.PageResult;
 import com.brad.pms.convertor.Convertors;
-import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.UserNotificationDTO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.entity.UserNotificationDO;
@@ -13,17 +14,16 @@ import com.brad.pms.security.UserContext;
 import com.brad.pms.webhook.WebhookEvent;
 import com.brad.pms.webhook.WebhookPublisher;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,14 +36,14 @@ public class NotificationService {
     public static final String PROJECT_COMMENTED = "PROJECT_COMMENTED";
     public static final String NODE_COMPLETED = "NODE_COMPLETED";
     public static final String NODE_ROLLED_BACK = "NODE_ROLLED_BACK";
+    public static final String TASK_DUE_SOON = "TASK_DUE_SOON";
+    public static final String TASK_OVERDUE = "TASK_OVERDUE";
 
     static final int DEFAULT_LIMIT = 20;
     static final int MAX_LIMIT = 50;
-    static final int LOOKBACK = 80;
     static final int SNIPPET = 120;
 
     private final UserNotificationMapper notificationMapper;
-    private final ProjectService projectService;
     private final UserService userService;
     private final FollowerService followerService;
     private final WebhookPublisher webhookPublisher;
@@ -129,30 +129,49 @@ public class NotificationService {
         notificationMapper.insert(row);
     }
 
+    /** Inserts a notification without publishing an outbound Webhook event. */
+    public boolean emitInApp(Long userId, String type, String title, String content,
+                             Long projectId, Long taskId, Long nodeId, Long actorId,
+                             String dedupeKey) {
+        if (userId == null || dedupeKey == null || dedupeKey.isBlank()) return false;
+        UserNotificationDO row = new UserNotificationDO();
+        row.setUserId(userId);
+        row.setType(type);
+        row.setTitle(title == null || title.isBlank() ? "通知" : title);
+        row.setContent(content);
+        row.setProjectId(projectId);
+        row.setTaskId(taskId);
+        row.setNodeId(nodeId);
+        row.setActorId(actorId);
+        row.setDedupeKey(dedupeKey);
+        try {
+            notificationMapper.insert(row);
+            return true;
+        } catch (DuplicateKeyException duplicate) {
+            return false;
+        }
+    }
+
     public List<UserNotificationDTO> list(boolean unreadFirst, int limit) {
         Long userId = UserContext.userId();
         int size = clamp(limit, DEFAULT_LIMIT, MAX_LIMIT);
-        List<UserNotificationDO> rows = notificationMapper.selectList(
-                new LambdaQueryWrapper<UserNotificationDO>()
-                        .eq(UserNotificationDO::getUserId, userId)
-                        .orderByDesc(UserNotificationDO::getCreatedAt)
-                        .last("LIMIT " + LOOKBACK));
-        List<UserNotificationDO> visible = keepReadable(rows);
-        if (unreadFirst) {
-            visible.sort(Comparator
-                    .comparing((UserNotificationDO row) -> row.getReadAt() != null)
-                    .thenComparing(UserNotificationDO::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
-        }
-        return toDTOs(visible.stream().limit(size).collect(Collectors.toList()));
+        return toDTOs(notificationMapper.selectVisibleList(userId, unreadFirst, size));
     }
 
     public int unreadCount() {
         Long userId = UserContext.userId();
-        List<UserNotificationDO> rows = notificationMapper.selectList(
-                new LambdaQueryWrapper<UserNotificationDO>()
-                        .eq(UserNotificationDO::getUserId, userId)
-                        .isNull(UserNotificationDO::getReadAt));
-        return keepReadable(rows).size();
+        long count = notificationMapper.countVisibleUnread(userId);
+        return count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
+    }
+
+    public PageResult<UserNotificationDTO> page(String type, boolean unreadOnly,
+                                                 long currPage, long pageSize) {
+        String normalizedType = normalizeType(type);
+        long safePage = Math.max(currPage, 1);
+        long safeSize = Math.min(Math.max(pageSize, 1), MAX_LIMIT);
+        IPage<UserNotificationDO> result = notificationMapper.selectVisiblePage(
+                new Page<>(safePage, safeSize), UserContext.userId(), normalizedType, unreadOnly);
+        return PageResult.of(result.getTotal(), result.getCurrent(), result.getSize(), toDTOs(result.getRecords()));
     }
 
     public void markRead(Long id) {
@@ -170,19 +189,6 @@ public class NotificationService {
                 .eq(UserNotificationDO::getUserId, UserContext.userId())
                 .isNull(UserNotificationDO::getReadAt)
                 .set(UserNotificationDO::getReadAt, LocalDateTime.now()));
-    }
-
-    private List<UserNotificationDO> keepReadable(List<UserNotificationDO> rows) {
-        Set<Long> projectIds = rows.stream()
-                .map(UserNotificationDO::getProjectId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        Set<Long> readable = projectService.listReadableByIds(projectIds).stream()
-                .map(ProjectDTO::getId)
-                .collect(Collectors.toSet());
-        return rows.stream()
-                .filter(row -> row.getProjectId() == null || readable.contains(row.getProjectId()))
-                .collect(Collectors.toList());
     }
 
     private List<UserNotificationDTO> toDTOs(List<UserNotificationDO> rows) {
@@ -228,6 +234,15 @@ public class NotificationService {
     static int clamp(int limit, int fallback, int max) {
         if (limit < 1) return fallback;
         return Math.min(limit, max);
+    }
+
+    private static String normalizeType(String type) {
+        if (type == null || type.isBlank()) return null;
+        String normalized = type.trim();
+        if (!TASK_DUE_SOON.equals(normalized) && !TASK_OVERDUE.equals(normalized)) {
+            throw new BusinessException(400, "通知类型不正确");
+        }
+        return normalized;
     }
 
     private void emitAll(List<Long> userIds, String type, String title, String content,

@@ -156,7 +156,10 @@ public class EnterpriseDataMigration implements CommandLineRunner {
         permissions.put("admin:import:write", "导入组织与人员");
         permissions.put("admin:audit:read", "查看审计日志");
         permissions.put("project:read", "查看项目");
+        permissions.put("project:create", "创建项目");
         permissions.put("project:write", "编辑项目");
+        permissions.put("project:manage", "管理项目");
+        permissions.put("project:comment:write", "发布项目评论");
         permissions.put("feedback:read", "查看反馈");
         permissions.put("feedback:write", "提交反馈");
         permissions.put("feedback:manage", "分诊与处理反馈");
@@ -181,17 +184,18 @@ public class EnterpriseDataMigration implements CommandLineRunner {
 
     private void bindBuiltinPermissions(Map<String, String> permissions) {
         Set<String> orgAdmin = Set.of("admin:user:read", "admin:user:write", "admin:org:read",
-                "admin:org:write", "admin:role:read", "admin:import:write", "admin:audit:read", "project:read", "project:write",
+                "admin:org:write", "admin:role:read", "admin:import:write", "admin:audit:read", "project:read", "project:create", "project:write", "project:manage", "project:comment:write",
                 "feedback:read", "feedback:write", "feedback:manage");
-        Set<String> orgManagers = Set.of("admin:user:read", "admin:org:read", "project:read", "project:write",
+        Set<String> orgManagers = Set.of("admin:user:read", "admin:org:read", "project:read", "project:create", "project:write", "project:comment:write",
                 "feedback:read", "feedback:write");
-        Set<String> projectManagers = Set.of("project:read", "project:write", "feedback:read", "feedback:write");
+        Set<String> projectManagers = Set.of("project:read", "project:create", "project:write", "project:comment:write", "feedback:read", "feedback:write");
+        Set<String> projectAdmins = Set.of("project:read", "project:create", "project:write", "project:manage", "project:comment:write", "feedback:read", "feedback:write");
         bindRolePermissions("ORG_ADMIN", orgAdmin, permissions);
         bindRolePermissions("BUSINESS_OWNER", orgManagers, permissions);
         bindRolePermissions("DEPT_MANAGER", orgManagers, permissions);
-        bindRolePermissions("PROJECT_ADMIN", projectManagers, permissions);
+        bindRolePermissions("PROJECT_ADMIN", projectAdmins, permissions);
         bindRolePermissions("PROJECT_MANAGER", projectManagers, permissions);
-        bindRolePermissions("MEMBER", Set.of("project:read", "feedback:read", "feedback:write"), permissions);
+        bindRolePermissions("MEMBER", Set.of("project:read", "project:create", "project:comment:write", "feedback:read", "feedback:write"), permissions);
         bindRolePermissions("SUPER_ADMIN", Set.of("feedback:read", "feedback:write", "feedback:manage"), permissions);
     }
 

@@ -70,6 +70,7 @@ public class GlobalExceptionHandler {
             case ResponseResult.PARAM_ERROR -> HttpStatus.BAD_REQUEST;
             case ResponseResult.UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
             case ResponseResult.FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case ResponseResult.NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ResponseResult.CONFLICT -> HttpStatus.CONFLICT;
             case ResponseResult.UNPROCESSABLE_ENTITY -> HttpStatus.UNPROCESSABLE_ENTITY;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;

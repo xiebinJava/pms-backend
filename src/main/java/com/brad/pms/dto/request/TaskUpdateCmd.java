@@ -24,4 +24,6 @@ public class TaskUpdateCmd {
     private Integer sort;
 
     private LocalDate dueDate;
+
+    private Boolean clearDueDate = false;
 }
