@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class NodeSolutionReviewDTO {
+    private Integer version;
     private String reviewType;
     private String status;
     private Long reviewerId;

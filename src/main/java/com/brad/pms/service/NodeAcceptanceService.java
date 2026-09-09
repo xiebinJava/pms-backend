@@ -82,7 +82,7 @@ public class NodeAcceptanceService {
             } catch (DuplicateKeyException ex) {
                 throw BusinessException.conflict("业务验收与缺陷闭环已被其他人创建，请刷新后重试");
             }
-        } else if (cmd.getVersion() != null && !Objects.equals(cmd.getVersion(), baseline.getVersion())) {
+        } else if (cmd.getVersion() == null || !Objects.equals(cmd.getVersion(), baseline.getVersion())) {
             throw BusinessException.conflict("业务验收与缺陷闭环已被其他人修改，请刷新后重试");
         }
 

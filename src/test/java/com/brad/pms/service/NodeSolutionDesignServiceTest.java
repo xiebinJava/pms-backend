@@ -156,7 +156,7 @@ class NodeSolutionDesignServiceTest {
         ProjectNodeDO node = node("design");
         when(permissionService.requireReviewableNode(1L, 10L, "完成方案评审")).thenReturn(node);
 
-        assertThatThrownBy(() -> service.completeReview(1L, 10L, "ARCHITECTURE", null))
+        assertThatThrownBy(() -> service.completeReview(1L, 10L, "ARCHITECTURE", null, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("评审类型");
     }
@@ -169,7 +169,7 @@ class NodeSolutionDesignServiceTest {
         when(reviewMapper.selectOne(any())).thenReturn(null);
         when(reviewMapper.insert(any(ProjectNodeSolutionReviewDO.class))).thenReturn(1);
 
-        service.assignReviewer(1L, 10L, "TECHNICAL", 7L);
+        service.assignReviewer(1L, 10L, "TECHNICAL", null, 7L);
 
         ArgumentCaptor<ProjectNodeSolutionReviewDO> captor = ArgumentCaptor.forClass(ProjectNodeSolutionReviewDO.class);
         verify(reviewMapper).insert(captor.capture());
@@ -193,7 +193,7 @@ class NodeSolutionDesignServiceTest {
         when(reviewMapper.selectOne(any())).thenReturn(review);
         when(reviewMapper.updateById(any(ProjectNodeSolutionReviewDO.class))).thenReturn(1);
 
-        service.assignReviewer(1L, 10L, "TECHNICAL", 8L);
+        service.assignReviewer(1L, 10L, "TECHNICAL", 0, 8L);
 
         ArgumentCaptor<ProjectNodeSolutionReviewDO> captor = ArgumentCaptor.forClass(ProjectNodeSolutionReviewDO.class);
         verify(reviewMapper).updateById(captor.capture());
@@ -211,7 +211,7 @@ class NodeSolutionDesignServiceTest {
         when(reviewMapper.selectOne(any())).thenReturn(review);
         when(reviewMapper.updateById(any(ProjectNodeSolutionReviewDO.class))).thenReturn(1);
 
-        service.updateReviewSuggestion(1L, 10L, "TECHNICAL", "补充接口边界说明");
+        service.updateReviewSuggestion(1L, 10L, "TECHNICAL", 0, "补充接口边界说明");
 
         ArgumentCaptor<ProjectNodeSolutionReviewDO> captor = ArgumentCaptor.forClass(ProjectNodeSolutionReviewDO.class);
         verify(reviewMapper).updateById(captor.capture());
@@ -229,7 +229,7 @@ class NodeSolutionDesignServiceTest {
         when(packageMapper.selectOne(any())).thenReturn(packageEntity());
         when(reviewMapper.selectOne(any())).thenReturn(review);
 
-        assertThatThrownBy(() -> service.completeReview(1L, 10L, "TECHNICAL", null))
+        assertThatThrownBy(() -> service.completeReview(1L, 10L, "TECHNICAL", 0, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("指定评审人");
         verify(reviewMapper, never()).updateById(any(ProjectNodeSolutionReviewDO.class));
@@ -249,7 +249,7 @@ class NodeSolutionDesignServiceTest {
         when(reviewMapper.updateById(any(ProjectNodeSolutionReviewDO.class))).thenReturn(1);
         when(reviewMapper.selectList(any())).thenReturn(List.of(review));
 
-        var result = service.completeReview(1L, 10L, "TECHNICAL", "补充接口边界说明");
+        var result = service.completeReview(1L, 10L, "TECHNICAL", 0, "补充接口边界说明");
 
         assertThat(result.getReviews()).anyMatch(item ->
                 "TECHNICAL".equals(item.getReviewType()) && "PASSED".equals(item.getStatus()));
@@ -268,7 +268,7 @@ class NodeSolutionDesignServiceTest {
         when(packageMapper.selectOne(any())).thenReturn(packageEntity());
         when(reviewMapper.selectOne(any())).thenReturn(null);
 
-        assertThatThrownBy(() -> service.completeReview(1L, 10L, "TECHNICAL", null))
+        assertThatThrownBy(() -> service.completeReview(1L, 10L, "TECHNICAL", 0, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("请先设置指定评审人");
         verify(reviewMapper, never()).updateById(any(ProjectNodeSolutionReviewDO.class));
@@ -284,7 +284,7 @@ class NodeSolutionDesignServiceTest {
         when(packageMapper.selectOne(any())).thenReturn(packageEntity());
         when(reviewMapper.selectOne(any())).thenReturn(review);
 
-        assertThatThrownBy(() -> service.completeReview(1L, 10L, "TECHNICAL", "再次评审"))
+        assertThatThrownBy(() -> service.completeReview(1L, 10L, "TECHNICAL", 0, "再次评审"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("评审已完成");
         verify(reviewMapper, never()).updateById(any(ProjectNodeSolutionReviewDO.class));
@@ -299,7 +299,7 @@ class NodeSolutionDesignServiceTest {
         when(reviewMapper.insert(any(ProjectNodeSolutionReviewDO.class)))
                 .thenThrow(new DuplicateKeyException("duplicate"));
 
-        assertThatThrownBy(() -> service.assignReviewer(1L, 10L, "TECHNICAL", 7L))
+        assertThatThrownBy(() -> service.assignReviewer(1L, 10L, "TECHNICAL", null, 7L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("其他人修改");
     }
@@ -460,7 +460,7 @@ class NodeSolutionDesignServiceTest {
         assertThat(result.getDecision().getStatus()).isEqualTo("DRAFT");
         assertThat(result.getDecision().getConfirmedAt()).isNull();
         verify(decisionMapper).updateById(decision);
-        verify(reviewMapper).update(any(), any());
+        verify(reviewMapper, never()).updateById(any(ProjectNodeSolutionReviewDO.class));
     }
 
     @Test
@@ -509,6 +509,7 @@ class NodeSolutionDesignServiceTest {
         review.setReviewType(type);
         review.setStatus(status);
         review.setReviewerId(7L);
+        review.setVersion(0);
         return review;
     }
 

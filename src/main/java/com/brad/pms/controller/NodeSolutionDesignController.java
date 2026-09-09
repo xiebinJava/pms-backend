@@ -56,7 +56,8 @@ public class NodeSolutionDesignController {
                                                                   @PathVariable Long nodeId,
                                                                   @PathVariable String reviewType,
                                                                   @Valid @RequestBody(required = false) NodeSolutionReviewCompleteCmd cmd) {
-        return ResponseResult.success(service.completeReview(projectId, nodeId, reviewType, cmd == null ? null : cmd.getComment()));
+        return ResponseResult.success(service.completeReview(projectId, nodeId, reviewType,
+                cmd == null ? null : cmd.getVersion(), cmd == null ? null : cmd.getComment()));
     }
 
     @PutMapping("/reviews/{reviewType}/reviewer")
@@ -65,7 +66,7 @@ public class NodeSolutionDesignController {
                                                                   @PathVariable Long nodeId,
                                                                   @PathVariable String reviewType,
                                                                   @Valid @RequestBody NodeSolutionReviewerUpdateCmd cmd) {
-        return ResponseResult.success(service.assignReviewer(projectId, nodeId, reviewType, cmd.getReviewerId()));
+        return ResponseResult.success(service.assignReviewer(projectId, nodeId, reviewType, cmd.getVersion(), cmd.getReviewerId()));
     }
 
     @PutMapping("/reviews/{reviewType}")
@@ -75,7 +76,7 @@ public class NodeSolutionDesignController {
                                                                           @PathVariable String reviewType,
                                                                           @Valid @RequestBody NodeSolutionReviewUpdateCmd cmd) {
         return ResponseResult.success(service.updateReviewSuggestion(projectId, nodeId, reviewType,
-                cmd == null ? null : cmd.getComment()));
+                cmd == null ? null : cmd.getVersion(), cmd == null ? null : cmd.getComment()));
     }
 
     @PostMapping("/decision/confirm")

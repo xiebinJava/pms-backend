@@ -1,7 +1,6 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.brad.pms.audit.AuditAction;
 import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
@@ -69,7 +68,7 @@ public class NodeSolutionDesignService {
 
         ProjectNodeSolutionDecisionDO decision = findDecision(projectId, nodeId);
         ProjectNodeSolutionPackageDO current = findPackage(projectId, nodeId);
-        if (current != null && cmd.getVersion() != null && !Objects.equals(cmd.getVersion(), current.getVersion())) {
+        if (current != null && (cmd.getVersion() == null || !Objects.equals(cmd.getVersion(), current.getVersion()))) {
             throw BusinessException.conflict("方案包已被其他人修改，请刷新后重试");
         }
         boolean contentChanged = current != null && packageContentChanged(current, cmd);
@@ -116,7 +115,8 @@ public class NodeSolutionDesignService {
     }
 
     @Transactional
-    public NodeSolutionDesignDTO completeReview(Long projectId, Long nodeId, String reviewType, String comment) {
+    public NodeSolutionDesignDTO completeReview(Long projectId, Long nodeId, String reviewType,
+                                                Integer expectedVersion, String comment) {
         ProjectNodeDO node = requireDesignNode(permissionService.requireReviewableNode(projectId, nodeId, "完成方案评审"));
         String normalizedType = upper(reviewType);
         if (!REVIEW_TYPES.contains(normalizedType)) throw BusinessException.error("方案评审类型不合法");
@@ -127,6 +127,7 @@ public class NodeSolutionDesignService {
         if (review == null || review.getReviewerId() == null) {
             throw BusinessException.error("请先设置指定评审人");
         }
+        requireVersion(review.getVersion(), expectedVersion, "方案评审已被其他人修改，请刷新后重试");
         if ("PASSED".equals(review.getStatus())) {
             throw BusinessException.conflict("评审已完成");
         }
@@ -148,7 +149,8 @@ public class NodeSolutionDesignService {
     }
 
     @Transactional
-    public NodeSolutionDesignDTO assignReviewer(Long projectId, Long nodeId, String reviewType, Long reviewerId) {
+    public NodeSolutionDesignDTO assignReviewer(Long projectId, Long nodeId, String reviewType,
+                                                Integer expectedVersion, Long reviewerId) {
         ProjectNodeDO node = requireManageableDesignNode(projectId, nodeId, "设置方案评审人");
         String normalizedType = upper(reviewType);
         if (!REVIEW_TYPES.contains(normalizedType)) throw BusinessException.error("方案评审类型不合法");
@@ -162,12 +164,14 @@ public class NodeSolutionDesignService {
             review.setReviewType(normalizedType);
             review.setStatus("PENDING");
             review.setReviewerId(reviewerId);
+            review.setVersion(0);
             try {
                 reviewMapper.insert(review);
             } catch (DuplicateKeyException ex) {
                 throw BusinessException.conflict("方案评审已被其他人修改，请刷新后重试");
             }
         } else {
+            requireVersion(review.getVersion(), expectedVersion, "方案评审已被其他人修改，请刷新后重试");
             boolean reviewerChanged = !Objects.equals(review.getReviewerId(), reviewerId);
             review.setReviewerId(reviewerId);
             if (reviewerChanged && "PASSED".equals(review.getStatus())) {
@@ -179,7 +183,9 @@ public class NodeSolutionDesignService {
                     decision.setStatus("DRAFT");
                     decision.setConfirmedBy(null);
                     decision.setConfirmedAt(null);
-                    decisionMapper.updateById(decision);
+                    if (decisionMapper.updateById(decision) != 1) {
+                        throw BusinessException.conflict("方案决策已被其他人修改，请刷新后重试");
+                    }
                 }
             }
             if (reviewMapper.updateById(review) != 1) {
@@ -194,12 +200,14 @@ public class NodeSolutionDesignService {
     }
 
     @Transactional
-    public NodeSolutionDesignDTO updateReviewSuggestion(Long projectId, Long nodeId, String reviewType, String comment) {
+    public NodeSolutionDesignDTO updateReviewSuggestion(Long projectId, Long nodeId, String reviewType,
+                                                       Integer expectedVersion, String comment) {
         ProjectNodeDO node = requireManageableDesignNode(projectId, nodeId, "更新方案评审建议");
         String normalizedType = upper(reviewType);
         if (!REVIEW_TYPES.contains(normalizedType)) throw BusinessException.error("方案评审类型不合法");
         ProjectNodeSolutionReviewDO review = findReview(projectId, nodeId, normalizedType);
         if (review == null) throw BusinessException.error("请先设置指定评审人");
+        requireVersion(review.getVersion(), expectedVersion, "方案评审已被其他人修改，请刷新后重试");
         review.setComment(trim(comment));
         if (reviewMapper.updateById(review) != 1) {
             throw BusinessException.conflict("方案评审已被其他人修改，请刷新后重试");
@@ -370,18 +378,22 @@ public class NodeSolutionDesignService {
     }
 
     private void resetReviewsAndDecision(Long projectId, Long nodeId, ProjectNodeSolutionDecisionDO decision) {
-        reviewMapper.update(null, new LambdaUpdateWrapper<ProjectNodeSolutionReviewDO>()
-                .eq(ProjectNodeSolutionReviewDO::getProjectId, projectId)
-                .eq(ProjectNodeSolutionReviewDO::getNodeId, nodeId)
-                .set(ProjectNodeSolutionReviewDO::getStatus, "PENDING")
-                .set(ProjectNodeSolutionReviewDO::getComment, null)
-                .set(ProjectNodeSolutionReviewDO::getCompletedBy, null)
-                .set(ProjectNodeSolutionReviewDO::getCompletedAt, null));
+        for (ProjectNodeSolutionReviewDO review : findReviews(projectId, nodeId)) {
+            review.setStatus("PENDING");
+            review.setComment(null);
+            review.setCompletedBy(null);
+            review.setCompletedAt(null);
+            if (reviewMapper.updateById(review) != 1) {
+                throw BusinessException.conflict("方案评审已被其他人修改，请刷新后重试");
+            }
+        }
         if (decision != null && "CONFIRMED".equals(decision.getStatus())) {
             decision.setStatus("DRAFT");
             decision.setConfirmedBy(null);
             decision.setConfirmedAt(null);
-            decisionMapper.updateById(decision);
+            if (decisionMapper.updateById(decision) != 1) {
+                throw BusinessException.conflict("方案决策已被其他人修改，请刷新后重试");
+            }
         }
     }
 
@@ -465,6 +477,7 @@ public class NodeSolutionDesignService {
         NodeSolutionReviewDTO dto = new NodeSolutionReviewDTO();
         dto.setReviewType(type);
         dto.setStatus(review == null ? "PENDING" : review.getStatus());
+        dto.setVersion(review == null ? 0 : review.getVersion());
         if (review != null) {
             dto.setReviewerId(review.getReviewerId());
             dto.setCanComplete("PENDING".equals(review.getStatus())
@@ -498,6 +511,10 @@ public class NodeSolutionDesignService {
 
     private void checkVersion(Integer actual, Integer expected, String message) {
         if (expected != null && !Objects.equals(actual, expected)) throw BusinessException.conflict(message);
+    }
+
+    private void requireVersion(Integer actual, Integer expected, String message) {
+        if (expected == null || !Objects.equals(actual, expected)) throw BusinessException.conflict(message);
     }
 
     private String upper(String value) {

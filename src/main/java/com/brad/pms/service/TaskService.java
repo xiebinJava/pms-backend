@@ -171,6 +171,7 @@ public class TaskService {
     @Transactional
     public ProjectTaskDTO update(Long id, TaskUpdateCmd cmd) {
         ProjectTaskDO task = requireTask(id);
+        requireCurrentVersion(task.getVersion(), cmd.getVersion());
         ProjectDO project = permissionService.requireProject(task.getProjectId());
         ProjectNodeDO node = permissionService.requireNode(task.getProjectId(), task.getNodeId());
         String previousDescription = task.getDescription();
@@ -208,7 +209,9 @@ public class TaskService {
         if (cmd.getSort() != null) task.setSort(cmd.getSort());
         if (Boolean.TRUE.equals(cmd.getClearDueDate())) task.setDueDate(null);
         else if (cmd.getDueDate() != null) task.setDueDate(cmd.getDueDate());
-        taskMapper.updateById(task);
+        if (taskMapper.updateById(task) != 1) {
+            throw BusinessException.conflict("任务已被其他人修改，请刷新后重试");
+        }
         if (manager && (cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement()))) {
             replaceTaskRequirementLink(task, requirement);
         }
@@ -257,7 +260,9 @@ public class TaskService {
             if (Objects.equals(previousStatus, child.getStatus())
                     && Objects.equals(previousDueDate, child.getDueDate())) continue;
 
-            taskMapper.updateById(child);
+            if (taskMapper.updateById(child) != 1) {
+                throw BusinessException.conflict("子任务已被其他人修改，请刷新后重试");
+            }
             if (!Objects.equals(previousStatus, child.getStatus())) {
                 operationLogService.record(AuditEvent.success(
                         AuditAction.TASK_STATUS_CHANGED.name(), AuditResourceType.TASK.name(), child.getId(), child.getProjectId(),
@@ -292,6 +297,7 @@ public class TaskService {
     @Transactional
     public ProjectTaskDTO move(Long id, TaskMoveCmd cmd) {
         ProjectTaskDO task = requireTask(id);
+        requireCurrentVersion(task.getVersion(), cmd.getVersion());
         ProjectDO project = permissionService.requireProject(task.getProjectId());
         ProjectNodeDO node = permissionService.requireNode(task.getProjectId(), task.getNodeId());
         Long userId = UserContext.userId();
@@ -303,13 +309,21 @@ public class TaskService {
         Integer previousStatus = task.getStatus();
         ensureChildStatusAllowed(task, cmd.getStatus());
         task.setStatus(cmd.getStatus());
-        taskMapper.updateById(task);
+        if (taskMapper.updateById(task) != 1) {
+            throw BusinessException.conflict("任务已被其他人修改，请刷新后重试");
+        }
         completeSubtasksIfCompleted(previousStatus, task);
         operationLogService.record(AuditEvent.success(
                 AuditAction.TASK_MOVED.name(), AuditResourceType.TASK.name(), id, task.getProjectId(),
                 null, java.util.Map.of("status", String.valueOf(previousStatus)),
                 java.util.Map.of("status", String.valueOf(task.getStatus()))));
         return toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
+    }
+
+    private void requireCurrentVersion(Integer currentVersion, Integer requestedVersion) {
+        if (!Objects.equals(currentVersion, requestedVersion)) {
+            throw BusinessException.conflict("任务已被其他人修改，请刷新后重试");
+        }
     }
 
     @Transactional

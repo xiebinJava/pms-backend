@@ -9,6 +9,7 @@ import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.dto.request.NodeScheduleUpdateCmd;
+import com.brad.pms.dto.request.NodeOwnerUpdateCmd;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectLifecycleLogDO;
 import com.brad.pms.entity.ProjectMemberDO;
@@ -124,9 +125,11 @@ public class NodeService {
     }
 
     @Transactional
-    public ProjectNodeDTO updateOwner(Long projectId, Long nodeId, Long ownerId) {
+    public ProjectNodeDTO updateOwner(Long projectId, Long nodeId, NodeOwnerUpdateCmd cmd) {
         ProjectDO project = permissionService.requireProjectManageable(projectId, "分配节点负责人");
         ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        requireCurrentVersion(node.getVersion(), cmd.getVersion());
+        Long ownerId = cmd.getOwnerId();
         if (NodeStatus.isReadOnly(node.getStatus())) {
             throw BusinessException.forbidden("节点已锁定，回滚后才可以分配节点负责人");
         }
@@ -140,7 +143,9 @@ public class NodeService {
         }
         Long previousOwnerId = node.getOwnerId();
         node.setOwnerId(ownerId);
-        nodeMapper.updateById(node);
+        if (nodeMapper.updateById(node) != 1) {
+            throw BusinessException.conflict("节点已被其他人修改，请刷新后重试");
+        }
         if (!java.util.Objects.equals(previousOwnerId, ownerId)) {
             operationLogService.record(AuditEvent.success(
                     AuditAction.NODE_OWNER_CHANGED.name(), AuditResourceType.PROJECT_NODE.name(), nodeId, projectId,
@@ -155,6 +160,7 @@ public class NodeService {
     public ProjectNodeDTO updateSchedule(Long projectId, Long nodeId, NodeScheduleUpdateCmd cmd) {
         ProjectDO project = permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = permissionService.requireManageableNode(projectId, nodeId, "编辑节点排期");
+        requireCurrentVersion(node.getVersion(), cmd.getVersion());
         if (NodeStatus.isReadOnly(node.getStatus())) {
             throw BusinessException.forbidden("节点已锁定，回滚后才可以编辑节点排期");
         }
@@ -166,7 +172,9 @@ public class NodeService {
         java.time.LocalDate previousEndDate = node.getEndDate();
         node.setStartDate(cmd.getStartDate());
         node.setEndDate(cmd.getEndDate());
-        nodeMapper.updateById(node);
+        if (nodeMapper.updateById(node) != 1) {
+            throw BusinessException.conflict("节点已被其他人修改，请刷新后重试");
+        }
         if (!java.util.Objects.equals(previousStartDate, node.getStartDate())
                 || !java.util.Objects.equals(previousEndDate, node.getEndDate())) {
             operationLogService.record(AuditEvent.success(
@@ -178,6 +186,12 @@ public class NodeService {
         UserDO owner = node.getOwnerId() == null ? null : userService.listByIds(java.util.Collections.singletonList(node.getOwnerId()))
                 .stream().findFirst().orElse(null);
         return toDTO(node, owner, project);
+    }
+
+    private void requireCurrentVersion(Integer currentVersion, Integer requestedVersion) {
+        if (!java.util.Objects.equals(currentVersion, requestedVersion)) {
+            throw BusinessException.conflict("节点已被其他人修改，请刷新后重试");
+        }
     }
 
     /**
@@ -357,6 +371,7 @@ public class NodeService {
     private ProjectNodeDTO toDTO(ProjectNodeDO node, UserDO owner, ProjectDO project) {
         ProjectNodeDTO dto = new ProjectNodeDTO();
         dto.setId(node.getId());
+        dto.setVersion(node.getVersion());
         dto.setProjectId(node.getProjectId());
         dto.setNodeKey(node.getNodeKey());
         dto.setName(node.getName());

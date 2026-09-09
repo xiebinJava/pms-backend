@@ -6,6 +6,8 @@ import lombok.Data;
 @Data
 public class NodeSolutionReviewUpdateCmd {
 
+    private Integer version;
+
     @Size(max = 2000)
     private String comment;
 }

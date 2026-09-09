@@ -3,11 +3,15 @@ package com.brad.pms.dto.request;
 import lombok.Data;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.List;
 
 @Data
 public class ProjectUpdateCmd {
+
+    @NotNull(message = "项目版本不能为空，请刷新后重试")
+    private Integer version;
 
     @NotBlank(message = "项目名称不能为空")
     private String name;

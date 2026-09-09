@@ -65,6 +65,7 @@ public final class Convertors {
                                        int memberCount, int taskCount, int doneTaskCount, int progress) {
         ProjectDTO dto = new ProjectDTO();
         dto.setId(do_.getId());
+        dto.setVersion(do_.getVersion());
         dto.setCode(do_.getCode());
         dto.setName(do_.getName());
         dto.setDescription(do_.getDescription());
@@ -109,6 +110,7 @@ public final class Convertors {
     public static ProjectTaskDTO toTask(ProjectTaskDO do_, UserDO assignee) {
         ProjectTaskDTO dto = new ProjectTaskDTO();
         dto.setId(do_.getId());
+        dto.setVersion(do_.getVersion());
         dto.setProjectId(do_.getProjectId());
         dto.setNodeId(do_.getNodeId());
         dto.setParentId(do_.getParentId());

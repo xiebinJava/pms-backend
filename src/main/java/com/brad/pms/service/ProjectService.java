@@ -107,6 +107,7 @@ public class ProjectService {
     @Transactional
     public ProjectDTO update(Long id, ProjectUpdateCmd cmd) {
         ProjectDO project = permissionService.requireProjectWritable(id, "编辑项目");
+        requireCurrentVersion(project.getVersion(), cmd.getVersion(), "项目");
         Map<String, Object> before = projectAuditSnapshot(project);
         Long previousProjectManagerId = project.getProjectManagerId();
         project.setName(cmd.getName());
@@ -126,15 +127,21 @@ public class ProjectService {
         if (managesProjectComposition) {
             permissionService.requireProjectManageable(id, "维护项目成员或项目经理");
         }
+        if (cmd.getProjectManagerId() != null) {
+            if (cmd.getMemberIds() == null) {
+                permissionService.requireProjectMember(id, cmd.getProjectManagerId());
+            } else if (!cmd.getMemberIds().contains(cmd.getProjectManagerId())) {
+                throw BusinessException.error("项目经理必须是项目成员");
+            }
+            project.setProjectManagerId(cmd.getProjectManagerId());
+        }
+        if (projectMapper.updateById(project) != 1) {
+            throw BusinessException.conflict("项目已被其他人修改，请刷新后重试");
+        }
         if (cmd.getMemberIds() != null) {
             memberService.replace(id, project.getCreatedBy() == null ? project.getOwnerId() : project.getCreatedBy(),
                     cmd.getMemberIds());
         }
-        if (cmd.getProjectManagerId() != null) {
-            permissionService.requireProjectMember(id, cmd.getProjectManagerId());
-            project.setProjectManagerId(cmd.getProjectManagerId());
-        }
-        projectMapper.updateById(project);
         Map<String, Object> after = projectAuditSnapshot(project);
         if (!before.equals(after)) {
             operationLogService.record(AuditEvent.success(
@@ -151,6 +158,12 @@ public class ProjectService {
             followerService.replace(id, cmd.getFollowerIds());
         }
         return detail(id);
+    }
+
+    private void requireCurrentVersion(Integer currentVersion, Integer requestedVersion, String resourceName) {
+        if (!Objects.equals(currentVersion, requestedVersion)) {
+            throw BusinessException.conflict(resourceName + "已被其他人修改，请刷新后重试");
+        }
     }
 
     @Transactional

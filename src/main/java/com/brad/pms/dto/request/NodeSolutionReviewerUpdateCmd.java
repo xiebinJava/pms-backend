@@ -6,6 +6,8 @@ import lombok.Data;
 @Data
 public class NodeSolutionReviewerUpdateCmd {
 
+    private Integer version;
+
     @NotNull
     private Long reviewerId;
 }

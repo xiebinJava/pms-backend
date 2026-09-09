@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -70,6 +71,7 @@ class TaskServiceTest {
         TableInfoHelper.initTableInfo(assistant, ProjectNodeRequirementDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectCommentDO.class);
         UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟", 0, "张伟", "张伟（Alex.Zhang）", 1L));
+        lenient().when(taskMapper.updateById(any(ProjectTaskDO.class))).thenReturn(1);
     }
 
     @AfterEach
@@ -244,6 +246,7 @@ class TaskServiceTest {
         when(taskMapper.selectList(any())).thenReturn(List.of(missingDateChild, datedChild));
 
         TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(parent.getVersion());
         cmd.setStatus(TaskStatus.DONE.getCode());
 
         taskService.update(1L, cmd);
@@ -266,11 +269,48 @@ class TaskServiceTest {
         when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
 
         TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(child.getVersion());
         cmd.setStatus(TaskStatus.DOING.getCode());
 
         assertThatThrownBy(() -> taskService.update(2L, cmd))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("父任务已完成");
+    }
+
+    @Test
+    void updateRejectsAStaleVersionBeforeMutatingTheTask() {
+        ProjectTaskDO task = task(2L, null);
+        task.setVersion(2);
+        when(taskMapper.selectById(2L)).thenReturn(task);
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(1);
+        cmd.setTitle("过期编辑");
+
+        assertThatThrownBy(() -> taskService.update(2L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("任务已被其他人修改")
+                .extracting(error -> ((BusinessException) error).getCode())
+                .isEqualTo(BusinessException.ResponseCode.CONFLICT);
+        verify(taskMapper, never()).updateById(any(ProjectTaskDO.class));
+    }
+
+    @Test
+    void moveRejectsAStaleVersionBeforeChangingStatus() {
+        ProjectTaskDO task = task(2L, null);
+        task.setVersion(2);
+        when(taskMapper.selectById(2L)).thenReturn(task);
+
+        TaskMoveCmd cmd = new TaskMoveCmd();
+        cmd.setVersion(1);
+        cmd.setStatus(TaskStatus.DOING.getCode());
+
+        assertThatThrownBy(() -> taskService.move(2L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("任务已被其他人修改")
+                .extracting(error -> ((BusinessException) error).getCode())
+                .isEqualTo(BusinessException.ResponseCode.CONFLICT);
+        verify(taskMapper, never()).updateById(any(ProjectTaskDO.class));
     }
 
     @Test
@@ -281,6 +321,7 @@ class TaskServiceTest {
         when(permissionService.requireProject(9L)).thenReturn(openProject());
         when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
         TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
         cmd.setClearDueDate(true);
 
         taskService.update(2L, cmd);
@@ -299,6 +340,7 @@ class TaskServiceTest {
         when(taskMapper.selectList(any())).thenReturn(List.of(child));
 
         TaskMoveCmd cmd = new TaskMoveCmd();
+        cmd.setVersion(parent.getVersion());
         cmd.setStatus(TaskStatus.DONE.getCode());
 
         taskService.move(1L, cmd);
@@ -335,6 +377,7 @@ class TaskServiceTest {
         task.setTitle(parentId == null ? "父任务" : "子任务");
         task.setStatus(0);
         task.setPriority(1);
+        task.setVersion(0);
         return task;
     }
 }

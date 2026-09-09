@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class ProjectDTO {
 
     private Long id;
+    private Integer version;
     private String code;
     private String name;
     private String description;

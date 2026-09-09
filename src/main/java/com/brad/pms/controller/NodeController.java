@@ -45,15 +45,15 @@ public class NodeController {
     @RequirePermission(PermissionCode.PROJECT_WRITE)
     public ResponseResult<ProjectNodeDTO> updateOwner(@PathVariable Long projectId,
                                                        @PathVariable Long nodeId,
-                                                       @RequestBody NodeOwnerUpdateCmd cmd) {
-        return ResponseResult.success(nodeService.updateOwner(projectId, nodeId, cmd.getOwnerId()));
+                                                       @Validated @RequestBody NodeOwnerUpdateCmd cmd) {
+        return ResponseResult.success(nodeService.updateOwner(projectId, nodeId, cmd));
     }
 
     @PutMapping("/{nodeId}/schedule")
     @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectNodeDTO> updateSchedule(@PathVariable Long projectId,
                                                           @PathVariable Long nodeId,
-                                                          @RequestBody NodeScheduleUpdateCmd cmd) {
+                                                          @Validated @RequestBody NodeScheduleUpdateCmd cmd) {
         return ResponseResult.success(nodeService.updateSchedule(projectId, nodeId, cmd));
     }
 }

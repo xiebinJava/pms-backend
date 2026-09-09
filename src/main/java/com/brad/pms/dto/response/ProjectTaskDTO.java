@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class ProjectTaskDTO {
 
     private Long id;
+    private Integer version;
     private Long projectId;
     private Long nodeId;
     private Long parentId;

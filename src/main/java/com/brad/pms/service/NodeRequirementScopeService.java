@@ -76,7 +76,7 @@ public class NodeRequirementScopeService {
             } catch (DuplicateKeyException ex) {
                 throw BusinessException.conflict("需求范围基线已被其他人创建，请刷新后重试");
             }
-        } else if (cmd.getVersion() != null && !Objects.equals(cmd.getVersion(), baseline.getVersion())) {
+        } else if (cmd.getVersion() == null || !Objects.equals(cmd.getVersion(), baseline.getVersion())) {
             throw BusinessException.conflict("需求范围基线已被其他人修改，请刷新后重试");
         }
 
