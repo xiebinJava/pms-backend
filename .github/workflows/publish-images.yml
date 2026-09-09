@@ -61,11 +61,13 @@ jobs:
         run: |
           set -euo pipefail
           for image in pms-backend pms-migrator; do
-            ref="ghcr.io/${{ steps.version.outputs.owner }}/${image}:${{ steps.version.outputs.version }}"
-            if docker buildx imagetools inspect "$ref" >/dev/null 2>&1; then
-              echo "refusing to overwrite existing version tag: $ref" >&2
-              exit 1
-            fi
+            for tag in "${{ steps.version.outputs.version }}" "sha-${{ github.sha }}"; do
+              ref="ghcr.io/${{ steps.version.outputs.owner }}/${image}:${tag}"
+              if docker buildx imagetools inspect "$ref" >/dev/null 2>&1; then
+                echo "refusing to overwrite existing immutable tag: $ref" >&2
+                exit 1
+              fi
+            done
           done
 
       - name: Build and push backend image
