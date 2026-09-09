@@ -12,7 +12,7 @@ class NodeSolutionDesignPermissionTest {
 
     @Test
     void protectsEverySolutionDesignEndpointWithProjectRead() {
-        for (String methodName : new String[]{"get", "save", "submit", "completeReview", "confirmDecision", "reopenDecision"}) {
+        for (String methodName : new String[]{"get", "save", "submit", "saveDecision", "completeReview", "assignReviewer", "updateReviewSuggestion", "confirmDecision"}) {
             var method = Arrays.stream(NodeSolutionDesignController.class.getDeclaredMethods())
                     .filter(candidate -> candidate.getName().equals(methodName))
                     .findFirst()

@@ -13,9 +13,13 @@ import com.brad.pms.dto.response.TaskPermissionsDTO;
 import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectNodeRequirementDO;
 import com.brad.pms.entity.ProjectTaskDO;
+import com.brad.pms.entity.ProjectTaskRequirementDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
+import com.brad.pms.mapper.ProjectNodeRequirementMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.ProjectTaskRequirementMapper;
 import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.UserContext;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -26,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -36,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -44,6 +50,8 @@ import static org.mockito.Mockito.when;
 class TaskServiceTest {
 
     @Mock ProjectTaskMapper taskMapper;
+    @Mock ProjectTaskRequirementMapper taskRequirementMapper;
+    @Mock ProjectNodeRequirementMapper requirementMapper;
     @Mock ProjectCommentMapper commentMapper;
     @Mock UserService userService;
     @Mock ProjectPermissionService permissionService;
@@ -58,6 +66,8 @@ class TaskServiceTest {
         Configuration configuration = new Configuration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "test");
         TableInfoHelper.initTableInfo(assistant, ProjectTaskDO.class);
+        TableInfoHelper.initTableInfo(assistant, ProjectTaskRequirementDO.class);
+        TableInfoHelper.initTableInfo(assistant, ProjectNodeRequirementDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectCommentDO.class);
         UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟", 0, "张伟", "张伟（Alex.Zhang）", 1L));
     }
@@ -97,6 +107,71 @@ class TaskServiceTest {
         assertThatThrownBy(() -> taskService.create(cmd))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("不能再拆分");
+    }
+
+    @Test
+    void createsTaskWithAnOptionalRequirementLink() {
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireManageableNode(9L, 3L, "创建任务")).thenReturn(openNode());
+        ProjectNodeRequirementDO requirement = new ProjectNodeRequirementDO();
+        requirement.setId(51L);
+        requirement.setProjectId(9L);
+        requirement.setNodeId(3L);
+        requirement.setCode("REQ-001");
+        requirement.setStatus(1);
+        when(requirementMapper.selectById(51L)).thenReturn(requirement);
+        when(taskMapper.insert(any(ProjectTaskDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, ProjectTaskDO.class).setId(77L);
+            return 1;
+        });
+        when(permissionService.taskPermissions(any(), any(), any())).thenReturn(new TaskPermissionsDTO());
+
+        TaskCreateCmd cmd = new TaskCreateCmd();
+        cmd.setProjectId(9L);
+        cmd.setNodeId(3L);
+        cmd.setTitle("商品详情页开发");
+        cmd.setRequirementId(51L);
+
+        ProjectTaskDTO dto = taskService.create(cmd);
+
+        ArgumentCaptor<ProjectTaskRequirementDO> captor = ArgumentCaptor.forClass(ProjectTaskRequirementDO.class);
+        verify(taskRequirementMapper).insert(captor.capture());
+        assertThat(captor.getValue().getTaskId()).isEqualTo(77L);
+        assertThat(captor.getValue().getRequirementId()).isEqualTo(51L);
+        assertThat(dto.getRequirementId()).isEqualTo(51L);
+        assertThat(dto.getRequirementCode()).isEqualTo("REQ-001");
+    }
+
+    @Test
+    void taskContractsDoNotExposeDevelopmentStoryAssociation() {
+        assertThat(java.util.Arrays.stream(TaskCreateCmd.class.getDeclaredFields()).map(java.lang.reflect.Field::getName))
+                .doesNotContain("developmentStoryId");
+        assertThat(java.util.Arrays.stream(ProjectTaskDTO.class.getDeclaredFields()).map(java.lang.reflect.Field::getName))
+                .doesNotContain("developmentStoryId", "developmentStoryTitle");
+    }
+
+    @Test
+    void createRejectsTaskLinkToUnconfirmedRequirement() {
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireManageableNode(9L, 3L, "创建任务")).thenReturn(openNode());
+        ProjectNodeRequirementDO requirement = new ProjectNodeRequirementDO();
+        requirement.setId(52L);
+        requirement.setProjectId(9L);
+        requirement.setNodeId(3L);
+        requirement.setCode("REQ-002");
+        requirement.setStatus(0);
+        when(requirementMapper.selectById(52L)).thenReturn(requirement);
+
+        TaskCreateCmd cmd = new TaskCreateCmd();
+        cmd.setProjectId(9L);
+        cmd.setNodeId(3L);
+        cmd.setTitle("未确认需求不应创建任务");
+        cmd.setRequirementId(52L);
+
+        assertThatThrownBy(() -> taskService.create(cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("需求必须先确认");
+        verify(taskMapper, never()).insert(any(ProjectTaskDO.class));
     }
 
     @Test

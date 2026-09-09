@@ -10,8 +10,6 @@ import java.util.List;
 public class NodeRequirementScopeDTO {
     private Long projectId;
     private Long nodeId;
-    private String objective;
-    private String deliverable;
     private Integer version;
     private Integer baselineStatus;
     private Long confirmedBy;

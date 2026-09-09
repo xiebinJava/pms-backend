@@ -47,6 +47,11 @@ public class NodeService {
     private final OperationLogService operationLogService;
     private final NodeRequirementScopeService requirementScopeService;
     private final NodeSolutionDesignService solutionDesignService;
+    private final NodePlanResourceRiskService planResourceRiskService;
+    private final NodeAcceptanceService acceptanceService;
+    private final NodeDevelopmentControlService developmentControlService;
+    private final NodeReleaseService releaseService;
+    private final NodeValueReviewService valueReviewService;
     private NotificationService notificationService;
 
     @Autowired
@@ -67,7 +72,7 @@ public class NodeService {
             {"design", "方案设计、评审与决策", "验证产品与技术方案，完成关键方案决策，业务、产品、技术和测试共同评审。",
                     "业务与产品方案、技术方案与测试策略、评审结论与决策记录",
                     "产品负责人、项目经理、技术负责人、产品经理、测试负责人、业务代表"},
-            {"plan", "计划、资源与风险基线", "建立进度、资源、质量与风险基线，排出里程碑、迭代与上线时间，拆解专题与任务并确认人员与依赖。",
+                    {"plan", "计划、资源与风险基线", "建立进度、资源、质量与风险基线，规划迭代计划与上线时间，拆解专题与任务并确认人员与依赖。",
                     "WBS 与项目计划、范围及优先级清单、资源及依赖清单、风险登记册",
                     "项目经理、技术负责人、产品负责人、测试负责人、运维负责人"},
             {"develop", "开发测试与项目控制", "按迭代完成开发、代码评审、测试与修复，定期更新进度，跟踪问题、风险与跨团队依赖。",
@@ -76,13 +81,13 @@ public class NodeService {
             {"acceptance", "业务验收与缺陷闭环", "业务人员按照真实场景完成验收，整理验收用例，准备 UAT 环境，问题记录、分派并跟踪修复。",
                     "测试报告与缺陷清单、缺陷关闭及遗留项清单、业务验收结论",
                     "业务负责人、产品负责人、项目经理、测试负责人"},
-            {"release", "发布决策与运营交接", "完成上线决策与运营交接，准备上线 Checklist 与审批，检查发布包、配置与回滚预案，确认监控、告警与值守。",
+            {"release", "发布决策与运营交接", "完成上线决策与运营交接，记录发布包、配置与回滚预案，确认监控、告警与值守。",
                     "发布记录与回滚预案、可交付版本与代码库、运维交接清单",
                     "项目经理、技术负责人、运维负责人、业务负责人"},
             {"review", "价值验证与项目复盘", "对照立项目标验证项目价值与系统使用情况，复盘延期、返工与沟通问题，回顾工期、质量、成本与团队投入。",
                     "项目价值评估、项目复盘报告",
                     "项目经理、业务负责人、技术负责人、核心项目成员"},
-            {"knowledge", "知识沉淀与标准改进", "沉淀经验与标准，更新项目管理流程和常用检查项，整理模板、清单与案例，归档项目文档并清理过期内容。",
+            {"knowledge", "知识沉淀与标准改进", "沉淀项目经验与管理标准，更新项目流程和常用检查项，整理可复用的模板、清单与案例，推动改进行动落地。",
                     "项目知识库、标准模板与案例、改进行动清单、流程及检查清单更新",
                     "项目经理、PMO、技术负责人、知识资产负责人"},
     };
@@ -198,6 +203,21 @@ public class NodeService {
         }
         if ("design".equals(node.getNodeKey())) {
             solutionDesignService.requireConfirmed(projectId, nodeId);
+        }
+        if ("plan".equals(node.getNodeKey())) {
+            planResourceRiskService.requireConfirmed(projectId, nodeId);
+        }
+        if ("acceptance".equals(node.getNodeKey())) {
+            acceptanceService.requireConfirmed(projectId, nodeId);
+        }
+        if ("develop".equals(node.getNodeKey())) {
+            developmentControlService.requireCompleted(projectId, nodeId);
+        }
+        if ("release".equals(node.getNodeKey())) {
+            releaseService.requireCompleted(projectId, nodeId);
+        }
+        if ("review".equals(node.getNodeKey())) {
+            valueReviewService.requireCompleted(projectId, nodeId);
         }
         node.setStatus(NodeStatus.COMPLETED.getCode());
         nodeMapper.updateById(node);

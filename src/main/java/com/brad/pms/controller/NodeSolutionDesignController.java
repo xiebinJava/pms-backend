@@ -2,8 +2,11 @@ package com.brad.pms.controller;
 
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.NodeSolutionDecisionConfirmCmd;
+import com.brad.pms.dto.request.NodeSolutionDecisionUpdateCmd;
 import com.brad.pms.dto.request.NodeSolutionPackageUpdateCmd;
 import com.brad.pms.dto.request.NodeSolutionReviewCompleteCmd;
+import com.brad.pms.dto.request.NodeSolutionReviewUpdateCmd;
+import com.brad.pms.dto.request.NodeSolutionReviewerUpdateCmd;
 import com.brad.pms.dto.response.NodeSolutionDesignDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
@@ -56,6 +59,25 @@ public class NodeSolutionDesignController {
         return ResponseResult.success(service.completeReview(projectId, nodeId, reviewType, cmd == null ? null : cmd.getComment()));
     }
 
+    @PutMapping("/reviews/{reviewType}/reviewer")
+    @RequirePermission(PermissionCode.PROJECT_READ)
+    public ResponseResult<NodeSolutionDesignDTO> assignReviewer(@PathVariable Long projectId,
+                                                                  @PathVariable Long nodeId,
+                                                                  @PathVariable String reviewType,
+                                                                  @Valid @RequestBody NodeSolutionReviewerUpdateCmd cmd) {
+        return ResponseResult.success(service.assignReviewer(projectId, nodeId, reviewType, cmd.getReviewerId()));
+    }
+
+    @PutMapping("/reviews/{reviewType}")
+    @RequirePermission(PermissionCode.PROJECT_READ)
+    public ResponseResult<NodeSolutionDesignDTO> updateReviewSuggestion(@PathVariable Long projectId,
+                                                                          @PathVariable Long nodeId,
+                                                                          @PathVariable String reviewType,
+                                                                          @Valid @RequestBody NodeSolutionReviewUpdateCmd cmd) {
+        return ResponseResult.success(service.updateReviewSuggestion(projectId, nodeId, reviewType,
+                cmd == null ? null : cmd.getComment()));
+    }
+
     @PostMapping("/decision/confirm")
     @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<NodeSolutionDesignDTO> confirmDecision(@PathVariable Long projectId,
@@ -64,10 +86,12 @@ public class NodeSolutionDesignController {
         return ResponseResult.success(service.confirmDecision(projectId, nodeId, cmd));
     }
 
-    @PostMapping("/decision/reopen")
+    @PutMapping("/decision")
     @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<NodeSolutionDesignDTO> reopenDecision(@PathVariable Long projectId,
-                                                                 @PathVariable Long nodeId) {
-        return ResponseResult.success(service.reopenDecision(projectId, nodeId));
+    public ResponseResult<NodeSolutionDesignDTO> saveDecision(@PathVariable Long projectId,
+                                                               @PathVariable Long nodeId,
+                                                               @Valid @RequestBody NodeSolutionDecisionUpdateCmd cmd) {
+        return ResponseResult.success(service.saveDecisionDraft(projectId, nodeId, cmd));
     }
+
 }

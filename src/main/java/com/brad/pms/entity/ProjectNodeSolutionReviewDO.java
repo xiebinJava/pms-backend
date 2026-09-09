@@ -18,6 +18,7 @@ public class ProjectNodeSolutionReviewDO {
     private Long projectId;
     private Long nodeId;
     private String reviewType;
+    private Long reviewerId;
     private String status;
     private String comment;
     private Long completedBy;

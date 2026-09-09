@@ -14,12 +14,12 @@
 
 - 仅 `nodeKey=design` 支持本工作台，其他节点继续使用现有通用详情。
 - 一个节点只有一个方案包、三条固定评审（业务/产品、技术、测试/发布）和一个决策记录，不增加候选方案打分、任意新增评审或无明确用途的配置入口。
-- 上游“需求澄清与范围基线”只读展示摘要；不得在本节点复制或编辑需求清单。
+- 需求范围基线只作为提交前的服务端前置条件；本节点不重复展示上游摘要，也不复制或编辑需求清单。
 - 方案包必须先提交；三条必要评审必须全部通过；决策必须确认后才能完成节点。
-- 决策确认后锁定结果、原因、条件和确认时间；重新打开决策后恢复可编辑且节点完成门禁重新关闭。
+- 决策确认后锁定结果、条件和确认时间；重新打开决策后恢复可编辑且节点完成门禁重新关闭。
 - 所有写接口由服务层再次校验项目、节点、权限、节点可编辑状态和状态前置条件；不能只依赖前端禁用按钮。
 - 方案包和决策使用 `version` 做乐观锁；并发更新返回冲突，不覆盖他人修改。
-- 不新增文件上传、Webhook、候选方案评分、复杂审批流或独立的评审人员配置页面。
+- 不新增文件上传、Webhook、候选方案评分、复杂审批流或独立的评审人员配置页面；评审人直接在三条评审行中选择项目成员，只有指定评审人或管理员可以完成对应评审。
 - 每个任务完成一个独立的 RED-GREEN-REFACTOR 循环；测试必须先于对应生产代码。
 
 ---
@@ -33,9 +33,9 @@
 
 **Interfaces:**
 - Produces three tables consumed by the service layer: `project_node_solution_package`, `project_node_solution_review`, `project_node_solution_decision`.
-- `project_node_solution_package` is unique by `(project_id, node_id)` and contains `package_version`, `product_solution`, `technical_solution`, `summary`, `scope_coverage`, `rollout_premise`, `status`, `version`.
+- `project_node_solution_package` is unique by `(project_id, node_id)` and contains `product_solution`, `technical_solution`, `status`, `version`.
 - `project_node_solution_review` is unique by `(project_id, node_id, review_type)` and contains fixed review types `BUSINESS_PRODUCT`, `TECHNICAL`, `TEST_RELEASE`, status `PENDING`/`PASSED`, comment, completed metadata.
-- `project_node_solution_decision` is unique by `(project_id, node_id)` and contains result `PASS`/`CONDITIONAL_PASS`/`RETURN_FOR_CHANGES`, reason, conditions, status `DRAFT`/`CONFIRMED`, confirmed metadata and `version`.
+- `project_node_solution_decision` is unique by `(project_id, node_id)` and contains result `PASS`/`CONDITIONAL_PASS`/`RETURN_FOR_CHANGES`, conditions, status `DRAFT`/`CONFIRMED`, confirmed metadata and `version`.
 
 - [ ] **Step 1: Write the failing migration contract test**
 
@@ -85,7 +85,7 @@
 
 - [ ] **Step 1: Write failing service tests**
 
-  Cover these behaviors with Mockito and real DTO validation: non-design nodes are rejected; saving trims text and persists a draft; submitting rejects an incomplete package or an unconfirmed upstream baseline; completing a review only accepts the three fixed types; decision confirmation rejects a missing review/package/reason and requires conditions for `CONDITIONAL_PASS`; confirmed decisions are locked; reopening changes status back to draft; stale package/decision versions throw a conflict; `requireConfirmed` rejects bypass attempts.
+  Cover these behaviors with Mockito and real DTO validation: non-design nodes are rejected; saving trims text and persists a draft; submitting rejects an incomplete package or an unconfirmed upstream baseline; completing a review only accepts the three fixed types and requires an assigned reviewer; decision confirmation rejects a missing review/package/result and requires conditions for `CONDITIONAL_PASS`; confirmed decisions are locked; reopening changes status back to draft; stale package/decision versions throw a conflict; `requireConfirmed` rejects bypass attempts.
 
 - [ ] **Step 2: Run the service tests to verify they fail**
 
@@ -94,7 +94,7 @@
 
 - [ ] **Step 3: Implement entities, DTOs, mappers, and service**
 
-  Follow the existing MyBatis-Plus entity and mapper conventions. `get` must return an empty draft package, three fixed review rows, an empty draft decision, and a read-only upstream baseline summary when no rows exist. `saveDraft` must reject confirmed decisions, use the package `version`, normalize whitespace, and keep the package in `DRAFT`. `submitPackage` validates the package version plus five non-empty text fields (product solution, technical solution, summary, scope coverage, rollout premise), checks the upstream requirement baseline is confirmed, and marks the package `SUBMITTED`. `completeReview` validates the review type and submitted package, sets only that fixed row to `PASSED`, and records the current user/time. `confirmDecision` checks package submitted, all three rows passed, result/reason/conditional conditions, uses the decision `version`, and sets `CONFIRMED`; `reopenDecision` clears confirmation metadata and sets `DRAFT`. All methods must call the existing `ProjectPermissionService` and `requireManageableNode` for writes.
+  Follow the existing MyBatis-Plus entity and mapper conventions. `get` must return an empty draft package, three fixed review rows, and an empty draft decision when no rows exist. `saveDraft` must reject confirmed decisions, use the package `version`, normalize whitespace, and keep the package in `DRAFT`. `submitPackage` validates the package version plus the product and technical solutions, checks the upstream requirement baseline is confirmed, and marks the package `SUBMITTED`. `completeReview` validates the review type, requires its reviewer to be assigned, rejects an already passed review, sets only that fixed row to `PASSED`, and records the current user/time. `confirmDecision` checks package submitted, all three rows passed, result and conditional conditions, uses the decision `version`, and sets `CONFIRMED`; `reopenDecision` clears confirmation metadata and sets `DRAFT`. All methods must call the existing `ProjectPermissionService` and `requireManageableNode` for writes.
 
 - [ ] **Step 4: Run the service tests to verify they pass**
 
@@ -184,11 +184,11 @@
 **Interfaces:**
 - Component props: `projectId: number`, `nodeId: number`, `nodeReadOnly: boolean`, `canEdit: boolean`.
 - Component events: `solution-status(status: string)` and `saved()`.
-- The component renders: upstream baseline read-only strip; one editable solution package with product/technical solution, summary, scope coverage and rollout premise; exactly three review rows; one decision form; compact completion checks; no candidate cards, arbitrary scores, file-upload controls, or task-add control.
+- The component renders: one editable solution package with product and technical solutions; exactly three review rows; one decision form; no candidate cards, arbitrary scores, file-upload controls, or task-add control.
 
 - [ ] **Step 1: Extend failing source/component tests**
 
-  Assert the workbench uses the new API methods, renders the three fixed review labels, keeps upstream content read-only, disables decision confirmation until package/reviews/reason are complete, locks decision inputs after confirmation, offers reopen, and `index.vue` renders it only for `design` while retaining `RequirementScopeWorkbench` for `requirement`.
+  Assert the workbench uses the new API methods, renders the three fixed review labels, requires reviewers before review completion, disables decision confirmation until package/reviews/result are complete, locks decision inputs after confirmation, offers reopen, and `index.vue` renders it only for `design` while retaining `RequirementScopeWorkbench` for `requirement`.
 
 - [ ] **Step 2: Run the frontend tests to verify they fail**
 
@@ -197,7 +197,7 @@
 
 - [ ] **Step 3: Implement the workbench and integration**
 
-  Follow the existing requirement workbench patterns for loading, skeleton/error state, messages, disabled/read-only behavior, and optimistic-lock payloads. Add a save-draft action and a submit-package action; allow one `完成评审` action per pending review; provide the decision select, reason and conditional conditions, confirm and reopen actions. Emit the solution status so the parent can keep the node completion button state understandable, but retain the backend as the final gate. Insert the component before the shared task board and leave the existing requirement workbench condition unchanged.
+  Follow the existing requirement workbench patterns for loading, skeleton/error state, messages, disabled/read-only behavior, and optimistic-lock payloads. Add a save-draft action and a submit-package action; allow one `完成评审` action per pending review after a reviewer is assigned; provide the decision select and conditional conditions, confirm and reopen actions. Emit the solution status so the parent can keep the node completion button state understandable, but retain the backend as the final gate. Insert the component before the shared task board and leave the existing requirement workbench condition unchanged.
 
 - [ ] **Step 4: Run frontend unit/type/build checks**
 

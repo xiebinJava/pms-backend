@@ -23,7 +23,7 @@ latest_migration="$({ find "$BACKEND_DIR/src/main/resources/db/migration" -maxde
   | sed -nE 's/^V([0-9]+)__.*\.sql$/\1/p' \
   | sort -n \
   | tail -n 1)"
-[[ "$latest_migration" == "18" ]] || fail "expected current migration baseline V1–V18, found V${latest_migration:-unknown}"
+[[ "$latest_migration" == "39" ]] || fail "expected current migration baseline V1–V39, found V${latest_migration:-unknown}"
 
 readmes=("$BACKEND_DIR/README.md")
 if [[ "$CHECK_FRONTEND" == true ]]; then
@@ -45,4 +45,4 @@ for route in \
   grep -F -- "$route" "$openapi" >/dev/null || fail "feedback route missing from OpenAPI contract: $route"
 done
 
-echo "Release consistency checks passed: migration=V1–V18, READMEs=current, feedback routes=documented"
+echo "Release consistency checks passed: migration=V1–V39, READMEs=current, feedback routes=documented"

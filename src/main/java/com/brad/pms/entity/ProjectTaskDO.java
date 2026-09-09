@@ -31,8 +31,6 @@ public class ProjectTaskDO {
 
     private Long assigneeId;
 
-    private Long milestoneId;
-
     private Integer sort;
 
     private LocalDate dueDate;

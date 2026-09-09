@@ -19,9 +19,13 @@ import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectNodeRequirementDO;
 import com.brad.pms.entity.UserDO;
+import com.brad.pms.entity.ProjectTaskRequirementDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
+import com.brad.pms.mapper.ProjectNodeRequirementMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.ProjectTaskRequirementMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -41,6 +45,8 @@ import java.util.stream.Stream;
 public class TaskService {
 
     private final ProjectTaskMapper taskMapper;
+    private final ProjectTaskRequirementMapper taskRequirementMapper;
+    private final ProjectNodeRequirementMapper requirementMapper;
     private final ProjectCommentMapper commentMapper;
     private final UserService userService;
     private final ProjectPermissionService permissionService;
@@ -114,6 +120,7 @@ public class TaskService {
         }
         ProjectDO project = permissionService.requireProject(cmd.getProjectId());
         ProjectNodeDO node = permissionService.requireManageableNode(cmd.getProjectId(), cmd.getNodeId(), "创建任务");
+        ProjectNodeRequirementDO requirement = resolveRequirement(cmd.getRequirementId(), cmd.getProjectId(), cmd.getNodeId());
         if (cmd.getAssigneeId() != null) {
             permissionService.requireProjectMember(cmd.getProjectId(), cmd.getAssigneeId());
         }
@@ -143,17 +150,22 @@ public class TaskService {
         task.setStatus(cmd.getStatus());
         task.setPriority(cmd.getPriority());
         task.setAssigneeId(cmd.getAssigneeId());
-        task.setMilestoneId(cmd.getMilestoneId());
         task.setSort(cmd.getSort());
         task.setDueDate(cmd.getDueDate());
         taskMapper.insert(task);
+        if (requirement != null) replaceTaskRequirementLink(task, requirement);
         if (task.getAssigneeId() != null) {
             notificationService.notifyTaskAssigned(task.getProjectId(), task.getId(), task.getTitle(), task.getAssigneeId());
         }
         operationLogService.record(AuditEvent.success(
                 AuditAction.TASK_CREATED.name(), AuditResourceType.TASK.name(), task.getId(), task.getProjectId(),
                 null, null, taskAuditSnapshot(task)));
-        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
+        ProjectTaskDTO dto = toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
+        if (requirement != null) {
+            dto.setRequirementId(requirement.getId());
+            dto.setRequirementCode(requirement.getCode());
+        }
+        return dto;
     }
 
     @Transactional
@@ -165,7 +177,6 @@ public class TaskService {
         String previousDeliverable = task.getDeliverable();
         Integer previousPriority = task.getPriority();
         Integer previousStatus = task.getStatus();
-        Long previousMilestone = task.getMilestoneId();
         java.util.Map<String, Object> before = taskContentAuditSnapshot(task, false, false);
         Long userId = UserContext.userId();
         boolean administrator = UserContext.isAdministrator();
@@ -176,9 +187,13 @@ public class TaskService {
             throw BusinessException.forbidden("仅项目创建人、项目经理、节点负责人或任务负责人可以编辑任务");
         }
         if (!manager && (cmd.getPriority() != null || cmd.getAssigneeId() != null
-                || cmd.getMilestoneId() != null || cmd.getSort() != null)) {
+                || cmd.getSort() != null
+                || cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement()))) {
             throw BusinessException.forbidden("任务负责人只能修改任务内容、状态和截止日期");
         }
+        ProjectNodeRequirementDO requirement = cmd.getRequirementId() == null
+                ? null
+                : resolveRequirement(cmd.getRequirementId(), task.getProjectId(), task.getNodeId());
         ensureChildStatusAllowed(task, cmd.getStatus());
         if (StringUtils.hasText(cmd.getTitle())) task.setTitle(cmd.getTitle());
         if (cmd.getDescription() != null) task.setDescription(cmd.getDescription());
@@ -190,11 +205,13 @@ public class TaskService {
             permissionService.requireProjectMember(task.getProjectId(), cmd.getAssigneeId());
             task.setAssigneeId(cmd.getAssigneeId());
         }
-        if (cmd.getMilestoneId() != null) task.setMilestoneId(cmd.getMilestoneId());
         if (cmd.getSort() != null) task.setSort(cmd.getSort());
         if (Boolean.TRUE.equals(cmd.getClearDueDate())) task.setDueDate(null);
         else if (cmd.getDueDate() != null) task.setDueDate(cmd.getDueDate());
         taskMapper.updateById(task);
+        if (manager && (cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement()))) {
+            replaceTaskRequirementLink(task, requirement);
+        }
         completeSubtasksIfCompleted(previousStatus, task);
         if (task.getAssigneeId() != null && !Objects.equals(previousAssignee, task.getAssigneeId())) {
             notificationService.notifyTaskAssigned(task.getProjectId(), task.getId(), task.getTitle(), task.getAssigneeId());
@@ -223,12 +240,6 @@ public class TaskService {
                     AuditAction.TASK_STATUS_CHANGED.name(), AuditResourceType.TASK.name(), id, task.getProjectId(),
                     null, java.util.Map.of("status", String.valueOf(previousStatus)),
                     java.util.Map.of("status", String.valueOf(task.getStatus()))));
-        }
-        if (!Objects.equals(previousMilestone, task.getMilestoneId())) {
-            operationLogService.record(AuditEvent.success(
-                    AuditAction.TASK_MILESTONE_CHANGED.name(), AuditResourceType.TASK.name(), id, task.getProjectId(),
-                    null, java.util.Map.of("milestoneId", String.valueOf(previousMilestone)),
-                    java.util.Map.of("milestoneId", String.valueOf(task.getMilestoneId()))));
         }
         return toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
     }
@@ -314,9 +325,11 @@ public class TaskService {
         List<ProjectTaskDO> children = taskMapper.selectList(new LambdaQueryWrapper<ProjectTaskDO>()
                 .eq(ProjectTaskDO::getParentId, id));
         for (ProjectTaskDO child : children) {
+            deleteTaskRequirementLink(child.getId());
             attachmentService.deleteAllForTask(child.getId());
             taskMapper.deleteById(child.getId());
         }
+        deleteTaskRequirementLink(id);
         attachmentService.deleteAllForTask(id);
         taskMapper.deleteById(id);
         operationLogService.record(AuditEvent.success(
@@ -332,7 +345,6 @@ public class TaskService {
         snapshot.put("assigneeId", task.getAssigneeId());
         snapshot.put("priority", task.getPriority());
         snapshot.put("nodeId", task.getNodeId());
-        snapshot.put("milestoneId", task.getMilestoneId());
         return snapshot;
     }
 
@@ -365,8 +377,45 @@ public class TaskService {
                 : userService.listByIds(List.of(assigneeId)).stream().findFirst().orElse(null);
     }
 
+    private ProjectNodeRequirementDO resolveRequirement(Long requirementId, Long projectId, Long nodeId) {
+        if (requirementId == null) return null;
+        ProjectNodeRequirementDO requirement = requirementMapper.selectById(requirementId);
+        if (requirement == null || !Objects.equals(requirement.getProjectId(), projectId)
+                || !Objects.equals(requirement.getNodeId(), nodeId)) {
+            throw BusinessException.error("关联需求必须属于当前节点");
+        }
+        if (!Objects.equals(requirement.getStatus(), 1)) {
+            throw BusinessException.error("需求必须先确认后才能创建关联任务");
+        }
+        return requirement;
+    }
+
+    private void replaceTaskRequirementLink(ProjectTaskDO task, ProjectNodeRequirementDO requirement) {
+        deleteTaskRequirementLink(task.getId());
+        if (requirement == null) return;
+        ProjectTaskRequirementDO link = new ProjectTaskRequirementDO();
+        link.setProjectId(task.getProjectId());
+        link.setNodeId(task.getNodeId());
+        link.setTaskId(task.getId());
+        link.setRequirementId(requirement.getId());
+        taskRequirementMapper.insert(link);
+    }
+
+    private void deleteTaskRequirementLink(Long taskId) {
+        if (taskId == null) return;
+        taskRequirementMapper.delete(new LambdaQueryWrapper<ProjectTaskRequirementDO>()
+                .eq(ProjectTaskRequirementDO::getTaskId, taskId));
+    }
+
     private ProjectTaskDTO toDTO(ProjectTaskDO task, ProjectDO project, ProjectNodeDO node, UserDO assignee) {
         ProjectTaskDTO dto = Convertors.toTask(task, assignee);
+        ProjectTaskRequirementDO link = taskRequirementMapper.selectOne(new LambdaQueryWrapper<ProjectTaskRequirementDO>()
+                .eq(ProjectTaskRequirementDO::getTaskId, task.getId()));
+        if (link != null) {
+            ProjectNodeRequirementDO requirement = requirementMapper.selectById(link.getRequirementId());
+            dto.setRequirementId(link.getRequirementId());
+            dto.setRequirementCode(requirement == null ? null : requirement.getCode());
+        }
         dto.setPermissions(permissionService.taskPermissions(project, node, task));
         return dto;
     }

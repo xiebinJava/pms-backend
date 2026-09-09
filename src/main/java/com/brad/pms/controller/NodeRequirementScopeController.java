@@ -44,9 +44,4 @@ public class NodeRequirementScopeController {
         return ResponseResult.success(service.confirm(projectId, nodeId));
     }
 
-    @PostMapping("/reopen")
-    @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<NodeRequirementScopeDTO> reopen(@PathVariable Long projectId, @PathVariable Long nodeId) {
-        return ResponseResult.success(service.reopen(projectId, nodeId));
-    }
 }

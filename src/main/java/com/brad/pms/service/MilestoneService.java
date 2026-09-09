@@ -7,15 +7,12 @@ import com.brad.pms.dto.request.MilestoneCreateCmd;
 import com.brad.pms.dto.request.MilestoneUpdateCmd;
 import com.brad.pms.dto.response.ProjectMilestoneDTO;
 import com.brad.pms.entity.ProjectMilestoneDO;
-import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.mapper.ProjectMilestoneMapper;
-import com.brad.pms.mapper.ProjectTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,7 +20,6 @@ import java.util.stream.Collectors;
 public class MilestoneService {
 
     private final ProjectMilestoneMapper milestoneMapper;
-    private final ProjectTaskMapper taskMapper;
     private final ProjectPermissionService permissionService;
 
     public List<ProjectMilestoneDTO> listByProject(Long projectId) {
@@ -33,21 +29,9 @@ public class MilestoneService {
                         .eq(ProjectMilestoneDO::getProjectId, projectId)
                         .orderByAsc(ProjectMilestoneDO::getDueDate));
 
-        List<ProjectTaskDO> tasks = taskMapper.selectList(
-                new LambdaQueryWrapper<ProjectTaskDO>()
-                        .eq(ProjectTaskDO::getProjectId, projectId)
-                        .isNotNull(ProjectTaskDO::getMilestoneId));
-
-        Map<Long, List<ProjectTaskDO>> byMilestone = tasks.stream()
-                .collect(Collectors.groupingBy(ProjectTaskDO::getMilestoneId));
-
-        return milestones.stream().map(m -> {
-            ProjectMilestoneDTO dto = Convertors.toMilestone(m);
-            List<ProjectTaskDO> msTasks = byMilestone.getOrDefault(m.getId(), List.of());
-            dto.setTaskCount(msTasks.size());
-            dto.setDoneTaskCount((int) msTasks.stream().filter(t -> t.getStatus() == 2).count());
-            return dto;
-        }).collect(Collectors.toList());
+        return milestones.stream()
+                .map(Convertors::toMilestone)
+                .collect(Collectors.toList());
     }
 
     public ProjectMilestoneDTO create(Long projectId, MilestoneCreateCmd cmd) {

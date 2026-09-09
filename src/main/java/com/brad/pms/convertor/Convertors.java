@@ -119,7 +119,6 @@ public final class Convertors {
         dto.setPriority(do_.getPriority());
         dto.setAssigneeId(do_.getAssigneeId());
         dto.setAssigneeName(userDisplayName(assignee));
-        dto.setMilestoneId(do_.getMilestoneId());
         dto.setSort(do_.getSort());
         dto.setDueDate(do_.getDueDate());
         dto.setCreatedAt(do_.getCreatedAt());
@@ -135,8 +134,6 @@ public final class Convertors {
         dto.setDescription(do_.getDescription());
         dto.setDueDate(do_.getDueDate());
         dto.setStatus(do_.getStatus());
-        dto.setTaskCount(0);
-        dto.setDoneTaskCount(0);
         dto.setCreatedAt(do_.getCreatedAt());
         return dto;
     }

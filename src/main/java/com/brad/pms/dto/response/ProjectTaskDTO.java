@@ -19,7 +19,8 @@ public class ProjectTaskDTO {
     private Integer priority;
     private Long assigneeId;
     private String assigneeName;
-    private Long milestoneId;
+    private Long requirementId;
+    private String requirementCode;
     private Integer sort;
     private LocalDate dueDate;
     private LocalDateTime createdAt;

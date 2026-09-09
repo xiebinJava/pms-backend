@@ -14,7 +14,5 @@ public class ProjectMilestoneDTO {
     private String description;
     private LocalDate dueDate;
     private Integer status;
-    private Integer taskCount;
-    private Integer doneTaskCount;
     private LocalDateTime createdAt;
 }

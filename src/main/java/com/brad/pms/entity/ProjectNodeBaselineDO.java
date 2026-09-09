@@ -19,8 +19,6 @@ public class ProjectNodeBaselineDO {
 
     private Long projectId;
     private Long nodeId;
-    private String objective;
-    private String deliverable;
     private Integer status;
     private Long confirmedBy;
     private LocalDateTime confirmedAt;

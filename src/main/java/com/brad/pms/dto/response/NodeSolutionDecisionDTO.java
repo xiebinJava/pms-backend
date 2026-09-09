@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 public class NodeSolutionDecisionDTO {
     private Long id;
     private String result;
-    private String reason;
     private String conditions;
     private String status;
     private Long confirmedBy;

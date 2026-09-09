@@ -1,6 +1,9 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.brad.pms.audit.AuditAction;
+import com.brad.pms.audit.AuditEvent;
+import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.NodeRequirementCmd;
 import com.brad.pms.dto.request.NodeRequirementScopeUpdateCmd;
@@ -12,9 +15,13 @@ import com.brad.pms.entity.ProjectNodeBaselineDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeRequirementDO;
 import com.brad.pms.entity.ProjectNodeScopeItemDO;
+import com.brad.pms.entity.ProjectTaskDO;
+import com.brad.pms.entity.ProjectTaskRequirementDO;
 import com.brad.pms.mapper.ProjectNodeBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
 import com.brad.pms.mapper.ProjectNodeScopeItemMapper;
+import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.ProjectTaskRequirementMapper;
 import com.brad.pms.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -37,12 +44,14 @@ import java.util.stream.Collectors;
 public class NodeRequirementScopeService {
 
     private static final String REQUIREMENT_NODE_KEY = "requirement";
-    private static final String BASELINE_CONFIRMED = "范围基线已确认，请重新打开后编辑";
 
     private final ProjectNodeBaselineMapper baselineMapper;
     private final ProjectNodeScopeItemMapper scopeItemMapper;
     private final ProjectNodeRequirementMapper requirementMapper;
+    private final ProjectTaskMapper taskMapper;
+    private final ProjectTaskRequirementMapper taskRequirementMapper;
     private final ProjectPermissionService permissionService;
+    private final OperationLogService operationLogService;
 
     public NodeRequirementScopeDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
@@ -67,21 +76,23 @@ public class NodeRequirementScopeService {
             } catch (DuplicateKeyException ex) {
                 throw BusinessException.conflict("需求范围基线已被其他人创建，请刷新后重试");
             }
-        } else if (Integer.valueOf(1).equals(baseline.getStatus())) {
-            throw BusinessException.conflict(BASELINE_CONFIRMED);
         } else if (cmd.getVersion() != null && !Objects.equals(cmd.getVersion(), baseline.getVersion())) {
             throw BusinessException.conflict("需求范围基线已被其他人修改，请刷新后重试");
         }
 
-        baseline.setObjective(trim(cmd.getObjective()));
-        baseline.setDeliverable(trim(cmd.getDeliverable()));
         baseline.setStatus(0);
+        baseline.setConfirmedBy(null);
+        baseline.setConfirmedAt(null);
         if (baselineMapper.updateById(baseline) != 1) {
             throw BusinessException.conflict("需求范围基线已被其他人修改，请刷新后重试");
         }
         replaceScopeItems(projectId, nodeId, cmd.getScopeItems());
         replaceRequirements(projectId, nodeId, cmd.getRequirements(), existingRequirements);
-        return toDTO(node, baseline);
+        NodeRequirementScopeDTO result = toDTO(node, baseline);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.NODE_REQUIREMENT_SCOPE_DRAFT_SAVED.name(), AuditResourceType.PROJECT_NODE.name(),
+                nodeId, projectId, null, null, result));
+        return result;
     }
 
     @Transactional
@@ -98,27 +109,11 @@ public class NodeRequirementScopeService {
         if (baselineMapper.updateById(baseline) != 1) {
             throw BusinessException.conflict("需求范围基线已被其他人修改，请刷新后重试");
         }
-        return toDTO(node, baseline);
-    }
-
-    @Transactional
-    public NodeRequirementScopeDTO reopen(Long projectId, Long nodeId) {
-        ProjectNodeDO node = permissionService.requireManageableNode(projectId, nodeId, "重新打开需求范围基线");
-        requireRequirementNode(node);
-        ProjectNodeBaselineDO baseline = findBaseline(projectId, nodeId);
-        if (baseline == null) return toDTO(node, null);
-
-        baseline.setStatus(0);
-        baseline.setConfirmedBy(null);
-        baseline.setConfirmedAt(null);
-        if (baselineMapper.updateById(baseline) != 1) {
-            throw BusinessException.conflict("需求范围基线已被其他人修改，请刷新后重试");
-        }
-        requirementMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProjectNodeRequirementDO>()
-                .eq(ProjectNodeRequirementDO::getProjectId, projectId)
-                .eq(ProjectNodeRequirementDO::getNodeId, nodeId)
-                .set(ProjectNodeRequirementDO::getStatus, 0));
-        return toDTO(node, baseline);
+        NodeRequirementScopeDTO result = toDTO(node, baseline);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.NODE_REQUIREMENT_SCOPE_CONFIRMED.name(), AuditResourceType.PROJECT_NODE.name(),
+                nodeId, projectId, null, java.util.Map.of("status", "DRAFT"), java.util.Map.of("status", "CONFIRMED")));
+        return result;
     }
 
     /** Called by node lifecycle completion so a client cannot bypass baseline confirmation. */
@@ -193,15 +188,11 @@ public class NodeRequirementScopeService {
             if (code != null && !codes.add(code)) throw BusinessException.error("需求编号不能重复");
             requirement.setCode(code);
         }
-        cmd.setObjective(trim(cmd.getObjective()));
-        cmd.setDeliverable(trim(cmd.getDeliverable()));
         cmd.setScopeItems(scopeItems);
         cmd.setRequirements(requirements);
     }
 
     private void validateComplete(NodeRequirementScopeDTO current) {
-        if (trim(current.getObjective()) == null) throw BusinessException.error("请填写本节点目标");
-        if (trim(current.getDeliverable()) == null) throw BusinessException.error("请填写节点交付结果");
         long inScopeCount = current.getScopeItems().stream().filter(item -> "IN".equals(item.getDirection())).count();
         if (inScopeCount == 0) throw BusinessException.error("至少保留一条纳入范围项");
         if (current.getRequirements().isEmpty()) throw BusinessException.error("至少添加一条需求");
@@ -229,13 +220,16 @@ public class NodeRequirementScopeService {
 
     private void replaceRequirements(Long projectId, Long nodeId, List<NodeRequirementCmd> items,
                                      List<ProjectNodeRequirementDO> existingItems) {
-        requirementMapper.delete(new LambdaQueryWrapper<ProjectNodeRequirementDO>()
-                .eq(ProjectNodeRequirementDO::getProjectId, projectId)
-                .eq(ProjectNodeRequirementDO::getNodeId, nodeId));
         Map<Long, ProjectNodeRequirementDO> existingById = new HashMap<>();
-        for (ProjectNodeRequirementDO existing : existingItems) {
+        for (ProjectNodeRequirementDO existing : existingItems == null ? List.<ProjectNodeRequirementDO>of() : existingItems) {
             if (existing.getId() != null) existingById.put(existing.getId(), existing);
         }
+        Set<Long> retainedIds = new HashSet<>();
+        Set<String> reservedCodes = items.stream()
+                .map(NodeRequirementCmd::getCode)
+                .map(this::trim)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         Set<String> usedCodes = new HashSet<>();
         AtomicInteger next = new AtomicInteger(1);
         for (int i = 0; i < items.size(); i++) {
@@ -244,11 +238,16 @@ public class NodeRequirementScopeService {
             if (code == null) {
                 do {
                     code = String.format(Locale.ROOT, "REQ-%03d", next.getAndIncrement());
-                } while (!usedCodes.add(code));
+                } while (reservedCodes.contains(code) || !usedCodes.add(code));
             } else {
                 usedCodes.add(code);
             }
+            ProjectNodeRequirementDO existing = cmd.getId() == null ? null : existingById.get(cmd.getId());
+            if (cmd.getId() != null && existing == null) {
+                throw BusinessException.error("需求不存在或不属于当前节点");
+            }
             ProjectNodeRequirementDO item = new ProjectNodeRequirementDO();
+            item.setId(existing == null ? null : existing.getId());
             item.setProjectId(projectId);
             item.setNodeId(nodeId);
             item.setCode(code);
@@ -259,8 +258,18 @@ public class NodeRequirementScopeService {
             item.setAcceptanceCriteria(cmd.getAcceptanceCriteria());
             item.setStatus(resolveRequirementStatus(cmd, existingById));
             item.setSort(cmd.getSort() == null ? i : cmd.getSort());
-            item.setCreatedBy(UserContext.userIdOrNull());
-            requirementMapper.insert(item);
+            item.setCreatedBy(existing == null ? UserContext.userIdOrNull() : existing.getCreatedBy());
+            if (item.getId() == null) requirementMapper.insert(item);
+            else {
+                retainedIds.add(item.getId());
+                requirementMapper.updateById(item);
+            }
+        }
+        for (ProjectNodeRequirementDO existing : existingById.values()) {
+            if (existing.getId() == null || retainedIds.contains(existing.getId())) continue;
+            taskRequirementMapper.delete(new LambdaQueryWrapper<ProjectTaskRequirementDO>()
+                    .eq(ProjectTaskRequirementDO::getRequirementId, existing.getId()));
+            requirementMapper.deleteById(existing.getId());
         }
     }
 
@@ -283,8 +292,6 @@ public class NodeRequirementScopeService {
         NodeRequirementScopeDTO dto = new NodeRequirementScopeDTO();
         dto.setProjectId(node.getProjectId());
         dto.setNodeId(node.getId());
-        dto.setObjective(baseline == null ? null : baseline.getObjective());
-        dto.setDeliverable(baseline == null ? null : baseline.getDeliverable());
         dto.setVersion(baseline == null ? null : baseline.getVersion());
         dto.setBaselineStatus(baseline == null || baseline.getStatus() == null ? 0 : baseline.getStatus());
         dto.setConfirmedBy(baseline == null ? null : baseline.getConfirmedBy());
@@ -295,13 +302,19 @@ public class NodeRequirementScopeService {
                 .eq(ProjectNodeScopeItemDO::getNodeId, node.getId())
                 .orderByAsc(ProjectNodeScopeItemDO::getSort)
                 .orderByAsc(ProjectNodeScopeItemDO::getId));
-        dto.setScopeItems(scopes.stream().map(this::toScopeDTO).collect(Collectors.toList()));
+        dto.setScopeItems((scopes == null ? List.<ProjectNodeScopeItemDO>of() : scopes).stream()
+                .map(this::toScopeDTO).collect(Collectors.toList()));
         List<ProjectNodeRequirementDO> requirements = requirementMapper.selectList(new LambdaQueryWrapper<ProjectNodeRequirementDO>()
                 .eq(ProjectNodeRequirementDO::getProjectId, node.getProjectId())
                 .eq(ProjectNodeRequirementDO::getNodeId, node.getId())
                 .orderByAsc(ProjectNodeRequirementDO::getSort)
                 .orderByAsc(ProjectNodeRequirementDO::getId));
-        dto.setRequirements(requirements.stream().map(this::toRequirementDTO).collect(Collectors.toList()));
+        List<ProjectNodeRequirementDO> safeRequirements = requirements == null
+                ? List.of() : requirements;
+        Map<Long, int[]> taskProgress = taskProgress(node.getProjectId(), node.getId(), safeRequirements);
+        dto.setRequirements(safeRequirements.stream()
+                .map(item -> toRequirementDTO(item, taskProgress.get(item.getId())))
+                .collect(Collectors.toList()));
         return dto;
     }
 
@@ -314,7 +327,7 @@ public class NodeRequirementScopeService {
         return dto;
     }
 
-    private NodeRequirementDTO toRequirementDTO(ProjectNodeRequirementDO item) {
+    private NodeRequirementDTO toRequirementDTO(ProjectNodeRequirementDO item, int[] progress) {
         NodeRequirementDTO dto = new NodeRequirementDTO();
         dto.setId(item.getId());
         dto.setCode(item.getCode());
@@ -325,7 +338,37 @@ public class NodeRequirementScopeService {
         dto.setAcceptanceCriteria(item.getAcceptanceCriteria());
         dto.setStatus(item.getStatus());
         dto.setSort(item.getSort());
+        dto.setTaskCount(progress == null ? 0 : progress[0]);
+        dto.setCompletedTaskCount(progress == null ? 0 : progress[1]);
         return dto;
+    }
+
+    private Map<Long, int[]> taskProgress(Long projectId, Long nodeId, List<ProjectNodeRequirementDO> requirements) {
+        List<Long> requirementIds = requirements.stream()
+                .map(ProjectNodeRequirementDO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (requirementIds.isEmpty()) return new HashMap<>();
+        List<ProjectTaskRequirementDO> links = taskRequirementMapper.selectList(new LambdaQueryWrapper<ProjectTaskRequirementDO>()
+                .eq(ProjectTaskRequirementDO::getProjectId, projectId)
+                .eq(ProjectTaskRequirementDO::getNodeId, nodeId)
+                .in(ProjectTaskRequirementDO::getRequirementId, requirementIds));
+        List<ProjectTaskRequirementDO> safeLinks = links == null ? List.of() : links;
+        List<Long> taskIds = safeLinks.stream().map(ProjectTaskRequirementDO::getTaskId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (taskIds.isEmpty()) return new HashMap<>();
+        List<ProjectTaskDO> tasks = taskMapper.selectBatchIds(taskIds);
+        Map<Long, ProjectTaskDO> taskById = (tasks == null ? List.<ProjectTaskDO>of() : tasks).stream()
+                .collect(Collectors.toMap(ProjectTaskDO::getId, item -> item, (left, right) -> left));
+        Map<Long, int[]> result = new HashMap<>();
+        for (ProjectTaskRequirementDO link : safeLinks) {
+            ProjectTaskDO task = taskById.get(link.getTaskId());
+            if (task == null) continue;
+            int[] counts = result.computeIfAbsent(link.getRequirementId(), ignored -> new int[2]);
+            counts[0]++;
+            if (Integer.valueOf(2).equals(task.getStatus())) counts[1]++;
+        }
+        return result;
     }
 
     private String upper(String value) {

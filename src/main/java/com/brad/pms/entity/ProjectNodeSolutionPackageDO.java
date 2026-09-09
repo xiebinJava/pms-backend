@@ -18,12 +18,8 @@ public class ProjectNodeSolutionPackageDO {
     private Long id;
     private Long projectId;
     private Long nodeId;
-    private String packageVersion;
     private String productSolution;
     private String technicalSolution;
-    private String summary;
-    private String scopeCoverage;
-    private String rolloutPremise;
     private String status;
 
     @Version

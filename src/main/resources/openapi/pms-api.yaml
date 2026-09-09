@@ -271,7 +271,7 @@ paths:
   /search:
     get:
       tags: [项目]
-      summary: 在可读范围内搜索项目、任务、里程碑和评论
+      summary: 在可读范围内搜索项目、任务和评论
       parameters:
         - name: q
           in: query
@@ -410,7 +410,10 @@ paths:
         required: true
         content:
           application/json:
-            schema: { type: object }
+            schema:
+              type: object
+              properties:
+                requirementId: { type: integer, format: int64, nullable: true, description: 关联当前需求澄清节点且已确认的需求编号 }
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -430,7 +433,11 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object }
+            schema:
+              type: object
+              properties:
+                requirementId: { type: integer, format: int64, nullable: true, description: 替换为当前节点下已确认的需求 }
+                clearRequirement: { type: boolean, description: 清除当前任务的需求关联 }
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -580,17 +587,6 @@ paths:
         '400': { $ref: '#/components/responses/BusinessError' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
-  /projects/{projectId}/nodes/{nodeId}/requirements-scope/reopen:
-    parameters:
-      - $ref: '#/components/parameters/ProjectId'
-      - $ref: '#/components/parameters/NodeId'
-    post:
-      tags: [任务与节点]
-      summary: 重新打开需求澄清范围基线
-      responses:
-        '200': { $ref: '#/components/responses/Success' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
   /projects/{projectId}/nodes/{nodeId}/solution-design:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -653,6 +649,48 @@ paths:
         '400': { $ref: '#/components/responses/BusinessError' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/reviews/{reviewType}/reviewer:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+      - name: reviewType
+        in: path
+        required: true
+        schema: { type: string, enum: [BUSINESS_PRODUCT, TECHNICAL, TEST_RELEASE] }
+    put:
+      tags: [任务与节点]
+      summary: 设置方案评审人
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionReviewerUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/reviews/{reviewType}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+      - name: reviewType
+        in: path
+        required: true
+        schema: { type: string, enum: [BUSINESS_PRODUCT, TECHNICAL, TEST_RELEASE] }
+    put:
+      tags: [任务与节点]
+      summary: 更新方案评审建议
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionReviewUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /projects/{projectId}/nodes/{nodeId}/solution-design/decision/confirm:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -670,53 +708,194 @@ paths:
         '400': { $ref: '#/components/responses/BusinessError' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
-  /projects/{projectId}/nodes/{nodeId}/solution-design/decision/reopen:
+  /projects/{projectId}/nodes/{nodeId}/solution-design/decision:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    put:
+      tags: [任务与节点]
+      summary: 保存方案决策草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionDecisionUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/acceptance:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取业务验收与缺陷闭环工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存业务验收草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeAcceptanceUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/development-control:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取开发测试与项目控制工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存开发专题、故事和状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeDevelopmentControlUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/plan-resource-risk:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取计划、资源与风险基线（含迭代计划）
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存计划、资源、风险和迭代计划草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodePlanResourceRiskUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/plan-resource-risk/confirm:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/NodeId'
     post:
       tags: [任务与节点]
-      summary: 重新打开方案决策
+      summary: 确认计划、资源、风险和迭代计划基线
       responses:
         '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
-  /projects/{projectId}/milestones:
+  /projects/{projectId}/iteration-plans:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     get:
       tags: [任务与节点]
-      summary: 里程碑列表
+      summary: 获取当前项目已确认的迭代计划
       responses:
         '200': { $ref: '#/components/responses/Success' }
-    post:
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/nodes/{nodeId}/release:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
       tags: [任务与节点]
-      summary: 新建里程碑
+      summary: 获取发布决策与运营交接工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存发布决策与运营交接草稿
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object }
+            schema: { $ref: '#/components/schemas/NodeReleaseUpdateRequest' }
       responses:
         '200': { $ref: '#/components/responses/Success' }
-  /projects/{projectId}/milestones/{id}:
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/value-review:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
-      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取价值验证与项目复盘工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     put:
       tags: [任务与节点]
-      summary: 更新里程碑
+      summary: 保存价值验证与项目复盘草稿
       requestBody:
+        required: true
         content:
           application/json:
-            schema: { type: object }
+            schema: { $ref: '#/components/schemas/NodeValueReviewUpdateRequest' }
       responses:
         '200': { $ref: '#/components/responses/Success' }
-    delete:
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/knowledge-standard:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
       tags: [任务与节点]
-      summary: 删除里程碑
+      summary: 获取知识沉淀与标准改进工作台
       responses:
         '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存知识资产和改进行动草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeKnowledgeStandardUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/acceptance/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 确认业务验收结论
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /projects/{projectId}/members:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -1298,10 +1477,8 @@ components:
       type: object
       properties:
         version: { type: integer, minimum: 0, nullable: true, description: 已读取的基线版本；版本冲突返回 409 }
-        objective: { type: string, maxLength: 2000 }
-        deliverable: { type: string, maxLength: 2000 }
         scopeItems: { type: array, description: 纳入/不纳入范围项 }
-        requirements: { type: array, description: 需求清单；新增或修改的条目需重新确认 }
+        requirements: { type: array, description: 需求清单；新增或修改的条目需重新确认；每条需求返回 taskCount 和 completedTaskCount }
     NodeRequirementScopeResponse:
       type: object
       properties:
@@ -1309,8 +1486,6 @@ components:
         nodeId: { type: integer, format: int64 }
         version: { type: integer, minimum: 0, nullable: true }
         baselineStatus: { type: integer, description: 0 草稿，1 已确认 }
-        objective: { type: string, nullable: true }
-        deliverable: { type: string, nullable: true }
         confirmedBy: { type: integer, format: int64, nullable: true }
         confirmedAt: { type: string, format: date-time, nullable: true }
         canEdit: { type: boolean }
@@ -1320,24 +1495,34 @@ components:
       type: object
       properties:
         version: { type: integer, minimum: 0, nullable: true, description: 已读取的方案包版本；版本冲突返回 409 }
-        packageVersion: { type: string, maxLength: 20, description: 方案包展示版本，如 v1.0 }
         productSolution: { type: string, maxLength: 4000 }
         technicalSolution: { type: string, maxLength: 4000 }
-        summary: { type: string, maxLength: 2000 }
-        scopeCoverage: { type: string, maxLength: 2000 }
-        rolloutPremise: { type: string, maxLength: 2000 }
+    NodeSolutionReviewerUpdateRequest:
+      type: object
+      required: [reviewerId]
+      properties:
+        reviewerId: { type: integer, format: int64, description: 项目成员用户 ID }
+    NodeSolutionReviewUpdateRequest:
+      type: object
+      properties:
+        comment: { type: string, maxLength: 2000, nullable: true, description: 可选评审建议 }
     NodeSolutionReviewCompleteRequest:
       type: object
       properties:
         comment: { type: string, maxLength: 2000 }
     NodeSolutionDecisionConfirmRequest:
       type: object
-      required: [result, reason]
+      required: [result]
       properties:
         version: { type: integer, minimum: 0, nullable: true, description: 已读取的决策版本；版本冲突返回 409 }
         result: { type: string, enum: [PASS, CONDITIONAL_PASS, RETURN_FOR_CHANGES] }
-        reason: { type: string, maxLength: 2000 }
         conditions: { type: string, maxLength: 2000, description: 有条件通过时必填 }
+    NodeSolutionDecisionUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的决策版本；版本冲突返回 409 }
+        result: { type: string, enum: [PASS, CONDITIONAL_PASS, RETURN_FOR_CHANGES], nullable: true }
+        conditions: { type: string, maxLength: 2000, description: 有条件通过时填写；草稿阶段可为空 }
     NodeSolutionDesignResponse:
       type: object
       properties:
@@ -1347,6 +1532,224 @@ components:
         solutionPackage: { type: object, description: 单个方案包 }
         reviews: { type: array, description: 固定三类必要评审 }
         decision: { type: object, description: 方案决策及锁定状态 }
+    NodeAcceptanceUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的验收版本；版本冲突返回 409 }
+        result: { type: string, enum: [PENDING, PASS, CONDITIONAL_PASS] }
+        residualItems: { type: string, maxLength: 2000 }
+        items: { type: array, description: 来自已确认需求的验收项结果和验证摘要 }
+    NodeAcceptanceResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        status: { type: integer, description: 0 草稿，1 已确认 }
+        sourceBaselineVersion: { type: integer, minimum: 0, nullable: true, description: 当前验收所对应的需求范围基线版本 }
+        sourceBaselineChanged: { type: boolean, description: 需求范围基线变更后当前验收需要重新编辑并保存 }
+        result: { type: string, enum: [PENDING, PASS, CONDITIONAL_PASS] }
+        residualItems: { type: string, nullable: true }
+        confirmedBy: { type: integer, format: int64, nullable: true }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        canEdit: { type: boolean }
+        items: { type: array }
+        defects: { type: array, description: 只读的关联缺陷摘要 }
+    NodeDevelopmentControlUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的开发控制版本；版本冲突返回 409 }
+        currentIteration: { type: string, maxLength: 120 }
+        topics:
+          type: array
+          description: 专题及其故事树；专题和故事负责人必须是项目成员
+          items: { $ref: '#/components/schemas/NodeDevelopmentTopic' }
+    NodeDevelopmentControlResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        currentIteration: { type: string, nullable: true }
+        canEdit: { type: boolean }
+        summary: { type: object, description: 从故事状态和进度派生的项目汇总 }
+        topics:
+          type: array
+          description: 专题和故事树
+          items: { $ref: '#/components/schemas/NodeDevelopmentTopic' }
+    NodeDevelopmentTopic:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        latestBuildVersion: { type: string, nullable: true }
+        testStatus: { type: string }
+        status: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        blocker: { type: string, nullable: true }
+        sort: { type: integer }
+        stories:
+          type: array
+          items: { $ref: '#/components/schemas/NodeDevelopmentStory' }
+    NodeDevelopmentStory:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        iterationPlanId: { type: integer, format: int64, nullable: true, description: 所属迭代计划；可为空 }
+        iterationPlanName: { type: string, nullable: true }
+        status: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        storyPoints: { type: integer, minimum: 0, maximum: 1000 }
+        startDate: { type: string, format: date, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        blocker: { type: string, nullable: true }
+        sort: { type: integer }
+    NodeIterationPlan:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string, maxLength: 200 }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        goal: { type: string, nullable: true, maxLength: 500 }
+        status: { type: string, enum: [PLANNED, IN_PROGRESS, DONE] }
+        startDate: { type: string, format: date, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        sort: { type: integer }
+    NodeIterationPlanInput:
+      allOf:
+        - $ref: '#/components/schemas/NodeIterationPlan'
+    NodePlanResourceRiskUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的基线版本 }
+        iterationPlans:
+          type: array
+          items: { $ref: '#/components/schemas/NodeIterationPlanInput' }
+        resources: { type: array }
+        risks: { type: array }
+    NodePlanResourceRiskResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        baselineStatus: { type: integer, description: 0 草稿，1 已确认 }
+        sourceDecisionChanged: { type: boolean }
+        canEdit: { type: boolean }
+        iterationPlans:
+          type: array
+          items: { $ref: '#/components/schemas/NodeIterationPlan' }
+        resources: { type: array }
+        risks: { type: array }
+    NodeReleaseUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的发布交接版本；版本冲突返回 409 }
+        releaseVersion: { type: string, maxLength: 120 }
+        releaseWindowStart: { type: string, format: date-time, nullable: true }
+        releaseWindowEnd: { type: string, format: date-time, nullable: true }
+        releaseType: { type: string, enum: [FULL, GRAY, HOTFIX] }
+        packageReady: { type: boolean }
+        configConfirmed: { type: boolean }
+        rollbackReady: { type: boolean }
+        monitoringConfirmed: { type: boolean }
+        onCallConfirmed: { type: boolean }
+        decisionResult: { type: string, enum: [PENDING, APPROVED, DEFERRED, CANCELLED] }
+        decisionNote: { type: string, maxLength: 2000 }
+        handoverNotes: { type: string, maxLength: 2000 }
+        observationItems: { type: string, maxLength: 2000 }
+        emergencyContact: { type: string, maxLength: 500 }
+    NodeReleaseResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        releaseVersion: { type: string, nullable: true }
+        releaseWindowStart: { type: string, format: date-time, nullable: true }
+        releaseWindowEnd: { type: string, format: date-time, nullable: true }
+        releaseType: { type: string, enum: [FULL, GRAY, HOTFIX] }
+        packageReady: { type: boolean }
+        configConfirmed: { type: boolean }
+        rollbackReady: { type: boolean }
+        monitoringConfirmed: { type: boolean }
+        onCallConfirmed: { type: boolean }
+        decisionResult: { type: string, enum: [PENDING, APPROVED, DEFERRED, CANCELLED] }
+        decisionNote: { type: string, nullable: true }
+        handoverNotes: { type: string, nullable: true }
+        observationItems: { type: string, nullable: true }
+        emergencyContact: { type: string, nullable: true }
+        canEdit: { type: boolean }
+    NodeValueReviewUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的价值复盘版本；版本冲突返回 409 }
+        resultStatus: { type: string, enum: [PENDING, ACHIEVED, PARTIAL, NOT_ACHIEVED] }
+        actualResult: { type: string, maxLength: 4000 }
+        retrospectiveConclusion: { type: string, maxLength: 4000 }
+        followUpActions: { type: string, maxLength: 2000 }
+    NodeKnowledgeStandardUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的知识工作台版本；版本冲突返回 409 }
+        assets:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAsset' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAction' }
+    NodeKnowledgeStandardResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        canEdit: { type: boolean }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        assets:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAsset' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAction' }
+    NodeKnowledgeAsset:
+      type: object
+      properties:
+        id: { type: integer, format: int64, nullable: true }
+        name: { type: string, maxLength: 200 }
+        source: { type: string, nullable: true, maxLength: 200 }
+        type: { type: string, enum: [TEMPLATE, CHECKLIST, CASE, STANDARD] }
+        improvement: { type: string, nullable: true, maxLength: 500 }
+        status: { type: string, enum: [UPDATED, REVIEW, RETAINED, PENDING] }
+        sort: { type: integer }
+    NodeKnowledgeAction:
+      type: object
+      properties:
+        id: { type: integer, format: int64, nullable: true }
+        title: { type: string, maxLength: 300 }
+        note: { type: string, nullable: true, maxLength: 500 }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        status: { type: string, enum: [NOT_STARTED, IN_PROGRESS, DONE] }
+        sort: { type: integer }
+    NodeValueReviewResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        resultStatus: { type: string, enum: [PENDING, ACHIEVED, PARTIAL, NOT_ACHIEVED] }
+        actualResult: { type: string, nullable: true }
+        retrospectiveConclusion: { type: string, nullable: true }
+        followUpActions: { type: string, nullable: true }
+        canEdit: { type: boolean }
     ApiResponse:
       type: object
       properties:

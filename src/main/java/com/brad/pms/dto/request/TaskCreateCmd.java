@@ -27,7 +27,7 @@ public class TaskCreateCmd {
 
     private Long assigneeId;
 
-    private Long milestoneId;
+    private Long requirementId;
 
     private Integer sort = 0;
 

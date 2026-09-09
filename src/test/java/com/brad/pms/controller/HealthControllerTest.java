@@ -20,7 +20,7 @@ class HealthControllerTest {
         Field field = HealthController.class.getDeclaredField("expectedMigrationVersion");
         field.setAccessible(true);
 
-        assertThat(field.getInt(controller)).isEqualTo(18);
+        assertThat(field.getInt(controller)).isEqualTo(40);
     }
 
     @Test

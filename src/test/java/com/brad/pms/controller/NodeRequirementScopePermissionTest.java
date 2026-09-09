@@ -12,7 +12,7 @@ class NodeRequirementScopePermissionTest {
 
     @Test
     void protectsEveryRequirementScopeEndpointWithProjectRead() {
-        for (String methodName : new String[]{"get", "save", "confirm", "reopen"}) {
+        for (String methodName : new String[]{"get", "save", "confirm"}) {
             var method = Arrays.stream(NodeRequirementScopeController.class.getDeclaredMethods())
                     .filter(candidate -> candidate.getName().equals(methodName))
                     .findFirst()

@@ -19,7 +19,9 @@ public class TaskUpdateCmd {
 
     private Long assigneeId;
 
-    private Long milestoneId;
+    private Long requirementId;
+
+    private Boolean clearRequirement = false;
 
     private Integer sort;
 

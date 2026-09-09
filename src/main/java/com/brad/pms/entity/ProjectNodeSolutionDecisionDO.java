@@ -19,7 +19,6 @@ public class ProjectNodeSolutionDecisionDO {
     private Long projectId;
     private Long nodeId;
     private String result;
-    private String reason;
     private String conditions;
     private String status;
     private Long confirmedBy;

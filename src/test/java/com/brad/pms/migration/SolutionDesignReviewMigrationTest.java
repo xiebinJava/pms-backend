@@ -36,6 +36,37 @@ class SolutionDesignReviewMigrationTest {
                 .doesNotContain("technical_solution VARCHAR(4000) NOT NULL");
     }
 
+    @Test
+    void addsAnOptionalReviewerToEachRequiredReview() throws IOException {
+        String migration = read("db/migration/V22__solution_design_reviewers.sql");
+        String schema = read("schema.sql");
+
+        assertThat(migration).containsIgnoringCase("ADD COLUMN reviewer_id BIGINT NULL");
+        assertThat(migration).containsIgnoringCase("idx_node_solution_review_reviewer");
+        assertThat(schema).containsIgnoringCase("reviewer_id   BIGINT");
+    }
+
+    @Test
+    void removesTheDeletedSolutionPackageFields() throws IOException {
+        String migration = read("db/migration/V23__remove_solution_package_legacy_fields.sql");
+        String schema = read("schema.sql");
+
+        assertThat(migration).containsIgnoringCase("DROP COLUMN package_version")
+                .containsIgnoringCase("DROP COLUMN summary")
+                .containsIgnoringCase("DROP COLUMN scope_coverage")
+                .containsIgnoringCase("DROP COLUMN rollout_premise")
+                .containsIgnoringCase("DROP COLUMN reason");
+        String packageTable = schema.substring(schema.indexOf("CREATE TABLE IF NOT EXISTS project_node_solution_package"));
+        packageTable = packageTable.substring(0, packageTable.indexOf("CREATE TABLE IF NOT EXISTS project_node_solution_review"));
+        String decisionTable = schema.substring(schema.indexOf("CREATE TABLE IF NOT EXISTS project_node_solution_decision"));
+        decisionTable = decisionTable.substring(0, decisionTable.indexOf("\n);") + 3);
+        assertThat(packageTable).doesNotContainIgnoringCase("package_version")
+                .doesNotContainIgnoringCase("scope_coverage")
+                .doesNotContainIgnoringCase("rollout_premise")
+                .doesNotContainIgnoringCase("summary");
+        assertThat(decisionTable).doesNotContainIgnoringCase("reason");
+    }
+
     private String read(String resource) throws IOException {
         try (InputStream stream = getClass().getClassLoader().getResourceAsStream(resource)) {
             assertThat(stream).as(resource).isNotNull();

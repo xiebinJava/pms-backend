@@ -133,12 +133,12 @@ public class DataInitializer implements CommandLineRunner {
         m2.setStatus(0);
         milestoneMapper.insert(m2);
 
-        task(p1.getId(), nodeId(p1Nodes, "kickoff"), "立项材料评审", "确认目标、范围与资源授权", 2, 2, admin.getId(), null, 1);
-        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, terry.getId(), null, 2);
-        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, kevin.getId(), null, 3);
-        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, terry.getId(), m1.getId(), 4);
-        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, claire.getId(), m1.getId(), 5);
-        task(p1.getId(), nodeId(p1Nodes, "knowledge"), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), m2.getId(), 6);
+        task(p1.getId(), nodeId(p1Nodes, "kickoff"), "立项材料评审", "确认目标、范围与资源授权", 2, 2, admin.getId(), 1);
+        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, terry.getId(), 2);
+        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, kevin.getId(), 3);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, terry.getId(), 4);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, claire.getId(), 5);
+        task(p1.getId(), nodeId(p1Nodes, "knowledge"), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), 6);
 
         ProjectCommentDO c1 = new ProjectCommentDO();
         c1.setProjectId(p1.getId());
@@ -217,7 +217,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void task(Long projectId, Long nodeId, String title, String desc, int status, int priority,
-                      Long assigneeId, Long milestoneId, int sort) {
+                      Long assigneeId, int sort) {
         ProjectTaskDO t = new ProjectTaskDO();
         t.setProjectId(projectId);
         t.setNodeId(nodeId);
@@ -226,7 +226,6 @@ public class DataInitializer implements CommandLineRunner {
         t.setStatus(status);
         t.setPriority(priority);
         t.setAssigneeId(assigneeId);
-        t.setMilestoneId(milestoneId);
         t.setSort(sort);
         taskMapper.insert(t);
     }

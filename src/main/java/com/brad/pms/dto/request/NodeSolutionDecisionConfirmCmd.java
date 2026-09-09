@@ -12,8 +12,5 @@ public class NodeSolutionDecisionConfirmCmd {
     private String result;
 
     @Size(max = 2000)
-    private String reason;
-
-    @Size(max = 2000)
     private String conditions;
 }

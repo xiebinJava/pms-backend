@@ -132,6 +132,19 @@ public class ProjectPermissionService {
         return node;
     }
 
+    /** Requires an open project and an unlocked node for a designated reviewer action. */
+    public ProjectNodeDO requireReviewableNode(Long projectId, Long nodeId, String action) {
+        ProjectDO project = requireProjectReadable(projectId);
+        if (!ProjectPermissionPolicy.isProjectOperational(project)) {
+            throw BusinessException.forbidden("项目当前状态不允许" + action);
+        }
+        ProjectNodeDO node = requireNode(projectId, nodeId);
+        if (NodeStatus.isReadOnly(node.getStatus())) {
+            throw BusinessException.forbidden("节点已锁定，回滚后才可以" + action);
+        }
+        return node;
+    }
+
     public void requireProjectMember(Long projectId, Long userId) {
         if (userId == null) {
             throw BusinessException.error("项目经理必须是项目成员");

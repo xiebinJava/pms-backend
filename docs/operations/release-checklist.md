@@ -5,12 +5,12 @@
 ## 2026-09-04 发布准备当前状态
 
 - [x] 生产配置静态门禁已加入：`bash scripts/validate-production-config.test.sh` 通过；不会打印密钥。
-- [x] 本机目标 OceanBase 已执行并复核 V18；V18 增加方案设计、三类评审和方案决策结构，V17 的需求澄清范围基线、V16 的项目等级字段和 V15 的通知提醒去重结构保持不变。
-- [x] 当前代码回归：后端 `mvn -q test`（268 个用例，0 失败、0 错误、1 跳过）、前端 `pnpm test`（174 项，0 失败）、类型检查和构建通过。
-- [x] 本机最新后端 JAR 已在 V18 迁移后使用 OceanBase profile 重启并复核 readiness；返回 `database=UP`、`migration=18`。
+- [x] 本机目标 OceanBase 已执行并复核 V20；V20 删除需求澄清基线中重复的目标/交付列，V19 的计划/资源/风险基线、V18 的方案设计评审决策结构、V17 的需求澄清范围基线、V16 的项目等级字段和 V15 的通知提醒去重结构保持不变。
+- [x] 当前代码回归：后端 `mvn -q test`（277 个用例，0 失败、0 错误、1 跳过）、前端 `npm test`（178 项，0 失败）、类型检查和构建通过。
+- [x] 本机最新后端 JAR 已在 V21 迁移后使用 OceanBase profile 重启并复核 readiness；返回 `database=UP`、`migration=21`。
 - [x] OpenAPI、生产配置门禁、脚本语法和当前发布一致性检查通过；前后端代码与文档已推送至远程 `main`/`release`。
 - [ ] 目标企业仍需注入真实 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储和监控，并记录 RPO/RTO 与故障联系人。
-- [ ] 本机 V18 备份生成、SHA-256/元数据校验和隔离空库恢复待补；历史 V12 备份演练不能替代当前 V18 备份演练。
+- [ ] 本机 V21 备份生成、SHA-256/元数据校验和隔离空库恢复待补；历史 V12 备份演练不能替代当前 V21 备份演练。
 - [x] 后端独立 CI `33705799078` 已通过单元测试、OpenAPI、配置/隐私门禁、Netty 依赖修复后的镜像 HIGH/CRITICAL 扫描和 SPDX SBOM。
 - [x] 跨仓库 GitHub Actions 已确认 `PMS_FRONT_REPO_READ_TOKEN` 可读 sibling `pms-front`；最终远程运行 `33705799079` 的 OceanBase、API、桌面/移动端 Playwright 全通过，使用后端提交 `9adbbff` 与前端提交 `05f241f`。
 - [x] 前端独立 CI `33704208291` 已通过隐私扫描、121 项测试、类型检查、构建、镜像高危扫描和 SPDX SBOM。
@@ -47,7 +47,7 @@
 - [ ] 已完成数据库备份与恢复演练，并保存校验值。
 - [ ] 备份文件包含 schema 版本、`.sha256` 校验文件和元数据，恢复仅使用显式空目标库。
 - [ ] 执行 `scripts/enterprise-preflight.sh` 通过。
-- [ ] 按 V1–V18 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知、V10 的通知节点标识、V11 的组织历史/导入失败字段、V12 的反馈工单/历史表、V13 的项目图片访问边界、V14 的审计上下文/结果字段和查询索引、V15 的通知去重键和唯一索引、V16 的 `project.project_level` 字段、V17 的需求澄清范围基线表以及 V18 的方案包/评审/决策表已落库。
+- [ ] 按 V1–V23 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知、V10 的通知节点标识、V11 的组织历史/导入失败字段、V12 的反馈工单/历史表、V13 的项目图片访问边界、V14 的审计上下文/结果字段和查询索引、V15 的通知去重键和唯一索引、V16 的 `project.project_level` 字段、V17 的需求澄清范围基线表、V18 的方案包/评审/决策表、V19 的计划/资源/风险基线、V20 的目标/交付列删除、V21 的需求-任务关联表、V22 的方案评审人字段和索引以及 V23 的已删除方案字段清理已落库。
 - [x] 执行迁移后 `scripts/verify-enterprise-migration.sh` 和 `scripts/enterprise-preflight.sh` 通过。
 - [ ] 生产应用只使用 `oceanbase` profile；H2 仅存在于测试配置。
 - [ ] 迁移失败时不直接删除业务表，按升级手册恢复到新数据库。

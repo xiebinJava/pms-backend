@@ -13,4 +13,6 @@ public class NodeRequirementDTO {
     private String acceptanceCriteria;
     private Integer status;
     private Integer sort;
+    private Integer taskCount;
+    private Integer completedTaskCount;
 }

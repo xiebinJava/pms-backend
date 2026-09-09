@@ -12,12 +12,6 @@ public class NodeRequirementScopeUpdateCmd {
 
     private Integer version;
 
-    @Size(max = 2000)
-    private String objective;
-
-    @Size(max = 2000)
-    private String deliverable;
-
     @Valid
     @Size(max = 100)
     private List<NodeScopeItemCmd> scopeItems = new ArrayList<>();

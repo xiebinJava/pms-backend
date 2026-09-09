@@ -12,7 +12,8 @@ usage() {
 Usage: oceanbase-upgrade.sh
 
 Apply pending V*.sql migrations to an existing OceanBase/MySQL database.
-The command is non-destructive: it never drops a database or truncates data.
+The command never drops a database or truncates data; individual migrations may
+explicitly remove deprecated tables or columns when the schema contract requires it.
 USAGE
 }
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then usage; exit 0; fi
@@ -231,4 +232,4 @@ if [[ "$pending" == "0" ]]; then
 else
   echo "OceanBase upgrade completed."
 fi
-echo "No database or table was dropped."
+echo "No database was dropped or truncated; table/column changes were limited to explicit migration SQL."

@@ -1,15 +1,20 @@
 package com.brad.pms.service;
 
+import com.brad.pms.audit.AuditAction;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeBaselineDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeRequirementDO;
 import com.brad.pms.entity.ProjectNodeScopeItemDO;
+import com.brad.pms.entity.ProjectTaskDO;
+import com.brad.pms.entity.ProjectTaskRequirementDO;
 import com.brad.pms.mapper.ProjectNodeBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
 import com.brad.pms.mapper.ProjectNodeScopeItemMapper;
+import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.ProjectTaskRequirementMapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
@@ -39,7 +44,10 @@ class NodeRequirementScopeServiceTest {
     @Mock ProjectNodeScopeItemMapper scopeItemMapper;
     @Mock ProjectNodeRequirementMapper requirementMapper;
     @Mock ProjectNodeMapper nodeMapper;
+    @Mock ProjectTaskMapper taskMapper;
+    @Mock ProjectTaskRequirementMapper taskRequirementMapper;
     @Mock ProjectPermissionService permissionService;
+    @Mock OperationLogService operationLogService;
 
     @InjectMocks NodeRequirementScopeService service;
 
@@ -48,14 +56,14 @@ class NodeRequirementScopeServiceTest {
         Configuration configuration = new Configuration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "test");
         TableInfoHelper.initTableInfo(assistant, ProjectNodeRequirementDO.class);
+        TableInfoHelper.initTableInfo(assistant, ProjectTaskDO.class);
+        TableInfoHelper.initTableInfo(assistant, ProjectTaskRequirementDO.class);
     }
 
     @Test
     void rejectsConfirmWhenTheBaselineIsIncomplete() {
         ProjectNodeDO node = requirementNode();
         ProjectNodeBaselineDO baseline = baseline();
-        baseline.setObjective("明确本阶段要做什么");
-        baseline.setDeliverable("可评审的需求基线");
         when(permissionService.requireManageableNode(1L, 10L, "确认需求范围基线")).thenReturn(node);
         when(baselineMapper.selectOne(any())).thenReturn(baseline);
         when(scopeItemMapper.selectList(any())).thenReturn(List.of());
@@ -71,8 +79,6 @@ class NodeRequirementScopeServiceTest {
         ProjectDO project = project();
         ProjectNodeDO node = requirementNode();
         ProjectNodeBaselineDO baseline = baseline();
-        baseline.setObjective("明确本阶段要做什么");
-        baseline.setDeliverable("可评审的需求基线");
         ProjectNodeScopeItemDO scope = new ProjectNodeScopeItemDO();
         scope.setDirection("IN");
         scope.setTitle("订单状态流转");
@@ -92,23 +98,73 @@ class NodeRequirementScopeServiceTest {
         assertThat(result.getBaselineStatus()).isEqualTo(1);
         assertThat(result.getConfirmedAt()).isNotNull();
         verify(baselineMapper).updateById(baseline);
+        verify(operationLogService).record(org.mockito.ArgumentMatchers.argThat(event ->
+                AuditAction.NODE_REQUIREMENT_SCOPE_CONFIRMED.name().equals(event.action())
+                        && "PROJECT_NODE".equals(event.resourceType())
+                        && Long.valueOf(10L).equals(event.resourceId())
+                        && Long.valueOf(1L).equals(event.projectId())));
     }
 
     @Test
-    void reopeningKeepsTheExistingContentAndOnlyClearsConfirmation() {
+    void confirmsACompleteBaselineWithoutNodeObjectiveOrDeliverable() {
+        ProjectNodeDO node = requirementNode();
+        ProjectNodeBaselineDO baseline = baseline();
+        ProjectNodeScopeItemDO scope = new ProjectNodeScopeItemDO();
+        scope.setDirection("IN");
+        scope.setTitle("订单状态流转");
+        ProjectNodeRequirementDO requirement = new ProjectNodeRequirementDO();
+        requirement.setCode("REQ-001");
+        requirement.setName("统一订单状态");
+        requirement.setAcceptanceCriteria("状态变更可追踪");
+        requirement.setStatus(1);
+        when(permissionService.requireManageableNode(1L, 10L, "确认需求范围基线")).thenReturn(node);
+        when(baselineMapper.selectOne(any())).thenReturn(baseline);
+        when(scopeItemMapper.selectList(any())).thenReturn(List.of(scope));
+        when(requirementMapper.selectList(any())).thenReturn(List.of(requirement));
+        when(baselineMapper.updateById(any(ProjectNodeBaselineDO.class))).thenReturn(1);
+
+        var result = service.confirm(1L, 10L);
+
+        assertThat(result.getBaselineStatus()).isEqualTo(1);
+    }
+
+    @Test
+    void editsAConfirmedBaselineDirectlyAndClearsItsConfirmation() {
         ProjectNodeDO node = requirementNode();
         ProjectNodeBaselineDO baseline = baseline();
         baseline.setStatus(1);
-        when(permissionService.requireManageableNode(1L, 10L, "重新打开需求范围基线")).thenReturn(node);
+        baseline.setVersion(0);
+        ProjectNodeRequirementDO existing = new ProjectNodeRequirementDO();
+        existing.setId(21L);
+        existing.setCode("REQ-001");
+        existing.setName("旧名称");
+        existing.setType("BUSINESS");
+        existing.setPriority(2);
+        existing.setAcceptanceCriteria("旧验收标准");
+        existing.setStatus(1);
+        when(permissionService.requireManageableNode(1L, 10L, "保存需求范围基线")).thenReturn(node);
         when(baselineMapper.selectOne(any())).thenReturn(baseline);
         when(baselineMapper.updateById(any(ProjectNodeBaselineDO.class))).thenReturn(1);
+        when(requirementMapper.selectList(any())).thenReturn(List.of(existing));
 
-        var result = service.reopen(1L, 10L);
+        NodeRequirementCmd requirement = new NodeRequirementCmd();
+        requirement.setId(21L);
+        requirement.setCode("REQ-001");
+        requirement.setName("新名称");
+        requirement.setType("BUSINESS");
+        requirement.setPriority(2);
+        requirement.setAcceptanceCriteria("旧验收标准");
+        requirement.setStatus(1);
+        NodeRequirementScopeUpdateCmd cmd = new NodeRequirementScopeUpdateCmd();
+        cmd.setVersion(0);
+        cmd.setRequirements(List.of(requirement));
 
-        assertThat(result.getBaselineStatus()).isEqualTo(0);
+        var result = service.saveDraft(1L, 10L, cmd);
+
+        assertThat(result.getBaselineStatus()).isZero();
         assertThat(result.getConfirmedAt()).isNull();
         verify(baselineMapper).updateById(baseline);
-        verify(requirementMapper).update(any(), any());
+        verify(requirementMapper).updateById(any(ProjectNodeRequirementDO.class));
     }
 
     @Test
@@ -119,8 +175,6 @@ class NodeRequirementScopeServiceTest {
         when(baselineMapper.updateById(any(ProjectNodeBaselineDO.class))).thenReturn(1);
 
         NodeRequirementScopeUpdateCmd cmd = new NodeRequirementScopeUpdateCmd();
-        cmd.setObjective("明确本阶段要做什么");
-        cmd.setDeliverable("可评审的需求基线");
         NodeScopeItemCmd scope = new NodeScopeItemCmd();
         scope.setDirection("IN");
         scope.setTitle("订单状态流转");
@@ -136,10 +190,13 @@ class NodeRequirementScopeServiceTest {
         service.saveDraft(1L, 10L, cmd);
 
         verify(scopeItemMapper).delete(any());
-        verify(requirementMapper).delete(any());
         verify(baselineMapper).insert(any(ProjectNodeBaselineDO.class));
         verify(scopeItemMapper).insert(any(ProjectNodeScopeItemDO.class));
         verify(requirementMapper).insert(any(ProjectNodeRequirementDO.class));
+        verify(operationLogService).record(org.mockito.ArgumentMatchers.argThat(event ->
+                AuditAction.NODE_REQUIREMENT_SCOPE_DRAFT_SAVED.name().equals(event.action())
+                        && Long.valueOf(10L).equals(event.resourceId())
+                        && Long.valueOf(1L).equals(event.projectId())));
     }
 
     @Test
@@ -196,8 +253,58 @@ class NodeRequirementScopeServiceTest {
         service.saveDraft(1L, 10L, cmd);
 
         ArgumentCaptor<ProjectNodeRequirementDO> captor = ArgumentCaptor.forClass(ProjectNodeRequirementDO.class);
-        verify(requirementMapper).insert(captor.capture());
+        verify(requirementMapper).updateById(captor.capture());
         assertThat(captor.getValue().getStatus()).isZero();
+    }
+
+    @Test
+    void includesLinkedTaskCompletionProgressPerRequirement() {
+        ProjectNodeDO node = requirementNode();
+        ProjectNodeRequirementDO requirement = new ProjectNodeRequirementDO();
+        requirement.setId(51L);
+        requirement.setProjectId(1L);
+        requirement.setNodeId(10L);
+        requirement.setCode("REQ-001");
+        requirement.setName("商品详情页");
+        requirement.setType("FUNCTIONAL");
+        requirement.setPriority(2);
+        requirement.setAcceptanceCriteria("页面可正常展示");
+        requirement.setStatus(0);
+        ProjectTaskRequirementDO firstLink = new ProjectTaskRequirementDO();
+        firstLink.setRequirementId(51L);
+        firstLink.setTaskId(71L);
+        firstLink.setProjectId(1L);
+        firstLink.setNodeId(10L);
+        ProjectTaskRequirementDO secondLink = new ProjectTaskRequirementDO();
+        secondLink.setRequirementId(51L);
+        secondLink.setTaskId(72L);
+        secondLink.setProjectId(1L);
+        secondLink.setNodeId(10L);
+        ProjectTaskDO completed = task(71L, 2);
+        ProjectTaskDO pending = task(72L, 0);
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        when(baselineMapper.selectOne(any())).thenReturn(baseline());
+        when(scopeItemMapper.selectList(any())).thenReturn(List.of());
+        when(requirementMapper.selectList(any())).thenReturn(List.of(requirement));
+        when(taskRequirementMapper.selectList(any())).thenReturn(List.of(firstLink, secondLink));
+        when(taskMapper.selectBatchIds(any())).thenReturn(List.of(completed, pending));
+
+        var result = service.get(1L, 10L);
+
+        assertThat(result.getRequirements()).singleElement().satisfies(item -> {
+            assertThat(item.getTaskCount()).isEqualTo(2);
+            assertThat(item.getCompletedTaskCount()).isEqualTo(1);
+            assertThat(item.getStatus()).isZero();
+        });
+    }
+
+    private ProjectTaskDO task(Long id, int status) {
+        ProjectTaskDO task = new ProjectTaskDO();
+        task.setId(id);
+        task.setProjectId(1L);
+        task.setNodeId(10L);
+        task.setStatus(status);
+        return task;
     }
 
     private ProjectDO project() {

@@ -34,7 +34,7 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 V1–V18 迁移脚本顺序校验并只执行缺失版本；其中 V8 增加任务附件、V9 增加站内通知、V10 增加通知节点标识、V11 增加组织历史/导入失败状态字段、V12 增加反馈工单及追加式处理历史、V13 增加项目图片访问边界、V14 增加审计上下文和结果字段、V15 增加通知提醒去重键和唯一索引、V16 增加项目等级字段（默认常规项目 C）、V17 增加需求澄清节点的范围基线和需求清单、V18 增加方案包、三类评审和方案决策。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
+3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 V1–V39 迁移脚本顺序校验并只执行缺失版本；V37 增加计划节点迭代计划及故事关联字段，V38/V39 更新计划节点文案；更早版本的变更说明沿用下方历史记录。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
 
    ```bash
    export OCEANBASE_USER=pms_migrator
@@ -111,7 +111,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 ## 8. 容器化与健康检查
 
 开源试用可从 `docker-compose.example.yml` 启动 OceanBase、后端和前端。示例仅适用于新建
-空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V18 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
+空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V39 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
 必须使用本手册的备份、预检和升级流程；检测到旧 Flyway 历史时，需先核对发布包并显式设置 `PMS_ACCEPT_FLYWAY_BASELINE=true`。
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
