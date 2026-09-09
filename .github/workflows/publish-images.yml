@@ -21,6 +21,10 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: publish-backend
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
