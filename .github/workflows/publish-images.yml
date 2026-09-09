@@ -85,14 +85,15 @@ jobs:
           provenance: true
           sbom: true
 
-      - name: Set package visibility to public
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify anonymous package access
         shell: bash
         run: |
           set -euo pipefail
-          for package_name in pms-backend pms-migrator; do
-            gh api --method PATCH "/user/packages/container/${package_name}" \
-              -f visibility=public >/dev/null
-            echo "${package_name} is public"
-          done
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          docker manifest inspect \
+            "ghcr.io/${{ steps.version.outputs.owner }}/pms-backend:${{ steps.version.outputs.version }}" \
+            >/dev/null
+          docker manifest inspect \
+            "ghcr.io/${{ steps.version.outputs.owner }}/pms-migrator:${{ steps.version.outputs.version }}" \
+            >/dev/null
+          echo "backend and migrator manifests are anonymously readable"
