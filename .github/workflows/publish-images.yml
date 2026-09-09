@@ -8,6 +8,11 @@ on:
         required: true
         type: string
         default: 1.0.0
+      verify_anonymous:
+        description: Verify anonymous GHCR access after a manual publish
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - 'v*.*.*'
@@ -109,6 +114,7 @@ jobs:
           sbom: true
 
       - name: Verify anonymous package access
+        if: github.event_name == 'push' || inputs.verify_anonymous
         shell: bash
         run: |
           set -euo pipefail
