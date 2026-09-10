@@ -30,6 +30,7 @@ public class ProjectDO {
     private Long projectManagerId;
 
     /** Primary organization responsible for the project. */
+    @TableField("org_unit_id")
     private Long orgUnitId;
 
     private LocalDate startDate;

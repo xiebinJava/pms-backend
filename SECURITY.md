@@ -8,7 +8,7 @@ The `main` branch and the latest `v1.x` release receive security fixes.
 
 Please do **not** open a public issue for security reports.
 
-Use GitHub's private vulnerability reporting on this repository, or email the maintainers listed in the latest release notes. Include:
+Use GitHub's private vulnerability reporting on this repository. Include:
 
 - affected version or commit
 - reproduction steps

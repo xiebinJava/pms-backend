@@ -138,9 +138,7 @@ public class OrgUnitService {
         long children = orgUnitMapper.selectCount(new LambdaQueryWrapper<OrgUnitDO>()
                 .eq(OrgUnitDO::getParentId, id).eq(OrgUnitDO::getStatus, "ACTIVE"));
         if (children > 0) throw BusinessException.error("请先处理下级组织");
-        long positions = userPositionMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.UserPositionDO>()
-                .eq(com.brad.pms.entity.UserPositionDO::getOrgUnitId, id)
-                .eq(com.brad.pms.entity.UserPositionDO::getStatus, "ACTIVE"));
+        long positions = userPositionMapper.countActiveByOrgUnitId(id);
         if (positions > 0) throw BusinessException.error("请先转移该组织下的在职人员");
         long projects = projectMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.ProjectDO>()
                 .eq(com.brad.pms.entity.ProjectDO::getOrgUnitId, id)
@@ -186,9 +184,7 @@ public class OrgUnitService {
         dto.setStatus(unit.getStatus());
         dto.setLeaderUserId(unit.getLeaderUserId());
         dto.setSort(unit.getSort());
-        Long memberCount = userPositionMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.UserPositionDO>()
-                .eq(com.brad.pms.entity.UserPositionDO::getOrgUnitId, unit.getId())
-                .eq(com.brad.pms.entity.UserPositionDO::getStatus, "ACTIVE"));
+        Long memberCount = (long) userPositionMapper.countActiveByOrgUnitId(unit.getId());
         dto.setMemberCount(memberCount == null ? 0 : Math.toIntExact(memberCount));
         if (unit.getLeaderUserId() != null) {
             UserDO leader = userMapper.selectById(unit.getLeaderUserId());

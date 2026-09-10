@@ -6,6 +6,7 @@
 
 ## Unreleased
 
+- Map `orgUnitId` to `org_unit_id` so H2/MySQL organization updates no longer query a missing `orgunitid` column.
 - Point first-time installers to the public `pms-distribution` repository and use the published GitHub clone URLs.
 - Release-closure snapshot (2026-09-01): `mvn -q test` 187 cases passed (0 failures, 0 errors, 1 skipped); live OceanBase readiness returned `migration=10`; V1–V10 backup/recovery and key-table row-count comparison passed.
 - Align readiness with the V10 migration baseline and make backup metadata sort migration versions numerically and record every table's exact row count.
