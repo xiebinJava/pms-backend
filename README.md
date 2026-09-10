@@ -2,12 +2,12 @@
 
 PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时数据库只支持 OceanBase 的 MySQL 兼容模式；H2 仅用于自动化测试，不用于开发或生产运行。
 
-如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](../pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
+如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](https://github.com/xiebinJava/pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
 
 ## 最终用户安装（推荐）
 
 ```bash
-git clone YOUR_DISTRIBUTION_REPO_URL pms-distribution
+git clone https://github.com/xiebinJava/pms-distribution.git
 cd pms-distribution
 ./scripts/bootstrap.sh
 ```
@@ -26,9 +26,8 @@ cd pms-distribution
 
 ```bash
 mkdir pms && cd pms
-# 将下面两个占位符替换成你实际使用的仓库地址
-git clone YOUR_BACKEND_REPO_URL pms-backend
-git clone YOUR_FRONTEND_REPO_URL pms-front
+git clone https://github.com/xiebinJava/pms-backend.git
+git clone https://github.com/xiebinJava/pms-front.git
 cd pms-backend
 ```
 
@@ -106,7 +105,7 @@ OceanBase brad_pms（MySQL 兼容模式，2881）
 - Excel/CSV 预览、校验、幂等提交、错误报告和事务回滚
 - 审计日志、请求追踪、健康检查和 Prometheus 指标
 
-前端页面和操作说明见兄弟仓库 [`pms-front`](../pms-front) 以及 [使用手册](../pms-front/docs/user-manual.md)。
+前端页面和操作说明见兄弟仓库 [`pms-front`](https://github.com/xiebinJava/pms-front) 以及 [使用手册](https://github.com/xiebinJava/pms-front/blob/main/docs/user-manual.md)。
 
 ## 数据库与账号
 
