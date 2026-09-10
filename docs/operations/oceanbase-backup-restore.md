@@ -5,7 +5,7 @@
 ## 账号与工具
 
 - `pms_app`：应用运行账号，只授予业务库的增删改查权限，不能建表或修改数据库结构。
-- `pms_migrator`：发布/升级账号，授予迁移需要的 DDL 权限；不授予 `DROP`，避免脚本误删业务对象。
+- `pms_migrator`：发布/升级账号，授予迁移需要的 DDL 权限，包括仅限业务库范围的 `DROP`；该账号只在初始化和升级任务中使用，不作为长期应用连接账号。迁移脚本仍禁止 `DROP DATABASE` 和 `TRUNCATE`。
 - `root@sys`：仅用于初始化账号、创建空的恢复库和 DBA 操作，不写入应用配置。
 - 脚本优先使用宿主机 `mysql`/`obclient`。没有客户端时，备份和恢复可使用固定版本的 `mysql:8.4` Docker 工具镜像；OceanBase 官方镜像自带的 `/u01/obclient/bin/mysqldump` 也可用于离线演练。
 

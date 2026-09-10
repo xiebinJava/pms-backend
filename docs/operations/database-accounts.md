@@ -7,10 +7,10 @@ PMS 采用单企业、单 OceanBase 租户部署，但不让应用使用 `root@s
 | 账号 | 使用场景 | 权限 |
 | --- | --- | --- |
 | `root@sys` | DBA 人工维护、首次账号初始化 | OceanBase 系统管理权限，不注入 backend |
-| `pms_migrator` | schema-init 和版本升级任务 | `brad_pms.*` 上的迁移 DDL 与必要 DML |
+| `pms_migrator` | schema-init 和版本升级任务 | `brad_pms.*` 上的迁移 DDL 与必要 DML（包含对象级 `DROP`） |
 | `pms_app` | backend 日常运行 | `brad_pms.*` 上的 `SELECT/INSERT/UPDATE/DELETE` |
 
-`pms_app` 没有建表、改表结构、建索引或删除表权限。`pms_migrator` 不应作为长期应用连接账号使用，迁移任务完成后应退出或停止。
+`pms_app` 没有建表、改表结构、建索引或删除表权限。`pms_migrator` 的 `DROP` 仅限 `brad_pms.*` 对象，不具备 `DROP DATABASE` 或 `TRUNCATE` 能力；它不应作为长期应用连接账号使用，迁移任务完成后应退出或停止。
 
 ## 首次初始化
 

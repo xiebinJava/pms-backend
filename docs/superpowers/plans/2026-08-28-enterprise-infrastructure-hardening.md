@@ -93,7 +93,7 @@
 
 - [x] **Step 2: 编写账号初始化脚本**
 
-  `oceanbase-accounts-init.sh` 只允许用 `root@sys` 首次执行，创建或更新两个账号：`pms_app` 对 `brad_pms.*` 授予 `SELECT, INSERT, UPDATE, DELETE`；`pms_migrator` 授予迁移需要的 DML 和 `CREATE, ALTER, INDEX, REFERENCES, CREATE VIEW, TRIGGER` 权限，不授予 `DROP`。脚本使用 `MYSQL_PWD` 传递密码，执行前拒绝空的生产密码，并且打印账号名和权限摘要但不打印密码。
+  `oceanbase-accounts-init.sh` 只允许用 `root@sys` 首次执行，创建或更新两个账号：`pms_app` 对 `brad_pms.*` 授予 `SELECT, INSERT, UPDATE, DELETE`；`pms_migrator` 授予迁移需要的 DML 和 `CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, TRIGGER` 权限，权限范围仅限业务库，且只在初始化和升级任务中使用。脚本使用 `MYSQL_PWD` 传递密码，执行前拒绝空的生产密码，并且打印账号名和权限摘要但不打印密码。
 
 - [x] **Step 3: 拆分 Compose 初始化职责**
 
@@ -101,7 +101,7 @@
 
 - [x] **Step 4: 编写权限冒烟脚本**
 
-  `check-oceanbase-privileges.sh` 使用应用账号验证 `SELECT/INSERT/UPDATE/DELETE` 可用、`CREATE TABLE` 被拒绝；使用迁移账号验证 `CREATE TABLE`、`ALTER TABLE` 可用。由于当前 OceanBase 不支持 MySQL 临时表，脚本使用带时间戳的探针表，并用 root 账号在退出时清理，不授予 `pms_migrator` 删除表权限。
+  `check-oceanbase-privileges.sh` 使用应用账号验证 `SELECT/INSERT/UPDATE/DELETE` 可用、`CREATE TABLE` 被拒绝；使用迁移账号验证 `CREATE TABLE`、`ALTER TABLE` 和受控的 `DROP TABLE` 可用。由于当前 OceanBase 不支持 MySQL 临时表，脚本使用带时间戳的探针表，并用 root 账号在退出时清理；迁移账号只拥有业务库对象级删除权限，不拥有 `DROP DATABASE` 或 `TRUNCATE` 能力。
 
 - [x] **Step 5: 运行并 Review**
 
