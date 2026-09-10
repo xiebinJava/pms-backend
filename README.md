@@ -48,10 +48,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 OceanBase、账号、V1–V36 数据库迁移、附件目录、后端和前端：
+首次启动会按以下顺序完成 OceanBase、账号、V1–V41 数据库迁移、附件目录、后端和前端：
 
 ```text
-OceanBase → accounts-init → schema-init（V1–V36）→ uploads-init → backend → frontend
+OceanBase → accounts-init → schema-init（V1–V41）→ uploads-init → backend → frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -132,7 +132,7 @@ export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
 ./scripts/enterprise-preflight.sh
 ```
 
-脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V36，V16 增加项目等级字段 `project.project_level`，V17 增加需求澄清节点的范围基线和需求清单，V18 增加方案设计、评审与决策节点工作台，V19 增加计划/资源/风险基线，V20 删除需求澄清节点中重复维护的 `objective`、`deliverable` 字段，V21 增加需求与任务的轻量关联及任务完成进度统计，V22 增加方案评审人字段和索引，V23 删除不再使用的方案版本、摘要、范围覆盖、上线前提和决策依据字段，V24 增加业务验收项、验收结论和缺陷关联摘要，V25 记录验收对应的需求基线版本并预留未来缺陷管理主键，V26 记录计划基线对应的方案决策版本，V27 增加开发测试与项目控制工作台，V28 增加故事负责人字段，V29 增加故事与任务的轻量关联，V30 增加发布决策与运营交接节点的发布信息、上线检查、人工决策和运营交接字段，V31 增加价值验证与项目复盘工作台，V32 对齐计划与开发专题的里程碑字段，V33 移除任务与里程碑的重复关联，V34 增加故事截止日期，V35 移除故事与任务的关联字段，V36 增加故事开始日期；详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V41，V16 增加项目等级字段 `project.project_level`，V17 增加需求澄清节点的范围基线和需求清单，V18 增加方案设计、评审与决策节点工作台，V19 增加计划/资源/风险基线，V20 删除需求澄清节点中重复维护的 `objective`、`deliverable` 字段，V21 增加需求与任务的轻量关联及任务完成进度统计，V22 增加方案评审人字段和索引，V23 删除不再使用的方案版本、摘要、范围覆盖、上线前提和决策依据字段，V24 增加业务验收项、验收结论和缺陷关联摘要，V25 记录验收对应的需求基线版本并预留未来缺陷管理主键，V26 记录计划基线对应的方案决策版本，V27 增加开发测试与项目控制工作台，V28 增加故事负责人字段，V29 增加故事与任务的轻量关联，V30 增加发布决策与运营交接节点的发布信息、上线检查、人工决策和运营交接字段，V31 增加价值验证与项目复盘工作台，V32 对齐计划与开发专题的里程碑字段，V33 移除任务与里程碑的重复关联，V34 增加故事截止日期，V35 移除故事与任务的关联字段，V36 增加故事开始日期；详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
 ## 本地直接启动后端（已有 OceanBase 时）
 
@@ -201,7 +201,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V36 OceanBase 迁移脚本
+├── db/migration/  V1–V41 OceanBase 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/

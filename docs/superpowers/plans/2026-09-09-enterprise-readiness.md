@@ -136,7 +136,7 @@
 - Modify project permission policy, data-scope queries, and frontend visibility controls.
 - Extend knowledge asset DTOs, APIs, UI, and migrations to support document links, versions, and search metadata.
 - Modify rate limiting, import/file processing, observability, backup, and release documentation.
-- Update `docs/operations/infrastructure-status.md` and `docs/operations/scaling-readiness.md` to match the V40 migration baseline.
+- Update `docs/operations/infrastructure-status.md` and `docs/operations/scaling-readiness.md` to match the V41 migration baseline.
 
 - [ ] Add failing permission tests for company-wide, organization-scoped, member-only, and private project visibility.
 - [ ] Implement optional project visibility without changing the current default behavior unexpectedly.
