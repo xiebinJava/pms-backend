@@ -1,11 +1,11 @@
-PMS is a single-tenant chart. It does not install OceanBase.
+PMS is a single-tenant chart. It does not install MySQL.
 
 1. Build and load your own images before install:
 
    docker build -t {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }} .
    docker build -t {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }} ../pms-front
 
-2. Point backend.env.oceanbaseHost at an existing MySQL-compatible OceanBase
+2. Point backend.env.mysqlHost at an existing MySQL 8 instance
    and inject secrets with --set-file or --set existingSecret=...
 
 3. The frontend image proxies /api to Service "{{ .Values.frontend.apiProxyHost }}".

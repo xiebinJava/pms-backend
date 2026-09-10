@@ -3,7 +3,7 @@
 [![CI](https://github.com/xiebinJava/pms-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/xiebinJava/pms-backend/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时数据库只支持 OceanBase 的 MySQL 兼容模式；H2 仅用于自动化测试，不用于开发或生产运行。
+PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时和测试都只使用 MySQL 8。
 
 如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](https://github.com/xiebinJava/pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
 
@@ -23,7 +23,7 @@ cd pms-distribution
 
 - Docker 20+ 和 Docker Compose v2
 - Git
-- 至少 4 GB 可用内存（OceanBase CE 启动需要一定时间和内存）
+- 至少 2 GB 可用内存（本地 MySQL 8 与后端）
 
 前后端需要放在同一个父目录，Compose 才能找到前端构建上下文：
 
@@ -37,17 +37,16 @@ cd pms-backend
 ### 2. 创建本地配置
 
 ```bash
-cp .env.oceanbase.example .env
+cp .env.mysql.example .env
 openssl rand -hex 32
 ```
 
-编辑 `.env`，至少替换下面 5 个占位值。`.env` 只在本机使用，永远不要提交：
+编辑 `.env`，至少替换下面这些占位值。`.env` 只在本机使用，永远不要提交：
 
 | 配置                           | 用途                             |
 | ------------------------------ | -------------------------------- |
-| `OCEANBASE_ROOT_PASSWORD`      | Compose 初始化 OceanBase 租户    |
-| `PMS_APP_PASSWORD`             | 后端运行账号（业务读写，无 DDL） |
-| `PMS_MIGRATOR_PASSWORD`        | 迁移账号（执行数据库升级）       |
+| `MYSQL_ROOT_PASSWORD`          | Compose 初始化 MySQL root        |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | 后端运行账号                     |
 | `PMS_JWT_SECRET`               | JWT 签名密钥，至少 32 字节随机值 |
 | `PMS_BOOTSTRAP_ADMIN_PASSWORD` | 首次创建管理员的密码，至少 12 位 |
 
@@ -60,10 +59,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 OceanBase、账号、V1–V41 数据库迁移、附件目录、后端和前端：
+首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V41）和前端：
 
 ```text
-OceanBase → accounts-init → schema-init（V1–V41）→ uploads-init → backend → frontend
+MySQL → uploads-init → backend（Flyway V1–V41）→ frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -96,7 +95,7 @@ pms-front（Vue 3 + Nginx/Vite）
   ↓ /api 代理
 pms-backend（Spring Boot，8080）
   ↓
-OceanBase brad_pms（MySQL 兼容模式，2881）
+MySQL 8 `pms`（3306）
 ```
 
 后端主要职责：
@@ -112,13 +111,12 @@ OceanBase brad_pms（MySQL 兼容模式，2881）
 
 ## 数据库与账号
 
-运行时只使用 OceanBase 数据库 `brad_pms`，数据库账号必须分离：
+运行时只使用 MySQL 8 数据库 `pms`。Compose 会创建 `MYSQL_USER` 应用账号；Flyway 在后端启动时执行迁移，不再使用独立的 migrator 镜像。
 
-| 账号               | 用途               | 是否允许 DDL |
-| ------------------ | ------------------ | ------------ |
-| `pms_app`          | 后端业务读写       | 否           |
-| `pms_migrator`     | 版本升级、结构校验 | 是           |
-| OceanBase 管理账号 | 仅初始化账号和租户 | 按企业策略   |
+| 账号                 | 用途                     |
+| -------------------- | ------------------------ |
+| `MYSQL_USER`（默认 `pms`） | 后端业务读写和 Flyway 迁移 |
+| MySQL `root`         | 仅初始化、备份和隔离恢复 |
 
 组织负责人和员工主归属是两套关系：
 
@@ -126,33 +124,31 @@ OceanBase brad_pms（MySQL 兼容模式，2881）
 - `sys_user_position.is_primary`：员工的主归属组织；
 - 同一员工还可以有多个兼职或项目归属。
 
-不要通过修改组织负责人来替代员工归属调整，也不要让应用账号执行迁移。
+不要通过修改组织负责人来替代员工归属调整。
 
-### 已有 OceanBase 的升级
+### 已有 MySQL 的升级
 
-已有企业数据库时，不要重新套用示例 Compose，也不要删除或重建业务库。使用迁移账号执行版本化脚本：
+已有企业数据库时，不要重新套用示例 Compose，也不要删除或重建业务库。先备份，再启动带新镜像/JAR 的后端，让 Flyway 补齐缺失版本：
 
 ```bash
 set -a
-source .env.oceanbase.local
+source .env.mysql.local
 set +a
-export OCEANBASE_USER="$PMS_MIGRATOR_USERNAME"
-export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
-
-./scripts/oceanbase-upgrade.sh
-./scripts/verify-enterprise-migration.sh
+./scripts/backup-mysql.sh
 ./scripts/enterprise-preflight.sh
+# 启动新版本后端后：
+./scripts/verify-enterprise-migration.sh
 ```
 
-脚本具备版本 checksum、命名锁和重复执行保护。第二次执行应看到 `No pending migrations`。当前基线为 V1–V41，V16 增加项目等级字段 `project.project_level`，V17 增加需求澄清节点的范围基线和需求清单，V18 增加方案设计、评审与决策节点工作台，V19 增加计划/资源/风险基线，V20 删除需求澄清节点中重复维护的 `objective`、`deliverable` 字段，V21 增加需求与任务的轻量关联及任务完成进度统计，V22 增加方案评审人字段和索引，V23 删除不再使用的方案版本、摘要、范围覆盖、上线前提和决策依据字段，V24 增加业务验收项、验收结论和缺陷关联摘要，V25 记录验收对应的需求基线版本并预留未来缺陷管理主键，V26 记录计划基线对应的方案决策版本，V27 增加开发测试与项目控制工作台，V28 增加故事负责人字段，V29 增加故事与任务的轻量关联，V30 增加发布决策与运营交接节点的发布信息、上线检查、人工决策和运营交接字段，V31 增加价值验证与项目复盘工作台，V32 对齐计划与开发专题的里程碑字段，V33 移除任务与里程碑的重复关联，V34 增加故事截止日期，V35 移除故事与任务的关联字段，V36 增加故事开始日期；详细步骤见 [OceanBase 升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+当前基线为 V1–V41。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
-## 本地直接启动后端（已有 OceanBase 时）
+## 本地直接启动后端（已有 MySQL 时）
 
-不使用 Compose、只启动本地 JAR 时：
+不使用完整 Compose、只启动本地 JAR 时：
 
 ```bash
 mvn -q -DskipTests package
-PMS_ENV_FILE=.env.oceanbase.local ./scripts/start-local-oceanbase.sh
+PMS_ENV_FILE=.env.mysql.local ./scripts/start-local-mysql.sh
 ```
 
 后端 API：`http://127.0.0.1:8080/api`；管理和就绪端口默认只监听 `127.0.0.1:8081`。
@@ -160,14 +156,20 @@ PMS_ENV_FILE=.env.oceanbase.local ./scripts/start-local-oceanbase.sh
 停止本地后端：
 
 ```bash
-./scripts/stop-local-oceanbase.sh
+./scripts/stop-local-mysql.sh
 ```
 
-本地文件 `.env.oceanbase.local` 不会被 Git 跟踪。启动前必须提供非空的 `PMS_JWT_SECRET`；生产环境还必须关闭 token 回显并启用 HTTPS、受限 CORS 和 SMTP 校验。
+本地文件 `.env.mysql.local` 不会被 Git 跟踪。启动前必须提供非空的 `PMS_JWT_SECRET`；生产环境还必须关闭 token 回显并启用 HTTPS、受限 CORS 和 SMTP 校验。
 
 ## 开发与验证
 
-后端不需要先启动数据库即可运行大部分自动化测试：
+自动化测试使用 Testcontainers MySQL 8，本机需要可用的 Docker。Colima 用户请先导出：
+
+```bash
+export DOCKER_HOST=unix://$HOME/.colima/<profile>/docker.sock
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+export TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1
+```
 
 ```bash
 mvn -q test
@@ -176,19 +178,15 @@ bash -n scripts/*.sh docker/*.sh
 ./scripts/check-privacy.sh
 ```
 
-测试会使用测试配置中的嵌入式数据库；这不代表运行时支持 H2。真实数据库验收使用：
+真实数据库验收使用：
 
 ```bash
 set -a
-source .env.oceanbase.local
+source .env.mysql.local
 set +a
-export OCEANBASE_USER="$PMS_MIGRATOR_USERNAME"
-export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
-export PMS_DB_USER="$PMS_MIGRATOR_USERNAME"
-export PMS_DB_PASSWORD="$PMS_MIGRATOR_PASSWORD"
-PMS_OCEANBASE_VERIFY=true ./scripts/verify-oceanbase.sh
+./scripts/verify-enterprise-migration.sh
 
-PMS_SMOKE_USERNAME=admin PMS_SMOKE_PASSWORD='<本地测试密码>' \
+PMS_SMOKE_USERNAME=alex.zhang@example.com PMS_SMOKE_PASSWORD='<本地测试密码>' \
   ./scripts/smoke-test.sh
 ```
 
@@ -213,7 +211,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V41 OceanBase 迁移脚本
+├── db/migration/  V1–V41 MySQL / Flyway 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/
@@ -248,7 +246,7 @@ docs/
 
 本 README 只解决本地快速启动；生产上线前请逐项完成 [发布验收清单](docs/operations/release-checklist.md)：
 
-- 使用企业自己的 OceanBase、`pms_app` 和 `pms_migrator` 凭据；
+- 使用企业自己的 MySQL 8 和 `MYSQL_USER` 凭据，不要用 root 跑应用；
 - `PMS_JWT_SECRET` 使用密钥管理器注入，至少 32 字节且不出现在日志；
 - `PMS_DEPLOYMENT_ENV=production`，关闭密码重置/邀请 token 回显；
 - 使用 HTTPS 反向代理，`PMS_CORS_ALLOWED_ORIGINS` 只允许正式前端来源；
@@ -258,8 +256,8 @@ docs/
 更多内容：
 
 - [业务规范](docs/business-specification.md)
-- [OceanBase 升级与预检](docs/operations/enterprise-upgrade-runbook.md)
-- [备份与恢复](docs/operations/oceanbase-backup-restore.md)
+- [升级与预检](docs/operations/enterprise-upgrade-runbook.md)
+- [备份与恢复](docs/operations/mysql-backup-restore.md)
 - [扩展与观测](docs/operations/scaling-readiness.md)
 - [基础设施状态](docs/operations/infrastructure-status.md)
 - [贡献指南](CONTRIBUTING.md)

@@ -6,9 +6,8 @@ PMS is a single-tenant, self-hosted project management system. Backend and front
 
 - Java 17 and Maven for `pms-backend`
 - Node.js 22 and pnpm 9.15.9 for `pms-front`
-- Contributor local runtime: MySQL 8 via `docker-compose.mysql.yml` and `./scripts/start-local-mysql.sh`
-- Enterprise / drill runtime: OceanBase (MySQL compatible), database `brad_pms`
-- H2 is test-only
+- Local and production runtime: MySQL 8 via `docker-compose.example.yml` or `./scripts/start-local-mysql.sh`
+- Automated tests use Testcontainers MySQL 8. H2 is not supported. Colima users should export `DOCKER_HOST=unix://$HOME/.colima/<profile>/docker.sock`, `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`, and `TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1` before `mvn test`.
 
 ## Checks before you open a pull request
 

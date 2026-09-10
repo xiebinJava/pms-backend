@@ -143,6 +143,6 @@
 
 1. Run `mvn -q test` and `mvn -q -DskipTests package` in `/Users/fs/Desktop/Project/pms-backend`.
 2. Run `pnpm test`, `pnpm typecheck`, and `pnpm build` in `/Users/fs/Desktop/Project/pms-front`.
-3. Apply V37 to the local OceanBase database with the existing migrator credentials, then restart the backend and verify `/actuator/health/readiness` returns HTTP 200.
+3. Apply V37 to the local MySQL database with the existing migrator credentials, then restart the backend and verify `/actuator/health/readiness` returns HTTP 200.
 4. Use the current browser route to verify: plan node shows an editable 迭代计划 section when unlocked; confirmed plan is read-only; development story modal has an iteration-plan selector and no milestone selector; tasks remain independent.
 5. Capture any remaining layout or API errors, fix them, then rerun the relevant focused tests and the final verification suite.

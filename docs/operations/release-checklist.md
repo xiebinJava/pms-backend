@@ -4,33 +4,33 @@
 
 ## 2026-09-04 发布准备当前状态
 
-> 说明：本节保留 2026-09-04 的历史验收快照，其中 V20/V21 等版本号不代表当前发布基线。当前迁移基线为 V41，当前发布请以 README、企业升级手册和发布一致性检查为准。
+> 说明：本节保留 2026-09-04 的历史验收快照，其中 V20/V21 等不代表当前发布基线。当前运行时为 MySQL 8，迁移基线为 V41；当前发布请以 README、企业升级手册和发布一致性检查为准。
 
 - [x] 生产配置静态门禁已加入：`bash scripts/validate-production-config.test.sh` 通过；不会打印密钥。
-- [x] 本机目标 OceanBase 已执行并复核 V20；V20 删除需求澄清基线中重复的目标/交付列，V19 的计划/资源/风险基线、V18 的方案设计评审决策结构、V17 的需求澄清范围基线、V16 的项目等级字段和 V15 的通知提醒去重结构保持不变。
+- [x] 本机目标 MySQL 已执行并复核 V20；V20 删除需求澄清基线中重复的目标/交付列，V19 的计划/资源/风险基线、V18 的方案设计评审决策结构、V17 的需求澄清范围基线、V16 的项目等级字段和 V15 的通知提醒去重结构保持不变。
 - [x] 当前代码回归：后端 `mvn -q test`（277 个用例，0 失败、0 错误、1 跳过）、前端 `npm test`（178 项，0 失败）、类型检查和构建通过。
-- [x] 本机最新后端 JAR 已在 V21 迁移后使用 OceanBase profile 重启并复核 readiness；返回 `database=UP`、`migration=21`。
+- [x] 本机最新后端 JAR 已在 V21 迁移后使用 mysql profile 重启并复核 readiness；返回 `database=UP`、`migration=21`。
 - [x] OpenAPI、生产配置门禁、脚本语法和当前发布一致性检查通过；前后端代码与文档已推送至远程 `main`/`release`。
-- [ ] 目标企业仍需注入真实 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储和监控，并记录 RPO/RTO 与故障联系人。
+- [ ] 目标企业仍需注入真实 JWT、MySQL/SMTP 凭据、HTTPS、受限 CORS、对象存储和监控，并记录 RPO/RTO 与故障联系人。
 - [ ] 本机 V21 备份生成、SHA-256/元数据校验和隔离空库恢复待补；历史 V12 备份演练不能替代当前 V21 备份演练。
 - [x] 后端独立 CI `33705799078` 已通过单元测试、OpenAPI、配置/隐私门禁、Netty 依赖修复后的镜像 HIGH/CRITICAL 扫描和 SPDX SBOM。
-- [x] 跨仓库 GitHub Actions 已确认 `PMS_FRONT_REPO_READ_TOKEN` 可读 sibling `pms-front`；最终远程运行 `33705799079` 的 OceanBase、API、桌面/移动端 Playwright 全通过，使用后端提交 `9adbbff` 与前端提交 `05f241f`。
+- [x] 跨仓库 GitHub Actions 已确认 `PMS_FRONT_REPO_READ_TOKEN` 可读 sibling `pms-front`；最终远程运行 `33705799079` 的 MySQL、API、桌面/移动端 Playwright 全通过，使用后端提交 `9adbbff` 与前端提交 `05f241f`。
 - [x] 前端独立 CI `33704208291` 已通过隐私扫描、121 项测试、类型检查、构建、镜像高危扫描和 SPDX SBOM。
 - [x] 已在两个仓库当前发布基线上创建并推送 `v1.0.4` 标签；`v1.0.3` 及更早历史标签保持不变。
 - [ ] 目标企业仍需使用真实测试账号和自己的配置重新执行桌面/移动端 Playwright，并由企业验收人签字。
 
 ## 2026-09-01 本机目标实例执行快照
 
-以下是本次本机 OceanBase `brad_pms` 演练的实际结果，不替代目标企业生产签字：
+以下是本次本机 MySQL `pms` 演练的实际结果，不替代目标企业生产签字：
 
 - [x] 后端 `mvn -q test`：187 个用例通过，0 失败、0 错误、1 跳过。
 - [x] 前端 `pnpm test`：112 项通过；`pnpm typecheck`、`pnpm build` 通过。
-- [x] OceanBase V1–V10 两次幂等升级、企业迁移校验和完整性预检通过。
+- [x] MySQL V1–V10 两次幂等升级、企业迁移校验和完整性预检通过。
 - [x] v10 逻辑备份、压缩流、SHA-256 和全表精确行数元数据通过；恢复到隔离空库并完成 5 张关键表行数比对。
 - [x] 后端 liveness/readiness 均返回 200；readiness `database=UP`、`migration=10`。
 - [x] 本地邮箱登录、Playwright 桌面主流程、390px 窄屏和使用手册录制通过。
-- [x] 跨仓库 CI：后端运行 `33596876132` 已通过 OceanBase、迁移幂等、API 冒烟、浏览器代理和桌面/移动端 Playwright。
-- [ ] 生产环境注入强 JWT、OceanBase/SMTP 凭据、HTTPS、受限 CORS、对象存储、监控告警，并记录 RPO/RTO 和故障联系人。
+- [x] 跨仓库 CI：后端运行 `33596876132` 已通过 MySQL、迁移幂等、API 冒烟、浏览器代理和桌面/移动端 Playwright。
+- [ ] 生产环境注入强 JWT、MySQL/SMTP 凭据、HTTPS、受限 CORS、对象存储、监控告警，并记录 RPO/RTO 和故障联系人。
 
 详细命令、校验值和行数证据见 [`drill-records/2026-09-01-release-acceptance.md`](drill-records/2026-09-01-release-acceptance.md)。
 
@@ -39,25 +39,25 @@
 - [ ] 后端使用 Java 17，执行 `mvn -q test` 全部通过。
 - [ ] 前端执行 `pnpm typecheck` 和 `pnpm build` 全部通过。
 - [ ] CI 的后端测试、前端检查和密钥扫描均通过。
-- [ ] CI 的 OceanBase 集成冒烟、Playwright 桌面/窄屏测试、Trivy 高危扫描和 SPDX SBOM 均通过。
+- [ ] CI 的 MySQL 集成冒烟、Playwright 桌面/窄屏测试、Trivy 高危扫描和 SPDX SBOM 均通过。
 - [ ] OpenAPI 合同通过 `./scripts/validate-openapi.sh` 校验。
 - [ ] 发布版本、数据库迁移脚本和回滚说明已标记并归档。
 
-## OceanBase 与迁移
+## MySQL 与迁移
 
-- [ ] 已确认目标 OceanBase MySQL 兼容模式、字符集 `utf8mb4` 和时区。
+- [ ] 已确认目标 MySQL 8、字符集 `utf8mb4` 和时区。
 - [ ] 已完成数据库备份与恢复演练，并保存校验值。
 - [ ] 备份文件包含 schema 版本、`.sha256` 校验文件和元数据，恢复仅使用显式空目标库。
 - [ ] 执行 `scripts/enterprise-preflight.sh` 通过。
-- [ ] 按 V1–V23 顺序执行迁移，确认 V5 的 `deleted`、`version`、关键唯一索引和外键、V6 的审计保留索引、V7 的 `email_normalized` 唯一索引、V8 的任务附件、V9 的站内通知、V10 的通知节点标识、V11 的组织历史/导入失败字段、V12 的反馈工单/历史表、V13 的项目图片访问边界、V14 的审计上下文/结果字段和查询索引、V15 的通知去重键和唯一索引、V16 的 `project.project_level` 字段、V17 的需求澄清范围基线表、V18 的方案包/评审/决策表、V19 的计划/资源/风险基线、V20 的目标/交付列删除、V21 的需求-任务关联表、V22 的方案评审人字段和索引以及 V23 的已删除方案字段清理已落库。
+- [ ] 由后端 Flyway 按 V1–V41 顺序执行迁移；空库首次启动即可完成，不要改已发布的迁移文件 checksum。
 - [x] 执行迁移后 `scripts/verify-enterprise-migration.sh` 和 `scripts/enterprise-preflight.sh` 通过。
-- [ ] 生产应用只使用 `oceanbase` profile；H2 仅存在于测试配置。
+- [ ] 生产应用只使用 `mysql` profile。
 - [ ] 迁移失败时不直接删除业务表，按升级手册恢复到新数据库。
 
 ## 安全配置
 
 - [ ] `PMS_JWT_SECRET` 为随机值且至少 32 字节，不在日志、镜像或仓库中出现。
-- [ ] `OCEANBASE_USER` 使用最小必要权限，密码通过密钥管理或运行环境注入。
+- [ ] `MYSQL_USER` 使用最小必要权限，密码通过密钥管理或运行环境注入；不要使用 `root`。
 - [ ] `PMS_CORS_ALLOWED_ORIGINS` 只填写正式前端来源，不使用 `*`。
 - [ ] 关闭 `PMS_PASSWORD_RESET_EXPOSE_TOKEN` 和 `PMS_INVITATION_EXPOSE_TOKEN`，并验证通知适配器。
 - [ ] `PMS_DEPLOYMENT_ENV=production`，通知启动校验开启；HTTPS 反代来自可信代理网段。

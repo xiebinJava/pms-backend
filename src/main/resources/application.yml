@@ -8,8 +8,8 @@ spring:
   application:
     name: pms-backend
   profiles:
-    # All local and enterprise runtime runs use OceanBase.
-    default: oceanbase
+    # Runtime and production use MySQL 8. Tests use the `test` profile.
+    default: mysql
   servlet:
     multipart:
       max-file-size: 5MB

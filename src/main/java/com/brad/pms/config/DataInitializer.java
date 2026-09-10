@@ -182,7 +182,6 @@ public class DataInitializer implements CommandLineRunner {
     private boolean isPersistentProfile() {
         return java.util.Arrays.stream(environment.getActiveProfiles())
                 .anyMatch(profile -> "mysql".equalsIgnoreCase(profile)
-                        || "oceanbase".equalsIgnoreCase(profile)
                         || "prod".equalsIgnoreCase(profile)
                         || "production".equalsIgnoreCase(profile));
     }

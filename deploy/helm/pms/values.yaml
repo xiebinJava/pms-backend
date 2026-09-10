@@ -1,5 +1,5 @@
-# Chart ships backend + frontend only. Bring your own OceanBase
-# (MySQL-compatible) and point backend.env.oceanbaseHost at it.
+# Chart ships backend + frontend only. Bring your own MySQL 8
+# and point backend.env.mysqlHost at it.
 nameOverride: ""
 fullnameOverride: ""
 
@@ -27,11 +27,11 @@ backend:
       cpu: "1"
       memory: 1Gi
   env:
-    springProfilesActive: oceanbase
-    oceanbaseHost: oceanbase.example.com
-    oceanbasePort: "2881"
-    oceanbaseDatabase: brad_pms
-    oceanbaseUser: pms_app
+    springProfilesActive: mysql
+    mysqlHost: mysql.example.com
+    mysqlPort: "3306"
+    mysqlDatabase: pms
+    mysqlUser: pms
     corsAllowedOrigins: https://pms.example.com
     publicBaseUrl: https://pms.example.com
     deploymentEnv: production
@@ -90,12 +90,12 @@ persistence:
   accessMode: ReadWriteOnce
 
 # Production should set existingSecret and leave these placeholders unused.
-# Required keys: jwtSecret, oceanbasePassword, bootstrapAdminEmail,
+# Required keys: jwtSecret, mysqlPassword, bootstrapAdminEmail,
 # bootstrapAdminPassword, bootstrapAdminNameZh
 existingSecret: ""
 secret:
   jwtSecret: replace_with_a_random_secret_at_least_32_bytes
-  oceanbasePassword: replace_with_pms_app_password
+  mysqlPassword: replace_with_pms_app_password
   bootstrapAdminEmail: alex.zhang@example.com
   bootstrapAdminPassword: replace_with_bootstrap_password_12_chars
   bootstrapAdminNameZh: 张伟

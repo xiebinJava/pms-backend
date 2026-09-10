@@ -6,49 +6,44 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 usage() {
   cat <<'USAGE'
-Usage: backup-oceanbase.sh
+Usage: backup-mysql.sh
 
 Create a compressed logical backup, SHA-256 checksum and metadata for the
-configured OceanBase/MySQL database. Set PMS_BACKUP_DIR to change the output.
+configured MySQL database. Set PMS_BACKUP_DIR to change the output.
 USAGE
 }
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then usage; exit 0; fi
 if [[ $# -ne 0 ]]; then usage >&2; exit 2; fi
 
-DB_HOST="${OCEANBASE_HOST:-127.0.0.1}"
-DB_PORT="${OCEANBASE_PORT:-2881}"
-DB_NAME="${OCEANBASE_DATABASE:-brad_pms}"
-DB_USER="${OCEANBASE_BACKUP_USER:-${OCEANBASE_USER:-pms_migrator@test}}"
-if [[ -z "${OCEANBASE_PASSWORD:-}" ]]; then
-  OCEANBASE_PASSWORD="${PMS_MIGRATOR_PASSWORD:-${PMS_APP_PASSWORD:-}}"
-fi
-if [[ -z "$OCEANBASE_PASSWORD" ]]; then
-  echo "OCEANBASE_PASSWORD or PMS_MIGRATOR_PASSWORD is required" >&2
+DB_HOST="${MYSQL_HOST:-127.0.0.1}"
+DB_PORT="${MYSQL_PORT:-3306}"
+DB_NAME="${MYSQL_DB:-pms}"
+DB_USER="${MYSQL_BACKUP_USER:-${MYSQL_USER:-pms}}"
+if [[ -z "${MYSQL_PASSWORD:-}" ]]; then
+  echo "MYSQL_PASSWORD is required" >&2
   exit 2
 fi
 case "$DB_NAME" in
-  (*[!A-Za-z0-9_.-]*) echo "OCEANBASE_DATABASE contains unsupported characters" >&2; exit 2;;
+  (*[!A-Za-z0-9_.-]*) echo "MYSQL_DB contains unsupported characters" >&2; exit 2;;
 esac
 
 if command -v mysql >/dev/null 2>&1; then
   SQL_CLIENT=mysql
-elif command -v obclient >/dev/null 2>&1; then
-  SQL_CLIENT=obclient
 elif command -v docker >/dev/null 2>&1; then
   SQL_CLIENT=container
 else
-  echo "mysql/obclient client or Docker is required" >&2
+  echo "mysql client or Docker is required" >&2
   exit 2
 fi
 mysql_base=(--protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names)
 container_mysql() {
-  MYSQL_PWD="$OCEANBASE_PASSWORD" docker run --rm --network host -e MYSQL_PWD mysql:8.4 mysql "${mysql_base[@]}" "$@"
+  MYSQL_PWD="$MYSQL_PASSWORD" docker run --rm --network host -e MYSQL_PWD mysql:8.4 mysql "${mysql_base[@]}" "$@"
 }
 sql() {
   if [[ "$SQL_CLIENT" == "container" ]]; then
     container_mysql --execute "$1" < /dev/null
   else
-    MYSQL_PWD="$OCEANBASE_PASSWORD" "$SQL_CLIENT" "${mysql_base[@]}" --execute "$1" < /dev/null
+    MYSQL_PWD="$MYSQL_PASSWORD" "$SQL_CLIENT" "${mysql_base[@]}" --execute "$1" < /dev/null
   fi
 }
 
@@ -86,13 +81,13 @@ dump_options=(--single-transaction --skip-lock-tables --skip-add-locks --skip-ad
 if [[ "$dump_mode" == "host" ]]; then
   dump_cmd=(mysqldump --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" "${dump_options[@]}" "$DB_NAME")
   if [[ "$archive" == *.zst ]]; then
-    MYSQL_PWD="$OCEANBASE_PASSWORD" "${dump_cmd[@]}" | "${compressor[@]}"
+    MYSQL_PWD="$MYSQL_PASSWORD" "${dump_cmd[@]}" | "${compressor[@]}"
   else
-    MYSQL_PWD="$OCEANBASE_PASSWORD" "${dump_cmd[@]}" | "${compressor[@]}" > "$archive"
+    MYSQL_PWD="$MYSQL_PASSWORD" "${dump_cmd[@]}" | "${compressor[@]}" > "$archive"
   fi
 else
   container_dump() {
-    MYSQL_PWD="$OCEANBASE_PASSWORD" docker run --rm --network host -e MYSQL_PWD mysql:8.4 \
+    MYSQL_PWD="$MYSQL_PASSWORD" docker run --rm --network host -e MYSQL_PWD mysql:8.4 \
       mysqldump --protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" \
       "${dump_options[@]}" "$DB_NAME"
   }
@@ -115,7 +110,7 @@ fi
   printf 'created_at_utc=%s\n' "$timestamp"
   printf 'backup_file=%s\n' "$(basename "$archive")"
   printf 'row_counts:\n'
-  # information_schema table statistics are estimates for OceanBase/MySQL and
+  # information_schema table statistics are estimates for MySQL and
   # are not suitable as restore evidence. Query exact counts for every table
   # while keeping identifiers constrained to metadata results.
   while IFS= read -r table_name; do
@@ -131,6 +126,6 @@ fi
   done < <(sql "SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_name;")
 } > "$metadata_file"
 trap - ERR INT TERM
-echo "OceanBase backup created: $archive"
+echo "MySQL backup created: $archive"
 echo "Checksum: $checksum_file"
 echo "Metadata: $metadata_file"

@@ -4,15 +4,15 @@
 
 **Goal:** 在现有单企业 PMS 基础上补齐可重复部署、安全运营、组织权限、批量导入、项目一致性、可观测性与发布验收，使项目具备企业内网长期运行和开源交付能力。
 
-**Architecture:** 保持单企业私有化部署和 OceanBase MySQL 兼容模式，后端继续以认证、权限点、组织数据范围和业务规则分层裁决访问；前端沿用现有 PMS 设计系统，仅补齐状态、交互和错误反馈。所有跨模块写操作通过事务服务完成，并记录可检索的操作审计。
+**Architecture:** 保持单企业私有化部署和 MySQL 8，后端继续以认证、权限点、组织数据范围和业务规则分层裁决访问；前端沿用现有 PMS 设计系统，仅补齐状态、交互和错误反馈。所有跨模块写操作通过事务服务完成，并记录可检索的操作审计。
 
-**Tech Stack:** Java 17、Spring Boot 2.7、MyBatis-Plus、OceanBase、JJWT、BCrypt、Vue 3、TypeScript、Ant Design Vue、pnpm、JUnit 5、Node test runner。
+**Tech Stack:** Java 17、Spring Boot 2.7、MyBatis-Plus、MySQL、JJWT、BCrypt、Vue 3、TypeScript、Ant Design Vue、pnpm、JUnit 5、Node test runner。
 
 **Spec:** `docs/superpowers/specs/2026-08-27-enterprise-organization-access-design.md`、`docs/superpowers/specs/2026-08-27-enterprise-foundation-security-design.md`
 
 ## Global Constraints
 
-- 单企业私有化部署；运行时数据库只允许 OceanBase，H2 仅用于测试。
+- 单企业私有化部署；运行时数据库只允许 MySQL，测试使用 Testcontainers MySQL。
 - 英文登录名使用 `Locale.ROOT` 小写归一化；用户展示固定为 `中文名（English.Name）`。
 - 每名在职员工只能有一条主归属；组织负责人和员工归属是两套独立关系。
 - 组织和人员只做停用/离职，不做物理删除；项目与审计历史必须可追溯。
@@ -23,25 +23,25 @@
 
 ---
 
-### Task 1: 可重复的 OceanBase 启动与生产配置
+### Task 1: 可重复的 MySQL 启动与生产配置
 
 **Files:**
 - Modify: `src/main/resources/application.yml`
-- Modify: `src/main/resources/application-oceanbase.yml`
-- Create: `scripts/start-local-oceanbase.sh`
-- Create: `scripts/stop-local-oceanbase.sh`
-- Create: `.env.oceanbase.example`
+- Modify: `src/main/resources/application-mysql.yml`
+- Create: `scripts/start-local-mysql.sh`
+- Create: `scripts/stop-local-mysql.sh`
+- Create: `.env.mysql.example`
 - Modify: `docs/operations/enterprise-upgrade-runbook.md`
-- Test: `src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java`
+- Test: `src/test/java/com/brad/pms/config/MysqlRuntimeConfigurationTest.java`
 
-**Deliverable:** 启动脚本从环境变量读取 OceanBase 连接和固定 `PMS_JWT_SECRET`，不再每次重启随机生成密钥；脚本能检查 2881、数据库连接、JWT 长度和 8080 占用，并输出可操作的失败原因。停止脚本只终止由脚本记录的后端 PID。
+**Deliverable:** 启动脚本从环境变量读取 MySQL 连接和固定 `PMS_JWT_SECRET`，不再每次重启随机生成密钥；脚本能检查 2881、数据库连接、JWT 长度和 8080 占用，并输出可操作的失败原因。停止脚本只终止由脚本记录的后端 PID。
 
-- [ ] **Step 1:** 为缺少 JWT、JWT 少于 32 字节、缺少 OceanBase 账号和端口不可达分别补充配置测试。
-- [ ] **Step 2:** 实现 `start-local-oceanbase.sh`、`stop-local-oceanbase.sh`，密码和 JWT 只通过进程环境传递，不写日志。
-- [ ] **Step 3:** 运行 `mvn -q -Dtest=OceanbaseConfigurationTest test` 和两个脚本的 shellcheck/冒烟检查。
-- [ ] **Step 4:** review 启动失败、重复启动、旧 PID 不存在和 8080 被占用四种路径后提交 `chore: make OceanBase startup repeatable`。
+- [ ] **Step 1:** 为缺少 JWT、JWT 少于 32 字节、缺少 MySQL 账号和端口不可达分别补充配置测试。
+- [ ] **Step 2:** 实现 `start-local-mysql.sh`、`stop-local-mysql.sh`，密码和 JWT 只通过进程环境传递，不写日志。
+- [ ] **Step 3:** 运行 `mvn -q -Dtest=MysqlRuntimeConfigurationTest test` 和两个脚本的 shellcheck/冒烟检查。
+- [ ] **Step 4:** review 启动失败、重复启动、旧 PID 不存在和 8080 被占用四种路径后提交 `chore: make MySQL startup repeatable`。
 
-**验收：** 重启后旧 JWT 仍可验证；后端日志明确显示 `oceanbase` profile；H2 不会被加载。
+**验收：** 重启后旧 JWT 仍可验证；后端日志明确显示 `mysql` profile；内存数据库不会被加载。
 
 ### Task 2: 完整的账号、会话和安全运营闭环
 
@@ -192,15 +192,15 @@
 - Test: `src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java`
 - Test: `/Users/fs/Desktop/Project/pms-front/src/router/admin-guard.test.mjs`
 
-**Deliverable:** 新用户可以按 README 在本地启动 OceanBase、后端和前端；CI 自动运行后端测试、前端类型检查和构建；发布清单覆盖迁移、回滚、备份、默认账号、JWT、CORS 和浏览器冒烟。
+**Deliverable:** 新用户可以按 README 在本地启动 MySQL、后端和前端；CI 自动运行后端测试、前端类型检查和构建；发布清单覆盖迁移、回滚、备份、默认账号、JWT、CORS 和浏览器冒烟。
 
 - [ ] **Step 1:** 编写不含真实密码的 Compose 示例和环境变量说明，默认不自动导入演示数据。
-- [ ] **Step 2:** 添加 CI：`mvn -q test`、`pnpm typecheck`、`pnpm build`，并检查仓库不存在密钥、H2 运行配置和大文件。
-- [ ] **Step 3:** 执行 `scripts/enterprise-preflight.sh`、`scripts/verify-enterprise-migration.sh` 和 OceanBase 冒烟登录。
+- [ ] **Step 2:** 添加 CI：`mvn -q test`、`pnpm typecheck`、`pnpm build`，并检查仓库不存在密钥、内存数据库运行配置和大文件。
+- [ ] **Step 3:** 执行 `scripts/enterprise-preflight.sh`、`scripts/verify-enterprise-migration.sh` 和 MySQL 冒烟登录。
 - [ ] **Step 4:** 使用浏览器验证登录、人员、组织、角色、导入、项目列表、项目详情和注销流程；记录每个失败项并修复后重跑。
 - [ ] **Step 5:** 最终 review 数据库、权限、日志、文案和响应式布局，提交 `chore: prepare enterprise open-source release`。
 
-**验收：** 全部测试通过，部署文档可从零执行，且没有未说明的默认密码、随机生产密钥或 H2 运行入口。
+**验收：** 全部测试通过，部署文档可从零执行，且没有未说明的默认密码、随机生产密钥或 内存数据库运行入口。
 
 ## 执行顺序
 
@@ -213,10 +213,10 @@
 | 阶段 | 状态 | Review 证据 |
 | --- | --- | --- |
 | 第 0 期：当前页面修复 | 已完成 | 前端搜索框、状态下拉框、查询按钮统一 36px/6px；桌面与 390px 窄屏无页面横向溢出；Node 单测 77/77、`pnpm typecheck`、`pnpm build` 通过。 |
-| 第 1 期：企业级基础加固 | 已完成 | 认证、RBAC、审计、健康检查和 OceanBase 配置由既有提交覆盖；新增 V5 迁移、MyBatis-Plus 逻辑删除/乐观锁、唯一索引、外键及 SQL 过滤；后端全量 71 项测试通过。 |
+| 第 1 期：企业级基础加固 | 已完成 | 认证、RBAC、审计、健康检查和 MySQL 配置由既有提交覆盖；新增 V5 迁移、MyBatis-Plus 逻辑删除/乐观锁、唯一索引、外键及 SQL 过滤；后端全量 71 项测试通过。 |
 | 第 2 期：组织与导入可靠性 | 已完成 | 主归属与组织负责人保持独立；导入预览、校验、幂等、事务回滚、错误审计和组织变更历史由既有服务测试覆盖；组织/人员相关测试通过。 |
 | 第 3 期：研发管理扩展 | 已完成 | 项目、节点排期、任务、里程碑、业务线和工作台页面已实现；列表/详情字段一致性与节点服务测试通过。 |
-| 第 4 期：开源交付 | 已完成 | README、Compose、初始化/升级脚本、CI、健康检查和发布清单已提交；迁移脚本在 H2 测试数据库完整执行，OceanBase 实例上线前仍需按本手册执行一次真实环境预检。 |
+| 第 4 期：开源交付 | 已完成 | README、Compose、初始化/升级脚本、CI、健康检查和发布清单已提交；迁移脚本在 Testcontainers MySQL 完整执行，MySQL 实例上线前仍需按本手册执行一次真实环境预检。 |
 
 ### 本轮完整性变更
 
@@ -227,14 +227,14 @@
 
 ### 发布前仍需执行
 
-自动化测试使用 H2 仅验证迁移语法和业务回归，生产运行时仍只允许 OceanBase。发布前必须在目标 OceanBase 租户执行 `enterprise-preflight.sh`、V1–V7 迁移、`verify-enterprise-migration.sh` 和登录/健康检查冒烟，并记录结果到发布清单。
+自动化测试使用 Testcontainers MySQL 验证迁移和业务回归，生产运行时仍只允许 MySQL。发布前必须在目标 MySQL 租户执行 `enterprise-preflight.sh`、V1–V7 迁移、`verify-enterprise-migration.sh` 和登录/健康检查冒烟，并记录结果到发布清单。
 
 ### 基础设施后续计划（2026-08-28）
 
 上表的“阶段完成”表示此前业务能力和基础开源骨架已完成，不表示生产基础设施已经全部收口。以下事项转入独立计划继续执行：
 
 - `pms_app` / `pms_migrator` 数据库账号隔离和应用配置切换；
-- OceanBase 备份、恢复、迁移锁、版本校验和可重复升级；
+- MySQL 备份、恢复、迁移锁、版本校验和可重复升级；
 - 统一 HTTP 错误状态、限流、通知服务和上传持久化；
 - 容器加固、结构化日志、指标、审计保留、OpenAPI、集成 CI、E2E、镜像扫描和 SBOM。
 

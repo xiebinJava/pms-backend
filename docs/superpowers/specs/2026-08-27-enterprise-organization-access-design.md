@@ -16,7 +16,7 @@
 
 ## 2. 当前系统与改造原则
 
-当前后端为 Spring Boot 2.7 + Java 17 + MyBatis-Plus，数据库兼容 H2、MySQL 8 和 OceanBase MySQL 模式；前端为 Vue 3 + TypeScript + Ant Design Vue。`sys_user` 当前只含 `username`、`nickname` 和 `system_role`，现有项目权限由 `ProjectPermissionPolicy` 和项目成员关系判定。
+当前后端为 Spring Boot 2.7 + Java 17 + MyBatis-Plus，数据库为 MySQL 8；前端为 Vue 3 + TypeScript + Ant Design Vue。`sys_user` 当前只含 `username`、`nickname` 和 `system_role`，现有项目权限由 `ProjectPermissionPolicy` 和项目成员关系判定。
 
 改造遵循以下原则：
 
@@ -24,7 +24,7 @@
 2. 后端为所有权限的最终裁决者；前端的路由、菜单和按钮隐藏只用于改善体验。
 3. 组织树只表达主汇报关系，禁止一个节点或主归属出现两个父节点；矩阵协作以兼职任职和 `project_member` 表达。
 4. 所有组织、人员、角色、授权、导入和安全关键操作必须写入审计日志。
-5. 数据库结构使用版本化、幂等的迁移脚本，分别验证 H2、MySQL 和 OceanBase。
+5. 数据库结构使用版本化、幂等的迁移脚本，验证 MySQL 8。
 
 ## 3. 领域模型与数据库设计
 
@@ -176,4 +176,4 @@
 - 角色配置可控制菜单、按钮、API 与数据范围；前端隐藏不替代后端拒绝。
 - 禁用员工立即失去访问权，历史项目与审计仍可查询；转岗不改变历史任职记录。
 - Excel/CSV 导入能下载模板、给出行级错误、在全部预检通过后一次性写入并生成导入日志。
-- 现有项目、节点、任务、里程碑、成员、评论和权限生命周期回归测试通过；H2、MySQL 和 OceanBase 均能完成迁移验证。
+- 现有项目、节点、任务、里程碑、成员、评论和权限生命周期回归测试通过；MySQL 8 能完成迁移验证。

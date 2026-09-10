@@ -43,19 +43,19 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: {{ .Values.backend.env.springProfilesActive | quote }}
-            - name: OCEANBASE_HOST
-              value: {{ .Values.backend.env.oceanbaseHost | quote }}
-            - name: OCEANBASE_PORT
-              value: {{ .Values.backend.env.oceanbasePort | quote }}
-            - name: OCEANBASE_DATABASE
-              value: {{ .Values.backend.env.oceanbaseDatabase | quote }}
-            - name: OCEANBASE_USER
-              value: {{ .Values.backend.env.oceanbaseUser | quote }}
-            - name: OCEANBASE_PASSWORD
+            - name: MYSQL_HOST
+              value: {{ .Values.backend.env.mysqlHost | quote }}
+            - name: MYSQL_PORT
+              value: {{ .Values.backend.env.mysqlPort | quote }}
+            - name: MYSQL_DB
+              value: {{ .Values.backend.env.mysqlDatabase | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.backend.env.mysqlUser | quote }}
+            - name: MYSQL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "pms.secretName" . }}
-                  key: oceanbasePassword
+                  key: mysqlPassword
             - name: PMS_JWT_SECRET
               valueFrom:
                 secretKeyRef:

@@ -6,13 +6,13 @@
 
 **Architecture:** Keep the existing FeedbackService/FeedbackController boundary. Centralize feedback permission implications in AuthorizationService, derive manager visibility from the existing DataScopeResolver and project/member tables, and emit allowlisted audit snapshots. Keep the frontend aligned with those capabilities and load project context lazily.
 
-**Tech Stack:** Spring Boot, MyBatis-Plus, Flyway, OceanBase-compatible SQL, Vue 3, TypeScript, Ant Design Vue, Vitest.
+**Tech Stack:** Spring Boot, MyBatis-Plus, Flyway, MySQL-compatible SQL, Vue 3, TypeScript, Ant Design Vue, Vitest.
 
 **Spec:** `docs/product-specs/pms-feedback-center.md` and `docs/business-specification.md`.
 
 ## Global Constraints
 
-- Do not use H2 at runtime; H2 remains test-only.
+- Do not use an in-process database at runtime; tests use Testcontainers MySQL.
 - Preserve `feedback:read`, `feedback:write`, and `feedback:manage` API names.
 - Keep reporter access to their own tickets; manager access must obey organization/project data scope.
 - Do not put feedback title, content, source URL, client request ID, or resolution text in operation-log snapshots.
@@ -61,6 +61,6 @@
 
 Verification completed on 2026-09-03:
 
-- Backend: `mvn -q test` — passed; Flyway applied all 12 migrations in the H2 test profile.
+- Backend: `mvn -q test` — passed; Flyway applied all 12 migrations in the Testcontainers MySQL test profile.
 - Frontend: `pnpm test` (121 passed), `pnpm typecheck`, and `pnpm build` — passed.
 - Backend and frontend: `git diff --check` — passed.

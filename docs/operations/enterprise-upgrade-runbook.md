@@ -4,26 +4,26 @@
 
 ## 1. 上线前原则
 
-- 运行时数据库固定使用 OceanBase MySQL 兼容模式；H2 仅用于自动化测试和一次性历史迁移快照，不作为本地或生产运行回退。
+- 运行时和测试都只使用 MySQL 8。
 - 迁移前必须备份数据库，并在副本上演练。本文脚本全部只读，不会打印密码，也不会自动删除或覆盖业务数据。
 - 固定使用一个业务数据库账号，授予迁移所需 DDL/DML 权限；应用运行账号按企业安全规范收敛权限。
 - 生产环境必须设置随机的 `PMS_JWT_SECRET`（至少 32 字节），不要使用仓库里的开发默认值。
 
 ## 2. 配置数据库连接
 
-脚本优先读取 `PMS_DB_*`，也兼容 `MYSQL_*` / `OCEANBASE_*`：
+脚本优先读取 `PMS_DB_*`，也兼容 `MYSQL_*`：
 
 ```bash
 export PMS_DB_HOST=127.0.0.1
-export PMS_DB_PORT=3306                 # OceanBase 通常为 2881
+export PMS_DB_PORT=3306
 export PMS_DB_NAME=pms
-export PMS_DB_USER=pms_migrator
+export PMS_DB_USER=pms
 export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 ```
 
 ## 3. 迁移步骤
 
-1. 停止应用写入，使用 [`oceanbase-backup-restore.md`](oceanbase-backup-restore.md) 的 `backup-oceanbase.sh` 完成全量备份并记录 SHA-256 校验值。
+1. 停止应用写入，使用 [`mysql-backup-restore.md`](mysql-backup-restore.md) 的 `backup-mysql.sh` 完成全量备份并记录 SHA-256 校验值。
 2. 在目标库执行只读预检：
 
    ```bash
@@ -34,15 +34,9 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 使用发布账号执行版本化升级。`scripts/oceanbase-upgrade.sh` 会按 V1–V41 迁移脚本顺序校验并只执行缺失版本；V37 增加计划节点迭代计划及故事关联字段，V38/V39 更新计划节点文案，V40 增加知识沉淀与标准改进工作台，V41 增加方案评审版本字段；更早版本的变更说明沿用下方历史记录。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`：
+3. 启动带新迁移的后端。Flyway 会按 V1–V41 顺序只执行缺失版本；V37 增加计划节点迭代计划及故事关联字段，V38/V39 更新计划节点文案，V40 增加知识沉淀与标准改进工作台，V41 增加方案评审版本字段。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`。
 
-   ```bash
-   export OCEANBASE_USER=pms_migrator
-   export OCEANBASE_PASSWORD="$PMS_MIGRATOR_PASSWORD"
-   ./scripts/oceanbase-upgrade.sh
-   ```
-
-   启动应用时使用 `--spring.profiles.active=oceanbase`，并提供 `OCEANBASE_HOST/PORT/DATABASE/USER/PASSWORD`。应用运行时使用 `pms_app`，不要使用 `pms_migrator` 或 `root`。
+   启动应用时使用 `--spring.profiles.active=mysql`，并提供 `MYSQL_HOST/PORT/DB/USER/PASSWORD`。不要使用 MySQL `root` 作为应用账号。
 
 4. 迁移完成后执行只读验收：
 
@@ -50,7 +44,7 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
    ./scripts/verify-enterprise-migration.sh
    ```
 
-   如需回滚，恢复到新建临时库后再执行上述验收；恢复命令和生产库保护参数见 [`oceanbase-backup-restore.md`](oceanbase-backup-restore.md)。
+   如需回滚，恢复到新建临时库后再执行上述验收；恢复命令和生产库保护参数见 [`mysql-backup-restore.md`](mysql-backup-restore.md)。
 
    验收包括企业表、关键列和索引、唯一活动根组织、内置 RBAC 角色以及项目组织归属。
 
@@ -110,8 +104,8 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 
 ## 8. 容器化与健康检查
 
-开源试用可从 `docker-compose.example.yml` 启动 OceanBase、后端和前端。示例仅适用于新建
-空库和已有库的 `schema-init` 都调用 `scripts/oceanbase-upgrade.sh`，按 V1–V41 逐版本、逐语句记录检查点；不再单独执行 `schema.sql` 或一次性 bootstrap 标记。已有生产库
+开源试用可从 `docker-compose.example.yml` 启动 MySQL、后端和前端。示例仅适用于新建
+空库；后端启动时由 Flyway 按 V1–V41 执行缺失版本，不再单独执行 `schema.sql`。已有生产库
 必须使用本手册的备份、预检和升级流程；检测到旧 Flyway 历史时，需先核对发布包并显式设置 `PMS_ACCEPT_FLYWAY_BASELINE=true`。
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与
@@ -129,7 +123,7 @@ JavaMailSender 把就绪状态误判为 DOWN。启用正式 SMTP 后，可将该
 
 容器运行时默认使用后端 UID 10001、非 root Nginx、只读根文件系统、独立上传卷和
 `no-new-privileges`；后端与前端只有在健康检查通过后才被 Compose 视为可用。生产部署应
-根据机器容量调整 `mem_limit`/`cpus`，并通过反向代理提供 HTTPS。示例 Compose 将数据库/迁移服务
+根据机器容量调整 `mem_limit`/`cpus`，并通过反向代理提供 HTTPS。示例 Compose 将 MySQL
 放在 `pms-data` 私网、前端与后端放在独立的 `pms-edge` 私网；Nginx 默认只信任 loopback，
 不会把整个 Compose 服务网段当作代理。外层 TLS 终止代理必须使用明确的可信 IP/CIDR，并在
 `nginx.conf` 的 `set_real_ip_from`/`geo` 中按部署网络显式加入；其它转发头会被清空，不可信客户端的
@@ -138,15 +132,15 @@ JavaMailSender 把就绪状态误判为 DOWN。启用正式 SMTP 后，可将该
 
 ## 9. 私有仓库集成测试凭据
 
-后端的 `.github/workflows/integration.yml` 会检出同一 GitHub Owner 下的 `pms-front` 并执行 OceanBase + Playwright
+后端的 `.github/workflows/integration.yml` 会检出同一 GitHub Owner 下的 `pms-front` 并执行 MySQL + Playwright
 集成测试。由于 GitHub Actions 的默认 `GITHUB_TOKEN` 只能读取当前仓库，必须在
 后端仓库的 Settings → Secrets and variables → Actions 中创建仓库级 secret
 `PMS_FRONT_REPO_READ_TOKEN`。该 Token 只授予同 Owner 下 `pms-front` 的 Contents: Read 权限，
 不要复用管理员个人 Token，也不要把 Token 写入 workflow、日志或 `.env`。未配置该 secret 时，
-工作流会在检出前给出明确错误并停止，不会误报为 OceanBase 或应用故障。
+工作流会在检出前给出明确错误并停止，不会误报为 MySQL 或应用故障。
 
 设置完成后，在后端仓库进入 Actions → `integration-and-e2e`，点击 **Run workflow**，
 选择 `main`（或输入已经审核过的前端分支、标签或提交 SHA）后运行。普通 push/PR 会自动使用
 前端远程 `main`，手动发布验收可以通过 `frontend_ref` 固定不可变提交。工作流成功后，重点查看
-`oceanbase-and-browser` 作业中的迁移幂等、API 冒烟、登录代理和桌面/移动端 Playwright 步骤；
+`mysql-and-browser` 作业中的 API 冒烟、登录代理和桌面/移动端 Playwright 步骤；
 不要仅凭“工作流已启动”判断通过。

@@ -2,18 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在单企业私有化部署模式下，补齐 OceanBase 权限隔离、可恢复升级、安全运营、容器运行、可观测性和开源交付能力，使 PMS 可以长期稳定运行。
+**Goal:** 在单企业私有化部署模式下，补齐 MySQL 权限隔离、可恢复升级、安全运营、容器运行、可观测性和开源交付能力，使 PMS 可以长期稳定运行。
 
-**Architecture:** 应用运行时只使用 `pms_app`，数据库初始化和版本升级只使用短时的 `pms_migrator`，DBA 保留 `root@sys` 作为人工维护账号。OceanBase 是唯一运行时数据库，H2 仅保留在测试配置；所有升级先预检、备份、加锁，再按版本执行并进行只读校验。前端继续通过 Nginx 访问后端，不改动现有业务逻辑和页面信息架构。
+**Architecture:** 应用运行时只使用 `pms_app`，数据库初始化和版本升级只使用短时的 `pms_migrator`，DBA 保留 `root@sys` 作为人工维护账号。MySQL 是唯一运行时数据库，测试使用 Testcontainers MySQL 8；所有升级先预检、备份、加锁，再按版本执行并进行只读校验。前端继续通过 Nginx 访问后端，不改动现有业务逻辑和页面信息架构。
 
-**Tech Stack:** Java 17、Spring Boot 3.5、Jakarta Validation/Servlet、MyBatis-Plus、OceanBase MySQL 模式、MySQL/obclient、Vue 3、TypeScript、pnpm、Nginx、Docker Compose、JUnit 5、Node test runner、Playwright、Trivy、Syft。
+**Tech Stack:** Java 17、Spring Boot 3.5、Jakarta Validation/Servlet、MyBatis-Plus、MySQL 8、mysql、Vue 3、TypeScript、pnpm、Nginx、Docker Compose、JUnit 5、Node test runner、Playwright、Trivy、Syft。
 
-**Spec:** `docs/superpowers/specs/2026-08-27-enterprise-foundation-security-design.md`、`docs/superpowers/specs/2026-08-26-oceanbase-migration-design.md`、`docs/business-specification.md`
+**Spec:** `docs/superpowers/specs/2026-08-27-enterprise-foundation-security-design.md`、`docs/superpowers/specs/enterprise-upgrade-runbook.md`、`docs/business-specification.md`
 
 ## Global Constraints
 
 - 单企业私有化部署，不引入多租户字段、租户切换或跨企业数据逻辑。
-- OceanBase 是生产和本地部署运行时数据库；H2 只允许出现在测试资源和测试 profile。
+- MySQL 是生产和本地部署运行时数据库；测试使用 Testcontainers MySQL 8。
 - `pms_app` 不得拥有建表、改表结构和删除表权限；`pms_migrator` 只在升级任务中使用；应用不得使用 `root@sys`。
 - 数据库升级禁止 `DROP DATABASE`、`TRUNCATE` 和覆盖非空业务数据；备份、校验和失败现场必须保留。
 - 密码、JWT、数据库连接串和通知服务密钥只能通过环境变量或密钥管理系统提供，不进入 Git、镜像层和普通日志。
@@ -33,12 +33,12 @@
 - Test: `git diff --check`、现有后端和前端验证命令
 
 **Interfaces:**
-- Consumes: 当前 OceanBase `brad_pms` 实例、现有 V1–V7 脚本、Compose 和 CI 配置。
+- Consumes: 当前 MySQL `pms` 实例、现有 V1–V7 脚本、Compose 和 CI 配置。
 - Produces: 一份标记“已完成/待完成/风险”的基础设施清单，后续任务以此为唯一状态来源。
 
 - [x] **Step 1: 记录当前可重复的基线**
 
-  在 `infrastructure-status.md` 固定记录以下结果：OceanBase V5 已执行、后端 71 项测试通过、前端 77 项测试通过、`pnpm typecheck` 和 `pnpm build` 通过、两个仓库工作区干净；同时列出当前缺口：应用仍默认使用 root、无备份恢复自动化、无 OpenAPI、无漏洞扫描、上传目录无持久卷、错误 HTTP 状态不统一。
+  在 `infrastructure-status.md` 固定记录以下结果：MySQL V5 已执行、后端 71 项测试通过、前端 77 项测试通过、`pnpm typecheck` 和 `pnpm build` 通过、两个仓库工作区干净；同时列出当前缺口：应用仍默认使用 root、无备份恢复自动化、无 OpenAPI、无漏洞扫描、上传目录无持久卷、错误 HTTP 状态不统一。
 
 - [x] **Step 2: 对齐路线图勾选状态**
 
@@ -73,27 +73,27 @@
 ### Task 1: 创建数据库运行账号并切换应用到最小权限
 
 **Files:**
-- Create: `docker/oceanbase-accounts-init.sh`
-- Create: `scripts/check-oceanbase-privileges.sh`
+- Create: `docker/mysql-accounts-init.sh`
+- Create: `scripts/enterprise-preflight.sh`
 - Create: `docs/operations/database-accounts.md`
 - Modify: `docker-compose.example.yml`
-- Modify: `docker/oceanbase-init.sh`
-- Modify: `src/main/resources/application-oceanbase.yml`
-- Modify: `.env.oceanbase.example`
-- Modify: `src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java`
-- Test: `src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java`
+- Modify: `docker/mysql-init.sh`
+- Modify: `src/main/resources/application-mysql.yml`
+- Modify: `.env.mysql.example`
+- Modify: `src/test/java/com/brad/pms/config/MysqlRuntimeConfigurationTest.java`
+- Test: `src/test/java/com/brad/pms/config/MysqlRuntimeConfigurationTest.java`
 
 **Interfaces:**
-- Consumes: `OCEANBASE_ROOT_PASSWORD`、`PMS_APP_PASSWORD`、`PMS_MIGRATOR_PASSWORD`，以及已有 `brad_pms` 数据库。
-- Produces: `pms_app`（运行时 DML 权限）和 `pms_migrator`（迁移 DDL 权限）；后端配置强制要求 `OCEANBASE_USER` 和 `OCEANBASE_PASSWORD`，不再默认回退到 root。
+- Consumes: `MYSQL_ROOT_PASSWORD`、`PMS_APP_PASSWORD`、`PMS_MIGRATOR_PASSWORD`，以及已有 `pms` 数据库。
+- Produces: `pms_app`（运行时 DML 权限）和 `pms_migrator`（迁移 DDL 权限）；后端配置强制要求 `MYSQL_USER` 和 `MYSQL_PASSWORD`，不再默认回退到 root。
 
 - [x] **Step 1: 写配置失败测试**
 
-  为以下场景补充测试：OceanBase profile 缺少 `OCEANBASE_USER` 失败；缺少 `OCEANBASE_PASSWORD` 失败；配置 `root@sys` 作为应用账号时启动校验失败；配置 `pms_app` 时通过。
+  为以下场景补充测试：mysql profile 缺少 `MYSQL_USER` 失败；缺少 `MYSQL_PASSWORD` 失败；配置 `root@sys` 作为应用账号时启动校验失败；配置 `pms_app` 时通过。
 
 - [x] **Step 2: 编写账号初始化脚本**
 
-  `oceanbase-accounts-init.sh` 只允许用 `root@sys` 首次执行，创建或更新两个账号：`pms_app` 对 `brad_pms.*` 授予 `SELECT, INSERT, UPDATE, DELETE`；`pms_migrator` 授予迁移需要的 DML 和 `CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, TRIGGER` 权限，权限范围仅限业务库，且只在初始化和升级任务中使用。脚本使用 `MYSQL_PWD` 传递密码，执行前拒绝空的生产密码，并且打印账号名和权限摘要但不打印密码。
+  `mysql-accounts-init.sh` 只允许用 `root@sys` 首次执行，创建或更新两个账号：`pms_app` 对 `pms.*` 授予 `SELECT, INSERT, UPDATE, DELETE`；`pms_migrator` 授予迁移需要的 DML 和 `CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, TRIGGER` 权限，权限范围仅限业务库，且只在初始化和升级任务中使用。脚本使用 `MYSQL_PWD` 传递密码，执行前拒绝空的生产密码，并且打印账号名和权限摘要但不打印密码。
 
 - [x] **Step 3: 拆分 Compose 初始化职责**
 
@@ -101,15 +101,15 @@
 
 - [x] **Step 4: 编写权限冒烟脚本**
 
-  `check-oceanbase-privileges.sh` 使用应用账号验证 `SELECT/INSERT/UPDATE/DELETE` 可用、`CREATE TABLE` 被拒绝；使用迁移账号验证 `CREATE TABLE`、`ALTER TABLE` 和受控的 `DROP TABLE` 可用。由于当前 OceanBase 不支持 MySQL 临时表，脚本使用带时间戳的探针表，并用 root 账号在退出时清理；迁移账号只拥有业务库对象级删除权限，不拥有 `DROP DATABASE` 或 `TRUNCATE` 能力。
+  `enterprise-preflight.sh` 使用应用账号验证 `SELECT/INSERT/UPDATE/DELETE` 可用、`CREATE TABLE` 被拒绝；使用迁移账号验证 `CREATE TABLE`、`ALTER TABLE` 和受控的 `DROP TABLE` 可用。由于当前 MySQL 不支持 MySQL 临时表，脚本使用带时间戳的探针表，并用 root 账号在退出时清理；迁移账号只拥有业务库对象级删除权限，不拥有 `DROP DATABASE` 或 `TRUNCATE` 能力。
 
 - [x] **Step 5: 运行并 Review**
 
   ```bash
-  OCEANBASE_PASSWORD="$OCEANBASE_ROOT_PASSWORD" \
+  MYSQL_PASSWORD="$MYSQL_ROOT_PASSWORD" \
     docker compose -f docker-compose.example.yml config --quiet
-  bash scripts/check-oceanbase-privileges.sh
-  mvn -q -Dtest=OceanbaseConfigurationTest test
+  bash scripts/enterprise-preflight.sh
+  mvn -q -Dtest=MysqlRuntimeConfigurationTest test
   ```
 
   Review 应确认后端容器环境中不存在 root 凭据，账号初始化重复执行不会修改业务数据，失败时不会输出密码。
@@ -117,30 +117,30 @@
 - [x] **Step 6: Commit**
 
   ```bash
-  git add docker docker-compose.example.yml src/main/resources/application-oceanbase.yml .env.oceanbase.example docs/operations/database-accounts.md scripts/check-oceanbase-privileges.sh src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java
-  git commit -m "feat: isolate OceanBase runtime and migration accounts"
+  git add docker docker-compose.example.yml src/main/resources/application-mysql.yml .env.mysql.example docs/operations/database-accounts.md scripts/enterprise-preflight.sh src/test/java/com/brad/pms/config/MysqlRuntimeConfigurationTest.java
+  git commit -m "feat: isolate MySQL runtime and migration accounts"
   ```
 
 **验收：** 应用只能使用 `pms_app`；迁移任务只能使用 `pms_migrator`；root 仅出现在账号初始化或 DBA 文档中。
 
 ---
 
-### Task 2: OceanBase 版本化升级、备份恢复与迁移锁
+### Task 2: MySQL 版本化升级、备份恢复与迁移锁
 
 **Files:**
-- Create: `scripts/oceanbase-upgrade.sh`
-- Create: `scripts/backup-oceanbase.sh`
-- Create: `scripts/restore-oceanbase.sh`
+- Create: `scripts/enterprise-preflight.sh`
+- Create: `scripts/backup-mysql.sh`
+- Create: `scripts/restore-mysql.sh`
 - Create: `scripts/verify-backup.sh`
-- Create: `docs/operations/oceanbase-backup-restore.md`
+- Create: `docs/operations/mysql-backup-restore.md`
 - Modify: `scripts/enterprise-preflight.sh`
 - Modify: `scripts/verify-enterprise-migration.sh`
-- Modify: `docker/oceanbase-init.sh`
-- Create: `src/test/java/com/brad/pms/migration/OceanbaseUpgradeScriptTest.java`
-- Test: `src/test/java/com/brad/pms/migration/OceanbaseSqlImporterTest.java`
+- Modify: `docker/mysql-init.sh`
+- Create: `src/test/java/com/brad/pms/ops/MysqlOpsScriptTest.java`
+- Test: `src/test/java/com/brad/pms/ops/MysqlOpsScriptTest.java`
 
 **Interfaces:**
-- Consumes: 迁移目录 `src/main/resources/db/migration/V*.sql`、`pms_migrator` 凭据、备份目录和 OceanBase MySQL/obclient 客户端。
+- Consumes: 迁移目录 `src/main/resources/db/migration/V*.sql`、`pms_migrator` 凭据、备份目录和 MySQL 客户端。
 - Produces: 可重复执行的升级命令、带校验和的备份文件、迁移锁和清晰的版本状态。
 
 - [x] **Step 1: 为升级状态写测试**
@@ -149,27 +149,27 @@
 
 - [x] **Step 2: 统一客户端发现和参数传递**
 
-  升级、预检、备份和恢复脚本按顺序使用宿主机 `obclient`/`mysql`，找不到时使用已固定版本的 `mysql:8.4` 工具容器；密码通过 `MYSQL_PWD` 传入，命令输出统一隐藏连接参数中的密码。
+  升级、预检、备份和恢复脚本按顺序使用宿主机 `mysql`/`mysql`，找不到时使用已固定版本的 `mysql:8.4` 工具容器；密码通过 `MYSQL_PWD` 传入，命令输出统一隐藏连接参数中的密码。
 
 - [x] **Step 3: 实现备份与恢复**
 
-  备份脚本输出 `brad_pms-<UTC时间>-<schema版本>.sql.zst`、SHA-256 文件和元数据（数据库版本、表行数、脚本版本）；恢复脚本默认只允许恢复到显式指定的空库或临时库，恢复前执行确认参数 `--allow-empty-target`，恢复后运行 `verify-backup.sh`。
+  备份脚本输出 `pms-<UTC时间>-<schema版本>.sql.zst`、SHA-256 文件和元数据（数据库版本、表行数、脚本版本）；恢复脚本默认只允许恢复到显式指定的空库或临时库，恢复前执行确认参数 `--allow-empty-target`，恢复后运行 `verify-backup.sh`。
 
 - [x] **Step 4: 实现升级锁和版本校验**
 
   升级脚本获取数据库命名锁 `pms-schema-upgrade`，读取 `flyway_schema_history` 或兼容的版本表，校验每个脚本的 SHA-256；仅执行缺失版本，已成功版本不得重复执行，失败时保留日志并输出下一步恢复命令。
 
-- [x] **Step 5: 实现真实 OceanBase 冒烟**
+- [x] **Step 5: 实现真实 MySQL 冒烟**
 
   在 `docker compose` 中以 `pms_migrator` 执行 V1–V7，随后运行 preflight、行数、外键、唯一索引、软删除列和根组织检查；同一升级命令连续运行两次，第二次必须报告“无待执行版本”。
 
 - [x] **Step 6: Commit**
 
   ```bash
-  mvn -q -Dtest=OceanbaseSqlImporterTest,OceanbaseUpgradeScriptTest test
+  mvn -q -Dtest=MysqlOpsScriptTest test
   bash -n scripts/*.sh docker/*.sh
-  git add scripts docs/operations/oceanbase-backup-restore.md docker/oceanbase-init.sh src/test/java/com/brad/pms/migration
-  git commit -m "feat: add repeatable OceanBase backup and upgrade workflow"
+  git add scripts docs/operations/mysql-backup-restore.md docker/mysql-init.sh src/test/java/com/brad/pms/migration
+  git commit -m "feat: add repeatable MySQL backup and upgrade workflow"
   ```
 
 **验收：** 能从备份恢复到临时库；升级失败有可操作的恢复路径；升级脚本重复执行不会重复建表、重复索引或产生重复数据。
@@ -295,12 +295,12 @@
 - Test: `docker compose -f docker-compose.example.yml config --quiet`
 
 **Interfaces:**
-- Consumes: 后端 `/api/health`、前端 Nginx、OceanBase 健康检查和现有 Compose 服务。
+- Consumes: 后端 `/api/health`、前端 Nginx、MySQL 健康检查和现有 Compose 服务。
 - Produces: 可观察、可自动恢复、默认最小权限的服务栈。
 
 - [x] **Step 1: 固定镜像和构建上下文**
 
-  为 OceanBase、MySQL 工具、Java runtime、Node build 和 Nginx 记录可更新的固定版本标签；发布 CI 再将标签解析并锁定 digest。构建阶段不得复制 `.env`、`.git`、`target`、`dist` 和上传文件。
+  为 MySQL、MySQL 工具、Java runtime、Node build 和 Nginx 记录可更新的固定版本标签；发布 CI 再将标签解析并锁定 digest。构建阶段不得复制 `.env`、`.git`、`target`、`dist` 和上传文件。
 
 - [x] **Step 2: 增加健康检查和恢复策略**
 
@@ -317,7 +317,7 @@
 - [x] **Step 5: 验证容器**
 
   ```bash
-  OCEANBASE_PASSWORD="$OCEANBASE_ROOT_PASSWORD" \
+  MYSQL_PASSWORD="$MYSQL_ROOT_PASSWORD" \
   PMS_JWT_SECRET="$(openssl rand -hex 32)" \
   docker compose -f docker-compose.example.yml config --quiet
   docker build -t pms-backend:local .
@@ -399,16 +399,16 @@
 - Modify: `docs/operations/release-checklist.md`
 
 **Interfaces:**
-- Consumes: Maven/pnpm 构建、Docker Compose、OceanBase、OpenAPI 合同和现有浏览器路由。
-- Produces: 每次提交的单元测试、真实 OceanBase 集成测试、前端 E2E、镜像漏洞扫描、SBOM 和依赖更新。
+- Consumes: Maven/pnpm 构建、Docker Compose、MySQL、OpenAPI 合同和现有浏览器路由。
+- Produces: 每次提交的单元测试、真实 MySQL 集成测试、前端 E2E、镜像漏洞扫描、SBOM 和依赖更新。
 
 - [x] **Step 1: 写 CI 阻断条件**
 
-  在 CI 中固定以下失败条件：后端测试失败、前端 typecheck/build 失败、OpenAPI 校验失败、仓库出现 H2 运行配置或私钥、Docker 镜像高危漏洞、SBOM 生成失败。CI 使用 `docker-compose.ci.yml` 将前端构建上下文固定到 Actions 检出的 `./pms-front` 目录，不依赖本地兄弟目录布局。
+  在 CI 中固定以下失败条件：后端测试失败、前端 typecheck/build 失败、OpenAPI 校验失败、仓库出现运行时内存数据库配置或私钥、Docker 镜像高危漏洞、SBOM 生成失败。CI 使用 `docker-compose.ci.yml` 将前端构建上下文固定到 Actions 检出的 `./pms-front` 目录，不依赖本地兄弟目录布局。
 
-- [x] **Step 2: 增加 OceanBase 集成作业**
+- [x] **Step 2: 增加 MySQL 集成作业**
 
-  启动固定版本 OceanBase，执行 accounts-init、schema-init、preflight、upgrade 两次和后端健康检查；使用临时随机数据库密码，不把密码写入日志或 artifact。
+  启动固定版本 MySQL，执行 accounts-init、schema-init、preflight、upgrade 两次和后端健康检查；使用临时随机数据库密码，不把密码写入日志或 artifact。
 
 - [x] **Step 3: 增加前端 E2E**
 
@@ -458,11 +458,11 @@
 
 - [ ] **Step 1: 执行从零部署演练（本机 Docker Hub 网络阻塞，待 CI/部署机）**
 
-  在干净目录使用 `.env.oceanbase.example` 的实际副本启动 OceanBase、账号初始化、schema-init、backend 和 frontend；登录并验证项目、组织、人员、角色、导入和审计页面。
+  在干净目录使用 `.env.mysql.example` 的实际副本启动 MySQL、账号初始化、schema-init、backend 和 frontend；登录并验证项目、组织、人员、角色、导入和审计页面。
 
-- [ ] **Step 2: 执行备份恢复演练（待真实 OceanBase 副本）**
+- [ ] **Step 2: 执行备份恢复演练（待真实 MySQL 副本）**
 
-  备份当前 `brad_pms`，恢复到临时库，运行行数、外键、索引、组织根节点和权限校验；记录耗时、备份大小、恢复结果和 RPO/RTO。
+  备份当前 `pms`，恢复到临时库，运行行数、外键、索引、组织根节点和权限校验；记录耗时、备份大小、恢复结果和 RPO/RTO。
 
 - [ ] **Step 3: 执行故障演练（待部署机）**
 
@@ -503,5 +503,5 @@
 - 已覆盖账号隔离、迁移、备份、恢复、错误响应、Cookie、限流、通知、上传、容器、健康检查、日志、审计、OpenAPI、CI、E2E、漏洞扫描和开源交付。
 - 所有任务均列出文件边界、输入输出接口、测试命令和提交点。
 - 未改变单企业模型、组织负责人/员工主归属关系或现有项目业务逻辑。
-- 现有本地 OceanBase 使用空密码只能作为迁移后的本地特例，计划明确要求生产账号使用非空强密码。
+- 现有本地 MySQL 使用空密码只能作为迁移后的本地特例，计划明确要求生产账号使用非空强密码。
 - `pms_app` 与 `pms_migrator` 的凭据不写入迁移 SQL、镜像或 Git 历史；实际执行时只从运行环境读取。

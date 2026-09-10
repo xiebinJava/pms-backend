@@ -6,7 +6,7 @@
 
 **Architecture:** 通过 V15 给 user_notification 增加内部幂等键，使用数据库侧候选查询和唯一约束保证提醒可重跑；提醒作业直接写入站内通知，不经过会发布 Webhook 的事件入口。保留顶部铃铛旧接口，新增 SQL 过滤后的分页接口和 /notifications 前端页面，通知中心、铃铛、项目深链共用现有 DTO 与路由规则。
 
-**Tech Stack:** Java 17、Spring Boot、MyBatis-Plus、Flyway、OceanBase/H2 测试、Vue 3、TypeScript、Ant Design Vue、Node built-in test runner、Vite。
+**Tech Stack:** Java 17、Spring Boot、MyBatis-Plus、Flyway、Testcontainers MySQL 测试、Vue 3、TypeScript、Ant Design Vue、Node built-in test runner、Vite。
 
 **Spec:** docs/superpowers/specs/2026-09-04-notification-center-task-reminders-design.md
 
@@ -17,7 +17,7 @@
 - 提醒默认 pms.notification.task-reminder.enabled=false；权限收口和 SQL 可读性验收完成后才允许打开。
 - 提醒候选、通知分页、顶部预览和未读数的状态/权限/删除过滤必须在 SQL 中完成后再分页或计数。
 - 提醒使用独立的仅站内写入入口，不调用会触发 WebhookPublisher 的现有事件通知入口。
-- 生产使用 OceanBase，自动化测试可使用 H2；保留所有既有未提交改动，不使用 destructive git commands。
+- 生产与测试均使用 MySQL 8；保留所有既有未提交改动，不使用 destructive git commands。
 - 后端使用 TaskStatus.DONE、ProjectStatus.ACTIVE 等枚举，不散落字符串或裸状态数字。
 - 前端正文只用文本插值渲染，不使用 v-html；页面在 390px 视口下不横向溢出。
 

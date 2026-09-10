@@ -14,7 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@ActiveProfiles("h2")
+@ActiveProfiles("test")
 class NotificationQueryIntegrationTest {
 
     private static final long RECIPIENT_ID = 990001L;

@@ -73,19 +73,19 @@ jwt_bytes="$(LC_ALL=C printf '%s' "$PMS_JWT_SECRET" | wc -c | tr -d '[:space:]')
 [[ "$jwt_bytes" =~ ^[0-9]+$ && jwt_bytes -ge 32 ]] || fail "PMS_JWT_SECRET must contain at least 32 bytes"
 unset jwt_bytes
 
-for name in OCEANBASE_HOST OCEANBASE_PORT OCEANBASE_DATABASE OCEANBASE_USER OCEANBASE_PASSWORD; do
+for name in MYSQL_HOST MYSQL_PORT MYSQL_DB MYSQL_USER MYSQL_PASSWORD; do
   require_var "$name"
 done
-require_port OCEANBASE_PORT
-reject_placeholder OCEANBASE_PASSWORD
-case "${OCEANBASE_DATABASE}" in
-  (*[!A-Za-z0-9_.-]*) fail "OCEANBASE_DATABASE contains unsupported characters" ;;
+require_port MYSQL_PORT
+reject_placeholder MYSQL_PASSWORD
+case "${MYSQL_DB}" in
+  (*[!A-Za-z0-9_.-]*) fail "MYSQL_DB contains unsupported characters" ;;
 esac
-oceanbase_user_normalized="$(printf '%s' "$OCEANBASE_USER" | tr '[:upper:]' '[:lower:]')"
-case "$oceanbase_user_normalized" in
-  root|root@sys|sys|sys@*) fail "OCEANBASE_USER must not be a root/system account" ;;
+mysql_user_normalized="$(printf '%s' "$MYSQL_USER" | tr '[:upper:]' '[:lower:]')"
+case "$mysql_user_normalized" in
+  root) fail "MYSQL_USER must not be a root account" ;;
 esac
-unset oceanbase_user_normalized
+unset mysql_user_normalized
 
 require_var PMS_CORS_ALLOWED_ORIGINS
 [[ "$PMS_CORS_ALLOWED_ORIGINS" != *'*'* ]] || fail "PMS_CORS_ALLOWED_ORIGINS must not contain *"

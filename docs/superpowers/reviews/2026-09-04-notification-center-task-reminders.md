@@ -24,7 +24,7 @@
 - `NotificationService.emitInApp` 独立写入站内表并捕获重复键，不经过会发布 Webhook 的 `emit()` 事件路径。
 - `UserNotificationMapper` 的列表、分页和未读数均包含项目删除/生命周期 SQL 条件；没有保留“先取 80 条、再由 Java 丢弃”的路径。
 - `GET /notifications/page` 受 `project:read` 保护，非法 `type` 返回 400；前端筛选互斥、切换回到第 1 页、翻页保留筛选，并使用文本插值渲染。
-- `start-local-oceanbase.sh` 已补充传递本地开发环境、通知启动检查和提醒配置，避免使用应用的生产默认值启动本地服务。
+- `start-local-mysql.sh` 已补充传递本地开发环境、通知启动检查和提醒配置，避免使用应用的生产默认值启动本地服务。
 
 ## 验证证据
 
@@ -38,7 +38,7 @@
 | `bash scripts/release-consistency.test.sh` | 通过，当前迁移基线 V1–V15 |
 | `bash -n scripts/*.sh docker/*.sh` | 通过 |
 | `git diff --check`（前后端） | 通过 |
-| OceanBase 幂等升级 | V1–V15 checksum 全部 verified；第二次执行无待迁移版本，未删除业务表 |
+| MySQL 幂等升级 | V1–V15 checksum 全部 verified；第二次执行无待迁移版本，未删除业务表 |
 | 企业迁移校验/完整性预检 | 通过；V15 去重索引存在；无数据变更 |
 | 本机 API | `/api/health/ready` 返回 200，`status=UP`、`database=UP`、`migration=15`；未登录访问 `/api/notifications/page` 返回 401 |
 | 前端路由冒烟 | `5173/notifications` 可加载；无登录会话时按预期跳转登录页。CUA 服务不可用，使用 Playwright 完成该路由的实际页面冒烟；未伪造登录态宣称已完成认证页面验收 |

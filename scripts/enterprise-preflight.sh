@@ -5,32 +5,30 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat <<'USAGE'
 Usage: enterprise-preflight.sh
 
-Read-only checks for an existing MySQL/OceanBase PMS database. Connection
-settings are read from PMS_DB_* first, then MYSQL_*/OCEANBASE_* variables.
+Read-only checks for an existing MySQL PMS database. Connection
+settings are read from PMS_DB_* first, then MYSQL_* variables.
 USAGE
   exit 0
 fi
 
-DB_HOST="${PMS_DB_HOST:-${MYSQL_HOST:-${OCEANBASE_HOST:-127.0.0.1}}}"
-DB_PORT="${PMS_DB_PORT:-${MYSQL_PORT:-${OCEANBASE_PORT:-3306}}}"
-DB_NAME="${PMS_DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-${OCEANBASE_DATABASE:-brad_pms}}}}"
-DB_USER="${PMS_DB_USER:-${MYSQL_USER:-${OCEANBASE_USER:-}}}"
-DB_PASSWORD="${PMS_DB_PASSWORD:-${MYSQL_PASSWORD:-${OCEANBASE_PASSWORD:-}}}"
+DB_HOST="${PMS_DB_HOST:-${MYSQL_HOST:-127.0.0.1}}"
+DB_PORT="${PMS_DB_PORT:-${MYSQL_PORT:-3306}}"
+DB_NAME="${PMS_DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-pms}}}"
+DB_USER="${PMS_DB_USER:-${MYSQL_USER:-}}"
+DB_PASSWORD="${PMS_DB_PASSWORD:-${MYSQL_PASSWORD:-}}"
 TOOL_IMAGE="${PMS_MYSQL_TOOL_IMAGE:-mysql:8.4}"
 TOOL_CLIENT="${PMS_MYSQL_TOOL_CLIENT:-mysql}"
 
 if command -v mysql >/dev/null 2>&1; then
   SQL_CLIENT=mysql
-elif command -v obclient >/dev/null 2>&1; then
-  SQL_CLIENT=obclient
 elif command -v docker >/dev/null 2>&1; then
   SQL_CLIENT=container
 else
-  echo "mysql/obclient client or Docker (mysql:8.4) is required (MySQL 8 or OceanBase MySQL mode)" >&2
+  echo "mysql client or Docker (mysql:8.4) is required" >&2
   exit 2
 fi
 if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
-  echo "PMS_DB_USER/PMS_DB_PASSWORD (or MYSQL_/OCEANBASE_ equivalents) are required" >&2
+  echo "PMS_DB_USER/PMS_DB_PASSWORD (or MYSQL_ equivalents) are required" >&2
   exit 2
 fi
 

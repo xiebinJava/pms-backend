@@ -39,7 +39,7 @@ class ContainerHardeningTest {
         assertThat(compose).contains("mem_limit:");
         assertThat(compose).contains("cpus:");
         assertThat(compose).contains("healthcheck:");
-        assertThat(compose).contains("127.0.0.1:2881:2881");
+        assertThat(compose).contains("127.0.0.1:3306:3306");
         assertThat(compose).contains("127.0.0.1:8080:8080");
         assertThat(compose).contains("uploads-init:");
         assertThat(compose).contains("chown -R 10001:10001");

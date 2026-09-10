@@ -6,7 +6,7 @@
 
 **Architecture:** Deliver the work in four gated stages. Stage 1 adds optimistic concurrency and explicit conflict handling to project/task/workbench saves. Stage 2 closes reminders and acceptance-defect workflows. Stage 3 adds cross-project management views only as a demo first; formal implementation requires explicit user approval. Stage 4 hardens visibility, knowledge reuse, and production operations.
 
-**Tech Stack:** Spring Boot 3.5, MyBatis-Plus, Flyway, H2 migration tests, Vue 3, TypeScript, Ant Design Vue, Node test runner, Vite.
+**Tech Stack:** Spring Boot 3.5, MyBatis-Plus, Flyway, Testcontainers MySQL tests, Vue 3, TypeScript, Ant Design Vue, Node test runner, Vite.
 
 **Spec:** Approved enterprise-readiness plan from the 2026-09-09 conversation; current code baseline is the `main` branch after commits `5ad0a75` and `8a4a947`.
 

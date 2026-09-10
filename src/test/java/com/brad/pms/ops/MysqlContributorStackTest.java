@@ -32,7 +32,7 @@ class MysqlContributorStackTest {
     }
 
     @Test
-    void mysqlComposeIsALocalOnlyDatabaseAndDoesNotReplaceOceanbase() throws Exception {
+    void mysqlComposeIsALocalDatabaseOnlyStack() throws Exception {
         String compose = Files.readString(Path.of("docker-compose.mysql.yml"));
 
         assertThat(compose).contains("image: mysql:8.4");

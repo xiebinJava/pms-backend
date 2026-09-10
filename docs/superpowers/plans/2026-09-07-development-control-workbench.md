@@ -6,7 +6,7 @@
 
 **Architecture:** 后端以开发基线、专题、故事三张表保存规范化数据，通过一个 GET/PUT 聚合接口返回树和派生汇总；前端保留当前树形视觉结构，把静态 seed 替换成接口状态，并以小型弹窗承载新增和状态编辑。专题和故事负责人均复用项目成员选择，并在树表统一负责人列展示。
 
-**Tech stack:** Spring Boot, MyBatis-Plus, Flyway, H2/OceanBase-compatible SQL, React/Vue-compatible existing Vue frontend, Ant Design Vue, Vitest/Node assertions, Playwright fallback smoke test.
+**Tech stack:** Spring Boot, MyBatis-Plus, Flyway, MySQL SQL, React/Vue-compatible existing Vue frontend, Ant Design Vue, Vitest/Node assertions, Playwright fallback smoke test.
 
 ## Task 1: 固化规格并建立数据库模型
 
@@ -14,7 +14,7 @@
 
 - [x] 先写迁移测试，覆盖三张表、唯一键、状态/进度字段和外键关联。
 - [x] 添加开发基线、专题、故事表及索引。
-- [x] 同步 H2 基线 schema，保证新环境和迁移环境一致。
+- [x] 同步 schema.sql 基线，保证新环境和迁移环境一致。
 
 ## Task 2: 实现后端领域对象、聚合接口和权限校验
 

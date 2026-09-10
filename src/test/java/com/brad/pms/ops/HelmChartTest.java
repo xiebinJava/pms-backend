@@ -23,14 +23,14 @@ class HelmChartTest {
 
         assertThat(chart).contains("name: pms");
         assertThat(chart).contains("version: 1.0.0");
-        assertThat(values).contains("oceanbaseHost: oceanbase.example.com");
+        assertThat(values).contains("mysqlHost: mysql.example.com");
         assertThat(values).contains("corsAllowedOrigins: https://pms.example.com");
         assertThat(values).contains("bootstrapAdminEmail: alex.zhang@example.com");
         assertThat(values).contains("bootstrapAdminNameZh: 张伟");
         assertThat(values).contains("jwtSecret: replace_with_a_random_secret_at_least_32_bytes");
         assertThat(values).contains("serviceMonitor:\n  enabled: false");
         assertThat(values).contains("ingress:\n  enabled: false");
-        assertThat(readme).contains("does not install OceanBase");
+        assertThat(readme).contains("does not install MySQL");
         assertThat(readme).doesNotContain("tenant_id");
     }
 

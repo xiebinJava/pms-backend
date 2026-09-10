@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在前后端代码已进入远程 `main` 后，完成 OceanBase 私有化部署的发布验证、生产配置、备份恢复演练和开源交付收口。
+**Goal:** 在前后端代码已进入远程 `main` 后，完成 MySQL 私有化部署的发布验证、生产配置、备份恢复演练和开源交付收口。
 
-**Architecture:** 保持单企业本地部署，不引入多租户迁移。运行时数据库只使用 OceanBase `brad_pms`；后端以 Java 17/Spring Boot 3.5 提供 `/api`，前端以 Vue 3/Vite 提供静态应用，所有发布验证通过 CI 和可重复脚本完成。
+**Architecture:** 保持单企业本地部署，不引入多租户迁移。运行时数据库只使用 MySQL `pms`；后端以 Java 17/Spring Boot 3.5 提供 `/api`，前端以 Vue 3/Vite 提供静态应用，所有发布验证通过 CI 和可重复脚本完成。
 
-**Tech Stack:** Java 17、Spring Boot 3.5、Jakarta Validation/Servlet、MyBatis-Plus、OceanBase MySQL 兼容模式、Vue 3、TypeScript、Vite、pnpm、Docker Compose、GitHub Actions、Playwright。
+**Tech Stack:** Java 17、Spring Boot 3.5、Jakarta Validation/Servlet、MyBatis-Plus、MySQL 8、Vue 3、TypeScript、Vite、pnpm、Docker Compose、GitHub Actions、Playwright。
 
 **Spec:** `docs/operations/infrastructure-status.md`、`docs/operations/release-checklist.md`、`docs/operations/enterprise-upgrade-runbook.md`、`/Users/fs/Desktop/Project/pms-front/docs/frontend-design-system.md`
 
@@ -15,18 +15,18 @@
 - Task 1：本地收口完成。不可变 `v1.0.0` 标签仍为后端 `7cc2820`、前端 `1519e88736d2d9fe19c1e436b8a96cd66b1457bf`；当前本地 `main` 已追加代码、文档与集成工作流提交，待远程凭据可用后推送。
 - Task 2：后端/前端本地门禁与后端 CI 已完成；当前后端 187 个用例（0 失败、0 错误、1 跳过），前端 111 项通过，类型检查和构建通过；Playwright 桌面、390px 窄屏和手册录制均通过。跨仓库集成仍等待 `PMS_FRONT_REPO_READ_TOKEN`。
 - Task 3：配置、Compose、密钥材料和安全启动校验已完成自动化核查；生产密钥注入必须在目标企业环境执行。
-- Task 4：2026-09-01 已在本机真实 OceanBase 完成 V1–V10 幂等升级、逻辑备份、SHA-256、全表精确行数元数据、隔离空库恢复和关键数据比对；备份脚本版本排序/输入流问题已修复并通过回归测试。
+- Task 4：2026-09-01 已在本机 MySQL 完成 V1–V10 幂等升级、逻辑备份、SHA-256、全表精确行数元数据、隔离空库恢复和关键数据比对；备份脚本版本排序/输入流问题已修复并通过回归测试。
 - Task 5：2026-09-01 已在本机真实前后端完成邮箱登录、项目入口、桌面/390px Playwright 冒烟和使用手册录制；生产目标环境仍需用企业账号复验。
 - Task 6：发布文档与扩展能力评估已更新；跨仓库 Secret 和生产密钥仍是外部配置动作。
 
 ## Global Constraints
 
 - 远程主分支为 `main`，不存在 `master`；后端和前端均以远程 `main` 作为发布基线。
-- 单企业私有化部署；OceanBase 是唯一运行时数据库，H2 仅允许出现在测试配置。
+- 单企业私有化部署；MySQL 是唯一运行时数据库，测试使用 Testcontainers MySQL。
 - 不在仓库、日志或镜像中保存密码、JWT、SMTP 凭据、邀请 Token 或重置 Token。
 - 生产环境必须启用通知启动校验，关闭重置/邀请 Token 回显，并限制 CORS 和 Actuator 访问来源。
 - 每个任务先执行验证，再修复问题；完成后更新 `infrastructure-status.md` 或 `release-checklist.md` 并进行 review。
-- 备份恢复只允许写入明确的空目标库，不对现有 `brad_pms` 执行覆盖式恢复。
+- 备份恢复只允许写入明确的空目标库，不对现有 `pms` 执行覆盖式恢复。
 
 ---
 
@@ -119,7 +119,7 @@ Expected: 测试、类型检查和生产构建全部通过。
 
 - [ ] **Step 3: 触发并保存 GitHub Actions 结果**
 
-确认后端 CI、前端 CI 和后端集成工作流均在同一发布提交上运行，并检查 Docker 镜像 Trivy 高危扫描、SPDX SBOM、OceanBase 迁移幂等性、API smoke 和 Playwright 桌面/窄屏测试均为通过。
+确认后端 CI、前端 CI 和后端集成工作流均在同一发布提交上运行，并检查 Docker 镜像 Trivy 高危扫描、SPDX SBOM、MySQL 迁移幂等性、API smoke 和 Playwright 桌面/窄屏测试均为通过。
 
 - [ ] **Step 4: review 测试缺口**
 
@@ -141,20 +141,20 @@ git commit -m "docs: record release gate results"
 ### Task 3: 收口生产配置和密钥策略
 
 **Files:**
-- Verify/Modify: `.env.oceanbase.example`
+- Verify/Modify: `.env.mysql.example`
 - Verify/Modify: `docker-compose.example.yml`
-- Verify/Modify: `src/main/resources/application-oceanbase.yml`
+- Verify/Modify: `src/main/resources/application-mysql.yml`
 - Verify/Modify: `src/main/java/com/brad/pms/config/NotificationConfigurationValidator.java`
 - Modify: `docs/operations/enterprise-upgrade-runbook.md`
 - Modify: `docs/operations/release-checklist.md`
-- Test: `src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java`
+- Test: `src/test/java/com/brad/pms/config/MysqlRuntimeConfigurationTest.java`
 - Test: `src/test/java/com/brad/pms/config/NotificationConfigurationValidatorTest.java`
 
 **Deliverable:** 目标企业部署使用 `PMS_DEPLOYMENT_ENV=production`、强随机 JWT、正式 SMTP、最小权限 `pms_app`，且不会回显敏感 Token。
 
 - [ ] **Step 1: 生成目标环境密钥并通过密钥管理注入**
 
-使用目标环境的密钥管理器生成至少 32 字节 `PMS_JWT_SECRET`、`pms_app`/`pms_migrator` 密码和 SMTP 凭据；只将变量名写入 `.env.oceanbase.example`，禁止把值写入 Git。
+使用目标环境的密钥管理器生成至少 32 字节 `PMS_JWT_SECRET`、`pms_app`/`pms_migrator` 密码和 SMTP 凭据；只将变量名写入 `.env.mysql.example`，禁止把值写入 Git。
 
 - [ ] **Step 2: 固定生产安全变量**
 
@@ -164,7 +164,7 @@ git commit -m "docs: record release gate results"
 
 ```bash
 cd /Users/fs/Desktop/Project/pms-backend
-mvn -q -Dtest=OceanbaseConfigurationTest,NotificationConfigurationValidatorTest test
+mvn -q -Dtest=MysqlRuntimeConfigurationTest,NotificationConfigurationValidatorTest test
 git grep -nE 'AKIA[0-9A-Z]{16}|-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----' -- ':!target' ':!backups' || true
 ```
 
@@ -177,30 +177,30 @@ Expected: 配置测试通过，仓库不包含真实凭据；生产启动在缺�
 - [ ] **Step 5: Commit**
 
 ```bash
-git add .env.oceanbase.example docker-compose.example.yml src/main/resources/application-oceanbase.yml docs/operations/enterprise-upgrade-runbook.md docs/operations/release-checklist.md
+git add .env.mysql.example docker-compose.example.yml src/main/resources/application-mysql.yml docs/operations/enterprise-upgrade-runbook.md docs/operations/release-checklist.md
 git commit -m "chore: finalize production configuration contract"
 ```
 
 ---
 
-### Task 4: 完成 OceanBase 备份、恢复和故障演练
+### Task 4: 完成 MySQL 备份、恢复和故障演练
 
 **Files:**
-- Verify: `scripts/backup-oceanbase.sh`
+- Verify: `scripts/backup-mysql.sh`
 - Verify: `scripts/verify-backup.sh`
-- Verify: `scripts/restore-oceanbase.sh`
+- Verify: `scripts/restore-mysql.sh`
 - Verify: `scripts/enterprise-preflight.sh`
 - Verify: `scripts/verify-enterprise-migration.sh`
-- Create: `docs/operations/drill-records/2026-08-31-oceanbase-recovery.md`
+- Create: `docs/operations/drill-records/mysql-backup-restore.md`
 - Modify: `docs/operations/infrastructure-status.md`
 
-**Deliverable:** 在不触碰现有 `brad_pms` 数据的前提下完成一次可验证的备份、校验、空库恢复、迁移校验和应用切换演练。
+**Deliverable:** 在不触碰现有 `pms` 数据的前提下完成一次可验证的备份、校验、空库恢复、迁移校验和应用切换演练。
 
 - [ ] **Step 1: 对现有数据库执行只读预检**
 
 ```bash
 cd /Users/fs/Desktop/Project/pms-backend
-set -a; . ./.env.oceanbase.local; set +a
+set -a; . ./.env.mysql.local; set +a
 ./scripts/enterprise-preflight.sh
 ./scripts/verify-enterprise-migration.sh
 ```
@@ -211,8 +211,8 @@ Expected: 预检通过，记录 schema V6、关键表/索引/外键和唯一根�
 
 ```bash
 export PMS_BACKUP_DIR=/secure/pms-backups/2026-08-31
-./scripts/backup-oceanbase.sh
-backup_file=$(find "$PMS_BACKUP_DIR" -maxdepth 1 -type f -name 'brad_pms-*.sql.*' ! -name '*.sha256' | sort | tail -n 1)
+./scripts/backup-mysql.sh
+backup_file=$(find "$PMS_BACKUP_DIR" -maxdepth 1 -type f -name 'pms-*.sql.*' ! -name '*.sha256' | sort | tail -n 1)
 ./scripts/verify-backup.sh "$backup_file"
 ```
 
@@ -220,14 +220,14 @@ Expected: 生成压缩备份、`.sha256` 和 `.meta`，校验通过；备份目�
 
 - [ ] **Step 3: 恢复到明确的空目标库**
 
-创建一次性空库 `brad_pms_restore`，设置 `OCEANBASE_DATABASE=brad_pms_restore` 后执行：
+创建一次性空库 `pms_restore`，设置 `MYSQL_DB=pms_restore` 后执行：
 
 ```bash
-OCEANBASE_DATABASE=brad_pms_restore ./scripts/restore-oceanbase.sh --allow-empty-target "$backup_file"
-OCEANBASE_DATABASE=brad_pms_restore ./scripts/verify-enterprise-migration.sh
+MYSQL_DB=pms_restore ./scripts/restore-mysql.sh --allow-empty-target "$backup_file"
+MYSQL_DB=pms_restore ./scripts/verify-enterprise-migration.sh
 ```
 
-Expected: 空库恢复和 V6 校验通过；脚本拒绝非空目标，也不会覆盖 `brad_pms`。
+Expected: 空库恢复和 V6 校验通过；脚本拒绝非空目标，也不会覆盖 `pms`。
 
 - [ ] **Step 4: 执行故障路径演练**
 
@@ -240,8 +240,8 @@ Expected: 空库恢复和 V6 校验通过；脚本拒绝非空目标，也不会
 - [ ] **Step 6: Commit**
 
 ```bash
-git add docs/operations/drill-records/2026-08-31-oceanbase-recovery.md docs/operations/infrastructure-status.md
-git commit -m "docs: record OceanBase recovery drill"
+git add docs/operations/drill-records/mysql-backup-restore.md docs/operations/infrastructure-status.md
+git commit -m "docs: record MySQL recovery drill"
 ```
 
 ---
@@ -258,7 +258,7 @@ git commit -m "docs: record OceanBase recovery drill"
 
 - [ ] **Step 1: 按部署手册启动目标环境**
 
-使用正式密钥注入后执行 `docker compose -f docker-compose.example.yml up -d --build`；确认后端仅使用 `oceanbase` profile，前端通过 `/api` 访问后端，上传目录使用持久卷。
+使用正式密钥注入后执行 `docker compose -f docker-compose.example.yml up -d --build`；确认后端仅使用 `mysql` profile，前端通过 `/api` 访问后端，上传目录使用持久卷。
 
 - [ ] **Step 2: 执行服务级 smoke**
 
@@ -298,11 +298,11 @@ git commit -m "docs: record application acceptance"
 - Modify: `/Users/fs/Desktop/Project/pms-front/README.md`
 - Create: `docs/operations/releases/v0.1.0.md`
 
-**Deliverable:** 新用户可从 README 以 OceanBase 启动项目，发布版本包含迁移、回滚、备份、默认账号安全说明、CI 证据和已知限制。
+**Deliverable:** 新用户可从 README 以 MySQL 启动项目，发布版本包含迁移、回滚、备份、默认账号安全说明、CI 证据和已知限制。
 
 - [ ] **Step 1: 对齐两仓库 README**
 
-说明远程分支为 `main`、单企业部署边界、OceanBase 前置条件、`pms_app`/`pms_migrator` 职责、生产环境变量、健康检查和首次管理员初始化方式；明确测试 H2 不参与运行时。
+说明远程分支为 `main`、单企业部署边界、MySQL 前置条件、`pms_app`/`pms_migrator` 职责、生产环境变量、健康检查和首次管理员初始化方式；明确测试也不使用内存数据库。
 
 - [ ] **Step 2: 生成发布说明**
 
@@ -321,7 +321,7 @@ git -C /Users/fs/Desktop/Project/pms-front tag -a v0.1.0 -m "PMS frontend releas
 
 - [ ] **Step 4: 最终 review**
 
-核对代码、数据库、权限、日志、响应式布局、文案、文档和镜像扫描结果；确认没有随机生产 JWT、共享默认密码、H2 运行入口或未说明的人工步骤。
+核对代码、数据库、权限、日志、响应式布局、文案、文档和镜像扫描结果；确认没有随机生产 JWT、共享默认密码、内存数据库运行入口或未说明的人工步骤。
 
 - [ ] **Step 5: Commit and push**
 

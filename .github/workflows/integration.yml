@@ -12,7 +12,7 @@ on:
         default: main
 
 jobs:
-  oceanbase-and-browser:
+  mysql-and-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -44,20 +44,16 @@ jobs:
           umask 077
           root_password="$(openssl rand -hex 24)"
           app_password="$(openssl rand -hex 24)"
-          migrator_password="$(openssl rand -hex 24)"
           jwt_secret="$(openssl rand -hex 32)"
           admin_password="$(openssl rand -hex 16)"
-          for secret in "$root_password" "$app_password" "$migrator_password" "$jwt_secret" "$admin_password"; do
+          for secret in "$root_password" "$app_password" "$jwt_secret" "$admin_password"; do
             echo "::add-mask::$secret"
           done
           {
-            echo "OCEANBASE_ROOT_PASSWORD=$root_password"
-            echo "PMS_APP_PASSWORD=$app_password"
-            echo "PMS_MIGRATOR_PASSWORD=$migrator_password"
-            echo "PMS_APP_USERNAME=pms_app@test"
-            echo "PMS_MIGRATOR_USERNAME=pms_migrator@test"
-            echo "OCEANBASE_USER=pms_app@test"
-            echo "OCEANBASE_PASSWORD=$app_password"
+            echo "MYSQL_ROOT_PASSWORD=$root_password"
+            echo "MYSQL_USER=pms"
+            echo "MYSQL_PASSWORD=$app_password"
+            echo "MYSQL_DB=pms"
             echo "PMS_JWT_SECRET=$jwt_secret"
             echo "PMS_DEPLOYMENT_ENV=development"
             # The browser talks to the backend through the frontend container
@@ -76,7 +72,7 @@ jobs:
             echo "PMS_SMOKE_PASSWORD=$admin_password"
             echo "PMS_SMOKE_USERNAME=alex.zhang"
           } >> "$GITHUB_ENV"
-      - name: Start OceanBase, backend and frontend
+      - name: Start MySQL, backend and frontend
         run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml up -d --build frontend
       - name: Validate current release contract
         env:
@@ -86,14 +82,6 @@ jobs:
         run: bash scripts/validate-production-config.test.sh
       - name: Check shell scripts
         run: bash -n scripts/*.sh docker/*.sh
-      - name: Run read-only migration preflight
-        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm --entrypoint /bin/bash schema-init /usr/local/bin/enterprise-preflight.sh
-      - name: Re-run migrations to verify idempotency
-        run: |
-          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm schema-init
-          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm schema-init
-      - name: Verify enterprise migration
-        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml run --rm --entrypoint /bin/bash schema-init /usr/local/bin/verify-enterprise-migration.sh
       - name: Run API smoke test
         run: ./scripts/smoke-test.sh
       - name: Create browser acceptance project fixture
@@ -190,10 +178,8 @@ jobs:
         if: ${{ failure() && hashFiles('.env') != '' }}
         run: |
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml ps
-          docker inspect --format='{{json .State.Health}}' pms-backend-oceanbase-1 || true
-          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 oceanbase || true
-          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 accounts-init || true
-          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 schema-init || true
+          docker inspect --format='{{json .State.Health}}' pms-backend-mysql-1 || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 mysql || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 uploads-init || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=300 backend || true
           docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 frontend || true

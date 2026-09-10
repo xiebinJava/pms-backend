@@ -19,7 +19,7 @@
 - 组织和人员不做物理删除；离职禁用账号并结束任职，转岗保留旧任职历史。
 - 权限校验只能在后端授权；前端菜单与按钮隐藏不是安全边界。
 - 所有组织、人员、角色、授权、导入和会话撤销必须写入 `sys_operation_log`，且日志不得含密码、令牌或其哈希。
-- 迁移不得执行 `DROP`、`TRUNCATE` 或覆盖非空业务库；H2、MySQL 8、OceanBase MySQL 模式均须通过验证。
+- 迁移不得执行 `DROP`、`TRUNCATE` 或覆盖非空业务库；MySQL 8 须通过验证。
 - 管理页面沿用 PMS 设计系统；新增 `--pms-font-size-nav: 14px`，控件高度 36px，面板圆角 8px。
 
 ---
@@ -90,7 +90,7 @@ Use `ALTER TABLE ... ADD COLUMN` only through an idempotent Java compatibility g
 
 - [ ] **Step 5: Make fresh and existing schema initialization deterministic**
 
-Keep `schema.sql` as a legacy reference only; Flyway owns initialization in all profiles. Ensure the migration test starts H2 with Flyway enabled and verifies a second application context start does not duplicate indexes or seed rows.
+Keep `schema.sql` as a legacy reference only; Flyway owns initialization in all profiles. Ensure the migration test starts Testcontainers MySQL with Flyway enabled and verifies a second application context start does not duplicate indexes or seed rows.
 
 - [ ] **Step 6: Run migration verification**
 
@@ -101,7 +101,7 @@ Expected: PASS with all enterprise tables, `sys_user.username_normalized`, `sys_
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pom.xml src/main/resources/application.yml src/main/resources/application-mysql.yml src/main/resources/application-oceanbase.yml src/main/resources/db/migration/V1__baseline_project_schema.sql src/main/resources/db/migration/V2__enterprise_identity_org_rbac.sql src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java
+git add pom.xml src/main/resources/application.yml src/main/resources/application-mysql.yml src/main/resources/application-mysql.yml src/main/resources/db/migration/V1__baseline_project_schema.sql src/main/resources/db/migration/V2__enterprise_identity_org_rbac.sql src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java
 git commit -m "feat: add enterprise organization schema"
 ```
 
@@ -728,7 +728,7 @@ git -C /Users/fs/Desktop/Project/pms-front commit -m "feat: add enterprise confi
 - Create: `docs/operations/enterprise-upgrade-runbook.md`
 - Create: `scripts/enterprise-preflight.sh`
 - Create: `scripts/verify-enterprise-migration.sh`
-- Modify: `src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java`
+- Modify: `src/test/java/com/brad/pms/config/MysqlRuntimeConfigurationTest.java`
 - Create: `src/test/java/com/brad/pms/security/EnterpriseRegressionTest.java`
 
 **Interfaces:**
@@ -764,7 +764,7 @@ Run: `mvn -q test`
 
 Run: `mvn -q -Dspring.profiles.active=mysql -Dtest=EnterpriseSchemaMigrationTest,EnterpriseRegressionTest test`
 
-Run: `mvn -q -Dspring.profiles.active=oceanbase -Dtest=OceanbaseConfigurationTest,EnterpriseSchemaMigrationTest test`
+Run: `mvn -q -Dspring.profiles.active=mysql -Dtest=MysqlRuntimeConfigurationTest,EnterpriseSchemaMigrationTest test`
 
 Expected: PASS with database credentials supplied only through the documented runtime environment.
 
@@ -781,7 +781,7 @@ Document bootstrap administrator environment variables, SMTP optional behavior, 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add README.md docs/operations/enterprise-upgrade-runbook.md scripts/enterprise-preflight.sh scripts/verify-enterprise-migration.sh src/test/java/com/brad/pms/config/OceanbaseConfigurationTest.java src/test/java/com/brad/pms/security/EnterpriseRegressionTest.java
+git add README.md docs/operations/enterprise-upgrade-runbook.md scripts/enterprise-preflight.sh scripts/verify-enterprise-migration.sh src/test/java/com/brad/pms/config/MysqlRuntimeConfigurationTest.java src/test/java/com/brad/pms/security/EnterpriseRegressionTest.java
 git commit -m "docs: add enterprise upgrade runbook"
 git -C /Users/fs/Desktop/Project/pms-front add README.md design-qa.md
 git -C /Users/fs/Desktop/Project/pms-front commit -m "docs: document enterprise configuration release"

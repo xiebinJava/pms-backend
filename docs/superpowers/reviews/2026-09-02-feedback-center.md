@@ -15,7 +15,7 @@ V1 反馈中心已按产品规格完成前后端闭环，保留“项目评论�
 | 幂等 | 通过 | `reporter_id + client_request_id` 唯一索引；重复提交返回已有工单详情，不重复写入 |
 | 并发更新 | 通过 | `version` 乐观锁 + 行锁读取；更新影响行数为 0 时返回 409 |
 | 历史和审计 | 通过 | 创建、更新、重开均追加 `feedback_history` 并写 `sys_operation_log`；历史为追加式 |
-| 数据库 | 通过 | `V12__feedback_center.sql` 创建两张表、外键、索引、软删除和版本字段；H2 schema migration test 通过，运行时仍以 OceanBase 为准 |
+| 数据库 | 通过 | `V12__feedback_center.sql` 创建两张表、外键、索引、软删除和版本字段；Testcontainers MySQL 迁移测试通过，运行时以 MySQL 为准 |
 | 前端体验 | 通过 | `/feedback` 页面包含筛选表格、提交弹窗、详情抽屉、历史时间线、管理员处理控件和窄屏样式；使用现有 PMS 视觉 token |
 | 文档 | 通过 | 业务规范、运行/发布文档及前端使用手册已补充反馈中心和 V1–V12 基线 |
 
@@ -39,7 +39,7 @@ git diff --check
 
 ## 外部环境注意事项
 
-本地自动化使用 H2 验证迁移脚本语法，生产运行仍必须使用 OceanBase。目标企业上线前仍需在真实 OceanBase、正式 HTTPS/CORS/SMTP、企业测试账号和浏览器环境中重复执行发布验收；本次未提交任何真实凭据。
+本地自动化使用 Testcontainers MySQL 验证迁移脚本，生产运行仍必须使用 MySQL。目标企业上线前仍需在真实 MySQL、正式 HTTPS/CORS/SMTP、企业测试账号和浏览器环境中重复执行发布验收；本次未提交任何真实凭据。
 
 ## 2026-09-03 跟进审查
 
@@ -67,4 +67,4 @@ cd /Users/fs/Desktop/Project/pms-front
 git diff --check
 ```
 
-以上聚焦后端回归、后端全量测试、前端测试、类型检查、生产构建和两仓库差异空白检查均通过；真实 OceanBase/浏览器验收仍属于发布前环境验证，本地 review 不代替目标企业环境验收。
+以上聚焦后端回归、后端全量测试、前端测试、类型检查、生产构建和两仓库差异空白检查均通过；真实 MySQL/浏览器验收仍属于发布前环境验证，本地 review 不代替目标企业环境验收。

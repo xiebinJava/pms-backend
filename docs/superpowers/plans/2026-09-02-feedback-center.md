@@ -6,7 +6,7 @@
 
 **Architecture:** Keep feedback tickets separate from project comments. The backend owns validation, scope checks, state transitions, optimistic locking, idempotency, and audit history; the frontend consumes the ticket API and renders a single responsive feedback center for submitters and feedback managers.
 
-**Tech Stack:** Spring Boot 3.5, MyBatis-Plus, Flyway, OceanBase MySQL mode (H2 only in tests), Vue 3, TypeScript, Ant Design Vue, Pinia, Node test runner.
+**Tech Stack:** Spring Boot 3.5, MyBatis-Plus, Flyway, MySQL 8 (Testcontainers MySQL in tests), Vue 3, TypeScript, Ant Design Vue, Pinia, Node test runner.
 
 **Spec:** `docs/product-specs/pms-feedback-center.md`
 
@@ -15,7 +15,7 @@
 - V1 is for authenticated internal enterprise users only; no anonymous feedback.
 - Project comments remain unchanged and are not reused as feedback tickets.
 - All user-facing status/type/priority labels are Chinese; enum codes are lower-case in secondary text where the existing UI displays codes.
-- OceanBase is the runtime database; add one versioned Flyway migration and update readiness/docs to the new version.
+- MySQL is the runtime database; add one versioned Flyway migration and update readiness/docs to the new version.
 - Every write path must use RBAC, validate context ownership, record an operation log, and preserve history.
 - No production implementation code is written before a corresponding failing test is observed.
 
@@ -40,7 +40,7 @@
 
 - [x] **Step 1: Write the failing transition and schema assertions.** Assert the approved transitions, rejection of invalid transitions, and presence of both tables, their `version`/`deleted` columns, and idempotency indexes.
 - [x] **Step 2: Run `mvn -q -Dtest=FeedbackStatusTest,EnterpriseSchemaMigrationTest test` and verify failure because the types/migration do not exist.**
-- [x] **Step 3: Add the three enums, two MyBatis entities, V12 schema, permission constants, and migration seed bindings.** Update the readiness expected migration from 11 to 12 and keep V12 OceanBase/H2 compatible.
+- [x] **Step 3: Add the three enums, two MyBatis entities, V12 schema, permission constants, and migration seed bindings.** Update the readiness expected migration from 11 to 12 and keep V12 MySQL compatible.
 - [x] **Step 4: Run the focused tests and verify they pass.**
 - [x] **Step 5: Review the schema for foreign keys, soft delete, optimistic locking, unique ticket/client keys, and indexes before continuing.**
 
@@ -110,7 +110,7 @@
 - [x] **Step 2: Update migration references from V1–V11 to V1–V12 where they describe the current schema.**
 - [x] **Step 3: Run backend and frontend full verification commands, including schema migration tests and existing manual/navigation tests.**
 - [x] **Step 4: Self-review against every section of `docs/product-specs/pms-feedback-center.md`; record findings in `docs/superpowers/reviews/2026-09-02-feedback-center.md`.**
-- [x] **Step 5: Run `git diff --check` and report any unresolved external-environment requirements separately (real OceanBase deployment, credentials, or Playwright browser execution).**
+- [x] **Step 5: Run `git diff --check` and report any unresolved external-environment requirements separately (real MySQL deployment, credentials, or Playwright browser execution).**
 
 ---
 

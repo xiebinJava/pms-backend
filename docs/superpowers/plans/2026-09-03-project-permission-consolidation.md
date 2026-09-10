@@ -6,7 +6,7 @@
 
 **Architecture:** 后端以 `AuthorizationService` 负责功能权限、`DataScopeResolver` 负责范围、`ProjectPermissionService` 负责项目资源加载与 capability 聚合、`ProjectPermissionPolicy` 负责责任关系和生命周期规则。项目读取采用“权限码 + 固定全公司覆盖”，项目写入采用治理路径或责任路径，不把三者强行做交集。前端只消费后端 capability；文档同步维护业务规则、使用手册和角色矩阵。
 
-**Tech Stack:** Spring Boot, MyBatis-Plus, OceanBase/MySQL-compatible SQL, JUnit 5/Mockito, Vue 3, TypeScript, Vite, Vitest.
+**Tech Stack:** Spring Boot, MyBatis-Plus, MySQL/MySQL-compatible SQL, JUnit 5/Mockito, Vue 3, TypeScript, Vite, Vitest.
 
 **Spec:** `docs/superpowers/specs/2026-09-03-project-permission-consolidation-design.md`
 

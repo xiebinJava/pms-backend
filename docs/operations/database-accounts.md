@@ -1,47 +1,33 @@
-# OceanBase 账号职责
+# MySQL 账号职责
 
-PMS 采用单企业、单 OceanBase 租户部署，但不让应用使用 `root@sys`。账号初始化脚本只负责创建账号和授予权限，业务数据不会被删除或覆盖。
+PMS 采用单企业、单 MySQL 实例部署。Compose 用 `MYSQL_ROOT_PASSWORD` 初始化实例，并用 `MYSQL_USER` / `MYSQL_PASSWORD` 创建应用账号。后端启动时由 Flyway 执行迁移，不再使用独立的 migrator 镜像。
 
 ## 账号职责
 
 | 账号 | 使用场景 | 权限 |
 | --- | --- | --- |
-| `root@sys` | DBA 人工维护、首次账号初始化 | OceanBase 系统管理权限，不注入 backend |
-| `pms_migrator` | schema-init 和版本升级任务 | `brad_pms.*` 上的迁移 DDL 与必要 DML（包含对象级 `DROP`） |
-| `pms_app` | backend 日常运行 | `brad_pms.*` 上的 `SELECT/INSERT/UPDATE/DELETE` |
+| MySQL `root` | 首次初始化、逻辑备份、隔离恢复 | 不注入 backend |
+| `MYSQL_USER`（默认 `pms`） | backend 日常运行和 Flyway 迁移 | 业务库 `pms` 上的 DML 与迁移所需 DDL |
 
-`pms_app` 没有建表、改表结构、建索引或删除表权限。`pms_migrator` 的 `DROP` 仅限 `brad_pms.*` 对象，不具备 `DROP DATABASE` 或 `TRUNCATE` 能力；它不应作为长期应用连接账号使用，迁移任务完成后应退出或停止。
+不要把 `MYSQL_ROOT_PASSWORD` 写入 backend 环境变量。生产环境的 `MYSQL_USER` 不能是 `root`。
 
 ## 首次初始化
 
-生成三个独立的强密码（建议使用 `openssl rand -hex 32`），只写入本地 `.env.oceanbase.local` 或密钥管理系统：
+生成独立的强密码（建议使用 `openssl rand -hex 32`），只写入本地 `.env.mysql.local` 或密钥管理系统：
 
 ```bash
-cp .env.oceanbase.example .env.oceanbase.local
-# 编辑 OCEANBASE_ROOT_PASSWORD、PMS_APP_PASSWORD、PMS_MIGRATOR_PASSWORD
-docker compose --env-file .env.oceanbase.local -f docker-compose.example.yml up --build
+cp .env.mysql.example .env.mysql.local
+# 编辑 MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD、PMS_JWT_SECRET、PMS_BOOTSTRAP_ADMIN_PASSWORD
+docker compose --env-file .env.mysql.local -f docker-compose.example.yml up --build
 ```
 
-Compose 启动顺序为：OceanBase → `accounts-init` → `schema-init` → backend → frontend。重复运行账号初始化是幂等的；只有显式设置 `PMS_ROTATE_ACCOUNT_PASSWORDS=true` 才会轮换已存在账号的密码。
+Compose 启动顺序为：MySQL → `uploads-init` → backend（Flyway）→ frontend。
 
-## 已有数据库切换
+## 已有数据库
 
-已有 `brad_pms` 数据库时，先执行只读预检，再运行 `accounts-init` 创建账号，最后用 `pms_app` 启动 backend。不要把 `OCEANBASE_ROOT_PASSWORD` 写入 backend 的环境变量，也不要在迁移脚本中保存任何密码。
+已有 `pms` 数据库时，先备份再启动新版本后端。不要删除或重建业务库。
 
 ```bash
-PMS_DB_USER=pms_app PMS_DB_PASSWORD="$PMS_APP_PASSWORD" \
-  bash scripts/enterprise-preflight.sh
-
-docker compose --env-file .env.oceanbase.local -f docker-compose.example.yml run --rm accounts-init
+./scripts/backup-mysql.sh
+./scripts/enterprise-preflight.sh
 ```
-
-完成后用以下命令验证权限边界：
-
-```bash
-PMS_APP_PASSWORD="$PMS_APP_PASSWORD" \
-PMS_MIGRATOR_PASSWORD="$PMS_MIGRATOR_PASSWORD" \
-OCEANBASE_ROOT_PASSWORD="$OCEANBASE_ROOT_PASSWORD" \
-  bash scripts/check-oceanbase-privileges.sh
-```
-
-OceanBase 当前版本不支持 MySQL 临时表，因此脚本会创建一个带时间戳的权限探针表，再使用 root 清理；探针不会写入业务数据。

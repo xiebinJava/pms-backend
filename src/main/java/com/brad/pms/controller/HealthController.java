@@ -17,7 +17,7 @@ import java.util.Map;
 /** Minimal liveness/readiness probe for self-hosted deployments. */
 @RestController
 public class HealthController {
-    /** Keep readiness aligned with the highest checked-in OceanBase migration. */
+    /** Keep readiness aligned with the highest checked-in Flyway migration. */
     private static final int LATEST_MIGRATION_VERSION = 41;
 
     private final DataSource dataSource;
@@ -68,9 +68,9 @@ public class HealthController {
 
     private String latestMigrationVersion(Connection connection) throws Exception {
         try {
-            return queryLatest(connection, "pms_schema_migration_history");
-        } catch (Exception ignored) {
             return queryLatest(connection, "flyway_schema_history");
+        } catch (Exception ignored) {
+            return queryLatest(connection, "pms_schema_migration_history");
         }
     }
 

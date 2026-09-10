@@ -12,4 +12,4 @@ about: Report a reproducible backend defect
 ## Environment
 
 - PMS version:
-- Java / OceanBase versions:
+- Java / MySQL versions:

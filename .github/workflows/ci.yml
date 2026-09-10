@@ -24,10 +24,14 @@ jobs:
         run: bash scripts/validate-production-config.test.sh
       - name: Check shell scripts
         run: bash -n scripts/*.sh docker/*.sh
-      - name: Check runtime configuration does not enable H2
+      - name: Check repository does not ship H2 or OceanBase runtime
         run: |
-          if git grep -nE 'h2:|jdbc:h2|org\.h2' -- src/main/resources/application*.yml; then
-            echo 'H2 must remain test-only' >&2
+          if git grep -nE 'jdbc:h2|com\.h2database|org\.h2|spring\.h2' -- pom.xml src Dockerfile docker-compose*.yml; then
+            echo 'H2 is not supported at runtime or in tests' >&2
+            exit 1
+          fi
+          if git grep -nE 'oceanbase/oceanbase|SPRING_PROFILES_ACTIVE[=:][[:space:]]*oceanbase' -- src/main Dockerfile docker-compose*.yml; then
+            echo 'OceanBase is not a supported runtime' >&2
             exit 1
           fi
       - name: Check repository for private key material

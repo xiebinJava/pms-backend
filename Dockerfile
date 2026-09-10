@@ -20,7 +20,7 @@ COPY docker/healthcheck-backend.sh /usr/local/bin/healthcheck-backend.sh
 RUN chmod 0755 /usr/local/bin/healthcheck-backend.sh
 USER 10001
 
-ENV SPRING_PROFILES_ACTIVE=oceanbase
+ENV SPRING_PROFILES_ACTIVE=mysql
 ENV JAVA_TOOL_OPTIONS="-Djava.io.tmpdir=/tmp"
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["/usr/local/bin/healthcheck-backend.sh"]

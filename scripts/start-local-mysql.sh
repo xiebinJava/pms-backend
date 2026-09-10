@@ -68,11 +68,11 @@ if [[ -z "${PMS_BOOTSTRAP_ADMIN_PASSWORD:-}" || "${#PMS_BOOTSTRAP_ADMIN_PASSWORD
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "docker is required to start the contributor MySQL 8 stack" >&2
+  echo "docker is required to start the local MySQL 8 stack" >&2
   exit 2
 fi
 if ! docker compose version >/dev/null 2>&1; then
-  echo "docker compose is required to start the contributor MySQL 8 stack" >&2
+  echo "docker compose is required to start the local MySQL 8 stack" >&2
   exit 2
 fi
 if ! command -v java >/dev/null 2>&1; then

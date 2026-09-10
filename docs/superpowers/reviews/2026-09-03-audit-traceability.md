@@ -4,7 +4,7 @@
 
 ## 结论
 
-核心实现通过代码 Review、后端/前端自动化门禁、真实本地 OceanBase 验证和 API 验收。审计链路已支持项目上下文、结果、原因、请求 ID、操作人、IP/User-Agent、脱敏摘要、项目/权限变更查询和详情查看；服务已用包含最新代码的构建重新启动。
+核心实现通过代码 Review、后端/前端自动化门禁、真实本地 MySQL 验证和 API 验收。审计链路已支持项目上下文、结果、原因、请求 ID、操作人、IP/User-Agent、脱敏摘要、项目/权限变更查询和详情查看；服务已用包含最新代码的构建重新启动。
 
 ## 实现范围
 
@@ -26,7 +26,7 @@
 | 前端生产构建 | 通过：`npm run build` |
 | OpenAPI/发布一致性 | 通过：`validate-openapi.sh`、`release-consistency.test.sh` |
 | 脚本与差异检查 | 通过：`bash -n`、两仓库 `git diff --check` |
-| OceanBase V14 | 通过：迁移版本 14，企业表/列/索引/外键/角色/组织完整性校验通过 |
+| MySQL V14 | 通过：迁移版本 14，企业表/列/索引/外键/角色/组织完整性校验通过 |
 | 后端健康检查 | 通过：live/ready HTTP 200，`database=UP`、`migration=14` |
 | 真实 API 验收 | 通过：匿名 401、普通成员 403、管理员项目筛选/详情/request ID 查询通过 |
 | 验收数据清理 | 通过：`audit-acceptance-*` 项目共 5 条，5 条均为 `status=4, deleted=1` |

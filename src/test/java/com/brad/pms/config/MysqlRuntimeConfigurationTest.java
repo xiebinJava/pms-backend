@@ -12,36 +12,34 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class OceanbaseConfigurationTest {
+class MysqlRuntimeConfigurationTest {
 
     @Test
-    void oceanbaseProfileUsesTheDedicatedDatabaseAndRuntimeCredentials() throws Exception {
+    void mysqlProfileUsesExplicitCredentialsAndFlyway() throws Exception {
         List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
-                "oceanbase", new ClassPathResource("application-oceanbase.yml"));
+                "mysql", new ClassPathResource("application-mysql.yml"));
         PropertySource<?> source = sources.get(0);
 
         assertThat(source.getProperty("spring.datasource.driver-class-name"))
                 .isEqualTo("com.mysql.cj.jdbc.Driver");
         assertThat(source.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:mysql://${OCEANBASE_HOST:127.0.0.1}:${OCEANBASE_PORT:2881}/${OCEANBASE_DATABASE:brad_pms}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true");
-        assertThat(source.getProperty("spring.datasource.username"))
-                .isEqualTo("${OCEANBASE_USER}");
-        assertThat(source.getProperty("spring.datasource.password"))
-                .isEqualTo("${OCEANBASE_PASSWORD}");
-        assertThat(source.getProperty("spring.datasource.hikari.connection-timeout"))
-                .isEqualTo("${PMS_DB_CONNECTION_TIMEOUT_MS:3000}");
-        assertThat(source.getProperty("spring.datasource.hikari.validation-timeout"))
-                .isEqualTo("${PMS_DB_VALIDATION_TIMEOUT_MS:1000}");
+                .asString()
+                .contains("${MYSQL_HOST:127.0.0.1}")
+                .contains("${MYSQL_PORT:3306}")
+                .contains("${MYSQL_DB:pms}");
+        assertThat(source.getProperty("spring.datasource.username")).isEqualTo("${MYSQL_USER}");
+        assertThat(source.getProperty("spring.datasource.password")).isEqualTo("${MYSQL_PASSWORD}");
+        assertThat(source.getProperty("spring.flyway.enabled")).isEqualTo(true);
         assertThat(source.getProperty("spring.h2.console.enabled")).isNull();
     }
 
     @Test
-    void defaultRuntimeUsesOceanbaseAndRequiresExplicitJwtSecret() throws Exception {
+    void defaultRuntimeUsesMysqlAndRequiresExplicitJwtSecret() throws Exception {
         List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
                 "application", new FileSystemResource("src/main/resources/application.yml"));
         PropertySource<?> source = sources.get(0);
 
-        assertThat(source.getProperty("spring.profiles.default")).isEqualTo("oceanbase");
+        assertThat(source.getProperty("spring.profiles.default")).isEqualTo("mysql");
         assertThat(source.getProperty("spring.sql.init.mode")).isEqualTo("never");
         assertThat(source.getProperty("pms.jwt.secret")).isEqualTo("${PMS_JWT_SECRET:}");
         assertThat(source.getProperty("pms.security.cors.allowed-origins"))
@@ -49,14 +47,16 @@ class OceanbaseConfigurationTest {
     }
 
     @Test
-    void composeSeparatesRuntimeAndMigrationDatabaseAccounts() throws Exception {
+    void composeUsesMysqlAndTheApplicationAccount() throws Exception {
         String compose = Files.readString(Path.of("docker-compose.example.yml"));
 
-        assertThat(compose).contains("OCEANBASE_USER: ${PMS_APP_USERNAME:-pms_app@test}");
-        assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}");
-        assertThat(compose).contains("OCEANBASE_USER: ${PMS_MIGRATOR_USERNAME:-pms_migrator@test}");
-        assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}");
-        assertThat(compose).doesNotContain("OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}");
+        assertThat(compose).contains("image: mysql:8.4");
+        assertThat(compose).contains("MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER}");
+        assertThat(compose).contains("MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD}");
+        assertThat(compose).contains("SPRING_PROFILES_ACTIVE: mysql");
+        assertThat(compose).doesNotContain("oceanbase");
+        assertThat(compose).doesNotContain("accounts-init");
+        assertThat(compose).doesNotContain("schema-init");
     }
 
     @Test
@@ -71,26 +71,13 @@ class OceanbaseConfigurationTest {
     }
 
     @Test
-    void localOceanbaseExampleDeclaresSafeTaskReminderDefaults() throws Exception {
-        String example = Files.readString(Path.of(".env.oceanbase.example"));
+    void localMysqlExampleDeclaresSafeTaskReminderDefaults() throws Exception {
+        String example = Files.readString(Path.of(".env.mysql.example"));
 
         assertThat(example).contains(
                 "PMS_NOTIFICATION_TASK_REMINDER_ENABLED=false",
                 "PMS_NOTIFICATION_TASK_REMINDER_CRON=\"0 0 9 * * *\"",
                 "PMS_NOTIFICATION_TASK_REMINDER_ZONE=Asia/Shanghai",
                 "PMS_NOTIFICATION_TASK_REMINDER_DUE_SOON_DAYS=7");
-    }
-
-    @Test
-    void mysqlProfileAlsoRequiresExplicitCredentials() throws Exception {
-        List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
-                "mysql", new ClassPathResource("application-mysql.yml"));
-        PropertySource<?> source = sources.get(0);
-
-        assertThat(source.getProperty("spring.datasource.username"))
-                .isEqualTo("${MYSQL_USER}");
-        assertThat(source.getProperty("spring.datasource.password"))
-                .isEqualTo("${MYSQL_PASSWORD}");
-        assertThat(source.getProperty("spring.flyway.enabled")).isEqualTo(true);
     }
 }

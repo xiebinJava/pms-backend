@@ -8,7 +8,7 @@
 
 **Architecture:** 保留现有 `sys_operation_log` 作为跨模块操作审计主表，增加项目上下文、结果、原因和请求来源字段；用结构化 `AuditEvent` 统一写入，业务状态变更与成功审计在同一事务内提交。项目生命周期日志继续保留为领域历史，操作审计负责跨模块检索和权限变更追踪，二者不互相替代。
 
-**Tech Stack:** Java 17、Spring Boot、MyBatis-Plus、OceanBase MySQL 兼容模式、Flyway 迁移、Vue 3、TypeScript、Node test、Playwright。
+**Tech Stack:** Java 17、Spring Boot、MyBatis-Plus、MySQL 8、Flyway 迁移、Vue 3、TypeScript、Node test、Playwright。
 
 **Spec:** `docs/business-specification.md` §6、§11；`docs/product-specs/pms-project-collaboration-permission-lifecycle.md` §10；`docs/operations/release-checklist.md` 审计与可观测性条目。
 
@@ -270,7 +270,7 @@ Expected: PASS。
 - [x] **Step 2: 编写 API 验收脚本。** 使用环境变量注入的 QA 账号创建临时项目并执行匿名 401、普通成员 403、项目 ID/result/request ID 查询、详情查询和删除清理；脚本结束验证验收项目均为 `deleted=1`，不写入仓库凭据。
 - [ ] **Step 3: 增加浏览器验收。** 用系统管理员验证审计菜单、筛选、分页、详情抽屉和权限变更快捷筛选；用普通成员验证菜单不可见且直接访问返回 403；用 390×844 验证筛选和详情不横向溢出。
 - [x] **Step 4: 更新业务手册。** 明确哪些操作必留审计、哪些字段不留、谁能看审计、审计与项目读取/反馈权限的关系、保留期配置和 request ID 排查方法。
-- [x] **Step 5: 执行完整门禁。** 后端 225 tests（0 失败、0 错误、1 跳过）、前端 139 tests、类型检查、构建、OpenAPI、V14 OceanBase 和真实 API 验收均通过。
+- [x] **Step 5: 执行完整门禁。** 后端 225 tests（0 失败、0 错误、1 跳过）、前端 139 tests、类型检查、构建、OpenAPI、V14 MySQL 和真实 API 验收均通过。
 
 Run:
 
@@ -291,7 +291,7 @@ npm run build
 git diff --check
 ```
 
-Expected: 全部命令退出码为 0；OceanBase 隔离实例完成 V14 迁移并通过健康检查；API 与浏览器验收无失败；审计摘要不含敏感值，测试数据清理为 0。
+Expected: 全部命令退出码为 0；MySQL 隔离实例完成 V14 迁移并通过健康检查；API 与浏览器验收无失败；审计摘要不含敏感值，测试数据清理为 0。
 
 ## 分期边界
 
@@ -309,4 +309,4 @@ Expected: 全部命令退出码为 0；OceanBase 隔离实例完成 V14 迁移�
 - 普通成员不能调用审计 API；`project:read` 不会隐式获得 `admin:audit:read`。
 - 终止、恢复、回滚、停用等原因可追踪；已删除项目的审计仍可按项目 ID查看。
 - 审计写入失败会阻止成功业务提交；敏感字段、正文和二进制不会进入审计记录。
-- 后端、前端、OpenAPI、OceanBase V14 迁移、脚本和 API 验收全部通过，文档和权限矩阵同步更新；浏览器验收保留为环境恢复后的补验项。
+- 后端、前端、OpenAPI、MySQL V14 迁移、脚本和 API 验收全部通过，文档和权限矩阵同步更新；浏览器验收保留为环境恢复后的补验项。
