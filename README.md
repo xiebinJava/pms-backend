@@ -1,5 +1,8 @@
 # PMS（Project Management System）后端
 
+[![CI](https://github.com/xiebinJava/pms-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/xiebinJava/pms-backend/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时数据库只支持 OceanBase 的 MySQL 兼容模式；H2 仅用于自动化测试，不用于开发或生产运行。
 
 如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](https://github.com/xiebinJava/pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
