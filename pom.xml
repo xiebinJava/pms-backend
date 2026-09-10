@@ -35,7 +35,7 @@
         <logback.version>1.5.18</logback.version>
         <!-- Keep AWS SDK's Netty transport on the latest patched 4.1 line. -->
         <netty.version>4.1.136.Final</netty.version>
-        <mysql-connector-j.version>9.4.0</mysql-connector-j.version>
+        <mysql-connector-j.version>26.7.0</mysql-connector-j.version>
         <aws.sdk.version>2.31.78</aws.sdk.version>
     </properties>
 
