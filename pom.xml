@@ -64,8 +64,8 @@
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <!-- 7.2 remains compatible with Spring Boot 2.7's Logback 1.2 line. -->
-            <version>7.2</version>
+            <!-- 9.0 remains compatible with Spring Boot 2.7's Logback 1.2 line. -->
+            <version>9.0</version>
         </dependency>
 
         <!-- MyBatis-Plus -->
