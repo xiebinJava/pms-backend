@@ -2,9 +2,19 @@
 
 PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时数据库只支持 OceanBase 的 MySQL 兼容模式；H2 仅用于自动化测试，不用于开发或生产运行。
 
-如果你第一次接触这个项目，先看下面的“5 分钟启动”。如果你要把系统部署到企业环境，再看“生产部署”和运维文档。
+如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](../pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
 
-## 5 分钟启动（推荐）
+## 最终用户安装（推荐）
+
+```bash
+git clone YOUR_DISTRIBUTION_REPO_URL pms-distribution
+cd pms-distribution
+./scripts/bootstrap.sh
+```
+
+打开 <http://localhost:5173>。脚本会生成管理员密码并写入本地、未跟踪的 `.pms-bootstrap-secrets`。生产配置、升级和备份见发行仓库文档。
+
+## 从源码启动（开发者）
 
 ### 1. 准备环境
 
