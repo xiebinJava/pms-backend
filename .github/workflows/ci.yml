@@ -1,0 +1,62 @@
+name: backend-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run backend tests
+        run: mvn -q test
+      - name: Validate OpenAPI contract
+        run: ./scripts/validate-openapi.sh
+      - name: Validate current release contract
+        run: bash scripts/release-consistency.test.sh --backend-only
+      - name: Validate production configuration guards
+        run: bash scripts/validate-production-config.test.sh
+      - name: Check shell scripts
+        run: bash -n scripts/*.sh docker/*.sh
+      - name: Check repository does not ship H2 or OceanBase runtime
+        run: |
+          if git grep -nE 'jdbc:h2|com\.h2database|org\.h2|spring\.h2' -- pom.xml src Dockerfile docker-compose*.yml; then
+            echo 'H2 is not supported at runtime or in tests' >&2
+            exit 1
+          fi
+          if git grep -nE 'oceanbase/oceanbase|SPRING_PROFILES_ACTIVE[=:][[:space:]]*oceanbase' -- src/main Dockerfile docker-compose*.yml; then
+            echo 'OceanBase is not a supported runtime' >&2
+            exit 1
+          fi
+      - name: Check repository for private key material
+        run: |
+          if git grep -nE 'AKIA[0-9A-Z]{16}|-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----'; then
+            echo 'credential material detected in repository' >&2
+            exit 1
+          fi
+      - name: Check repository for company and personal identifiers
+        run: ./scripts/check-privacy.sh
+      - name: Build backend image for security scan
+        run: docker build --tag pms-backend:ci .
+      - name: Scan backend image (high and critical)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: pms-backend:ci
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+      - name: Generate backend SPDX SBOM
+        uses: anchore/sbom-action@v0.17.0
+        with:
+          image: pms-backend:ci
+          format: spdx-json
+          output-file: backend-sbom.spdx.json
+          artifact-name: backend-sbom.spdx.json

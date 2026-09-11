@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pms.fullname" . }}-backend
+  labels:
+    {{- include "pms.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  type: {{ .Values.backend.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.backend.service.port }}
+      targetPort: http
+  selector:
+    {{- include "pms.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+---
+# The frontend image proxies /api to http://backend:8080. Keep this alias
+# so a baked nginx.conf works without rebuilding the image.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.apiProxyHost }}
+  labels:
+    {{- include "pms.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.backend.service.port }}
+      targetPort: http
+  selector:
+    {{- include "pms.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+{{- if .Values.backend.management.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pms.fullname" . }}-backend-management
+  labels:
+    {{- include "pms.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend-management
+spec:
+  type: {{ .Values.backend.management.service.type }}
+  ports:
+    - name: management
+      port: {{ .Values.backend.management.port }}
+      targetPort: management
+  selector:
+    {{- include "pms.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+{{- end }}

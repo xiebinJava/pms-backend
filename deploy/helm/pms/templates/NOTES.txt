@@ -1,0 +1,26 @@
+PMS 是单企业 Chart，不会安装 MySQL。
+
+1. 安装前先构建并加载自己的镜像：
+
+   docker build -t {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }} .
+   docker build -t {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }} ../pms-front
+
+2. 把 backend.env.mysqlHost 指向已有的 MySQL 8，
+   并用 --set-file 或 --set existingSecret=... 注入密钥。
+
+3. 前端镜像会把 /api 代理到 Service "{{ .Values.frontend.apiProxyHost }}"。
+   同一个命名空间里只应有一份 PMS 使用该名称。
+
+4. Actuator 位于 ClusterIP 端口 {{ .Values.backend.management.port }}。
+   不要把该 Service 挂到 Ingress。仅在集群已有
+   prometheus-operator 时启用 serviceMonitor。
+
+{{- if .Values.ingress.enabled }}
+
+访问 https://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+
+可用 port-forward 打开前端：
+
+  kubectl port-forward svc/{{ include "pms.fullname" . }}-frontend 5173:{{ .Values.frontend.service.port }}
+{{- end }}

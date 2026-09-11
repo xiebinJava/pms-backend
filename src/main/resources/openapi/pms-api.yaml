@@ -1,0 +1,1843 @@
+openapi: 3.0.3
+info:
+  title: PMS 项目管理 API
+  version: 1.0.0
+  description: 单企业私有化部署的项目、组织和权限管理接口。
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: /api
+tags:
+  - name: 认证
+  - name: 项目
+  - name: 任务与节点
+  - name: 组织与权限
+  - name: 导入与审计
+  - name: 反馈
+  - name: 健康检查
+paths:
+  /auth/providers:
+    get:
+      tags: [认证]
+      security: []
+      summary: 当前部署启用的登录方式
+      responses:
+        '200':
+          description: 登录方式列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /auth/oidc/start:
+    get:
+      tags: [认证]
+      security: []
+      summary: 开始 OIDC 授权码登录
+      responses:
+        '200':
+          description: 返回授权地址
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+  /auth/oidc/callback:
+    post:
+      tags: [认证]
+      security: []
+      summary: 用 OIDC 授权码换取本系统会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/ldap/login:
+    post:
+      tags: [认证]
+      security: []
+      summary: 目录账号登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+  /auth/login:
+    post:
+      tags: [认证]
+      security: []
+      summary: 邮箱登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/refresh:
+    post:
+      tags: [认证]
+      security: []
+      summary: 刷新访问令牌
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [认证]
+      summary: 退出并撤销当前刷新会话
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/password/change:
+    post:
+      tags: [认证]
+      summary: 修改当前用户密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/me:
+    get:
+      tags: [认证]
+      summary: 当前用户
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/activate:
+    post:
+      tags: [认证]
+      security: []
+      summary: 使用邀请令牌激活账号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /auth/password-reset/request:
+    post:
+      tags: [认证]
+      security: []
+      summary: 申请密码重置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/password-reset/confirm:
+    post:
+      tags: [认证]
+      security: []
+      summary: 确认密码重置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /users/search:
+    get:
+      tags: [组织与权限]
+      summary: 按姓名或邮箱搜索用户
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /workbench:
+    get:
+      tags: [项目]
+      summary: 当前用户工作台聚合（我的任务、参与项目、最近动态）
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /notifications:
+    get:
+      tags: [项目]
+      summary: 当前用户站内通知
+      parameters:
+        - name: unreadFirst
+          in: query
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /notifications/page:
+    get:
+      tags: [项目]
+      summary: 分页查询当前用户可见的站内通知
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string, enum: [TASK_DUE_SOON, TASK_OVERDUE] }
+          description: 仅支持临期或逾期提醒类型；省略表示全部类型
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - name: currPage
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /notifications/unread-count:
+    get:
+      tags: [项目]
+      summary: 未读通知数量
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /notifications/{id}/read:
+    post:
+      tags: [项目]
+      summary: 将一条通知标为已读
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /notifications/read-all:
+    post:
+      tags: [项目]
+      summary: 将全部通知标为已读
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /search:
+    get:
+      tags: [项目]
+      summary: 在可读范围内搜索项目、任务和评论
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/page:
+    post:
+      tags: [项目]
+      summary: 项目分页查询
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keyword: { type: string }
+                status: { type: integer }
+                view: { type: string, enum: [MINE, PORTFOLIO, ALL] }
+                orgUnitId: { type: integer, format: int64 }
+                projectManagerId: { type: integer, format: int64 }
+                projectLevel: { type: integer, enum: [0, 1, 2, 3] }
+                attention: { type: string, enum: [ACTIVE, OVERDUE, NO_MANAGER, STALE_NODE] }
+                currentNodeKey: { type: string }
+                currPage: { type: integer, minimum: 1, default: 1 }
+                pageSize: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /projects:
+    post:
+      tags: [项目]
+      summary: 创建项目
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                priority: { type: integer, minimum: 0, maximum: 3, description: 低、中、高、紧急 }
+                projectLevel: { type: integer, enum: [0, 1, 2, 3], default: 0, description: 0常规(C)、1重要(B)、2关键(A)、3战略(S) }
+                orgUnitId: { type: integer, format: int64 }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [项目]
+      summary: 项目详情
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [项目]
+      summary: 更新项目
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                priority: { type: integer, minimum: 0, maximum: 3, description: 低、中、高、紧急 }
+                projectLevel: { type: integer, enum: [0, 1, 2, 3], description: 0常规(C)、1重要(B)、2关键(A)、3战略(S) }
+                orgUnitId: { type: integer, format: int64 }
+                projectManagerId: { type: integer, format: int64, nullable: true }
+                memberIds: { type: array, items: { type: integer, format: int64 } }
+                expectedMemberIds: { type: array, items: { type: integer, format: int64 }, description: 客户端上次看到的成员集合，用于避免覆盖并发自动加入的成员 }
+                followerIds: { type: array, items: { type: integer, format: int64 } }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [项目]
+      summary: 删除项目
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/stats:
+    get:
+      tags: [项目]
+      summary: 项目统计
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /projects/summary:
+    post:
+      tags: [项目]
+      summary: 项目列表摘要
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keyword: { type: string }
+                status: { type: integer }
+                view: { type: string, enum: [MINE, PORTFOLIO, ALL] }
+                orgUnitId: { type: integer, format: int64 }
+                projectManagerId: { type: integer, format: int64 }
+                projectLevel: { type: integer, enum: [0, 1, 2, 3] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /projects/{id}/terminate:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [项目]
+      summary: 终止项目
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [项目]
+      summary: 恢复已终止项目
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [任务与节点]
+      summary: 项目任务列表
+      parameters:
+        - name: nodeId
+          in: query
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [任务与节点]
+      summary: 新建任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requirementId: { type: integer, format: int64, nullable: true, description: 关联当前需求澄清节点且已确认的需求编号 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [任务与节点]
+      summary: 任务详情（含子任务、任务评论和附件）
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 更新任务
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requirementId: { type: integer, format: int64, nullable: true, description: 替换为当前节点下已确认的需求 }
+                clearRequirement: { type: boolean, description: 清除当前任务的需求关联 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [任务与节点]
+      summary: 删除任务
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}/attachments:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [任务与节点]
+      summary: 上传任务附件（图片或 PDF）
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}/attachments/{attachmentId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: attachmentId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    get:
+      tags: [任务与节点]
+      summary: 下载任务附件
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [任务与节点]
+      summary: 删除任务附件
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /tasks/{id}/move:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [任务与节点]
+      summary: 拖拽变更任务状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/nodes:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [任务与节点]
+      summary: 项目节点列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/nodes/{nodeId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 完成节点
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/rollback:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 回滚节点
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/owner:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    put:
+      tags: [任务与节点]
+      summary: 设置节点负责人
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/nodes/{nodeId}/schedule:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    put:
+      tags: [任务与节点]
+      summary: 更新节点排期
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/nodes/{nodeId}/requirements-scope:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取需求澄清范围基线
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存需求澄清范围基线草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeRequirementScopeUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/requirements-scope/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 确认需求澄清范围基线
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取方案设计评审决策工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存方案包草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionPackageUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/submit:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 提交方案包
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: integer, minimum: 0, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/reviews/{reviewType}/complete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+      - name: reviewType
+        in: path
+        required: true
+        schema: { type: string, enum: [BUSINESS_PRODUCT, TECHNICAL, TEST_RELEASE] }
+    post:
+      tags: [任务与节点]
+      summary: 完成一类方案评审
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionReviewCompleteRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/reviews/{reviewType}/reviewer:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+      - name: reviewType
+        in: path
+        required: true
+        schema: { type: string, enum: [BUSINESS_PRODUCT, TECHNICAL, TEST_RELEASE] }
+    put:
+      tags: [任务与节点]
+      summary: 设置方案评审人
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionReviewerUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/reviews/{reviewType}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+      - name: reviewType
+        in: path
+        required: true
+        schema: { type: string, enum: [BUSINESS_PRODUCT, TECHNICAL, TEST_RELEASE] }
+    put:
+      tags: [任务与节点]
+      summary: 更新方案评审建议
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionReviewUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/decision/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 确认方案决策
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionDecisionConfirmRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/solution-design/decision:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    put:
+      tags: [任务与节点]
+      summary: 保存方案决策草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeSolutionDecisionUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/acceptance:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取业务验收与缺陷闭环工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存业务验收草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeAcceptanceUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/development-control:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取开发测试与项目控制工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存开发专题、故事和状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeDevelopmentControlUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/plan-resource-risk:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取计划、资源与风险基线（含迭代计划）
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存计划、资源、风险和迭代计划草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodePlanResourceRiskUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/plan-resource-risk/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 确认计划、资源、风险和迭代计划基线
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/iteration-plans:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [任务与节点]
+      summary: 获取当前项目已确认的迭代计划
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/nodes/{nodeId}/release:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取发布决策与运营交接工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存发布决策与运营交接草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeReleaseUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/value-review:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取价值验证与项目复盘工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存价值验证与项目复盘草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeValueReviewUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/knowledge-standard:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    get:
+      tags: [任务与节点]
+      summary: 获取知识沉淀与标准改进工作台
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [任务与节点]
+      summary: 保存知识资产和改进行动草稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeKnowledgeStandardUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/nodes/{nodeId}/acceptance/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/NodeId'
+    post:
+      tags: [任务与节点]
+      summary: 确认业务验收结论
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/members:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [项目]
+      summary: 项目成员列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [项目]
+      summary: 添加项目成员
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/members/{memberId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: memberId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [项目]
+      summary: 移除项目成员
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/followers:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [项目]
+      summary: 项目关注人列表
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /projects/{projectId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [项目]
+      summary: 项目动态列表；传入 taskId 时仅返回该任务评论
+      parameters:
+        - name: taskId
+          in: query
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [项目]
+      summary: 发布项目动态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /comments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [项目]
+      summary: 删除动态
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /feedback/tickets:
+    get:
+      tags: [反馈]
+      summary: 查询反馈工单
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 160 }
+        - name: feedbackType
+          in: query
+          schema: { type: string, description: 反馈类型编码 }
+        - name: priority
+          in: query
+          schema: { type: string, description: 优先级编码 }
+        - name: status
+          in: query
+          schema: { type: string, description: 状态编码 }
+        - name: currPage
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [反馈]
+      summary: 提交反馈工单
+      description: 已登录用户提交反馈；clientRequestId 与提交人组合用于幂等保护。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreateRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /feedback/tickets/assignees:
+    get:
+      tags: [反馈]
+      summary: 查询反馈负责人候选人
+      description: 仅返回当前处理人数据范围内、处于启用状态的人员。
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /feedback/tickets/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [反馈]
+      summary: 查看反馈详情和处理历史
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [反馈]
+      summary: 分诊并更新反馈工单
+      description: 处理人必须携带 version；服务端按数据范围和状态机校验状态、优先级、负责人及处理说明。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackUpdateRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /feedback/tickets/{id}/reopen:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [反馈]
+      summary: 重新打开反馈工单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackReopenRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /projects/{projectId}/images:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      tags: [项目]
+      summary: 上传项目图片
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /projects/{projectId}/images/{filename}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: filename
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [项目]
+      summary: 读取项目图片
+      responses:
+        '200': { description: 图片二进制 }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [项目]
+      summary: 删除项目图片
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/org/tree:
+    get:
+      tags: [组织与权限]
+      summary: 查询组织树
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /org/tree:
+    get:
+      tags: [组织与权限]
+      summary: 查询项目可用组织树
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/org:
+    post:
+      tags: [组织与权限]
+      summary: 新增组织单元
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/org/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 更新组织单元
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [组织与权限]
+      summary: 停用组织单元
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/org/{id}/move:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 移动组织节点
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/org/{id}/history:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [组织与权限]
+      summary: 查询组织变更历史
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users:
+    get:
+      tags: [组织与权限]
+      summary: 查询人员
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users/invite:
+    post:
+      tags: [组织与权限]
+      summary: 邀请员工
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /admin/users/{id}/reinvite:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [组织与权限]
+      summary: 重新发送待激活账号的激活链接
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /admin/users/page:
+    get:
+      tags: [组织与权限]
+      summary: 人员分页
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users/{id}/primary-position:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 设置主归属
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/part-time-positions:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [组织与权限]
+      summary: 添加兼职归属
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/part-time-positions/{positionId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: positionId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [组织与权限]
+      summary: 移除兼职归属
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/roles/{roleId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: roleId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      tags: [组织与权限]
+      summary: 授予角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [组织与权限]
+      summary: 撤销角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/users/{id}/disable:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [组织与权限]
+      summary: 停用账号并撤销会话
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/roles:
+    get:
+      tags: [组织与权限]
+      summary: 查询角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [组织与权限]
+      summary: 创建角色
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/roles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [组织与权限]
+      summary: 更新角色
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [组织与权限]
+      summary: 删除角色
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /admin/import/preview/organizations:
+    post:
+      tags: [导入与审计]
+      summary: 预览组织 Excel/CSV 导入
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/import/preview/users:
+    post:
+      tags: [导入与审计]
+      summary: 预览员工 Excel/CSV 导入
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/BusinessError' }
+  /admin/import/{jobId}/commit:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [导入与审计]
+      summary: 提交导入任务
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/import/{jobId}/errors.csv:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [导入与审计]
+      summary: 下载导入错误报告
+      responses:
+        '200': { description: CSV 错误报告 }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/import/template/organizations.csv:
+    get:
+      tags: [导入与审计]
+      summary: 下载组织导入模板
+      responses:
+        '200': { description: CSV 模板 }
+  /admin/import/template/users.csv:
+    get:
+      tags: [导入与审计]
+      summary: 下载员工导入模板
+      responses:
+        '200': { description: CSV 模板 }
+  /admin/audit:
+    get:
+      tags: [导入与审计]
+      summary: 分页查询审计日志
+      parameters:
+        - { name: action, in: query, required: false, schema: { type: string } }
+        - { name: resourceType, in: query, required: false, schema: { type: string } }
+        - { name: resourceId, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: operatorId, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: projectId, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: result, in: query, required: false, schema: { type: string, enum: [SUCCESS, FAILURE] } }
+        - { name: requestId, in: query, required: false, schema: { type: string } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date-time, description: 半开区间结束时间，不包含该时刻 } }
+        - { name: currPage, in: query, required: false, schema: { type: integer, format: int64, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, required: false, schema: { type: integer, format: int64, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/audit/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [导入与审计]
+      summary: 查看审计日志详情
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /health:
+    get:
+      tags: [健康检查]
+      security: []
+      summary: 就绪探针
+      responses:
+        '200': { description: 数据库和迁移就绪 }
+        '503': { description: 服务未就绪 }
+  /healthz:
+    get:
+      tags: [健康检查]
+      security: []
+      summary: 就绪探针别名
+      responses:
+        '200': { description: 数据库和迁移就绪 }
+        '503': { description: 服务未就绪 }
+  /health/ready:
+    get:
+      tags: [健康检查]
+      security: []
+      summary: 就绪探针
+      responses:
+        '200': { description: 数据库和迁移就绪 }
+        '503': { description: 服务未就绪 }
+  /health/live:
+    get:
+      tags: [健康检查]
+      security: []
+      summary: 存活探针
+      responses:
+        '200': { description: 进程存活 }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    NodeId:
+      name: nodeId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, description: 登录邮箱，不区分大小写 }
+        username: { type: string, deprecated: true, description: 兼容旧客户端的英文名，不区分大小写 }
+        password: { type: string, format: password }
+    FeedbackCreateRequest:
+      type: object
+      required: [title, content, feedbackType]
+      properties:
+        title: { type: string, maxLength: 160 }
+        content: { type: string, maxLength: 5000 }
+        feedbackType: { type: string, description: QUESTION、BUG、FEATURE、UX、DATA、PERMISSION 或 OTHER }
+        priority: { type: string, description: LOW、NORMAL、HIGH 或 URGENT }
+        projectId: { type: integer, format: int64 }
+        taskId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        contextModule: { type: string, maxLength: 80 }
+        sourceUrl: { type: string, maxLength: 1000 }
+        clientRequestId: { type: string, maxLength: 80, description: 与提交人组合的幂等请求号 }
+    FeedbackUpdateRequest:
+      type: object
+      required: [version]
+      properties:
+        status: { type: string }
+        priority: { type: string }
+        assigneeId: { type: integer, format: int64, nullable: true }
+        resolutionNote: { type: string, maxLength: 2000 }
+        version: { type: integer, minimum: 0 }
+    FeedbackReopenRequest:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 0 }
+        note: { type: string, maxLength: 2000 }
+    NodeRequirementScopeUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的基线版本；版本冲突返回 409 }
+        scopeItems: { type: array, description: 纳入/不纳入范围项 }
+        requirements: { type: array, description: 需求清单；新增或修改的条目需重新确认；每条需求返回 taskCount 和 completedTaskCount }
+    NodeRequirementScopeResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        baselineStatus: { type: integer, description: 0 草稿，1 已确认 }
+        confirmedBy: { type: integer, format: int64, nullable: true }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        canEdit: { type: boolean }
+        scopeItems: { type: array }
+        requirements: { type: array }
+    NodeSolutionPackageUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的方案包版本；版本冲突返回 409 }
+        productSolution: { type: string, maxLength: 4000 }
+        technicalSolution: { type: string, maxLength: 4000 }
+    NodeSolutionReviewerUpdateRequest:
+      type: object
+      required: [reviewerId]
+      properties:
+        reviewerId: { type: integer, format: int64, description: 项目成员用户 ID }
+    NodeSolutionReviewUpdateRequest:
+      type: object
+      properties:
+        comment: { type: string, maxLength: 2000, nullable: true, description: 可选评审建议 }
+    NodeSolutionReviewCompleteRequest:
+      type: object
+      properties:
+        comment: { type: string, maxLength: 2000 }
+    NodeSolutionDecisionConfirmRequest:
+      type: object
+      required: [result]
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的决策版本；版本冲突返回 409 }
+        result: { type: string, enum: [PASS, CONDITIONAL_PASS, RETURN_FOR_CHANGES] }
+        conditions: { type: string, maxLength: 2000, description: 有条件通过时必填 }
+    NodeSolutionDecisionUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的决策版本；版本冲突返回 409 }
+        result: { type: string, enum: [PASS, CONDITIONAL_PASS, RETURN_FOR_CHANGES], nullable: true }
+        conditions: { type: string, maxLength: 2000, description: 有条件通过时填写；草稿阶段可为空 }
+    NodeSolutionDesignResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        upstreamBaseline: { type: object, description: 需求范围基线只读摘要 }
+        solutionPackage: { type: object, description: 单个方案包 }
+        reviews: { type: array, description: 固定三类必要评审 }
+        decision: { type: object, description: 方案决策及锁定状态 }
+    NodeAcceptanceUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的验收版本；版本冲突返回 409 }
+        result: { type: string, enum: [PENDING, PASS, CONDITIONAL_PASS] }
+        residualItems: { type: string, maxLength: 2000 }
+        items: { type: array, description: 来自已确认需求的验收项结果和验证摘要 }
+    NodeAcceptanceResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        status: { type: integer, description: 0 草稿，1 已确认 }
+        sourceBaselineVersion: { type: integer, minimum: 0, nullable: true, description: 当前验收所对应的需求范围基线版本 }
+        sourceBaselineChanged: { type: boolean, description: 需求范围基线变更后当前验收需要重新编辑并保存 }
+        result: { type: string, enum: [PENDING, PASS, CONDITIONAL_PASS] }
+        residualItems: { type: string, nullable: true }
+        confirmedBy: { type: integer, format: int64, nullable: true }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        canEdit: { type: boolean }
+        items: { type: array }
+        defects: { type: array, description: 只读的关联缺陷摘要 }
+    NodeDevelopmentControlUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的开发控制版本；版本冲突返回 409 }
+        currentIteration: { type: string, maxLength: 120 }
+        topics:
+          type: array
+          description: 专题及其故事树；选择专题或故事负责人后会自动加入项目成员
+          items: { $ref: '#/components/schemas/NodeDevelopmentTopic' }
+    NodeDevelopmentControlResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        currentIteration: { type: string, nullable: true }
+        canEdit: { type: boolean }
+        summary: { type: object, description: 从故事状态和进度派生的项目汇总 }
+        topics:
+          type: array
+          description: 专题和故事树
+          items: { $ref: '#/components/schemas/NodeDevelopmentTopic' }
+    NodeDevelopmentTopic:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        latestBuildVersion: { type: string, nullable: true }
+        testStatus: { type: string }
+        status: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        blocker: { type: string, nullable: true }
+        sort: { type: integer }
+        stories:
+          type: array
+          items: { $ref: '#/components/schemas/NodeDevelopmentStory' }
+    NodeDevelopmentStory:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        iterationPlanId: { type: integer, format: int64, nullable: true, description: 所属迭代计划；可为空 }
+        iterationPlanName: { type: string, nullable: true }
+        status: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        storyPoints: { type: integer, minimum: 0, maximum: 1000 }
+        startDate: { type: string, format: date, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        blocker: { type: string, nullable: true }
+        sort: { type: integer }
+    NodeIterationPlan:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string, maxLength: 200 }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        goal: { type: string, nullable: true, maxLength: 500 }
+        status: { type: string, enum: [PLANNED, IN_PROGRESS, DONE] }
+        startDate: { type: string, format: date, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        sort: { type: integer }
+    NodeIterationPlanInput:
+      allOf:
+        - $ref: '#/components/schemas/NodeIterationPlan'
+    NodePlanResourceRiskUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的基线版本 }
+        iterationPlans:
+          type: array
+          items: { $ref: '#/components/schemas/NodeIterationPlanInput' }
+        resources: { type: array }
+        risks: { type: array }
+    NodePlanResourceRiskResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        baselineStatus: { type: integer, description: 0 草稿，1 已确认 }
+        sourceDecisionChanged: { type: boolean }
+        canEdit: { type: boolean }
+        iterationPlans:
+          type: array
+          items: { $ref: '#/components/schemas/NodeIterationPlan' }
+        resources: { type: array }
+        risks: { type: array }
+    NodeReleaseUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的发布交接版本；版本冲突返回 409 }
+        releaseVersion: { type: string, maxLength: 120 }
+        releaseWindowStart: { type: string, format: date-time, nullable: true }
+        releaseWindowEnd: { type: string, format: date-time, nullable: true }
+        releaseType: { type: string, enum: [FULL, GRAY, HOTFIX] }
+        packageReady: { type: boolean }
+        configConfirmed: { type: boolean }
+        rollbackReady: { type: boolean }
+        monitoringConfirmed: { type: boolean }
+        onCallConfirmed: { type: boolean }
+        decisionResult: { type: string, enum: [PENDING, APPROVED, DEFERRED, CANCELLED] }
+        decisionNote: { type: string, maxLength: 2000 }
+        handoverNotes: { type: string, maxLength: 2000 }
+        observationItems: { type: string, maxLength: 2000 }
+        emergencyContact: { type: string, maxLength: 500 }
+    NodeReleaseResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        releaseVersion: { type: string, nullable: true }
+        releaseWindowStart: { type: string, format: date-time, nullable: true }
+        releaseWindowEnd: { type: string, format: date-time, nullable: true }
+        releaseType: { type: string, enum: [FULL, GRAY, HOTFIX] }
+        packageReady: { type: boolean }
+        configConfirmed: { type: boolean }
+        rollbackReady: { type: boolean }
+        monitoringConfirmed: { type: boolean }
+        onCallConfirmed: { type: boolean }
+        decisionResult: { type: string, enum: [PENDING, APPROVED, DEFERRED, CANCELLED] }
+        decisionNote: { type: string, nullable: true }
+        handoverNotes: { type: string, nullable: true }
+        observationItems: { type: string, nullable: true }
+        emergencyContact: { type: string, nullable: true }
+        canEdit: { type: boolean }
+    NodeValueReviewUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的价值复盘版本；版本冲突返回 409 }
+        resultStatus: { type: string, enum: [PENDING, ACHIEVED, PARTIAL, NOT_ACHIEVED] }
+        actualResult: { type: string, maxLength: 4000 }
+        retrospectiveConclusion: { type: string, maxLength: 4000 }
+        followUpActions: { type: string, maxLength: 2000 }
+    NodeKnowledgeStandardUpdateRequest:
+      type: object
+      properties:
+        version: { type: integer, minimum: 0, nullable: true, description: 已读取的知识工作台版本；版本冲突返回 409 }
+        assets:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAsset' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAction' }
+    NodeKnowledgeStandardResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        canEdit: { type: boolean }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        assets:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAsset' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/NodeKnowledgeAction' }
+    NodeKnowledgeAsset:
+      type: object
+      properties:
+        id: { type: integer, format: int64, nullable: true }
+        name: { type: string, maxLength: 200 }
+        source: { type: string, nullable: true, maxLength: 200 }
+        type: { type: string, enum: [TEMPLATE, CHECKLIST, CASE, STANDARD] }
+        improvement: { type: string, nullable: true, maxLength: 500 }
+        status: { type: string, enum: [UPDATED, REVIEW, RETAINED, PENDING] }
+        sort: { type: integer }
+    NodeKnowledgeAction:
+      type: object
+      properties:
+        id: { type: integer, format: int64, nullable: true }
+        title: { type: string, maxLength: 300 }
+        note: { type: string, nullable: true, maxLength: 500 }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        status: { type: string, enum: [NOT_STARTED, IN_PROGRESS, DONE] }
+        sort: { type: integer }
+    NodeValueReviewResponse:
+      type: object
+      properties:
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+        version: { type: integer, minimum: 0, nullable: true }
+        resultStatus: { type: string, enum: [PENDING, ACHIEVED, PARTIAL, NOT_ACHIEVED] }
+        actualResult: { type: string, nullable: true }
+        retrospectiveConclusion: { type: string, nullable: true }
+        followUpActions: { type: string, nullable: true }
+        canEdit: { type: boolean }
+    ApiResponse:
+      type: object
+      properties:
+        code: { type: integer, example: 0 }
+        msg: { type: string }
+        data: {}
+        requestId: { type: string }
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          required: [code, msg, requestId]
+  responses:
+    Success:
+      description: 请求成功
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+    Unauthorized:
+      description: 未认证或会话已失效
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: 无权访问
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: 数据冲突
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    BusinessError:
+      description: 业务校验失败
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    TooManyRequests:
+      description: 请求过于频繁
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+security:
+  - bearerAuth: []

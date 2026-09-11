@@ -1,0 +1,149 @@
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: pms-backend
+  profiles:
+    # Runtime and production use MySQL 8. Tests use the `test` profile.
+    default: mysql
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+  sql:
+    init:
+      # Flyway owns schema initialization for every profile.
+      mode: never
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    # V1 mirrors the pre-Flyway schema.sql baseline. Enterprise tables are
+    # introduced by V2 and later migrations.
+    baseline-version: 1
+    locations: classpath:db/migration
+  # SMTP properties are only consumed when PMS_MAIL_ENABLED=true.
+  mail:
+    host: ${PMS_MAIL_HOST:}
+    port: ${PMS_MAIL_PORT:587}
+    username: ${PMS_MAIL_USERNAME:}
+    password: ${PMS_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${PMS_MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${PMS_MAIL_SMTP_STARTTLS:true}
+      mail.smtp.starttls.required: ${PMS_MAIL_SMTP_STARTTLS_REQUIRED:true}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+
+pms:
+  deployment:
+    environment: ${PMS_DEPLOYMENT_ENV:production}
+  upload-dir: ${PMS_UPLOAD_DIR:/var/lib/pms/uploads}
+  upload:
+    quota-bytes: ${PMS_UPLOAD_QUOTA_BYTES:524288000}
+  storage:
+    type: ${PMS_STORAGE_TYPE:local}
+    s3:
+      endpoint: ${PMS_S3_ENDPOINT:}
+      region: ${PMS_S3_REGION:us-east-1}
+      bucket: ${PMS_S3_BUCKET:}
+      access-key: ${PMS_S3_ACCESS_KEY:}
+      secret-key: ${PMS_S3_SECRET_KEY:}
+      path-style: ${PMS_S3_PATH_STYLE:true}
+  webhook:
+    enabled: ${PMS_WEBHOOK_ENABLED:false}
+    url: ${PMS_WEBHOOK_URL:}
+    secret: ${PMS_WEBHOOK_SECRET:}
+    timeout-ms: ${PMS_WEBHOOK_TIMEOUT_MS:5000}
+  jwt:
+    # 生产环境务必通过环境变量/配置文件覆盖
+    secret: ${PMS_JWT_SECRET:}
+    expire-hours: 168
+  auth:
+    access-expire-minutes: ${PMS_ACCESS_EXPIRE_MINUTES:30}
+    refresh-expire-days: ${PMS_REFRESH_EXPIRE_DAYS:30}
+    max-failed-logins: ${PMS_MAX_FAILED_LOGINS:5}
+    lock-minutes: ${PMS_LOCK_MINUTES:15}
+    # Development fallback returns a copyable URL. Set false in production and
+    # provide a PasswordResetNotifier bean (mail/Feishu/WeCom integration).
+    password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:false}
+    invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:false}
+    local-enabled: ${PMS_AUTH_LOCAL_ENABLED:true}
+    oidc:
+      enabled: ${PMS_OIDC_ENABLED:false}
+      display-name: ${PMS_OIDC_DISPLAY_NAME:SSO}
+      issuer: ${PMS_OIDC_ISSUER:}
+      authorization-uri: ${PMS_OIDC_AUTHORIZATION_URI:}
+      token-uri: ${PMS_OIDC_TOKEN_URI:}
+      userinfo-uri: ${PMS_OIDC_USERINFO_URI:}
+      client-id: ${PMS_OIDC_CLIENT_ID:}
+      client-secret: ${PMS_OIDC_CLIENT_SECRET:}
+      redirect-uri: ${PMS_OIDC_REDIRECT_URI:http://localhost:5173/login/oidc/callback}
+      scopes: ${PMS_OIDC_SCOPES:openid email profile}
+    ldap:
+      enabled: ${PMS_LDAP_ENABLED:false}
+      display-name: ${PMS_LDAP_DISPLAY_NAME:Directory}
+      url: ${PMS_LDAP_URL:}
+      base-dn: ${PMS_LDAP_BASE_DN:}
+      user-search-filter: ${PMS_LDAP_USER_SEARCH_FILTER:}
+      user-dn-pattern: ${PMS_LDAP_USER_DN_PATTERN:}
+      manager-dn: ${PMS_LDAP_MANAGER_DN:}
+      manager-password: ${PMS_LDAP_MANAGER_PASSWORD:}
+      email-attribute: ${PMS_LDAP_EMAIL_ATTRIBUTE:mail}
+  notification:
+    startup-check-enabled: ${PMS_NOTIFICATION_STARTUP_CHECK:true}
+    task-reminder:
+      enabled: ${PMS_NOTIFICATION_TASK_REMINDER_ENABLED:false}
+      cron: ${PMS_NOTIFICATION_TASK_REMINDER_CRON:0 0 9 * * *}
+      zone: ${PMS_NOTIFICATION_TASK_REMINDER_ZONE:Asia/Shanghai}
+      due-soon-days: ${PMS_NOTIFICATION_TASK_REMINDER_DUE_SOON_DAYS:7}
+    mail:
+      enabled: ${PMS_MAIL_ENABLED:false}
+      base-url: ${PMS_PUBLIC_BASE_URL:http://localhost:57979}
+      from: ${PMS_MAIL_FROM:}
+  audit:
+    retention-days: ${PMS_AUDIT_RETENTION_DAYS:180}
+    retention:
+      enabled: ${PMS_AUDIT_RETENTION_ENABLED:true}
+      dry-run: ${PMS_AUDIT_RETENTION_DRY_RUN:false}
+      cron: ${PMS_AUDIT_RETENTION_CRON:0 0 2 * * *}
+  security:
+    rate-limit:
+      capacity: ${PMS_RATE_LIMIT_CAPACITY:10}
+      window-seconds: ${PMS_RATE_LIMIT_WINDOW_SECONDS:60}
+    cors:
+      allowed-origins: ${PMS_CORS_ALLOWED_ORIGINS:http://localhost:57979,http://127.0.0.1:57979}
+
+management:
+  # Keep operational endpoints off the public servlet port. Operators may
+  # override the address/port for an internal monitoring network only.
+  server:
+    port: ${PMS_MANAGEMENT_PORT:8081}
+    address: ${PMS_MANAGEMENT_ADDRESS:127.0.0.1}
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    # An unconfigured JavaMailSender otherwise makes Actuator readiness DOWN
+    # even when application mail notifications are intentionally disabled.
+    # Enable explicitly only when the deployment has a verified SMTP target.
+    mail:
+      enabled: ${PMS_MAIL_HEALTH_ENABLED:false}
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

@@ -1,0 +1,189 @@
+name: integration-and-e2e
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      frontend_ref:
+        description: 'Reviewed pms-front branch, tag, or commit SHA (defaults to main)'
+        required: false
+        type: string
+        default: main
+
+jobs:
+  mysql-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate frontend repository read token
+        env:
+          FRONTEND_REPO_READ_TOKEN: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
+        run: |
+          if [[ -z "$FRONTEND_REPO_READ_TOKEN" ]]; then
+            echo "::error::Configure PMS_FRONT_REPO_READ_TOKEN with read-only Contents access to the sibling pms-front repository before running integration-and-e2e."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/pms-front
+          path: pms-front
+          token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
+          # Push/PR runs use the current remote main. A manual dispatch may
+          # pin a reviewed branch, tag, or immutable commit SHA for release.
+          ref: ${{ inputs.frontend_ref || 'main' }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - name: Prepare ephemeral integration environment
+        shell: bash
+        run: |
+          umask 077
+          root_password="$(openssl rand -hex 24)"
+          app_password="$(openssl rand -hex 24)"
+          jwt_secret="$(openssl rand -hex 32)"
+          admin_password="$(openssl rand -hex 16)"
+          for secret in "$root_password" "$app_password" "$jwt_secret" "$admin_password"; do
+            echo "::add-mask::$secret"
+          done
+          {
+            echo "MYSQL_ROOT_PASSWORD=$root_password"
+            echo "MYSQL_USER=pms"
+            echo "MYSQL_PASSWORD=$app_password"
+            echo "MYSQL_DB=pms"
+            echo "PMS_JWT_SECRET=$jwt_secret"
+            echo "PMS_DEPLOYMENT_ENV=development"
+            # The browser talks to the backend through the frontend container
+            # at 127.0.0.1:5173, so include that explicit Origin in CI.
+            echo "PMS_CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173"
+            echo "PMS_BOOTSTRAP_ADMIN_EMAIL=alex.zhang@example.com"
+            echo "PMS_BOOTSTRAP_ADMIN_USERNAME=alex.zhang"
+            echo "PMS_BOOTSTRAP_ADMIN_NAME_ZH=张伟"
+            echo "PMS_BOOTSTRAP_ADMIN_PASSWORD=$admin_password"
+            echo "PMS_NOTIFICATION_STARTUP_CHECK=false"
+            echo "PMS_PASSWORD_RESET_EXPOSE_TOKEN=true"
+            echo "PMS_INVITATION_EXPOSE_TOKEN=true"
+          } > .env
+          {
+            echo "E2E_PASSWORD=$admin_password"
+            echo "PMS_SMOKE_PASSWORD=$admin_password"
+            echo "PMS_SMOKE_USERNAME=alex.zhang"
+          } >> "$GITHUB_ENV"
+      - name: Start MySQL, backend and frontend
+        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml up -d --build frontend
+      - name: Validate current release contract
+        env:
+          PMS_FRONTEND_DIR: ${{ github.workspace }}/pms-front
+        run: bash scripts/release-consistency.test.sh
+      - name: Validate production configuration guards
+        run: bash scripts/validate-production-config.test.sh
+      - name: Check shell scripts
+        run: bash -n scripts/*.sh docker/*.sh
+      - name: Run API smoke test
+        run: ./scripts/smoke-test.sh
+      - name: Create browser acceptance project fixture
+        env:
+          E2E_USERNAME: alex.zhang@example.com
+          E2E_PASSWORD: ${{ env.E2E_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          login_response="$(mktemp)"
+          project_response="$(mktemp)"
+          trap 'rm -f "$login_response" "$project_response"' EXIT
+
+          login_status="$(curl --silent --show-error --max-time 10 \
+            -H 'Content-Type: application/json' \
+            --data "$(printf '{\"email\":\"%s\",\"password\":\"%s\"}' "$E2E_USERNAME" "$E2E_PASSWORD")" \
+            -o "$login_response" -w '%{http_code}' \
+            http://127.0.0.1:8080/api/auth/login)"
+          if [[ "$login_status" != "200" ]]; then
+            echo "Browser fixture login failed with HTTP $login_status"
+            exit 1
+          fi
+
+          access_token="$(python3 - "$login_response" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+          token = payload.get("data", {}).get("accessToken")
+          if not token:
+              raise SystemExit("login response did not contain an access token")
+          print(token)
+          PY
+          )"
+          echo "::add-mask::$access_token"
+
+          create_status="$(curl --silent --show-error --max-time 10 \
+            -H "Authorization: Bearer $access_token" \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"CI 浏览器验收项目","description":"仅用于 CI 浏览器验收","priority":1,"startDate":"2026-09-02","endDate":"2026-09-30"}' \
+            -o "$project_response" -w '%{http_code}' \
+            http://127.0.0.1:8080/api/projects)"
+          if [[ "$create_status" != "200" ]]; then
+            echo "Browser fixture project creation failed with HTTP $create_status"
+            sed -E 's/(accessToken|refreshToken|token|password)[^,}]*/\1=REDACTED/g' "$project_response"
+            exit 1
+          fi
+
+          project_id="$(python3 - "$project_response" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+          if payload.get("code") != 200:
+              raise SystemExit(payload.get("msg", "project fixture response was not successful"))
+          project_id = payload.get("data", {}).get("id")
+          if not isinstance(project_id, int):
+              raise SystemExit("project fixture response did not contain a numeric id")
+          print(project_id)
+          PY
+          )"
+          echo "E2E_PROJECT_ID=$project_id" >> "$GITHUB_ENV"
+      - name: Verify browser login proxy
+        env:
+          E2E_USERNAME: alex.zhang@example.com
+          E2E_PASSWORD: ${{ env.E2E_PASSWORD }}
+        run: |
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --max-time 10 \
+            -H 'Content-Type: application/json' \
+            --data "$(printf '{\"email\":\"%s\",\"password\":\"%s\"}' "$E2E_USERNAME" "$E2E_PASSWORD")" \
+            -o "$response_file" -w '%{http_code}' \
+            http://127.0.0.1:5173/api/auth/login)"
+          echo "Browser login proxy HTTP status: $status"
+          if [[ "$status" != "200" ]] || ! grep -q '"code":200' "$response_file"; then
+            echo "Browser login proxy did not return a successful API envelope"
+            sed -E 's/(accessToken|refreshToken|token|password)[^,}]*/\1=REDACTED/g' "$response_file"
+            exit 1
+          fi
+      - name: Install Playwright browser
+        working-directory: pms-front
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Run desktop and mobile browser smoke tests
+        working-directory: pms-front
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5173
+          E2E_USERNAME: alex.zhang@example.com
+        run: pnpm exec playwright test
+      - name: Show service status on failure
+        if: ${{ failure() && hashFiles('.env') != '' }}
+        run: |
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml ps
+          docker inspect --format='{{json .State.Health}}' pms-backend-mysql-1 || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 mysql || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 uploads-init || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=300 backend || true
+          docker compose -f docker-compose.example.yml -f docker-compose.ci.yml logs --no-color --tail=200 frontend || true
+
+      - name: Stop integration stack
+        if: ${{ always() && hashFiles('.env') != '' }}
+        run: docker compose -f docker-compose.example.yml -f docker-compose.ci.yml down -v

@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pms.fullname" . }}-backend
+  labels:
+    {{- include "pms.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pms.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "pms.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.port }}
+            - name: management
+              containerPort: {{ .Values.backend.management.port }}
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.backend.env.springProfilesActive | quote }}
+            - name: MYSQL_HOST
+              value: {{ .Values.backend.env.mysqlHost | quote }}
+            - name: MYSQL_PORT
+              value: {{ .Values.backend.env.mysqlPort | quote }}
+            - name: MYSQL_DB
+              value: {{ .Values.backend.env.mysqlDatabase | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.backend.env.mysqlUser | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pms.secretName" . }}
+                  key: mysqlPassword
+            - name: PMS_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pms.secretName" . }}
+                  key: jwtSecret
+            - name: PMS_BOOTSTRAP_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pms.secretName" . }}
+                  key: bootstrapAdminEmail
+            - name: PMS_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pms.secretName" . }}
+                  key: bootstrapAdminPassword
+            - name: PMS_BOOTSTRAP_ADMIN_NAME_ZH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pms.secretName" . }}
+                  key: bootstrapAdminNameZh
+            - name: PMS_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pms.secretName" . }}
+                  key: bootstrapAdminUsername
+            - name: PMS_CORS_ALLOWED_ORIGINS
+              value: {{ .Values.backend.env.corsAllowedOrigins | quote }}
+            - name: PMS_PUBLIC_BASE_URL
+              value: {{ .Values.backend.env.publicBaseUrl | quote }}
+            - name: PMS_DEPLOYMENT_ENV
+              value: {{ .Values.backend.env.deploymentEnv | quote }}
+            - name: PMS_STORAGE_TYPE
+              value: {{ .Values.backend.env.storageType | quote }}
+            - name: PMS_UPLOAD_DIR
+              value: {{ .Values.backend.env.uploadDir | quote }}
+            - name: PMS_WEBHOOK_ENABLED
+              value: {{ .Values.backend.env.webhookEnabled | quote }}
+            - name: PMS_OIDC_ENABLED
+              value: {{ .Values.backend.env.oidcEnabled | quote }}
+            - name: PMS_LDAP_ENABLED
+              value: {{ .Values.backend.env.ldapEnabled | quote }}
+            - name: PMS_NOTIFICATION_STARTUP_CHECK
+              value: {{ .Values.backend.env.notificationStartupCheck | quote }}
+            - name: PMS_PASSWORD_RESET_EXPOSE_TOKEN
+              value: {{ .Values.backend.env.passwordResetExposeToken | quote }}
+            - name: PMS_INVITATION_EXPOSE_TOKEN
+              value: {{ .Values.backend.env.invitationExposeToken | quote }}
+            - name: PMS_MANAGEMENT_ADDRESS
+              value: "0.0.0.0"
+            - name: PMS_MANAGEMENT_PORT
+              value: {{ .Values.backend.management.port | quote }}
+            {{- range .Values.backend.extraEnv }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: uploads
+              mountPath: {{ .Values.backend.env.uploadDir }}
+          livenessProbe:
+            httpGet:
+              path: /api/health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: uploads
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "pms.fullname" . }}-uploads
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

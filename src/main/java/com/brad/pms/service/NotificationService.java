@@ -1,0 +1,270 @@
+package com.brad.pms.service;
+
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.common.page.PageResult;
+import com.brad.pms.convertor.Convertors;
+import com.brad.pms.dto.response.UserNotificationDTO;
+import com.brad.pms.entity.UserDO;
+import com.brad.pms.entity.UserNotificationDO;
+import com.brad.pms.mapper.UserNotificationMapper;
+import com.brad.pms.security.UserContext;
+import com.brad.pms.webhook.WebhookEvent;
+import com.brad.pms.webhook.WebhookPublisher;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class NotificationService {
+
+    public static final String TASK_ASSIGNED = "TASK_ASSIGNED";
+    public static final String TASK_COMMENTED = "TASK_COMMENTED";
+    public static final String PROJECT_COMMENTED = "PROJECT_COMMENTED";
+    public static final String NODE_COMPLETED = "NODE_COMPLETED";
+    public static final String NODE_ROLLED_BACK = "NODE_ROLLED_BACK";
+    public static final String TASK_DUE_SOON = "TASK_DUE_SOON";
+    public static final String TASK_OVERDUE = "TASK_OVERDUE";
+
+    static final int DEFAULT_LIMIT = 20;
+    static final int MAX_LIMIT = 50;
+    static final int SNIPPET = 120;
+
+    private final UserNotificationMapper notificationMapper;
+    private final UserService userService;
+    private final FollowerService followerService;
+    private final WebhookPublisher webhookPublisher;
+
+    public void notifyTaskAssigned(Long projectId, Long taskId, String taskTitle, Long assigneeId) {
+        Long actorId = UserContext.userId();
+        String snippet = truncate(taskTitle, SNIPPET);
+        emit(assigneeId, TASK_ASSIGNED, "任务已指派给你", snippet, projectId, taskId, null, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                TASK_ASSIGNED, projectId, taskId, actorId, recipients(assigneeId), "任务已指派给你", snippet));
+    }
+
+    public void notifyComment(Long projectId, Long taskId, String content, Long assigneeId, Long managerId) {
+        Long actorId = UserContext.userId();
+        String actorName = actorDisplayName(actorId);
+        String snippet = truncate(content, SNIPPET);
+        if (taskId != null) {
+            String title = actorName + " 评论了任务";
+            List<Long> targets = mergeRecipients(assigneeId, managerId);
+            targets.addAll(followerIds(projectId));
+            emitAll(targets, TASK_COMMENTED, title, snippet, projectId, taskId, null, actorId);
+            webhookPublisher.publish(WebhookEvent.of(
+                    TASK_COMMENTED, projectId, taskId, actorId, recipients(targets.toArray(Long[]::new)),
+                    title, snippet));
+            return;
+        }
+        String title = actorName + " 评论了项目";
+        List<Long> targets = mergeRecipients(managerId);
+        targets.addAll(followerIds(projectId));
+        emitAll(targets, PROJECT_COMMENTED, title, snippet, projectId, null, null, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                PROJECT_COMMENTED, projectId, null, actorId, recipients(targets.toArray(Long[]::new)),
+                title, snippet));
+    }
+
+    public void notifyNodeCompleted(Long projectId, Long nodeId, String nodeName,
+                                    Long managerId, Long ownerId, Long nextOwnerId) {
+        Long actorId = UserContext.userId();
+        String title = actorDisplayName(actorId) + " 完成了节点";
+        String snippet = truncate(nodeName, SNIPPET);
+        List<Long> targets = mergeRecipients(managerId, ownerId, nextOwnerId);
+        targets.addAll(followerIds(projectId));
+        emitAll(targets, NODE_COMPLETED, title, snippet, projectId, null, nodeId, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                NODE_COMPLETED, projectId, null, nodeId, actorId, recipients(targets.toArray(Long[]::new)),
+                title, snippet));
+    }
+
+    public void notifyNodeRolledBack(Long projectId, Long nodeId, String nodeName,
+                                     Long managerId, Long ownerId, String reason) {
+        Long actorId = UserContext.userId();
+        String title = actorDisplayName(actorId) + " 回滚了节点";
+        String detail = nodeName == null || nodeName.isBlank() ? "" : nodeName.trim();
+        if (reason != null && !reason.isBlank()) {
+            detail = detail.isEmpty() ? reason.trim() : detail + "：" + reason.trim();
+        }
+        String snippet = truncate(detail, SNIPPET);
+        List<Long> targets = mergeRecipients(managerId, ownerId);
+        targets.addAll(followerIds(projectId));
+        emitAll(targets, NODE_ROLLED_BACK, title, snippet, projectId, null, nodeId, actorId);
+        webhookPublisher.publish(WebhookEvent.of(
+                NODE_ROLLED_BACK, projectId, null, nodeId, actorId, recipients(targets.toArray(Long[]::new)),
+                title, snippet));
+    }
+
+    public void emit(Long userId, String type, String title, String content,
+                     Long projectId, Long taskId, Long actorId) {
+        emit(userId, type, title, content, projectId, taskId, null, actorId);
+    }
+
+    public void emit(Long userId, String type, String title, String content,
+                     Long projectId, Long taskId, Long nodeId, Long actorId) {
+        if (userId == null || Objects.equals(userId, actorId)) return;
+        UserNotificationDO row = new UserNotificationDO();
+        row.setUserId(userId);
+        row.setType(type);
+        row.setTitle(title == null || title.isBlank() ? "通知" : title);
+        row.setContent(content);
+        row.setProjectId(projectId);
+        row.setTaskId(taskId);
+        row.setNodeId(nodeId);
+        row.setActorId(actorId);
+        notificationMapper.insert(row);
+    }
+
+    /** Inserts a notification without publishing an outbound Webhook event. */
+    public boolean emitInApp(Long userId, String type, String title, String content,
+                             Long projectId, Long taskId, Long nodeId, Long actorId,
+                             String dedupeKey) {
+        if (userId == null || dedupeKey == null || dedupeKey.isBlank()) return false;
+        UserNotificationDO row = new UserNotificationDO();
+        row.setUserId(userId);
+        row.setType(type);
+        row.setTitle(title == null || title.isBlank() ? "通知" : title);
+        row.setContent(content);
+        row.setProjectId(projectId);
+        row.setTaskId(taskId);
+        row.setNodeId(nodeId);
+        row.setActorId(actorId);
+        row.setDedupeKey(dedupeKey);
+        try {
+            notificationMapper.insert(row);
+            return true;
+        } catch (DuplicateKeyException duplicate) {
+            return false;
+        }
+    }
+
+    public List<UserNotificationDTO> list(boolean unreadFirst, int limit) {
+        Long userId = UserContext.userId();
+        int size = clamp(limit, DEFAULT_LIMIT, MAX_LIMIT);
+        return toDTOs(notificationMapper.selectVisibleList(userId, unreadFirst, size));
+    }
+
+    public int unreadCount() {
+        Long userId = UserContext.userId();
+        long count = notificationMapper.countVisibleUnread(userId);
+        return count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
+    }
+
+    public PageResult<UserNotificationDTO> page(String type, boolean unreadOnly,
+                                                 long currPage, long pageSize) {
+        String normalizedType = normalizeType(type);
+        long safePage = Math.max(currPage, 1);
+        long safeSize = Math.min(Math.max(pageSize, 1), MAX_LIMIT);
+        IPage<UserNotificationDO> result = notificationMapper.selectVisiblePage(
+                new Page<>(safePage, safeSize), UserContext.userId(), normalizedType, unreadOnly);
+        return PageResult.of(result.getTotal(), result.getCurrent(), result.getSize(), toDTOs(result.getRecords()));
+    }
+
+    public void markRead(Long id) {
+        UserNotificationDO row = notificationMapper.selectById(id);
+        if (row == null || !Objects.equals(row.getUserId(), UserContext.userId())) {
+            throw BusinessException.error("通知不存在");
+        }
+        if (row.getReadAt() != null) return;
+        row.setReadAt(LocalDateTime.now());
+        notificationMapper.updateById(row);
+    }
+
+    public void markAllRead() {
+        notificationMapper.update(null, new LambdaUpdateWrapper<UserNotificationDO>()
+                .eq(UserNotificationDO::getUserId, UserContext.userId())
+                .isNull(UserNotificationDO::getReadAt)
+                .set(UserNotificationDO::getReadAt, LocalDateTime.now()));
+    }
+
+    private List<UserNotificationDTO> toDTOs(List<UserNotificationDO> rows) {
+        if (rows.isEmpty()) return List.of();
+        Map<Long, UserDO> actors = userService.listByIds(rows.stream()
+                        .map(UserNotificationDO::getActorId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList()))
+                .stream().collect(Collectors.toMap(UserDO::getId, Function.identity(), (left, right) -> left));
+        return rows.stream().map(row -> {
+            UserNotificationDTO dto = new UserNotificationDTO();
+            dto.setId(row.getId());
+            dto.setType(row.getType());
+            dto.setTitle(row.getTitle());
+            dto.setContent(row.getContent());
+            dto.setProjectId(row.getProjectId());
+            dto.setTaskId(row.getTaskId());
+            dto.setNodeId(row.getNodeId());
+            dto.setActorId(row.getActorId());
+            dto.setActorName(Convertors.userDisplayName(actors.get(row.getActorId())));
+            dto.setReadAt(row.getReadAt());
+            dto.setCreatedAt(row.getCreatedAt());
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
+    private String actorDisplayName(Long actorId) {
+        if (actorId == null) return "有人";
+        return userService.listByIds(List.of(actorId)).stream()
+                .findFirst()
+                .map(Convertors::userDisplayName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse("有人");
+    }
+
+    static String truncate(String value, int max) {
+        if (value == null) return "";
+        String text = value.trim();
+        return text.length() <= max ? text : text.substring(0, max);
+    }
+
+    static int clamp(int limit, int fallback, int max) {
+        if (limit < 1) return fallback;
+        return Math.min(limit, max);
+    }
+
+    private static String normalizeType(String type) {
+        if (type == null || type.isBlank()) return null;
+        String normalized = type.trim();
+        if (!TASK_DUE_SOON.equals(normalized) && !TASK_OVERDUE.equals(normalized)) {
+            throw new BusinessException(400, "通知类型不正确");
+        }
+        return normalized;
+    }
+
+    private void emitAll(List<Long> userIds, String type, String title, String content,
+                         Long projectId, Long taskId, Long nodeId, Long actorId) {
+        LinkedHashSet<Long> unique = new LinkedHashSet<>();
+        if (userIds != null) unique.addAll(userIds);
+        unique.forEach(userId -> emit(userId, type, title, content, projectId, taskId, nodeId, actorId));
+    }
+
+    private List<Long> followerIds(Long projectId) {
+        List<Long> ids = followerService.listUserIds(projectId);
+        return ids == null ? List.of() : ids;
+    }
+
+    private static List<Long> mergeRecipients(Long... ids) {
+        return new ArrayList<>(recipients(ids));
+    }
+
+    private static List<Long> recipients(Long... ids) {
+        return Arrays.stream(ids == null ? new Long[0] : ids)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+}

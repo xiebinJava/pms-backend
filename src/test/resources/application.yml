@@ -1,0 +1,28 @@
+spring:
+  profiles:
+    active: test
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
+
+pms:
+  deployment:
+    environment: test
+  upload-dir: ${PMS_UPLOAD_DIR:/tmp/pms-test-uploads}
+  notification:
+    startup-check-enabled: false
+  jwt:
+    secret: ${PMS_JWT_SECRET:pms-open-source-test-secret-please-override-2026}
+    expire-hours: 168
+  auth:
+    access-expire-minutes: ${PMS_ACCESS_EXPIRE_MINUTES:30}
+    refresh-expire-days: ${PMS_REFRESH_EXPIRE_DAYS:30}
+    max-failed-logins: ${PMS_MAX_FAILED_LOGINS:5}
+    lock-minutes: ${PMS_LOCK_MINUTES:15}
+    password-reset-expose-token: ${PMS_PASSWORD_RESET_EXPOSE_TOKEN:true}
+    invitation-expose-token: ${PMS_INVITATION_EXPOSE_TOKEN:true}
