@@ -12,7 +12,7 @@
 
     <groupId>com.brad</groupId>
     <artifactId>pms-backend</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.7</version>
     <name>pms-backend</name>
     <description>Project Management System - Backend</description>
     <licenses>
