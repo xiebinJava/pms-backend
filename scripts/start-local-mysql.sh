@@ -4,7 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.mysql.yml"
-JAR_PATH="${PMS_JAR_PATH:-$PROJECT_DIR/target/pms-backend-1.0.0.jar}"
+JAR_PATH="${PMS_JAR_PATH:-}"
+if [[ -z "$JAR_PATH" ]]; then
+  JAR_PATH="$(ls -1 "$PROJECT_DIR"/target/pms-backend-*.jar 2>/dev/null | head -n 1 || true)"
+fi
+JAR_PATH="${JAR_PATH:-$PROJECT_DIR/target/pms-backend-1.0.7.jar}"
 RUN_DIR="${PMS_RUN_DIR:-$PROJECT_DIR/.run}"
 PID_FILE="$RUN_DIR/pms-backend.pid"
 LOG_FILE="$RUN_DIR/pms-backend.log"
