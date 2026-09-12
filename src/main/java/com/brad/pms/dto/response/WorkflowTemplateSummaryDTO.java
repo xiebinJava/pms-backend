@@ -12,6 +12,7 @@ public class WorkflowTemplateSummaryDTO {
     private String name;
     private String description;
     private Integer draftVersionNo;
+    private Integer draftRevision;
     private Integer publishedVersionNo;
     private Long publishedVersionId;
     private List<WorkflowTemplateVersionSummaryDTO> publishedVersions;

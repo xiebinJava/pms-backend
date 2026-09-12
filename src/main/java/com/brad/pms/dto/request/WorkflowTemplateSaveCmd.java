@@ -10,6 +10,8 @@ import lombok.Data;
 @Data
 public class WorkflowTemplateSaveCmd {
     private Long projectTypeId;
+    /** Revision read by the editor; null means no draft existed when editing began. */
+    private Integer expectedDraftRevision;
     @NotBlank(message = "流程模板名称不能为空")
     @Size(max = 160, message = "流程模板名称不能超过160个字符")
     private String name;

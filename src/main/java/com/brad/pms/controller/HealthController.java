@@ -18,7 +18,7 @@ import java.util.Map;
 @RestController
 public class HealthController {
     /** Keep readiness aligned with the highest checked-in Flyway migration. */
-    private static final int LATEST_MIGRATION_VERSION = 41;
+    private static final int LATEST_MIGRATION_VERSION = 42;
 
     private final DataSource dataSource;
     private final int expectedMigrationVersion;

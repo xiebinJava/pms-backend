@@ -27,6 +27,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -117,18 +119,28 @@ public class WorkflowTemplateService {
             template.setLatestVersionNo(0);
             template.setDeleted(false);
             template.setCreatedBy(UserContext.userIdOrNull());
-            templateMapper.insert(template);
+            if (templateMapper.insert(template) != 1) {
+                throw BusinessException.conflict("流程模板未能创建，请重试");
+            }
         } else {
             template = requireTemplate(templateId);
             if (cmd.getProjectTypeId() != null && !cmd.getProjectTypeId().equals(template.getProjectTypeId())) {
                 throw BusinessException.error("流程模板所属项目类型不可更改");
             }
-            template.setName(cmd.getName().trim());
-            template.setDescription(trimToNull(cmd.getDescription()));
-            templateMapper.updateById(template);
         }
 
         WorkflowTemplateVersionDO draft = findLatestVersion(template.getId(), "DRAFT");
+        if (templateId != null) {
+            Integer currentRevision = draft == null ? null : draft.getVersion();
+            if (!Objects.equals(cmd.getExpectedDraftRevision(), currentRevision)) {
+                throw BusinessException.conflict("流程草稿已被其他人修改，请刷新后重试");
+            }
+            template.setName(cmd.getName().trim());
+            template.setDescription(trimToNull(cmd.getDescription()));
+            if (templateMapper.updateById(template) != 1) {
+                throw BusinessException.conflict("流程模板无法更新，请刷新后重试");
+            }
+        }
         if (draft == null) {
             draft = new WorkflowTemplateVersionDO();
             draft.setTemplateId(template.getId());
@@ -137,10 +149,21 @@ public class WorkflowTemplateService {
             draft.setCreatedBy(UserContext.userIdOrNull());
         }
         draft.setDefinitionJson(serialize(definition));
-        if (draft.getId() == null) versionMapper.insert(draft);
-        else versionMapper.updateById(draft);
+        if (draft.getId() == null) {
+            try {
+                if (versionMapper.insert(draft) != 1) {
+                    throw BusinessException.conflict("流程草稿未能保存，请重试");
+                }
+            } catch (DuplicateKeyException e) {
+                throw BusinessException.conflict("流程草稿已被其他人创建，请刷新后重试");
+            }
+        } else if (versionMapper.updateById(draft) != 1) {
+            throw BusinessException.conflict("流程草稿已被其他人修改，请刷新后重试");
+        }
         template.setLatestVersionNo(Math.max(template.getLatestVersionNo() == null ? 0 : template.getLatestVersionNo(), draft.getVersionNo()));
-        templateMapper.updateById(template);
+        if (templateMapper.updateById(template) != 1) {
+            throw BusinessException.conflict("流程模板无法更新，请刷新后重试");
+        }
         operationLogService.record(AuditEvent.success(AuditAction.WORKFLOW_TEMPLATE_DRAFT_SAVED.name(),
                 AuditResourceType.WORKFLOW_TEMPLATE.name(), template.getId(), null, null, null,
                 Map.of("versionNo", draft.getVersionNo(), "nodeCount", definition.nodes().size())));
@@ -252,6 +275,7 @@ public class WorkflowTemplateService {
         dto.setName(template.getName());
         dto.setDescription(template.getDescription());
         dto.setDraftVersionNo(draft == null ? null : draft.getVersionNo());
+        dto.setDraftRevision(draft == null ? null : draft.getVersion());
         dto.setPublishedVersionNo(published == null ? null : published.getVersionNo());
         dto.setPublishedVersionId(published == null ? null : published.getId());
         dto.setPublishedVersions(publishedVersions.stream().map(version -> {
@@ -280,6 +304,7 @@ public class WorkflowTemplateService {
         dto.setLatestVersionNo(template.getLatestVersionNo());
         dto.setDraftVersionId(draft == null ? null : draft.getId());
         dto.setDraftVersionNo(draft == null ? null : draft.getVersionNo());
+        dto.setDraftRevision(draft == null ? null : draft.getVersion());
         dto.setPublishedVersionId(published == null ? null : published.getId());
         dto.setPublishedVersionNo(published == null ? null : published.getVersionNo());
         dto.setDefinition(active == null ? null : parse(active.getDefinitionJson()));

@@ -6,8 +6,6 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.lang.reflect.Field;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -15,12 +13,32 @@ import static org.mockito.Mockito.when;
 class HealthControllerTest {
 
     @Test
-    void defaultReadinessExpectsLatestEnterpriseMigration() throws Exception {
-        HealthController controller = new HealthController(mock(DataSource.class));
-        Field field = HealthController.class.getDeclaredField("expectedMigrationVersion");
-        field.setAccessible(true);
+    void defaultReadinessAcceptsLatestConfigurableWorkflowMigration() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement databaseProbe = mock(PreparedStatement.class);
+        PreparedStatement migrationProbe = mock(PreparedStatement.class);
+        ResultSet databaseResult = mock(ResultSet.class);
+        ResultSet migrationResult = mock(ResultSet.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT 1")).thenReturn(databaseProbe);
+        when(databaseProbe.executeQuery()).thenReturn(databaseResult);
+        when(databaseResult.next()).thenReturn(true);
+        when(databaseResult.getInt(1)).thenReturn(1);
+        when(connection.prepareStatement(
+                "SELECT version FROM flyway_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1"))
+                .thenReturn(migrationProbe);
+        when(migrationProbe.executeQuery()).thenReturn(migrationResult);
+        when(migrationResult.next()).thenReturn(true);
+        when(migrationResult.getString(1)).thenReturn("42");
 
-        assertThat(field.getInt(controller)).isEqualTo(41);
+        HealthController controller = new HealthController(dataSource);
+
+        assertThat(controller.readiness().getStatusCodeValue()).isEqualTo(200);
+        assertThat(controller.readiness().getBody())
+                .containsEntry("status", "UP")
+                .containsEntry("database", "UP")
+                .containsEntry("migration", "42");
     }
 
     @Test

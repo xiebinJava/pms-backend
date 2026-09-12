@@ -81,6 +81,7 @@ class WorkflowTemplateServiceSelectionTest {
         latest.setVersionNo(2);
         WorkflowTemplateVersionDO draft = version(23L, 8L, "DRAFT");
         draft.setVersionNo(3);
+        draft.setVersion(7);
         when(templateMapper.selectList(any())).thenReturn(java.util.List.of(template));
         when(projectTypeMapper.selectList(isNull())).thenReturn(java.util.List.of(type));
         when(versionMapper.selectList(any())).thenReturn(java.util.List.of(draft, latest, first));
@@ -92,6 +93,7 @@ class WorkflowTemplateServiceSelectionTest {
                 .containsExactly(21L, 22L);
         assertThat(summary.getDefaultTemplateVersionId()).isEqualTo(21L);
         assertThat(summary.getDefaultTemplate()).isTrue();
+        assertThat(summary.getDraftRevision()).isEqualTo(7);
     }
 
     private static ProjectTypeDO type(Long id, Long defaultVersion) {

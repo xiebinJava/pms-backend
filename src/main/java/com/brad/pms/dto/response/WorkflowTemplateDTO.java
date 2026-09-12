@@ -15,6 +15,7 @@ public class WorkflowTemplateDTO {
     private Integer latestVersionNo;
     private Long draftVersionId;
     private Integer draftVersionNo;
+    private Integer draftRevision;
     private Long publishedVersionId;
     private Integer publishedVersionNo;
     private WorkflowTemplateDefinition definition;
