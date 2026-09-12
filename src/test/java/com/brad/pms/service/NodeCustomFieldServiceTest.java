@@ -27,6 +27,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -87,6 +88,48 @@ class NodeCustomFieldServiceTest {
 
         assertThat(existing.getValueJson()).isEqualTo("null");
         verify(valueMapper).updateById(existing);
+    }
+
+    @Test
+    void savesAnEmptyOptionalDateRangeArrayAsAnAbsentValue() throws Exception {
+        ProjectDO project = project(55L);
+        ProjectNodeDO node = node("entry");
+        WorkflowNodeDefinition definition = v2Definition(List.of(
+                new WorkflowFieldDefinition("schedule", "计划", WorkflowFieldType.DATE_RANGE, false,
+                        List.of(), true, null)));
+        WorkflowNodeFieldValuesCmd cmd = new WorkflowNodeFieldValuesCmd();
+        cmd.setValues(Map.of("schedule", new ObjectMapper().readTree("[]")));
+
+        when(permissionService.requireProjectReadable(3L)).thenReturn(project);
+        when(permissionService.requireManageableNode(3L, 7L, "编辑节点字段")).thenReturn(node);
+        when(workflowTemplateService.getNodeDefinition(55L, "entry")).thenReturn(definition);
+        when(valueMapper.selectOne(any())).thenReturn(null);
+        when(valueMapper.selectList(any())).thenReturn(List.of());
+        when(attachmentMapper.selectList(any())).thenReturn(List.of());
+
+        service.save(3L, 7L, cmd);
+
+        var inserted = forClass(ProjectNodeFieldValueDO.class);
+        verify(valueMapper).insert(inserted.capture());
+        assertThat(inserted.getValue().getValueJson()).isEqualTo("[]");
+    }
+
+    @Test
+    void blocksCompletionWhenARequiredDateRangeWasSavedAsAnEmptyArray() {
+        ProjectNodeFieldValueDO saved = new ProjectNodeFieldValueDO();
+        saved.setProjectId(3L);
+        saved.setNodeId(7L);
+        saved.setFieldKey("schedule");
+        saved.setValueJson("[]");
+        WorkflowNodeDefinition definition = v2Definition(List.of(
+                new WorkflowFieldDefinition("schedule", "计划", WorkflowFieldType.DATE_RANGE, true,
+                        List.of(), true, null)));
+        when(valueMapper.selectList(any())).thenReturn(List.of(saved));
+        when(attachmentMapper.selectList(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.requireRequiredFields(3L, 7L, definition))
+                .isInstanceOf(com.brad.pms.common.exception.BusinessException.class)
+                .hasMessage("请先填写计划");
     }
 
     @Test

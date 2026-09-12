@@ -92,6 +92,21 @@ class WorkflowFieldValueValidatorTest {
     }
 
     @Test
+    void acceptsBlankDateRangesForSavingButKeepsRequiredRangesMissingAtCompletion() throws Exception {
+        var fields = List.of(
+                field("optionalSchedule", WorkflowFieldType.DATE_RANGE, false, List.of()),
+                field("requiredSchedule", WorkflowFieldType.DATE_RANGE, true, List.of()));
+        Map<String, JsonNode> values = Map.of(
+                "optionalSchedule", mapper.readTree("[]"),
+                "requiredSchedule", mapper.readTree("[]"));
+
+        assertThat(WorkflowFieldValueValidator.validate(fields, values))
+                .containsOnlyKeys("optionalSchedule", "requiredSchedule");
+        assertThat(WorkflowFieldValueValidator.missingRequiredFields(fields, values))
+                .containsExactly("requiredSchedule");
+    }
+
+    @Test
     void excludesHiddenAndProjectBoundFieldsFromNodeCustomValueRules() throws Exception {
         var fields = List.of(
                 v2Field("hidden", "隐藏项", WorkflowFieldType.TEXT, true, List.of(), false, null),

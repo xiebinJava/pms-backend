@@ -31,6 +31,10 @@ public final class WorkflowFieldValueValidator {
                 normalized.put(entry.getKey(), value);
                 continue;
             }
+            if (definition.type() == WorkflowFieldType.DATE_RANGE && value.isArray() && value.isEmpty()) {
+                normalized.put(entry.getKey(), value);
+                continue;
+            }
             validateOne(definition, value);
             normalized.put(entry.getKey(), value);
         }

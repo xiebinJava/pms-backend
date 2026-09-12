@@ -87,7 +87,7 @@ public final class WorkflowTemplateDefinitionValidator {
             throw new IllegalArgumentException("v2 节点不能配置旧项目信息字段");
         }
         validateFields(node.fields(), true);
-        validateContentOrder(node.contentOrder());
+        validateContentOrder(node.contentOrder(), node.fields());
     }
 
     private static void validateFields(List<WorkflowFieldDefinition> fields, boolean v2) {
@@ -137,19 +137,33 @@ public final class WorkflowTemplateDefinitionValidator {
         }
     }
 
-    private static void validateContentOrder(List<String> contentOrder) {
+    private static void validateContentOrder(List<String> contentOrder, List<WorkflowFieldDefinition> fields) {
         if (contentOrder == null) throw new IllegalArgumentException("节点内容排序不能为空");
         Set<String> entries = new HashSet<>();
         for (String entry : contentOrder) {
+            if (entry == null) throw new IllegalArgumentException("节点内容排序存在未知项");
             if (!entries.add(entry)) throw new IllegalArgumentException("节点内容排序不能重复");
-            if ("fields".equals(entry)) continue;
+            if ("fields".equals(entry) || "legacy-custom-fields".equals(entry)) continue;
             if (!entry.startsWith("component:")) throw new IllegalArgumentException("节点内容排序存在未知项");
             String component = entry.substring("component:".length());
             if (!SUPPORTED_COMPONENTS.contains(component) || WorkflowComponentKey.PROJECT_BASIC_INFO.equals(component)) {
                 throw new IllegalArgumentException("节点内容排序存在未知项");
             }
         }
-        if (!entries.contains("fields")) throw new IllegalArgumentException("节点内容排序必须包含字段区");
+        boolean hasBoundFields = fields.stream().anyMatch(field -> field.binding() != null);
+        boolean hasUnboundFields = fields.stream().anyMatch(field -> field.binding() == null);
+        boolean hasFieldsSlot = entries.contains("fields");
+        boolean hasLegacyCustomFieldsSlot = entries.contains("legacy-custom-fields");
+
+        if ((hasFieldsSlot && fields.isEmpty())
+                || (hasLegacyCustomFieldsSlot && !hasUnboundFields)
+                || (hasLegacyCustomFieldsSlot && hasFieldsSlot && !hasBoundFields)) {
+            throw new IllegalArgumentException("节点内容排序包含空字段区");
+        }
+        if ((hasBoundFields && !hasFieldsSlot)
+                || (hasUnboundFields && !hasLegacyCustomFieldsSlot && !hasFieldsSlot)) {
+            throw new IllegalArgumentException("节点内容排序必须包含字段区");
+        }
     }
 
     private static void validateProjectFields(WorkflowNodeDefinition node) {

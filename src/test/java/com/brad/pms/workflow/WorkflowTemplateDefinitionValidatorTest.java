@@ -188,6 +188,54 @@ class WorkflowTemplateDefinitionValidatorTest {
     }
 
     @Test
+    void acceptsEmptyV2NodesAndRequiresOrderSlotsOnlyForDefinedFields() {
+        WorkflowTemplateDefinition emptyNode = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("empty", List.of(), List.of()),
+                v2Node("workbench-only", List.of(), List.of("component:solution-design"))));
+        WorkflowTemplateDefinition missingFieldSlot = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("field-without-slot", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        false, List.of(), true, null)), List.of())));
+        WorkflowTemplateDefinition danglingFieldsSlot = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("dangling-fields", List.of(), List.of("fields"))));
+        WorkflowTemplateDefinition danglingLegacySlot = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("dangling-legacy", List.of(), List.of("legacy-custom-fields"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator.validate(emptyNode).nodes()).hasSize(2);
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(missingFieldSlot))
+                .hasMessageContaining("节点内容排序");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(danglingFieldsSlot))
+                .hasMessageContaining("节点内容排序");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(danglingLegacySlot))
+                .hasMessageContaining("节点内容排序");
+    }
+
+    @Test
+    void acceptsMigrationOnlyLegacyCustomFieldOrderWithoutChangingTheUnifiedV2Slot() {
+        WorkflowTemplateDefinition migrated = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("migrated", List.of(
+                        v2Field("project-description", "项目描述", WorkflowFieldType.TEXTAREA,
+                                false, List.of(), true, "project.description"),
+                        v2Field("legacy-note", "旧备注", WorkflowFieldType.TEXT,
+                                false, List.of(), true, null)),
+                        List.of("fields", "component:solution-design", "legacy-custom-fields")),
+                v2Node("legacy-only", List.of(v2Field("legacy-note", "旧备注", WorkflowFieldType.TEXT,
+                        false, List.of(), true, null)), List.of("component:solution-design", "legacy-custom-fields"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator.validate(migrated)).isEqualTo(migrated);
+    }
+
+    @Test
+    void rejectsNullContentOrderEntriesAsUnknownSchemaItems() {
+        WorkflowTemplateDefinition nullOrderEntry = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("null-entry", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        false, List.of(), true, null)), java.util.Arrays.asList("fields", null))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(nullOrderEntry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("节点内容排序存在未知项");
+    }
+
+    @Test
     void rejectsInvalidV2BindingsFieldsAndContentOrder() {
         WorkflowTemplateDefinition duplicateOrder = new WorkflowTemplateDefinition(2, List.of(
                 v2Node("intake", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
