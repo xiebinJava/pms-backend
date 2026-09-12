@@ -8,6 +8,8 @@ import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.workflow.WorkflowFieldDefinition;
+import com.brad.pms.workflow.WorkflowFieldType;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -252,5 +255,103 @@ class NodeServiceCompleteTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("工作流配置缺失");
         verify(nodeMapper, never()).updateById(node);
+    }
+
+    @Test
+    void blocksCompletionWhenAVisibleRequiredV2ProjectBindingIsMissingFromCanonicalProjectData() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        ProjectNodeDO node = completableNode("custom-intake");
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("custom-intake", "自定义登记", "说明", "交付物", "角色",
+                java.util.List.of(), java.util.List.of(new WorkflowFieldDefinition("project-description", "项目描述",
+                WorkflowFieldType.TEXTAREA, true, java.util.List.of(), true, "project.description")),
+                false, java.util.List.of(), java.util.List.of("fields"));
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(workflowTemplateService.getNodeDefinition(17L, "custom-intake")).thenReturn(definition);
+        when(projectMapper.selectById(1L)).thenReturn(project);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+        nodeService.setNotificationService(notificationService);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("项目描述");
+        verify(nodeMapper, never()).updateById(node);
+    }
+
+    @Test
+    void allowsCompletionWhenARequiredV2ProjectBindingIsHidden() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        ProjectNodeDO node = completableNode("custom-intake");
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("custom-intake", "自定义登记", "说明", "交付物", "角色",
+                java.util.List.of(), java.util.List.of(new WorkflowFieldDefinition("project-description", "项目描述",
+                WorkflowFieldType.TEXTAREA, true, java.util.List.of(), false, "project.description")),
+                false, java.util.List.of(), java.util.List.of("fields"));
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(workflowTemplateService.getNodeDefinition(17L, "custom-intake")).thenReturn(definition);
+        org.mockito.Mockito.lenient().when(projectMapper.selectById(1L)).thenReturn(project);
+        when(taskMapper.selectCount(any())).thenReturn(1L);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("未完成任务");
+    }
+
+    @Test
+    void doesNotTreatContentOrderAloneAsACanonicalProjectBinding() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        ProjectNodeDO node = completableNode("custom-intake");
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("custom-intake", "自定义登记", "说明", "交付物", "角色",
+                java.util.List.of(), java.util.List.of(new WorkflowFieldDefinition("note", "备注",
+                WorkflowFieldType.TEXT, false, java.util.List.of(), true, null)),
+                false, java.util.List.of(), java.util.List.of("fields"));
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(workflowTemplateService.getNodeDefinition(17L, "custom-intake")).thenReturn(definition);
+        when(taskMapper.selectCount(any())).thenReturn(1L);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("未完成任务");
+    }
+
+    @Test
+    void exposesV2ContentOrderAndDerivesComponentsFromItsReferences() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        ProjectNodeDO node = completableNode("custom-intake");
+        node.setStatus(2);
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("custom-intake", "自定义登记", "说明", "交付物", "角色",
+                null, java.util.List.of(), false, null,
+                java.util.List.of("component:solution-design", "fields", "component:value-review"));
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(nodeMapper.selectList(any())).thenReturn(java.util.List.of(node));
+        when(userService.listByIds(java.util.List.of(3L))).thenReturn(java.util.List.of());
+        when(workflowTemplateService.getNodeDefinition(17L, "custom-intake")).thenReturn(definition);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+
+        var dto = nodeService.list(1L).get(0);
+
+        assertThat(dto.getContentOrder()).containsExactly("component:solution-design", "fields", "component:value-review");
+        assertThat(dto.getComponents()).containsExactly("solution-design", "value-review");
+    }
+
+    private static ProjectNodeDO completableNode(String key) {
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(10L);
+        node.setProjectId(1L);
+        node.setNodeKey(key);
+        node.setOwnerId(3L);
+        node.setStatus(1);
+        return node;
     }
 }

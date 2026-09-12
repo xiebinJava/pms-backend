@@ -31,6 +31,7 @@ public class ProjectNodeDTO {
     private LocalDateTime createdAt;
     private NodePermissionsDTO permissions;
     private List<String> components;
+    private List<String> contentOrder;
     private List<WorkflowFieldDefinition> fields;
     private Boolean projectBasicInfo;
     private List<WorkflowProjectFieldDefinition> projectBasicInfoFields;

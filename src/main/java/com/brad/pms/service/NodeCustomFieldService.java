@@ -77,6 +77,11 @@ public class NodeCustomFieldService {
             if (value != null && !value.isNull() && field.type() == WorkflowFieldType.PERSON && value.isIntegralNumber()) {
                 permissionService.requireProjectMember(projectId, value.asLong());
             }
+            if (value != null && !value.isNull() && field.type() == WorkflowFieldType.PERSON_MULTI && value.isArray()) {
+                for (JsonNode personId : value) {
+                    permissionService.requireProjectMember(projectId, personId.asLong());
+                }
+            }
             if (value != null && !value.isNull() && field.type() == WorkflowFieldType.ATTACHMENT) {
                 validateAttachmentReferences(projectId, nodeId, field.key(), value);
             }
@@ -110,16 +115,26 @@ public class NodeCustomFieldService {
                     AuditResourceType.PROJECT_NODE.name(), nodeId, projectId, null, null,
                     Map.of("fieldKeys", values.keySet())));
         }
-        return getValuesForNode(projectId, nodeId);
+        return getValuesForNode(projectId, nodeId, definition);
     }
 
     public WorkflowNodeFieldValuesDTO getValuesForNode(Long projectId, Long nodeId) {
+        ProjectDO project = projectMapper.selectById(projectId);
+        ProjectNodeDO node = nodeMapper.selectById(nodeId);
+        WorkflowNodeDefinition definition = project == null || node == null || !Objects.equals(node.getProjectId(), projectId)
+                ? null : workflowTemplateService.getNodeDefinition(project.getWorkflowTemplateVersionId(), node.getNodeKey());
+        return getValuesForNode(projectId, nodeId, definition);
+    }
+
+    public WorkflowNodeFieldValuesDTO getValuesForNode(Long projectId, Long nodeId, WorkflowNodeDefinition definition) {
         List<ProjectNodeFieldValueDO> rows = valueMapper.selectList(new LambdaQueryWrapper<ProjectNodeFieldValueDO>()
                 .eq(ProjectNodeFieldValueDO::getProjectId, projectId)
                 .eq(ProjectNodeFieldValueDO::getNodeId, nodeId));
+        Map<String, WorkflowFieldDefinition> fields = fieldsByKey(definition);
         Map<String, JsonNode> values = new LinkedHashMap<>();
         Map<String, Integer> versions = new LinkedHashMap<>();
         for (ProjectNodeFieldValueDO row : rows) {
+            if (isBound(fields, row.getFieldKey())) continue;
             values.put(row.getFieldKey(), parseValue(row.getValueJson()));
             versions.put(row.getFieldKey(), row.getVersion());
         }
@@ -129,6 +144,7 @@ public class NodeCustomFieldService {
                 .orderByAsc(ProjectNodeFieldAttachmentDO::getId));
         Map<String, List<WorkflowFieldAttachmentDTO>> attachmentDtos = new LinkedHashMap<>();
         for (ProjectNodeFieldAttachmentDO row : attachments) {
+            if (isBound(fields, row.getFieldKey())) continue;
             attachmentDtos.computeIfAbsent(row.getFieldKey(), key -> new ArrayList<>()).add(toAttachmentDTO(row));
         }
         WorkflowNodeFieldValuesDTO dto = new WorkflowNodeFieldValuesDTO();
@@ -140,7 +156,7 @@ public class NodeCustomFieldService {
 
     public void requireRequiredFields(Long projectId, Long nodeId, WorkflowNodeDefinition definition) {
         if (definition == null || definition.fields() == null || definition.fields().isEmpty()) return;
-        WorkflowNodeFieldValuesDTO dto = getValuesForNode(projectId, nodeId);
+        WorkflowNodeFieldValuesDTO dto = getValuesForNode(projectId, nodeId, definition);
         try {
             WorkflowFieldValueValidator.validate(definition.fields(), dto.getValues());
         } catch (IllegalArgumentException e) {
@@ -156,6 +172,7 @@ public class NodeCustomFieldService {
         ProjectDO project = permissionService.requireProjectReadable(projectId);
         permissionService.requireManageableNode(projectId, nodeId, "上传节点字段附件");
         WorkflowFieldDefinition field = requireField(requireDefinition(project, requireNode(projectId, nodeId)), fieldKey);
+        requireUnbound(field);
         if (field.type() != WorkflowFieldType.ATTACHMENT) throw BusinessException.error("该节点字段不是附件类型");
         FileStorageService.StoredFile stored = fileStorageService.storeAttachment(file);
         ProjectNodeFieldAttachmentDO row = new ProjectNodeFieldAttachmentDO();
@@ -182,14 +199,17 @@ public class NodeCustomFieldService {
     public Resource loadAttachment(Long projectId, Long nodeId, String fieldKey, Long attachmentId) {
         permissionService.requireProjectReadable(projectId);
         permissionService.requireNode(projectId, nodeId);
+        requireUnboundField(projectId, nodeId, fieldKey);
         return fileStorageService.load(requireAttachment(projectId, nodeId, fieldKey, attachmentId).getFileKey());
     }
 
     public String attachmentContentType(Long projectId, Long nodeId, String fieldKey, Long attachmentId) {
+        requireUnboundField(projectId, nodeId, fieldKey);
         return defaultContentType(requireAttachmentAfterRead(projectId, nodeId, fieldKey, attachmentId).getContentType());
     }
 
     public String attachmentName(Long projectId, Long nodeId, String fieldKey, Long attachmentId) {
+        requireUnboundField(projectId, nodeId, fieldKey);
         return requireAttachmentAfterRead(projectId, nodeId, fieldKey, attachmentId).getOriginalName();
     }
 
@@ -197,6 +217,7 @@ public class NodeCustomFieldService {
     public void deleteAttachment(Long projectId, Long nodeId, String fieldKey, Long attachmentId) {
         ProjectDO project = permissionService.requireProjectReadable(projectId);
         permissionService.requireManageableNode(projectId, nodeId, "删除节点字段附件");
+        requireUnboundField(projectId, nodeId, fieldKey);
         ProjectNodeFieldAttachmentDO attachment = requireAttachment(projectId, nodeId, fieldKey, attachmentId);
         ProjectNodeFieldValueDO value = findValue(nodeId, attachment.getFieldKey());
         if (value != null && value.getValueJson() != null) {
@@ -218,6 +239,7 @@ public class NodeCustomFieldService {
     private void validateAllAttachmentReferences(Long projectId, Long nodeId, WorkflowNodeDefinition definition,
                                                   Map<String, JsonNode> values) {
         for (WorkflowFieldDefinition field : definition.fields()) {
+            if (field.binding() != null) continue;
             JsonNode value = values.get(field.key());
             if (field.type() == WorkflowFieldType.ATTACHMENT && value != null && value.isArray()) {
                 validateAttachmentReferences(projectId, nodeId, field.key(), value);
@@ -251,6 +273,27 @@ public class NodeCustomFieldService {
     private WorkflowFieldDefinition requireField(WorkflowNodeDefinition definition, String key) {
         return definition.fields().stream().filter(field -> field.key().equals(key)).findFirst()
                 .orElseThrow(() -> BusinessException.error("节点字段不存在"));
+    }
+
+    private void requireUnbound(WorkflowFieldDefinition field) {
+        if (field.binding() != null) throw BusinessException.error("字段未配置: " + field.key());
+    }
+
+    private void requireUnboundField(Long projectId, Long nodeId, String fieldKey) {
+        ProjectDO project = projectMapper.selectById(projectId);
+        if (project == null) throw BusinessException.error("项目不存在");
+        ProjectNodeDO node = requireNode(projectId, nodeId);
+        requireUnbound(requireField(requireDefinition(project, node), fieldKey));
+    }
+
+    private static Map<String, WorkflowFieldDefinition> fieldsByKey(WorkflowNodeDefinition definition) {
+        if (definition == null || definition.fields() == null) return Map.of();
+        return definition.fields().stream().collect(Collectors.toMap(WorkflowFieldDefinition::key, field -> field));
+    }
+
+    private static boolean isBound(Map<String, WorkflowFieldDefinition> fields, String fieldKey) {
+        WorkflowFieldDefinition field = fields.get(fieldKey);
+        return field != null && field.binding() != null;
     }
 
     private ProjectNodeFieldValueDO findValue(Long nodeId, String fieldKey) {

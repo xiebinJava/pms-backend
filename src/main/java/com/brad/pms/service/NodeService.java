@@ -246,7 +246,11 @@ public class NodeService {
         ProjectDO project = permissionService.requireProject(projectId);
         ProjectNodeDO node = permissionService.requireCompletableNode(projectId, nodeId);
         WorkflowNodeDefinition definition = resolveNodeDefinition(project, node);
-        if (definition != null && definition.projectBasicInfo()) validateKickoffProfile(projectId, node, definition);
+        if (definition != null && definition.projectBasicInfo()) {
+            validateKickoffProfile(projectId, node, definition);
+        } else if (definition != null && hasRequiredVisibleProjectBinding(definition)) {
+            validateRequiredProjectBindings(projectId, definition);
+        }
         if (node.getOwnerId() == null) {
             throw BusinessException.error("请先分配节点负责人");
         }
@@ -325,6 +329,42 @@ public class NodeService {
         if (!missing.isEmpty()) {
             throw BusinessException.error("请先完善" + String.join("、", missing));
         }
+    }
+
+    private void validateRequiredProjectBindings(Long projectId, WorkflowNodeDefinition definition) {
+        if (definition.fields() == null) return;
+        ProjectDO project = projectMapper.selectById(projectId);
+        if (project == null) throw BusinessException.error("项目不存在");
+
+        List<String> missing = new ArrayList<>();
+        for (var field : definition.fields()) {
+            if (field.binding() == null || !field.required() || Boolean.FALSE.equals(field.visible())) continue;
+            switch (field.binding()) {
+                case "project.description" -> { if (project.getDescription() == null || project.getDescription().isBlank()) missing.add(field.label()); }
+                case "project.priority" -> { if (project.getPriority() == null) missing.add(field.label()); }
+                case "project.projectLevel" -> { if (project.getProjectLevel() == null) missing.add(field.label()); }
+                case "project.schedule" -> { if (project.getStartDate() == null || project.getEndDate() == null) missing.add(field.label()); }
+                case "project.businessLine" -> { if (project.getOrgUnitId() == null) missing.add(field.label()); }
+                case "project.projectManager" -> { if (project.getProjectManagerId() == null) missing.add(field.label()); }
+                case "project.projectMembers" -> {
+                    long count = memberMapper.selectCount(new LambdaQueryWrapper<ProjectMemberDO>()
+                            .eq(ProjectMemberDO::getProjectId, projectId));
+                    if (count == 0) missing.add(field.label());
+                }
+                case "project.followers" -> {
+                    Long count = followerMapper == null ? 0L : followerMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.ProjectFollowerDO>()
+                            .eq(com.brad.pms.entity.ProjectFollowerDO::getProjectId, projectId));
+                    if (count == null || count == 0) missing.add(field.label());
+                }
+                default -> { }
+            }
+        }
+        if (!missing.isEmpty()) throw BusinessException.error("请先完善" + String.join("、", missing));
+    }
+
+    private boolean hasRequiredVisibleProjectBinding(WorkflowNodeDefinition definition) {
+        return definition.fields() != null && definition.fields().stream()
+                .anyMatch(field -> field.binding() != null && field.required() && !Boolean.FALSE.equals(field.visible()));
     }
 
     /**
@@ -415,13 +455,14 @@ public class NodeService {
         dto.setPermissions(permissionService.nodePermissions(project, node));
         WorkflowNodeDefinition definition = resolveNodeDefinition(project, node);
         if (definition != null) {
-            dto.setComponents(definition.components());
+            dto.setComponents(runtimeComponents(definition));
+            dto.setContentOrder(definition.contentOrder());
             dto.setFields(definition.fields());
             dto.setProjectBasicInfo(definition.projectBasicInfo());
             dto.setProjectBasicInfoFields(definition.projectBasicInfoFields());
         }
         if (nodeCustomFieldService != null && definition != null) {
-            var values = nodeCustomFieldService.getValuesForNode(project.getId(), node.getId());
+            var values = nodeCustomFieldService.getValuesForNode(project.getId(), node.getId(), definition);
             dto.setFieldValues(values.getValues());
             dto.setFieldValueVersions(values.getVersions());
             dto.setFieldAttachments(values.getAttachments());
@@ -440,10 +481,10 @@ public class NodeService {
     }
 
     private void validateAttachedComponents(Long projectId, Long nodeId, WorkflowNodeDefinition definition) {
-        if (definition == null || definition.components() == null) {
+        if (definition == null) {
             throw BusinessException.error("节点工作流配置缺失或无效，请联系管理员");
         }
-        for (String component : definition.components()) {
+        for (String component : runtimeComponents(definition)) {
             switch (component) {
                 case "requirement-scope" -> requirementScopeService.requireConfirmed(projectId, nodeId);
                 case "solution-design" -> solutionDesignService.requireConfirmed(projectId, nodeId);
@@ -456,5 +497,15 @@ public class NodeService {
                 default -> throw BusinessException.error("节点包含无法识别的工作台组件: " + component);
             }
         }
+    }
+
+    private List<String> runtimeComponents(WorkflowNodeDefinition definition) {
+        if (definition.contentOrder() == null) {
+            return definition.components() == null ? List.of() : definition.components();
+        }
+        return definition.contentOrder().stream()
+                .filter(entry -> entry.startsWith("component:"))
+                .map(entry -> entry.substring("component:".length()))
+                .collect(Collectors.toList());
     }
 }
