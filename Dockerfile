@@ -17,7 +17,8 @@ RUN apt-get update \
     && chown -R 10001:10001 /var/lib/pms
 COPY --from=build /workspace/target/pms-backend-*.jar /app/pms-backend.jar
 COPY docker/healthcheck-backend.sh /usr/local/bin/healthcheck-backend.sh
-RUN chmod 0755 /usr/local/bin/healthcheck-backend.sh
+RUN sed -i 's/\r$//' /usr/local/bin/healthcheck-backend.sh \
+    && chmod 0755 /usr/local/bin/healthcheck-backend.sh
 USER 10001
 
 ENV SPRING_PROFILES_ACTIVE=mysql
