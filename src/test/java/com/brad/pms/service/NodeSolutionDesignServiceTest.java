@@ -19,6 +19,7 @@ import com.brad.pms.mapper.ProjectNodeSolutionPackageMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionReviewMapper;
 import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
@@ -70,6 +72,9 @@ class NodeSolutionDesignServiceTest {
     void rejectsNonDesignNodes() {
         ProjectNodeDO node = node("requirement");
         when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        doThrow(BusinessException.error("仅配置了方案设计组件的节点支持方案工作台"))
+                .when(permissionService).requireNodeComponent(node, WorkflowComponentKey.SOLUTION_DESIGN,
+                        "仅配置了方案设计组件的节点支持方案工作台");
 
         assertThatThrownBy(() -> service.get(1L, 10L))
                 .isInstanceOf(BusinessException.class)
@@ -116,7 +121,7 @@ class NodeSolutionDesignServiceTest {
         when(packageMapper.selectOne(any())).thenReturn(packageEntity());
         ProjectNodeDO requirementNode = node("requirement");
         requirementNode.setId(11L);
-        when(nodeMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(requirementNode);
+        when(permissionService.findNodeWithComponent(1L, WorkflowComponentKey.REQUIREMENT_SCOPE)).thenReturn(requirementNode);
         NodeRequirementScopeDTO baseline = new NodeRequirementScopeDTO();
         baseline.setBaselineStatus(0);
         when(requirementScopeService.get(1L, 11L)).thenReturn(baseline);
@@ -138,7 +143,7 @@ class NodeSolutionDesignServiceTest {
         when(permissionService.requireManageableNode(1L, 10L, "提交方案包")).thenReturn(node);
         when(packageMapper.selectOne(any())).thenReturn(pkg);
         when(packageMapper.updateById(any(ProjectNodeSolutionPackageDO.class))).thenReturn(1);
-        when(nodeMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(requirementNode);
+        when(permissionService.findNodeWithComponent(1L, WorkflowComponentKey.REQUIREMENT_SCOPE)).thenReturn(requirementNode);
         when(requirementScopeService.get(1L, 11L)).thenReturn(baseline);
         when(decisionMapper.selectOne(any())).thenReturn(null);
         when(reviewMapper.selectList(any())).thenReturn(List.of());

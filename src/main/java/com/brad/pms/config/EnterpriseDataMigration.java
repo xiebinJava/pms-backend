@@ -155,6 +155,8 @@ public class EnterpriseDataMigration implements CommandLineRunner {
         permissions.put("admin:role:write", "编辑角色");
         permissions.put("admin:import:write", "导入组织与人员");
         permissions.put("admin:audit:read", "查看审计日志");
+        permissions.put("admin:workflow:read", "查看流程模板");
+        permissions.put("admin:workflow:write", "维护流程模板");
         permissions.put("project:read", "查看项目");
         permissions.put("project:create", "创建项目");
         permissions.put("project:write", "编辑项目");
@@ -184,12 +186,12 @@ public class EnterpriseDataMigration implements CommandLineRunner {
 
     private void bindBuiltinPermissions(Map<String, String> permissions) {
         Set<String> orgAdmin = Set.of("admin:user:read", "admin:user:write", "admin:org:read",
-                "admin:org:write", "admin:role:read", "admin:import:write", "admin:audit:read", "project:read", "project:create", "project:write", "project:manage", "project:comment:write",
+                "admin:org:write", "admin:role:read", "admin:import:write", "admin:audit:read", "admin:workflow:read", "admin:workflow:write", "project:read", "project:create", "project:write", "project:manage", "project:comment:write",
                 "feedback:read", "feedback:write", "feedback:manage");
         Set<String> orgManagers = Set.of("admin:user:read", "admin:org:read", "project:read", "project:create", "project:write", "project:comment:write",
                 "feedback:read", "feedback:write");
         Set<String> projectManagers = Set.of("project:read", "project:create", "project:write", "project:comment:write", "feedback:read", "feedback:write");
-        Set<String> projectAdmins = Set.of("project:read", "project:create", "project:write", "project:manage", "project:comment:write", "feedback:read", "feedback:write");
+        Set<String> projectAdmins = Set.of("admin:workflow:read", "admin:workflow:write", "project:read", "project:create", "project:write", "project:manage", "project:comment:write", "feedback:read", "feedback:write");
         bindRolePermissions("ORG_ADMIN", orgAdmin, permissions);
         bindRolePermissions("BUSINESS_OWNER", orgManagers, permissions);
         bindRolePermissions("DEPT_MANAGER", orgManagers, permissions);

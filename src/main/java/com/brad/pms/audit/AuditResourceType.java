@@ -4,6 +4,7 @@ package com.brad.pms.audit;
 public enum AuditResourceType {
     PROJECT,
     PROJECT_NODE,
+    PROJECT_NODE_FIELD_ATTACHMENT,
     TASK,
     PROJECT_MEMBER,
     PROJECT_FOLLOWER,
@@ -11,6 +12,8 @@ public enum AuditResourceType {
     TASK_ATTACHMENT,
     PROJECT_IMAGE,
     ROLE,
+    WORKFLOW_TEMPLATE,
+    PROJECT_TYPE,
     USER,
     ORG_UNIT,
     IMPORT_JOB,

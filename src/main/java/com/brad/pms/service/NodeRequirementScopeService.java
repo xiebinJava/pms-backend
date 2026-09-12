@@ -23,6 +23,7 @@ import com.brad.pms.mapper.ProjectNodeScopeItemMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.mapper.ProjectTaskRequirementMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NodeRequirementScopeService {
 
-    private static final String REQUIREMENT_NODE_KEY = "requirement";
 
     private final ProjectNodeBaselineMapper baselineMapper;
     private final ProjectNodeScopeItemMapper scopeItemMapper;
@@ -146,9 +146,8 @@ public class NodeRequirementScopeService {
     }
 
     private ProjectNodeDO requireRequirementNode(ProjectNodeDO node) {
-        if (node == null || !REQUIREMENT_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅需求澄清与范围基线节点支持需求基线");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.REQUIREMENT_SCOPE,
+                "仅配置了需求范围组件的节点支持需求工作台");
         return node;
     }
 

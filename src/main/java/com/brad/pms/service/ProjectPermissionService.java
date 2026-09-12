@@ -19,6 +19,7 @@ import com.brad.pms.security.ProjectPermissionPolicy;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.security.DataScopeResolver;
 import com.brad.pms.security.LoginUser;
+import com.brad.pms.workflow.WorkflowNodeDefinition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,7 @@ public class ProjectPermissionService {
     private final ProjectNodeMapper nodeMapper;
     private final DataScopeResolver dataScopeResolver;
     private final AuthorizationService authorizationService;
+    private final WorkflowTemplateService workflowTemplateService;
 
     /** Backward-compatible name used by read paths; it now means readable. */
     public ProjectDO requireProject(Long projectId) {
@@ -130,6 +132,28 @@ public class ProjectPermissionService {
             throw BusinessException.error("节点不存在");
         }
         return node;
+    }
+
+    public void requireNodeComponent(ProjectNodeDO node, String componentKey, String message) {
+        if (node == null) throw BusinessException.error(message);
+        ProjectDO project = requireProjectReadable(node.getProjectId());
+        WorkflowNodeDefinition definition = workflowTemplateService.getNodeDefinition(
+                project.getWorkflowTemplateVersionId(), node.getNodeKey());
+        if (definition == null || !definition.components().contains(componentKey)) {
+            throw BusinessException.error(message);
+        }
+    }
+
+    public ProjectNodeDO findNodeWithComponent(Long projectId, String componentKey) {
+        ProjectDO project = requireProjectReadable(projectId);
+        WorkflowNodeDefinition definition = workflowTemplateService.getDefinition(project.getWorkflowTemplateVersionId())
+                .nodes().stream()
+                .filter(node -> node.components().contains(componentKey))
+                .findFirst().orElse(null);
+        if (definition == null) return null;
+        return nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
+                .eq(ProjectNodeDO::getProjectId, projectId)
+                .eq(ProjectNodeDO::getNodeKey, definition.key()));
     }
 
     /** Requires an open project and an unlocked node for a designated reviewer action. */

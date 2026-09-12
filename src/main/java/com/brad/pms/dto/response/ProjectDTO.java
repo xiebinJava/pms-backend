@@ -16,6 +16,8 @@ public class ProjectDTO {
     private Integer status;
     private Integer priority;
     private Integer projectLevel;
+    private Long projectTypeId;
+    private Long workflowTemplateVersionId;
     private Long ownerId;
     private String ownerName;
     private Long createdBy;

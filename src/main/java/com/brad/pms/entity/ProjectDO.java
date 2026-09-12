@@ -25,6 +25,10 @@ public class ProjectDO {
 
     private Integer projectLevel;
 
+    private Long projectTypeId;
+
+    private Long workflowTemplateVersionId;
+
     private Long ownerId;
 
     private Long projectManagerId;

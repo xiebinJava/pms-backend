@@ -12,6 +12,7 @@ import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeReleaseBaselineDO;
 import com.brad.pms.mapper.ProjectNodeReleaseBaselineMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class NodeReleaseService {
 
-    public static final String RELEASE_NODE_KEY = "release";
     private static final Set<String> RELEASE_TYPES = Set.of("FULL", "GRAY", "HOTFIX");
     private static final Set<String> DECISION_RESULTS = Set.of("PENDING", "APPROVED", "DEFERRED", "CANCELLED");
 
@@ -179,9 +179,8 @@ public class NodeReleaseService {
     }
 
     private ProjectNodeDO requireReleaseNode(ProjectNodeDO node) {
-        if (node == null || !RELEASE_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅发布决策与运营交接节点支持发布交接工作台");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.RELEASE_HANDOVER,
+                "仅配置了发布交接组件的节点支持发布工作台");
         return node;
     }
 

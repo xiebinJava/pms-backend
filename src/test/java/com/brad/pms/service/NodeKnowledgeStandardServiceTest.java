@@ -6,6 +6,7 @@ import com.brad.pms.dto.request.NodeKnowledgeStandardUpdateCmd;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeKnowledgeBaselineDO;
 import com.brad.pms.mapper.ProjectMemberMapper;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import com.brad.pms.mapper.ProjectNodeKnowledgeActionMapper;
 import com.brad.pms.mapper.ProjectNodeKnowledgeAssetMapper;
 import com.brad.pms.mapper.ProjectNodeKnowledgeBaselineMapper;
@@ -19,6 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,11 +41,15 @@ class NodeKnowledgeStandardServiceTest {
 
     @Test
     void rejectsNonKnowledgeNodes() {
-        when(permissionService.requireNode(1L, 10L)).thenReturn(node("develop"));
+        ProjectNodeDO node = node("develop");
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        doThrow(BusinessException.error("仅配置了知识标准组件的节点支持知识工作台"))
+                .when(permissionService).requireNodeComponent(node, WorkflowComponentKey.KNOWLEDGE_STANDARD,
+                        "仅配置了知识标准组件的节点支持知识工作台");
 
         assertThatThrownBy(() -> service.get(1L, 10L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("知识沉淀与标准改进");
+                .hasMessageContaining("知识标准组件");
     }
 
     @Test

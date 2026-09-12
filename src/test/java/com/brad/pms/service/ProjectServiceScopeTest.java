@@ -11,6 +11,9 @@ import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectMemberDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.OrgUnitDO;
+import com.brad.pms.entity.ProjectTypeDO;
+import com.brad.pms.entity.WorkflowTemplateDO;
+import com.brad.pms.entity.WorkflowTemplateVersionDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.security.DataScopeResolver;
 import com.brad.pms.security.LoginUser;
@@ -49,6 +52,7 @@ class ProjectServiceScopeTest {
     @Mock DataScopeResolver dataScopeResolver;
     @Mock OrgUnitMapper orgUnitMapper;
     @Mock OperationLogService operationLogService;
+    @Mock WorkflowTemplateService workflowTemplateService;
 
     @InjectMocks ProjectService projectService;
 
@@ -72,10 +76,25 @@ class ProjectServiceScopeTest {
         command.setName("CI 验收项目");
         command.setProjectLevel(2);
 
+        ProjectTypeDO projectType = new ProjectTypeDO();
+        projectType.setId(5L);
+        WorkflowTemplateVersionDO templateVersion = new WorkflowTemplateVersionDO();
+        templateVersion.setId(9L);
+        WorkflowTemplateDO template = new WorkflowTemplateDO();
+        template.setId(3L);
+        template.setProjectTypeId(5L);
+        when(workflowTemplateService.resolveForProjectCreation(null, null))
+                .thenReturn(new WorkflowTemplateService.WorkflowTemplateBinding(projectType, templateVersion, template));
+        var workflowDefinition = com.brad.pms.workflow.BuiltInWorkflowTemplate.compatibilityDefinition();
+        when(workflowTemplateService.getDefinition(9L)).thenReturn(workflowDefinition);
+        projectService.setWorkflowTemplateService(workflowTemplateService);
+
         when(projectMapper.insert(any(ProjectDO.class))).thenAnswer(invocation -> {
             ProjectDO project = invocation.getArgument(0);
             assertThat(project.getCode()).startsWith("TMP-");
             assertThat(project.getProjectLevel()).isEqualTo(2);
+            assertThat(project.getProjectTypeId()).isEqualTo(5L);
+            assertThat(project.getWorkflowTemplateVersionId()).isEqualTo(9L);
             project.setId(99L);
             return 1;
         });
@@ -98,6 +117,7 @@ class ProjectServiceScopeTest {
         ProjectDTO result = projectService.create(command);
 
         assertThat(result.getCode()).isEqualTo("PRJ-000099");
+        verify(nodeService).initFromDefinition(99L, 1L, workflowDefinition);
         verify(projectMapper).updateById(org.mockito.ArgumentMatchers.<ProjectDO>argThat(
                 project -> "PRJ-000099".equals(project.getCode())));
                 verify(operationLogService).record(org.mockito.ArgumentMatchers.argThat(event ->

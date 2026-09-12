@@ -22,6 +22,7 @@ import com.brad.pms.mapper.ProjectNodeKnowledgeActionMapper;
 import com.brad.pms.mapper.ProjectNodeKnowledgeAssetMapper;
 import com.brad.pms.mapper.ProjectNodeKnowledgeBaselineMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NodeKnowledgeStandardService {
 
-    public static final String KNOWLEDGE_NODE_KEY = "knowledge";
     private static final Set<String> ASSET_TYPES = Set.of("TEMPLATE", "CHECKLIST", "CASE", "STANDARD");
     private static final Set<String> ASSET_STATUSES = Set.of("UPDATED", "REVIEW", "RETAINED", "PENDING");
     private static final Set<String> ACTION_STATUSES = Set.of("NOT_STARTED", "IN_PROGRESS", "DONE");
@@ -219,9 +219,8 @@ public class NodeKnowledgeStandardService {
     }
 
     private ProjectNodeDO requireKnowledgeNode(ProjectNodeDO node) {
-        if (node == null || !KNOWLEDGE_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅知识沉淀与标准改进节点支持知识工作台");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.KNOWLEDGE_STANDARD,
+                "仅配置了知识标准组件的节点支持知识工作台");
         return node;
     }
 

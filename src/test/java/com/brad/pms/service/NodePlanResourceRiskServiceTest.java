@@ -21,6 +21,7 @@ import com.brad.pms.mapper.ProjectNodeRiskMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionDecisionMapper;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,8 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -60,7 +63,12 @@ class NodePlanResourceRiskServiceTest {
 
     @BeforeEach
     void stubConfirmedSolutionDecision() {
-        lenient().when(nodeMapper.selectOne(any())).thenReturn(node("design"));
+        lenient().when(permissionService.findNodeWithComponent(1L, WorkflowComponentKey.SOLUTION_DESIGN)).thenReturn(node("design"));
+        lenient().doAnswer(invocation -> {
+            ProjectNodeDO node = invocation.getArgument(0);
+            if (!"plan".equals(node.getNodeKey())) throw new BusinessException(400, "仅计划、资源与风险基线节点");
+            return null;
+        }).when(permissionService).requireNodeComponent(any(), eq(WorkflowComponentKey.PLAN_RESOURCE_RISK), anyString());
         lenient().when(decisionMapper.selectOne(any())).thenReturn(confirmedSolutionDecision());
         lenient().when(iterationPlanMapper.selectList(any())).thenReturn(List.of(iterationPlan()));
         lenient().when(iterationPlanMapper.insert(any(ProjectNodeIterationPlanDO.class))).thenReturn(1);
@@ -151,7 +159,6 @@ class NodePlanResourceRiskServiceTest {
         ProjectNodeSolutionDecisionDO decision = confirmedSolutionDecision();
         decision.setStatus("DRAFT");
         when(permissionService.requireManageableNode(1L, 10L, "保存计划、资源与风险基线")).thenReturn(node);
-        when(nodeMapper.selectOne(any())).thenReturn(node("design"));
         when(decisionMapper.selectOne(any())).thenReturn(decision);
 
         assertThatThrownBy(() -> service.saveDraft(1L, 10L, updateCommand()))
@@ -196,7 +203,6 @@ class NodePlanResourceRiskServiceTest {
         decision.setVersion(2);
         when(permissionService.requireManageableNode(1L, 10L, "确认计划、资源与风险基线")).thenReturn(node);
         when(baselineMapper.selectOne(any())).thenReturn(baseline);
-        when(nodeMapper.selectOne(any())).thenReturn(node("design"));
         when(decisionMapper.selectOne(any())).thenReturn(decision);
 
         assertThatThrownBy(() -> service.confirm(1L, 10L))

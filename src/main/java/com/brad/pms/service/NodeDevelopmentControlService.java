@@ -24,6 +24,7 @@ import com.brad.pms.mapper.ProjectNodeDevelopmentBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -42,7 +43,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NodeDevelopmentControlService {
 
-    public static final String DEVELOP_NODE_KEY = "develop";
     private static final Set<String> STORY_STATUSES = Set.of("NOT_STARTED", "IN_PROGRESS", "TESTING", "DONE", "BLOCKED");
     private static final Set<String> TEST_STATUSES = Set.of("NOT_STARTED", "TESTING", "PASSED", "FAILED");
 
@@ -449,9 +449,8 @@ public class NodeDevelopmentControlService {
     }
 
     private ProjectNodeDO requireDevelopNode(ProjectNodeDO node) {
-        if (node == null || !DEVELOP_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅开发测试与项目控制节点支持开发控制工作台");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.DEVELOPMENT_CONTROL,
+                "仅配置了开发控制组件的节点支持开发工作台");
         return node;
     }
 

@@ -8,6 +8,7 @@ import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.workflow.WorkflowNodeDefinition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,6 +39,8 @@ class NodeServiceCompleteTest {
     @Mock NodeDevelopmentControlService developmentControlService;
     @Mock NodeValueReviewService valueReviewService;
     @Mock MemberService memberService;
+    @Mock WorkflowTemplateService workflowTemplateService;
+    @Mock NodeCustomFieldService nodeCustomFieldService;
 
     @InjectMocks NodeService nodeService;
 
@@ -168,6 +171,62 @@ class NodeServiceCompleteTest {
         assertThatThrownBy(() -> nodeService.complete(1L, 10L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("价值验证");
+        verify(nodeMapper, never()).updateById(node);
+    }
+
+    @Test
+    void routesSpecializedCompletionByAttachedComponentAfterNodeRename() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(10L);
+        node.setProjectId(1L);
+        node.setNodeKey("custom-solution-stage");
+        node.setOwnerId(3L);
+        node.setStatus(1);
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(taskMapper.selectCount(any())).thenReturn(0L);
+        when(workflowTemplateService.getNodeDefinition(17L, "custom-solution-stage"))
+                .thenReturn(new WorkflowNodeDefinition("custom-solution-stage", "自定义方案节点", "说明", "交付物", "角色",
+                        java.util.List.of("solution-design"), java.util.List.of(), false, java.util.List.of()));
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+        org.mockito.Mockito.doThrow(BusinessException.error("请先确认方案决策"))
+                .when(solutionDesignService).requireConfirmed(1L, 10L);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("方案决策");
+        verify(nodeMapper, never()).updateById(node);
+    }
+
+    @Test
+    void blocksCompletionWhenARequiredCustomFieldIsMissing() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(10L);
+        node.setProjectId(1L);
+        node.setNodeKey("custom-intake");
+        node.setOwnerId(3L);
+        node.setStatus(1);
+        var definition = new WorkflowNodeDefinition("custom-intake", "自定义登记", "说明", "交付物", "角色",
+                java.util.List.of(), java.util.List.of(
+                new com.brad.pms.workflow.WorkflowFieldDefinition("business-case", "业务价值",
+                        com.brad.pms.workflow.WorkflowFieldType.TEXT, true, java.util.List.of())), false, java.util.List.of());
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(taskMapper.selectCount(any())).thenReturn(0L);
+        when(workflowTemplateService.getNodeDefinition(17L, "custom-intake")).thenReturn(definition);
+        org.mockito.Mockito.doThrow(BusinessException.error("请先填写业务价值"))
+                .when(nodeCustomFieldService).requireRequiredFields(1L, 10L, definition);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+        nodeService.setNodeCustomFieldService(nodeCustomFieldService);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("业务价值");
         verify(nodeMapper, never()).updateById(node);
     }
 }

@@ -12,6 +12,7 @@ import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeValueReviewDO;
 import com.brad.pms.mapper.ProjectNodeValueReviewMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class NodeValueReviewService {
 
-    public static final String REVIEW_NODE_KEY = "review";
     private static final Set<String> RESULT_STATUSES = Set.of("PENDING", "ACHIEVED", "PARTIAL", "NOT_ACHIEVED");
 
     private final ProjectNodeValueReviewMapper reviewMapper;
@@ -138,9 +138,8 @@ public class NodeValueReviewService {
     }
 
     private ProjectNodeDO requireReviewNode(ProjectNodeDO node) {
-        if (node == null || !REVIEW_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅价值验证与项目复盘节点支持价值复盘工作台");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.VALUE_REVIEW,
+                "仅配置了价值复盘组件的节点支持价值复盘工作台");
         return node;
     }
 

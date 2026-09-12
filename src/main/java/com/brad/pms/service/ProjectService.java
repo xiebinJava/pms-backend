@@ -37,6 +37,7 @@ import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.PermissionCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -63,10 +64,18 @@ public class ProjectService {
     private final DataScopeResolver dataScopeResolver;
     private final OrgUnitMapper orgUnitMapper;
     private final OperationLogService operationLogService;
+    private WorkflowTemplateService workflowTemplateService;
+
+    @Autowired
+    public void setWorkflowTemplateService(WorkflowTemplateService workflowTemplateService) {
+        this.workflowTemplateService = workflowTemplateService;
+    }
 
     @Transactional
     public ProjectDTO create(ProjectCreateCmd cmd) {
         Long creatorId = UserContext.userId();
+        WorkflowTemplateService.WorkflowTemplateBinding workflowBinding = workflowTemplateService == null
+                ? null : workflowTemplateService.resolveForProjectCreation(cmd.getProjectTypeId(), cmd.getWorkflowTemplateVersionId());
         ProjectDO project = new ProjectDO();
         project.setName(cmd.getName());
         project.setDescription(cmd.getDescription());
@@ -74,6 +83,10 @@ public class ProjectService {
         project.setStatus(ProjectStatus.ACTIVE.getCode());
         project.setPriority(cmd.getPriority());
         project.setProjectLevel(requireProjectLevel(cmd.getProjectLevel()));
+        if (workflowBinding != null) {
+            project.setProjectTypeId(workflowBinding.projectType().getId());
+            project.setWorkflowTemplateVersionId(workflowBinding.version().getId());
+        }
         // owner_id 为历史兼容字段，真实项目创建人统一取当前登录用户。
         project.setOwnerId(creatorId);
         project.setCreatedBy(creatorId);
@@ -96,7 +109,12 @@ public class ProjectService {
         projectMapper.updateById(project);
 
         // 初始化项目管理节点（完成当前节点自动解锁下一个）
-        nodeService.initDefault(project.getId(), creatorId);
+        if (workflowBinding == null) {
+            nodeService.initDefault(project.getId(), creatorId);
+        } else {
+            nodeService.initFromDefinition(project.getId(), creatorId,
+                    workflowTemplateService.getDefinition(workflowBinding.version().getId()));
+        }
 
         // 创建人自动成为项目成员，项目经理在首节点确认后再设置。
         memberService.add(project.getId(), creatorId, 0);

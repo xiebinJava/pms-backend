@@ -72,6 +72,8 @@ public final class Convertors {
         dto.setStatus(do_.getStatus());
         dto.setPriority(do_.getPriority());
         dto.setProjectLevel(do_.getProjectLevel());
+        dto.setProjectTypeId(do_.getProjectTypeId());
+        dto.setWorkflowTemplateVersionId(do_.getWorkflowTemplateVersionId());
         dto.setOwnerId(do_.getOwnerId());
         dto.setOwnerName(userDisplayName(owner));
         dto.setCreatedBy(do_.getCreatedBy());

@@ -22,9 +22,9 @@ import com.brad.pms.mapper.ProjectNodeAcceptanceBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeAcceptanceDefectMapper;
 import com.brad.pms.mapper.ProjectNodeAcceptanceItemMapper;
 import com.brad.pms.mapper.ProjectNodeBaselineMapper;
-import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -44,15 +44,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NodeAcceptanceService {
 
-    private static final String ACCEPTANCE_NODE_KEY = "acceptance";
-    private static final String REQUIREMENT_NODE_KEY = "requirement";
     private static final Set<String> RESULTS = Set.of("PENDING", "PASS", "CONDITIONAL_PASS");
     private static final Set<String> ITEM_RESULTS = Set.of("PENDING", "PASS", "FAIL", "BLOCKED");
 
     private final ProjectNodeAcceptanceBaselineMapper baselineMapper;
     private final ProjectNodeAcceptanceItemMapper itemMapper;
     private final ProjectNodeAcceptanceDefectMapper defectMapper;
-    private final ProjectNodeMapper nodeMapper;
     private final ProjectNodeBaselineMapper requirementBaselineMapper;
     private final ProjectNodeRequirementMapper requirementMapper;
     private final ProjectPermissionService permissionService;
@@ -297,9 +294,7 @@ public class NodeAcceptanceService {
     }
 
     private ProjectNodeBaselineDO findRequirementBaseline(Long projectId) {
-        ProjectNodeDO requirementNode = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
-                .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getNodeKey, REQUIREMENT_NODE_KEY));
+        ProjectNodeDO requirementNode = permissionService.findNodeWithComponent(projectId, WorkflowComponentKey.REQUIREMENT_SCOPE);
         if (requirementNode == null) return null;
         return requirementBaselineMapper.selectOne(new LambdaQueryWrapper<ProjectNodeBaselineDO>()
                 .eq(ProjectNodeBaselineDO::getProjectId, projectId)
@@ -311,9 +306,7 @@ public class NodeAcceptanceService {
         if (requirementBaseline == null || !Integer.valueOf(1).equals(requirementBaseline.getStatus())) {
             return List.of();
         }
-        ProjectNodeDO requirementNode = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
-                .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getNodeKey, REQUIREMENT_NODE_KEY));
+        ProjectNodeDO requirementNode = permissionService.findNodeWithComponent(projectId, WorkflowComponentKey.REQUIREMENT_SCOPE);
         if (requirementNode == null) return List.of();
         List<ProjectNodeRequirementDO> requirements = requirementMapper.selectList(new LambdaQueryWrapper<ProjectNodeRequirementDO>()
                 .eq(ProjectNodeRequirementDO::getProjectId, projectId)
@@ -341,9 +334,8 @@ public class NodeAcceptanceService {
     }
 
     private ProjectNodeDO requireAcceptanceNode(ProjectNodeDO node) {
-        if (node == null || !ACCEPTANCE_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅业务验收与缺陷闭环节点支持验收工作台");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.BUSINESS_ACCEPTANCE,
+                "仅配置了业务验收组件的节点支持验收工作台");
         return node;
     }
 

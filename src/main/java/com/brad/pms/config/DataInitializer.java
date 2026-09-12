@@ -5,6 +5,7 @@ import com.brad.pms.common.enums.SystemRole;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.mapper.*;
 import com.brad.pms.service.NodeService;
+import com.brad.pms.service.WorkflowTemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -35,6 +36,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ProjectMilestoneMapper milestoneMapper;
     private final ProjectCommentMapper commentMapper;
     private final NodeService nodeService;
+    private final WorkflowTemplateService workflowTemplateService;
     private final EnterpriseDataMigration enterpriseDataMigration;
     private final Environment environment;
 
@@ -85,6 +87,7 @@ public class DataInitializer implements CommandLineRunner {
         UserDO terry = demoUsers.get(1);
         UserDO kevin = demoUsers.get(2);
         UserDO claire = demoUsers.get(3);
+        var defaultWorkflow = workflowTemplateService.resolveForProjectCreation(null, null);
 
         ProjectDO p1 = new ProjectDO();
         p1.setName("开源项目管理平台");
@@ -96,9 +99,12 @@ public class DataInitializer implements CommandLineRunner {
         p1.setStartDate(LocalDate.now().minusDays(20));
         p1.setEndDate(LocalDate.now().plusDays(80));
         p1.setProgress(35);
+        p1.setProjectTypeId(defaultWorkflow.projectType().getId());
+        p1.setWorkflowTemplateVersionId(defaultWorkflow.version().getId());
         p1.setCode("PRJ-000001");
         projectMapper.insert(p1);
-        nodeService.initDefault(p1.getId(), admin.getId());
+        nodeService.initFromDefinition(p1.getId(), admin.getId(),
+                workflowTemplateService.getDefinition(defaultWorkflow.version().getId()));
         List<ProjectNodeDTO> p1Nodes = nodeService.list(p1.getId());
 
         ProjectDO p2 = new ProjectDO();
@@ -111,9 +117,12 @@ public class DataInitializer implements CommandLineRunner {
         p2.setStartDate(LocalDate.now().plusDays(10));
         p2.setEndDate(LocalDate.now().plusDays(120));
         p2.setProgress(0);
+        p2.setProjectTypeId(defaultWorkflow.projectType().getId());
+        p2.setWorkflowTemplateVersionId(defaultWorkflow.version().getId());
         p2.setCode("PRJ-000002");
         projectMapper.insert(p2);
-        nodeService.initDefault(p2.getId(), terry.getId());
+        nodeService.initFromDefinition(p2.getId(), terry.getId(),
+                workflowTemplateService.getDefinition(defaultWorkflow.version().getId()));
 
         member(p1.getId(), admin.getId(), 0);
         member(p1.getId(), brad.getId(), 1);

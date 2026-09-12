@@ -15,6 +15,7 @@ import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
 import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -143,12 +145,16 @@ class NodeDevelopmentControlServiceTest {
 
     @Test
     void rejectsNonDevelopmentNodes() {
+        ProjectNodeDO node = node("plan");
         when(permissionService.requireProjectReadable(1L)).thenReturn(new ProjectDO());
-        when(permissionService.requireNode(1L, 10L)).thenReturn(node("plan"));
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        doThrow(BusinessException.error("仅配置了开发控制组件的节点支持开发工作台"))
+                .when(permissionService).requireNodeComponent(node, WorkflowComponentKey.DEVELOPMENT_CONTROL,
+                        "仅配置了开发控制组件的节点支持开发工作台");
 
         assertThatThrownBy(() -> service.get(1L, 10L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("开发测试与项目控制");
+                .hasMessageContaining("开发控制组件");
     }
 
     @Test

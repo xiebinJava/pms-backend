@@ -16,6 +16,8 @@ import com.brad.pms.mapper.ProjectNodeAcceptanceItemMapper;
 import com.brad.pms.mapper.ProjectNodeBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
+import com.brad.pms.workflow.WorkflowComponentKey;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +31,9 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,6 +53,17 @@ class NodeAcceptanceServiceTest {
 
     @InjectMocks NodeAcceptanceService service;
 
+    @BeforeEach
+    void stubConfiguredComponent() {
+        lenient().doAnswer(invocation -> {
+            ProjectNodeDO node = invocation.getArgument(0);
+            if (!"acceptance".equals(node.getNodeKey())) throw new BusinessException(400, "仅业务验收与缺陷闭环节点");
+            return null;
+        }).when(permissionService).requireNodeComponent(any(), eq(WorkflowComponentKey.BUSINESS_ACCEPTANCE), anyString());
+        lenient().when(permissionService.findNodeWithComponent(1L, WorkflowComponentKey.REQUIREMENT_SCOPE))
+                .thenReturn(node("requirement"));
+    }
+
     @Test
     void rejectsNonAcceptanceNodes() {
         when(permissionService.requireNode(1L, 10L)).thenReturn(node("plan"));
@@ -60,7 +76,6 @@ class NodeAcceptanceServiceTest {
     @Test
     void savesAcceptanceDraftAgainstConfirmedRequirements() {
         when(permissionService.requireManageableNode(1L, 10L, "保存业务验收与缺陷闭环")).thenReturn(node("acceptance"));
-        when(nodeMapper.selectOne(any())).thenReturn(node("requirement"));
         when(requirementBaselineMapper.selectOne(any())).thenReturn(requirementBaseline());
         when(baselineMapper.selectOne(any())).thenReturn(null);
         when(baselineMapper.insert(any(ProjectNodeAcceptanceBaselineDO.class))).thenReturn(1);
@@ -85,7 +100,6 @@ class NodeAcceptanceServiceTest {
     @Test
     void rejectsConfirmationWithIncompleteItemsOrMissingConditionalResiduals() {
         when(permissionService.requireManageableNode(1L, 10L, "确认业务验收与缺陷闭环")).thenReturn(node("acceptance"));
-        when(nodeMapper.selectOne(any())).thenReturn(node("requirement"));
         when(requirementBaselineMapper.selectOne(any())).thenReturn(requirementBaseline());
         when(baselineMapper.selectOne(any())).thenReturn(baseline());
         when(requirementMapper.selectList(any())).thenReturn(List.of(requirement(21L, "REQ-001")));
@@ -104,7 +118,6 @@ class NodeAcceptanceServiceTest {
     @Test
     void confirmsConditionalAcceptanceAndAuditsIt() {
         when(permissionService.requireManageableNode(1L, 10L, "确认业务验收与缺陷闭环")).thenReturn(node("acceptance"));
-        when(nodeMapper.selectOne(any())).thenReturn(node("requirement"));
         when(requirementBaselineMapper.selectOne(any())).thenReturn(requirementBaseline());
         when(baselineMapper.selectOne(any())).thenReturn(baseline());
         when(requirementMapper.selectList(any())).thenReturn(List.of(requirement(21L, "REQ-001")));
@@ -132,7 +145,6 @@ class NodeAcceptanceServiceTest {
     @Test
     void editsAConfirmedAcceptanceDirectlyAndClearsItsConfirmation() {
         when(permissionService.requireManageableNode(1L, 10L, "保存业务验收与缺陷闭环")).thenReturn(node("acceptance"));
-        when(nodeMapper.selectOne(any())).thenReturn(node("requirement"));
         when(requirementBaselineMapper.selectOne(any())).thenReturn(requirementBaseline());
         when(baselineMapper.selectOne(any())).thenReturn(confirmedAcceptanceBaseline());
         when(requirementMapper.selectList(any())).thenReturn(List.of(requirement(21L, "REQ-001")));
@@ -172,7 +184,6 @@ class NodeAcceptanceServiceTest {
     void rejectsCompletionWhenRequirementBaselineVersionChanged() {
         when(permissionService.requireProjectReadable(1L)).thenReturn(null);
         when(permissionService.requireNode(1L, 10L)).thenReturn(node("acceptance"));
-        when(nodeMapper.selectOne(any())).thenReturn(node("requirement"));
         ProjectNodeAcceptanceBaselineDO accepted = baseline();
         accepted.setStatus(1);
         accepted.setRequirementBaselineVersion(1);
@@ -189,7 +200,6 @@ class NodeAcceptanceServiceTest {
     @Test
     void rejectsOversizedAcceptanceNotesBeforeWriting() {
         when(permissionService.requireManageableNode(1L, 10L, "保存业务验收与缺陷闭环")).thenReturn(node("acceptance"));
-        when(nodeMapper.selectOne(any())).thenReturn(node("requirement"));
         when(requirementBaselineMapper.selectOne(any())).thenReturn(requirementBaseline());
         when(requirementMapper.selectList(any())).thenReturn(List.of(requirement(21L, "REQ-001")));
         NodeAcceptanceItemCmd item = new NodeAcceptanceItemCmd();
@@ -208,7 +218,6 @@ class NodeAcceptanceServiceTest {
     @Test
     void rejectsNullAcceptanceItemsBeforeWriting() {
         when(permissionService.requireManageableNode(1L, 10L, "保存业务验收与缺陷闭环")).thenReturn(node("acceptance"));
-        when(nodeMapper.selectOne(any())).thenReturn(node("requirement"));
         when(requirementBaselineMapper.selectOne(any())).thenReturn(requirementBaseline());
         when(requirementMapper.selectList(any())).thenReturn(List.of(requirement(21L, "REQ-001")));
         NodeAcceptanceUpdateCmd cmd = new NodeAcceptanceUpdateCmd();

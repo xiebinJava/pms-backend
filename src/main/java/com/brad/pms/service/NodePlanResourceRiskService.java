@@ -22,7 +22,6 @@ import com.brad.pms.entity.ProjectNodeIterationPlanDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
 import com.brad.pms.entity.ProjectNodeSolutionDecisionDO;
 import com.brad.pms.entity.UserDO;
-import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectNodePlanBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeResourceMapper;
 import com.brad.pms.mapper.ProjectNodeRiskMapper;
@@ -30,6 +29,7 @@ import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionDecisionMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -49,7 +49,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NodePlanResourceRiskService {
 
-    private static final String PLAN_NODE_KEY = "plan";
     private static final Set<String> RESOURCE_STATUSES = Set.of("PENDING", "CONFIRMED");
     private static final Set<String> RISK_LEVELS = Set.of("HIGH", "MEDIUM", "LOW");
     private static final Set<String> RISK_STATUSES = Set.of("OPEN", "MITIGATED");
@@ -60,7 +59,6 @@ public class NodePlanResourceRiskService {
     private final ProjectNodeIterationPlanMapper iterationPlanMapper;
     private final ProjectNodeDevelopmentStoryMapper storyMapper;
     private final ProjectNodeSolutionDecisionMapper decisionMapper;
-    private final ProjectNodeMapper nodeMapper;
     private final MemberService memberService;
     private final ProjectPermissionService permissionService;
     private final UserService userService;
@@ -399,9 +397,7 @@ public class NodePlanResourceRiskService {
     }
 
     private ProjectNodeSolutionDecisionDO findSolutionDecision(Long projectId) {
-        ProjectNodeDO designNode = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
-                .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getNodeKey, NodeSolutionDesignService.DESIGN_NODE_KEY));
+        ProjectNodeDO designNode = permissionService.findNodeWithComponent(projectId, WorkflowComponentKey.SOLUTION_DESIGN);
         if (designNode == null) return null;
         return decisionMapper.selectOne(new LambdaQueryWrapper<ProjectNodeSolutionDecisionDO>()
                 .eq(ProjectNodeSolutionDecisionDO::getProjectId, projectId)
@@ -415,9 +411,8 @@ public class NodePlanResourceRiskService {
     }
 
     private ProjectNodeDO requirePlanNode(ProjectNodeDO node) {
-        if (node == null || !PLAN_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅计划、资源与风险基线节点支持计划工作台");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.PLAN_RESOURCE_RISK,
+                "仅配置了计划资源风险组件的节点支持计划工作台");
         return node;
     }
 

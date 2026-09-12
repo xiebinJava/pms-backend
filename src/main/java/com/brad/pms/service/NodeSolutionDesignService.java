@@ -19,11 +19,11 @@ import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeSolutionDecisionDO;
 import com.brad.pms.entity.ProjectNodeSolutionPackageDO;
 import com.brad.pms.entity.ProjectNodeSolutionReviewDO;
-import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionDecisionMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionPackageMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionReviewMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -40,14 +40,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class NodeSolutionDesignService {
 
-    public static final String DESIGN_NODE_KEY = "design";
     public static final List<String> REVIEW_TYPES = List.of("BUSINESS_PRODUCT", "TECHNICAL", "TEST_RELEASE");
     private static final Set<String> DECISION_RESULTS = Set.of("PASS", "CONDITIONAL_PASS", "RETURN_FOR_CHANGES");
 
     private final ProjectNodeSolutionPackageMapper packageMapper;
     private final ProjectNodeSolutionReviewMapper reviewMapper;
     private final ProjectNodeSolutionDecisionMapper decisionMapper;
-    private final ProjectNodeMapper nodeMapper;
     private final MemberService memberService;
     private final ProjectPermissionService permissionService;
     private final NodeRequirementScopeService requirementScopeService;
@@ -323,9 +321,8 @@ public class NodeSolutionDesignService {
     }
 
     private ProjectNodeDO requireDesignNode(ProjectNodeDO node) {
-        if (node == null || !DESIGN_NODE_KEY.equals(node.getNodeKey())) {
-            throw BusinessException.error("仅方案设计、评审与决策节点支持方案工作台");
-        }
+        permissionService.requireNodeComponent(node, WorkflowComponentKey.SOLUTION_DESIGN,
+                "仅配置了方案设计组件的节点支持方案工作台");
         return node;
     }
 
@@ -401,9 +398,7 @@ public class NodeSolutionDesignService {
     }
 
     private NodeRequirementBaselineSummaryDTO upstreamBaseline(Long projectId) {
-        ProjectNodeDO requirementNode = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
-                .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getNodeKey, "requirement"));
+        ProjectNodeDO requirementNode = permissionService.findNodeWithComponent(projectId, WorkflowComponentKey.REQUIREMENT_SCOPE);
         NodeRequirementBaselineSummaryDTO summary = new NodeRequirementBaselineSummaryDTO();
         if (requirementNode == null) return summary;
         NodeRequirementScopeDTO baseline = requirementScopeService.get(projectId, requirementNode.getId());

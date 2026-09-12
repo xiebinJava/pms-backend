@@ -9,9 +9,9 @@ import com.brad.pms.entity.ProjectNodePlanBaselineDO;
 import com.brad.pms.entity.ProjectNodeSolutionDecisionDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
-import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectNodePlanBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionDecisionMapper;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,10 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class IterationPlanService {
 
-    private static final String PLAN_NODE_KEY = "plan";
-
     private final ProjectNodeIterationPlanMapper iterationPlanMapper;
-    private final ProjectNodeMapper nodeMapper;
     private final ProjectNodePlanBaselineMapper baselineMapper;
     private final ProjectNodeSolutionDecisionMapper decisionMapper;
     private final ProjectPermissionService permissionService;
@@ -74,9 +71,7 @@ public class IterationPlanService {
     }
 
     private List<NodeIterationPlanDTO> listConfirmedByProject(Long projectId) {
-        ProjectNodeDO planNode = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
-                .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getNodeKey, PLAN_NODE_KEY));
+        ProjectNodeDO planNode = permissionService.findNodeWithComponent(projectId, WorkflowComponentKey.PLAN_RESOURCE_RISK);
         if (planNode == null) return List.of();
         ProjectNodePlanBaselineDO baseline = baselineMapper.selectOne(new LambdaQueryWrapper<ProjectNodePlanBaselineDO>()
                 .eq(ProjectNodePlanBaselineDO::getProjectId, projectId)
@@ -88,9 +83,7 @@ public class IterationPlanService {
     }
 
     private boolean isCurrent(Long projectId, ProjectNodePlanBaselineDO baseline) {
-        ProjectNodeDO designNode = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
-                .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getNodeKey, NodeSolutionDesignService.DESIGN_NODE_KEY));
+        ProjectNodeDO designNode = permissionService.findNodeWithComponent(projectId, WorkflowComponentKey.SOLUTION_DESIGN);
         if (designNode == null) return false;
         ProjectNodeSolutionDecisionDO decision = decisionMapper.selectOne(new LambdaQueryWrapper<ProjectNodeSolutionDecisionDO>()
                 .eq(ProjectNodeSolutionDecisionDO::getProjectId, projectId)
