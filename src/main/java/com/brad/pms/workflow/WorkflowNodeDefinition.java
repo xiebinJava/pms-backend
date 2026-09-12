@@ -11,5 +11,14 @@ public record WorkflowNodeDefinition(
         List<String> components,
         List<WorkflowFieldDefinition> fields,
         boolean projectBasicInfo,
-        List<WorkflowProjectFieldDefinition> projectBasicInfoFields) {
+        List<WorkflowProjectFieldDefinition> projectBasicInfoFields,
+        List<String> contentOrder) {
+
+    public WorkflowNodeDefinition(String key, String name, String description, String deliverable, String roles,
+                                  List<String> components, List<WorkflowFieldDefinition> fields,
+                                  boolean projectBasicInfo,
+                                  List<WorkflowProjectFieldDefinition> projectBasicInfoFields) {
+        this(key, name, description, deliverable, roles, components, fields, projectBasicInfo,
+                projectBasicInfoFields, null);
+    }
 }

@@ -7,5 +7,12 @@ public record WorkflowFieldDefinition(
         String label,
         WorkflowFieldType type,
         boolean required,
-        List<String> options) {
+        List<String> options,
+        Boolean visible,
+        String binding) {
+
+    public WorkflowFieldDefinition(String key, String label, WorkflowFieldType type, boolean required,
+                                   List<String> options) {
+        this(key, label, type, required, options, null, null);
+    }
 }

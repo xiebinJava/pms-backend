@@ -66,6 +66,46 @@ class WorkflowFieldValueValidatorTest {
                 .hasMessageContaining("字段值类型无效");
     }
 
+    @Test
+    void validatesRadioPeopleAndOrderedDateRanges() throws Exception {
+        var fields = List.of(
+                field("priority", WorkflowFieldType.RADIO, false, List.of("P0", "P1")),
+                field("members", WorkflowFieldType.PERSON_MULTI, false, List.of()),
+                field("schedule", WorkflowFieldType.DATE_RANGE, false, List.of()));
+
+        assertThat(WorkflowFieldValueValidator.validate(fields, Map.of(
+                "priority", mapper.readTree("\"P0\""),
+                "members", mapper.readTree("[7,8]"),
+                "schedule", mapper.readTree("[\"2026-09-12\",\"2026-09-13\"]")))).hasSize(3);
+
+        assertThatThrownBy(() -> WorkflowFieldValueValidator.validate(fields,
+                Map.of("priority", mapper.readTree("\"P2\"")))).hasMessageContaining("选项无效");
+        assertThatThrownBy(() -> WorkflowFieldValueValidator.validate(fields,
+                Map.of("members", mapper.readTree("[7,7]")))).hasMessageContaining("字段值类型无效");
+        assertThatThrownBy(() -> WorkflowFieldValueValidator.validate(fields,
+                Map.of("members", mapper.readTree("[0]")))).hasMessageContaining("字段值类型无效");
+        assertThatThrownBy(() -> WorkflowFieldValueValidator.validate(fields,
+                Map.of("schedule", mapper.readTree("[\"2026-09-12\"]")))).hasMessageContaining("日期格式无效");
+        assertThatThrownBy(() -> WorkflowFieldValueValidator.validate(fields,
+                Map.of("schedule", mapper.readTree("[\"2026-09-14\",\"2026-09-13\"]"))))
+                .hasMessageContaining("日期格式无效");
+    }
+
+    @Test
+    void excludesHiddenAndProjectBoundFieldsFromNodeCustomValueRules() throws Exception {
+        var fields = List.of(
+                v2Field("hidden", "隐藏项", WorkflowFieldType.TEXT, true, List.of(), false, null),
+                v2Field("priority", "优先级", WorkflowFieldType.RADIO, true, List.of(), true, "project.priority"),
+                v2Field("note", "备注", WorkflowFieldType.TEXT, true, List.of(), true, null));
+
+        assertThat(WorkflowFieldValueValidator.validate(fields,
+                Map.of("note", mapper.readTree("\"已填写\"")))).containsOnlyKeys("note");
+        assertThat(WorkflowFieldValueValidator.missingRequiredFields(fields, Map.of()))
+                .containsExactly("备注");
+        assertThatThrownBy(() -> WorkflowFieldValueValidator.validate(fields,
+                Map.of("priority", mapper.readTree("\"P0\"")))).hasMessageContaining("字段未配置");
+    }
+
     private WorkflowFieldDefinition field(String key, WorkflowFieldType type, boolean required, List<String> options) {
         String label = switch (key) {
             case "title" -> "标题";
@@ -73,5 +113,10 @@ class WorkflowFieldValueValidatorTest {
             default -> key;
         };
         return new WorkflowFieldDefinition(key, label, type, required, options);
+    }
+
+    private WorkflowFieldDefinition v2Field(String key, String label, WorkflowFieldType type, boolean required,
+                                            List<String> options, boolean visible, String binding) {
+        return new WorkflowFieldDefinition(key, label, type, required, options, visible, binding);
     }
 }

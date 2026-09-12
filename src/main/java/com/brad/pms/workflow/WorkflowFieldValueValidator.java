@@ -18,7 +18,9 @@ public final class WorkflowFieldValueValidator {
     public static Map<String, JsonNode> validate(List<WorkflowFieldDefinition> definitions,
                                                   Map<String, JsonNode> values) {
         Map<String, WorkflowFieldDefinition> byKey = new HashMap<>();
-        for (WorkflowFieldDefinition definition : definitions) byKey.put(definition.key(), definition);
+        for (WorkflowFieldDefinition definition : definitions) {
+            if (definition.binding() == null) byKey.put(definition.key(), definition);
+        }
         Map<String, JsonNode> normalized = new LinkedHashMap<>();
         if (values == null) return normalized;
         for (Map.Entry<String, JsonNode> entry : values.entrySet()) {
@@ -39,7 +41,7 @@ public final class WorkflowFieldValueValidator {
                                                       Map<String, JsonNode> values) {
         List<String> missing = new ArrayList<>();
         for (WorkflowFieldDefinition definition : definitions) {
-            if (!definition.required()) continue;
+            if (!definition.required() || definition.binding() != null || Boolean.FALSE.equals(definition.visible())) continue;
             JsonNode value = values == null ? null : values.get(definition.key());
             if (isEmpty(value)) missing.add(definition.label());
         }
@@ -51,15 +53,20 @@ public final class WorkflowFieldValueValidator {
             case TEXT -> value.isTextual() && value.asText().length() <= 500;
             case TEXTAREA -> value.isTextual() && value.asText().length() <= 10000;
             case NUMBER -> value.isNumber();
+            case RADIO -> isConfiguredOption(field, value);
             case DATE -> isDate(value);
-            case SINGLE_SELECT -> value.isTextual() && field.options().contains(value.asText());
+            case DATE_RANGE -> isDateRange(value);
+            case SINGLE_SELECT -> isConfiguredOption(field, value);
             case MULTI_SELECT -> isMultiSelect(field, value);
             case PERSON -> value.isIntegralNumber() && value.asLong() > 0;
+            case PERSON_MULTI -> isPeople(value);
             case ATTACHMENT -> isAttachmentList(value);
         };
         if (!valid) {
-            String reason = field.type() == WorkflowFieldType.SINGLE_SELECT || field.type() == WorkflowFieldType.MULTI_SELECT
-                    ? "选项无效" : field.type() == WorkflowFieldType.DATE ? "日期格式无效" : "字段值类型无效";
+            String reason = field.type() == WorkflowFieldType.RADIO || field.type() == WorkflowFieldType.SINGLE_SELECT
+                    || field.type() == WorkflowFieldType.MULTI_SELECT ? "选项无效"
+                    : field.type() == WorkflowFieldType.DATE || field.type() == WorkflowFieldType.DATE_RANGE
+                    ? "日期格式无效" : "字段值类型无效";
             throw new IllegalArgumentException(field.label() + reason);
         }
     }
@@ -78,9 +85,31 @@ public final class WorkflowFieldValueValidator {
         if (!value.isArray()) return false;
         Set<String> selected = new HashSet<>();
         for (JsonNode option : value) {
-            if (!option.isTextual() || !field.options().contains(option.asText()) || !selected.add(option.asText())) return false;
+            if (!option.isTextual() || !options(field).contains(option.asText()) || !selected.add(option.asText())) return false;
         }
         return true;
+    }
+
+    private static boolean isConfiguredOption(WorkflowFieldDefinition field, JsonNode value) {
+        return value.isTextual() && options(field).contains(value.asText());
+    }
+
+    private static boolean isPeople(JsonNode value) {
+        if (!value.isArray()) return false;
+        Set<Long> ids = new HashSet<>();
+        for (JsonNode id : value) {
+            if (!id.isIntegralNumber() || id.asLong() <= 0 || !ids.add(id.asLong())) return false;
+        }
+        return true;
+    }
+
+    private static boolean isDateRange(JsonNode value) {
+        if (!value.isArray() || value.size() != 2 || !isDate(value.get(0)) || !isDate(value.get(1))) return false;
+        return !LocalDate.parse(value.get(0).asText()).isAfter(LocalDate.parse(value.get(1).asText()));
+    }
+
+    private static List<String> options(WorkflowFieldDefinition field) {
+        return field.options() == null ? List.of() : field.options();
     }
 
     private static boolean isAttachmentList(JsonNode value) {

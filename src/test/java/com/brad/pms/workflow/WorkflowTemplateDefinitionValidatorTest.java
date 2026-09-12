@@ -110,6 +110,86 @@ class WorkflowTemplateDefinitionValidatorTest {
                 .hasMessageContaining("字段标识重复");
     }
 
+    @Test
+    void keepsV1FieldTypesLimitedToTheLegacyContract() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(1,
+                List.of(node("intake", List.of(field("priority", "优先级", WorkflowFieldType.RADIO,
+                        false, List.of("P0", "P1"))))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(definition))
+                .hasMessageContaining("字段类型无效");
+    }
+
+    @Test
+    void acceptsV2FieldsBindingsAndCompleteContentOrder() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(
+                        v2Field("description", "项目说明", WorkflowFieldType.TEXTAREA, true, List.of(), true,
+                                "project.description"),
+                        v2Field("priority", "优先级", WorkflowFieldType.RADIO, false, List.of(), true,
+                                "project.priority"),
+                        v2Field("level", "等级", WorkflowFieldType.SINGLE_SELECT, false, List.of(), true,
+                                "project.projectLevel"),
+                        v2Field("schedule", "计划", WorkflowFieldType.DATE_RANGE, false, List.of(), true,
+                                "project.schedule"),
+                        v2Field("business", "业务线", WorkflowFieldType.SINGLE_SELECT, false, List.of(), true,
+                                "project.businessLine"),
+                        v2Field("manager", "项目经理", WorkflowFieldType.PERSON, false, List.of(), true,
+                                "project.projectManager"),
+                        v2Field("members", "成员", WorkflowFieldType.PERSON_MULTI, false, List.of(), true,
+                                "project.projectMembers"),
+                        v2Field("followers", "关注人", WorkflowFieldType.PERSON_MULTI, false, List.of(), true,
+                                "project.followers"),
+                        v2Field("note", "备注", WorkflowFieldType.TEXT, false, List.of(), true, null),
+                        v2Field("estimate", "估算", WorkflowFieldType.NUMBER, false, List.of(), true, null),
+                        v2Field("due", "日期", WorkflowFieldType.DATE, false, List.of(), true, null),
+                        v2Field("labels", "标签", WorkflowFieldType.MULTI_SELECT, false, List.of("A", "B"), true, null),
+                        v2Field("files", "附件", WorkflowFieldType.ATTACHMENT, false, List.of(), true, null)),
+                        List.of("fields", "component:solution-design"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator.validate(definition)).isEqualTo(definition);
+    }
+
+    @Test
+    void rejectsInvalidV2BindingsFieldsAndContentOrder() {
+        WorkflowTemplateDefinition duplicateOrder = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        false, List.of(), true, null)), List.of("fields", "fields", "component:solution-design"))));
+        WorkflowTemplateDefinition unknownOrder = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        false, List.of(), true, null)), List.of("fields", "component:unknown"))));
+        WorkflowTemplateDefinition projectBasicInfoOrder = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        false, List.of(), true, null)), List.of("fields", "component:project-basic-info"))));
+        WorkflowTemplateDefinition unknownBinding = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        false, List.of(), true, "project.owner")), List.of("fields"))));
+        WorkflowTemplateDefinition hiddenRequired = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        true, List.of(), false, null)), List.of("fields"))));
+        WorkflowTemplateDefinition wrongBindingType = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(v2Field("priority", "优先级", WorkflowFieldType.TEXT,
+                        false, List.of(), true, "project.priority")), List.of("fields"))));
+        WorkflowTemplateDefinition invalidOptions = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(v2Field("note", "备注", WorkflowFieldType.TEXT,
+                        false, List.of("错误"), true, null)), List.of("fields"))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(duplicateOrder))
+                .hasMessageContaining("内容排序");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(unknownOrder))
+                .hasMessageContaining("内容排序");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(projectBasicInfoOrder))
+                .hasMessageContaining("内容排序");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(unknownBinding))
+                .hasMessageContaining("绑定");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(hiddenRequired))
+                .hasMessageContaining("必填字段必须显示");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(wrongBindingType))
+                .hasMessageContaining("控件类型");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(invalidOptions))
+                .hasMessageContaining("只有单选或多选字段可以配置选项");
+    }
+
     private static WorkflowNodeDefinition node(String key, List<WorkflowFieldDefinition> fields) {
         return new WorkflowNodeDefinition(key, key, "说明", "交付物", "角色", List.of(), fields, false, List.of());
     }
@@ -117,5 +197,16 @@ class WorkflowTemplateDefinitionValidatorTest {
     private static WorkflowFieldDefinition field(String key, String label, WorkflowFieldType type,
                                                  boolean required, List<String> options) {
         return new WorkflowFieldDefinition(key, label, type, required, options);
+    }
+
+    private static WorkflowNodeDefinition v2Node(String key, List<WorkflowFieldDefinition> fields,
+                                                 List<String> contentOrder) {
+        return new WorkflowNodeDefinition(key, key, "说明", "交付物", "角色", null, fields, false, null, contentOrder);
+    }
+
+    private static WorkflowFieldDefinition v2Field(String key, String label, WorkflowFieldType type,
+                                                    boolean required, List<String> options, boolean visible,
+                                                    String binding) {
+        return new WorkflowFieldDefinition(key, label, type, required, options, visible, binding);
     }
 }
