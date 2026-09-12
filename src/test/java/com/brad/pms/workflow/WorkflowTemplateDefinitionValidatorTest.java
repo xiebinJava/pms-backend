@@ -1,5 +1,6 @@
 package com.brad.pms.workflow;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -118,6 +119,42 @@ class WorkflowTemplateDefinitionValidatorTest {
 
         assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(definition))
                 .hasMessageContaining("字段类型无效");
+    }
+
+    @Test
+    void acceptsLegacyV1JsonWithNewMetadataAbsent() throws Exception {
+        String legacyJson = """
+                {"schemaVersion":1,"nodes":[{"key":"intake","name":"intake","description":"说明",
+                "deliverable":"交付物","roles":"角色","components":[],"fields":[{"key":"title",
+                "label":"标题","type":"TEXT","required":true,"options":[]}],"projectBasicInfo":false,
+                "projectBasicInfoFields":[]}]}
+                """;
+        WorkflowTemplateDefinition definition = new ObjectMapper().readValue(legacyJson, WorkflowTemplateDefinition.class);
+
+        assertThat(definition.nodes().get(0).fields().get(0).visible()).isNull();
+        assertThat(definition.nodes().get(0).fields().get(0).binding()).isNull();
+        assertThat(definition.nodes().get(0).contentOrder()).isNull();
+        assertThat(WorkflowTemplateDefinitionValidator.validate(definition)).isEqualTo(definition);
+    }
+
+    @Test
+    void rejectsV1BindingAndVisibilityMetadata() {
+        WorkflowTemplateDefinition withBinding = new WorkflowTemplateDefinition(1,
+                List.of(node("intake", List.of(v2Field("title", "标题", WorkflowFieldType.TEXT,
+                        true, List.of(), true, "project.description")))));
+        WorkflowTemplateDefinition withHiddenRequired = new WorkflowTemplateDefinition(1,
+                List.of(node("intake", List.of(v2Field("title", "标题", WorkflowFieldType.TEXT,
+                        true, List.of(), false, null)))));
+        WorkflowTemplateDefinition withVisibleMetadata = new WorkflowTemplateDefinition(1,
+                List.of(node("intake", List.of(v2Field("title", "标题", WorkflowFieldType.TEXT,
+                        false, List.of(), true, null)))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(withBinding))
+                .hasMessageContaining("v1 字段不能配置绑定");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(withHiddenRequired))
+                .hasMessageContaining("v1 字段不能配置显示属性");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(withVisibleMetadata))
+                .hasMessageContaining("v1 字段不能配置显示属性");
     }
 
     @Test

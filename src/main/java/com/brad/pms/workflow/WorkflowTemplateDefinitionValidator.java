@@ -106,6 +106,12 @@ public final class WorkflowTemplateDefinitionValidator {
             if (!v2 && !V1_FIELD_TYPES.contains(field.type())) {
                 throw new IllegalArgumentException("字段类型无效");
             }
+            if (!v2 && field.binding() != null) {
+                throw new IllegalArgumentException("v1 字段不能配置绑定");
+            }
+            if (!v2 && field.visible() != null) {
+                throw new IllegalArgumentException("v1 字段不能配置显示属性");
+            }
             if (v2 && field.required() && Boolean.FALSE.equals(field.visible())) {
                 throw new IllegalArgumentException("必填字段必须显示");
             }
