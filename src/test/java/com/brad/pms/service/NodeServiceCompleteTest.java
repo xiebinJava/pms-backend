@@ -229,4 +229,28 @@ class NodeServiceCompleteTest {
                 .isInstanceOf(BusinessException.class).hasMessageContaining("业务价值");
         verify(nodeMapper, never()).updateById(node);
     }
+
+    @Test
+    void rejectsCompletionWhenTheBoundWorkflowHasNoDefinitionForTheNode() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(10L);
+        node.setProjectId(1L);
+        node.setNodeKey("orphan-stage");
+        node.setOwnerId(3L);
+        node.setStatus(1);
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(taskMapper.selectCount(any())).thenReturn(0L);
+        when(workflowTemplateService.getNodeDefinition(17L, "orphan-stage")).thenReturn(null);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+        nodeService.setNotificationService(notificationService);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("工作流配置缺失");
+        verify(nodeMapper, never()).updateById(node);
+    }
 }

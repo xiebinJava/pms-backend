@@ -431,17 +431,18 @@ public class NodeService {
     }
 
     private WorkflowNodeDefinition resolveNodeDefinition(ProjectDO project, ProjectNodeDO node) {
-        if (project != null && project.getWorkflowTemplateVersionId() != null && workflowTemplateService != null) {
-            WorkflowNodeDefinition configured = workflowTemplateService.getNodeDefinition(
+        if (project != null && project.getWorkflowTemplateVersionId() != null) {
+            return workflowTemplateService == null ? null : workflowTemplateService.getNodeDefinition(
                     project.getWorkflowTemplateVersionId(), node.getNodeKey());
-            if (configured != null) return configured;
         }
         return BuiltInWorkflowTemplate.compatibilityDefinition().nodes().stream()
                 .filter(definition -> definition.key().equals(node.getNodeKey())).findFirst().orElse(null);
     }
 
     private void validateAttachedComponents(Long projectId, Long nodeId, WorkflowNodeDefinition definition) {
-        if (definition == null || definition.components() == null) return;
+        if (definition == null || definition.components() == null) {
+            throw BusinessException.error("节点工作流配置缺失或无效，请联系管理员");
+        }
         for (String component : definition.components()) {
             switch (component) {
                 case "requirement-scope" -> requirementScopeService.requireConfirmed(projectId, nodeId);
