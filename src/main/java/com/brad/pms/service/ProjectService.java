@@ -17,6 +17,7 @@ import com.brad.pms.dto.request.ProjectPageQry;
 import com.brad.pms.dto.request.ProjectUpdateCmd;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.ProjectListSummaryDTO;
+import com.brad.pms.dto.response.ProjectPermissionsDTO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectLifecycleLogDO;
 import com.brad.pms.entity.ProjectMemberDO;
@@ -324,6 +325,19 @@ public class ProjectService {
                 || dataScopeResolver.hasAllCompanyScope(current, PermissionCode.PROJECT_READ));
     }
 
+    /** Board read boundary: reuse list scope/org filtering and the same enriched project DTOs. */
+    public ReadableBoardProjects loadReadableBoardProjects(Long orgUnitId) {
+        ProjectPageQry query = new ProjectPageQry();
+        query.setOrgUnitId(orgUnitId);
+        List<ProjectDO> projects = projectMapper.selectList(listWrapper(query, false));
+        if (projects.isEmpty()) return new ReadableBoardProjects(List.of(), List.of());
+        List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
+                .in(ProjectNodeDO::getProjectId, projectIds(projects)));
+        return new ReadableBoardProjects(enrich(projects, nodes, permissionService.projectPermissionsBatch(projects)), nodes);
+    }
+
+    public record ReadableBoardProjects(List<ProjectDTO> projects, List<ProjectNodeDO> nodes) { }
+
     public Map<String, Object> stats() {
         LambdaQueryWrapper<ProjectDO> wrapper = new LambdaQueryWrapper<ProjectDO>()
                 .ne(ProjectDO::getStatus, ProjectStatus.DELETED.getCode());
@@ -559,6 +573,11 @@ public class ProjectService {
     }
 
     private List<ProjectDTO> enrich(List<ProjectDO> projects) {
+        return enrich(projects, null, null);
+    }
+
+    private List<ProjectDTO> enrich(List<ProjectDO> projects, List<ProjectNodeDO> preloadedNodes,
+                                    Map<Long, ProjectPermissionsDTO> preloadedPermissions) {
         if (projects.isEmpty()) return Collections.emptyList();
 
         List<Long> projectIds = projects.stream().map(ProjectDO::getId).collect(Collectors.toList());
@@ -592,7 +611,7 @@ public class ProjectService {
         // The project list and detail page share node completion as the single
         // source of truth for overall progress. Keep the stored value only as
         // a legacy fallback for projects that have no nodes yet.
-        List<ProjectNodeDO> nodes = nodeMapper.selectList(
+        List<ProjectNodeDO> nodes = preloadedNodes != null ? preloadedNodes : nodeMapper.selectList(
                 new LambdaQueryWrapper<ProjectNodeDO>().in(ProjectNodeDO::getProjectId, projectIds));
         Map<Long, List<ProjectNodeDO>> nodesByProject = nodes.stream()
                 .collect(Collectors.groupingBy(ProjectNodeDO::getProjectId));
@@ -621,7 +640,7 @@ public class ProjectService {
                 dto.setCurrentNodeKey(currentNode.getNodeKey());
                 dto.setCurrentNodeName(currentNode.getName());
             }
-            dto.setPermissions(permissionService.projectPermissions(p));
+            dto.setPermissions(preloadedPermissions == null ? permissionService.projectPermissions(p) : preloadedPermissions.get(pid));
             return dto;
         }).collect(Collectors.toList());
     }
@@ -636,8 +655,13 @@ public class ProjectService {
 
     static int calculateNodeProgress(List<ProjectNodeDO> nodes, Integer storedProgress) {
         if (nodes == null || nodes.isEmpty()) return storedProgress == null ? 0 : storedProgress;
-        long completed = nodes.stream().filter(node -> Integer.valueOf(2).equals(node.getStatus())).count();
-        return (int) Math.round(completed * 100.0 / nodes.size());
+        List<ProjectNodeDO> validNodes = nodes.stream()
+                .filter(node -> !Boolean.TRUE.equals(node.getDeleted()))
+                .filter(node -> node.getStatus() != null && node.getStatus() >= 0 && node.getStatus() <= 3)
+                .toList();
+        if (validNodes.isEmpty()) return 0;
+        long completed = validNodes.stream().filter(node -> Integer.valueOf(2).equals(node.getStatus())).count();
+        return (int) Math.round(completed * 100.0 / validNodes.size());
     }
 
     private Map<String, Object> projectAuditSnapshot(ProjectDO project) {

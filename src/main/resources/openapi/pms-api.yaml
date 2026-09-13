@@ -374,6 +374,34 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /projects/board:
+    get:
+      tags: [项目]
+      summary: 企业项目看板
+      description: >-
+        Requires project:read. Uses the same project read scope and organization-descendant filter as the project list.
+        Node completion supplies actual progress; current workflow node deadlines supply milestones.
+        Risk, story and acceptance data only include nodes with the corresponding component in the project's bound workflow version.
+        Removed-component records are excluded. All date comparisons use the same server-local asOfDate.
+      parameters:
+        - name: orgUnitId
+          in: query
+          required: false
+          description: Selected organization and its descendants, intersected with the current project read scope.
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Scoped board snapshot; unconfigured sources are explicit JSON null, configured empty sources contain zero counts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProjectBoardResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /projects/summary:
     post:
       tags: [项目]
@@ -1475,6 +1503,116 @@ components:
       required: true
       schema: { type: integer, format: int64 }
   schemas:
+    ProjectBoardResponse:
+      type: object
+      required: [asOfDate, generatedAt, allCompanyScope, projects]
+      properties:
+        asOfDate: { type: string, format: date }
+        generatedAt: { type: string, format: date-time }
+        allCompanyScope: { type: boolean, description: Whether the caller has company-wide project read scope, independent of the selected organization. }
+        projects:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectBoardRow' }
+    ProjectBoardRow:
+      type: object
+      required: [project, phase, health, expectedProgress, progressVariance, overdueDays, overdueNodeCount, openRiskCount, highRiskCount, mediumRiskCount, riskDataState, nodeDataState, dataIssues, nextNode, storySummary, acceptanceSummary]
+      properties:
+        project: { $ref: '#/components/schemas/ProjectDTO' }
+        phase: { type: string, enum: [NOT_STARTED, IN_PROGRESS, COMPLETED, TERMINATED, UNKNOWN], description: Completed/terminated lifecycle takes precedence; active phase uses node states, never legacy project status 0. }
+        health: { type: string, enum: [HEALTHY, WATCH, CRITICAL, UNKNOWN, COMPLETED, TERMINATED], description: 'Active projects: CRITICAL for overdue project/node, OPEN HIGH risk or variance <= -15; WATCH for OPEN MEDIUM or variance <= -8. Otherwise HEALTHY needs valid project dates, an unfinished node deadline and configured risks; else UNKNOWN.' }
+        expectedProgress: { type: integer, minimum: 0, maximum: 100, nullable: true, description: Rounded linear progress between project dates with end > start. Null for invalid dates or terminal lifecycle. }
+        progressVariance: { type: integer, nullable: true, description: Enriched project progress minus expected progress. }
+        overdueDays: { type: integer, minimum: 0, description: Days past the project deadline; zero for terminal projects. }
+        overdueNodeCount: { type: integer, minimum: 0, description: Unfinished nonterminated nodes due before asOfDate; zero for terminal projects. }
+        openRiskCount: { type: integer, minimum: 0, nullable: true }
+        highRiskCount: { type: integer, minimum: 0, nullable: true, description: OPEN HIGH risks only. }
+        mediumRiskCount: { type: integer, minimum: 0, nullable: true, description: OPEN MEDIUM risks only. }
+        riskDataState: { type: string, enum: [AVAILABLE, NOT_CONFIGURED] }
+        nodeDataState: { type: string, enum: [AVAILABLE, NOT_CONFIGURED] }
+        dataIssues:
+          type: array
+          description: Known health warnings still apply when these issues exist. Empty for terminal projects.
+          items: { type: string, enum: [PROJECT_DATES_MISSING, NODE_SCHEDULE_MISSING, RISK_BASELINE_NOT_CONFIGURED] }
+        nextNode:
+          type: object
+          nullable: true
+          required: [id, name, endDate]
+          description: Earliest unfinished nonterminated node deadline on or after asOfDate; null for terminal projects.
+          properties:
+            id: { type: integer, format: int64 }
+            name: { type: string, nullable: true }
+            endDate: { type: string, format: date }
+        storySummary:
+          type: object
+          nullable: true
+          description: Available only with development-control; null points count as zero, overdue excludes DONE stories and deadlines on asOfDate.
+          required: [total, notStarted, inProgress, testing, done, blocked, overdue, points, donePoints]
+          properties:
+            total: { type: integer }
+            notStarted: { type: integer }
+            inProgress: { type: integer }
+            testing: { type: integer }
+            done: { type: integer }
+            blocked: { type: integer }
+            overdue: { type: integer }
+            points: { type: integer }
+            donePoints: { type: integer }
+        acceptanceSummary:
+          type: object
+          nullable: true
+          description: Available only with business-acceptance; RESOLVED/CLOSED defects are resolved, remaining statuses are open. Does not include release incidents.
+          required: [total, open, resolved]
+          properties:
+            total: { type: integer }
+            open: { type: integer }
+            resolved: { type: integer }
+    ProjectDTO:
+      type: object
+      description: Same enriched project payload as project list/detail, including node-completion progress and resource permissions.
+      properties:
+        id: { type: integer, format: int64 }
+        version: { type: integer, nullable: true }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: integer, description: Normalized lifecycle; legacy 0 is returned as active 1. }
+        priority: { type: integer, nullable: true }
+        projectLevel: { type: integer, nullable: true }
+        projectTypeId: { type: integer, format: int64, nullable: true }
+        workflowTemplateVersionId: { type: integer, format: int64, nullable: true }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        createdBy: { type: integer, format: int64, nullable: true }
+        createdByName: { type: string, nullable: true }
+        createdByAvatar: { type: string, nullable: true }
+        projectManagerId: { type: integer, format: int64, nullable: true }
+        projectManagerName: { type: string, nullable: true }
+        projectManagerAvatar: { type: string, nullable: true }
+        orgUnitId: { type: integer, format: int64, nullable: true }
+        orgUnitName: { type: string, nullable: true }
+        orgUnitPath: { type: string, nullable: true }
+        orgUnitLeaderName: { type: string, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        progress: { type: integer }
+        taskCount: { type: integer }
+        doneTaskCount: { type: integer }
+        memberCount: { type: integer }
+        currentNodeKey: { type: string, nullable: true }
+        currentNodeName: { type: string, nullable: true }
+        createdAt: { type: string, nullable: true, example: '2026-09-13T20:15:00', description: 本地日期时间字符串，不含时区偏移 }
+        updatedAt: { type: string, nullable: true, example: '2026-09-13T20:15:00', description: 本地日期时间字符串，不含时区偏移 }
+        permissions:
+          type: object
+          properties:
+            canManageProject: { type: boolean }
+            canManageMembers: { type: boolean }
+            canSetProjectManager: { type: boolean }
+            canAssignNodeOwner: { type: boolean }
+            canTerminateProject: { type: boolean }
+            canRestoreProject: { type: boolean }
+            canDeleteProject: { type: boolean }
+            canWriteComment: { type: boolean }
     LoginRequest:
       type: object
       required: [email, password]
@@ -1791,7 +1929,7 @@ components:
     ApiResponse:
       type: object
       properties:
-        code: { type: integer, example: 0 }
+        code: { type: integer, example: 200 }
         msg: { type: string }
         data: {}
         requestId: { type: string }

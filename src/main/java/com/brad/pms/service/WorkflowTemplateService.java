@@ -33,6 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -237,6 +240,21 @@ public class WorkflowTemplateService {
     public WorkflowNodeDefinition getNodeDefinition(Long versionId, String nodeKey) {
         return getDefinition(versionId).nodes().stream()
                 .filter(node -> node.key().equals(nodeKey)).findFirst().orElse(null);
+    }
+
+    /** Batch equivalent of getDefinition, retaining legacy null binding and validation semantics. */
+    public Map<Long, WorkflowTemplateDefinition> getDefinitions(Collection<Long> versionIds) {
+        Map<Long, WorkflowTemplateDefinition> result = new HashMap<>();
+        var ids = new HashSet<>(versionIds);
+        if (ids.remove(null)) result.put(null, BuiltInWorkflowTemplate.compatibilityDefinition());
+        if (!ids.isEmpty()) {
+            for (WorkflowTemplateVersionDO version : versionMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
+                    .in(WorkflowTemplateVersionDO::getId, ids))) {
+                result.put(version.getId(), parse(version.getDefinitionJson()));
+            }
+            if (!result.keySet().containsAll(ids)) throw BusinessException.error("流程模板版本不存在");
+        }
+        return result;
     }
 
     private ProjectTypeDTO toProjectTypeDTO(ProjectTypeDO type) {

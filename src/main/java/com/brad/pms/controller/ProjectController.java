@@ -8,7 +8,9 @@ import com.brad.pms.dto.request.ProjectUpdateCmd;
 import com.brad.pms.dto.request.ProjectLifecycleCmd;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.ProjectListSummaryDTO;
+import com.brad.pms.dto.response.ProjectBoardDTO;
 import com.brad.pms.service.ProjectService;
+import com.brad.pms.service.ProjectBoardService;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,13 @@ import org.springframework.web.bind.annotation.*;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectBoardService projectBoardService;
+
+    @GetMapping("/board")
+    @RequirePermission(PermissionCode.PROJECT_READ)
+    public ResponseResult<ProjectBoardDTO> board(@RequestParam(required = false) Long orgUnitId) {
+        return ResponseResult.success(projectBoardService.getBoard(orgUnitId));
+    }
 
     @PostMapping
     @RequirePermission(PermissionCode.PROJECT_CREATE)

@@ -24,6 +24,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * 所有项目协作写操作的统一鉴权入口。
@@ -229,9 +235,40 @@ public class ProjectPermissionService {
     }
 
     public ProjectPermissionsDTO projectPermissions(ProjectDO project) {
-        Long userId = UserContext.userIdOrNull();
         boolean writable = canWriteProject(project);
         boolean manageable = canManageProject(project);
+        boolean comment = ProjectPermissionPolicy.isProjectOperational(project)
+                && ProjectPermissionPolicy.isProjectReadable(project)
+                && authorizationService.has(PermissionCode.PROJECT_COMMENT_WRITE);
+        return projectPermissions(project, writable, manageable, comment);
+    }
+
+    /** Resolve user permission scopes once, independent of the number of board projects. */
+    public Map<Long, ProjectPermissionsDTO> projectPermissionsBatch(Collection<ProjectDO> projects) {
+        if (projects.isEmpty()) return Map.of();
+        Predicate<ProjectDO> writeScope = scopedPermissionPredicate(PermissionCode.PROJECT_WRITE);
+        Predicate<ProjectDO> manageScope = scopedPermissionPredicate(PermissionCode.PROJECT_MANAGE);
+        boolean comment = authorizationService.has(PermissionCode.PROJECT_COMMENT_WRITE);
+        Map<Long, ProjectPermissionsDTO> result = new HashMap<>();
+        for (ProjectDO project : projects) {
+            boolean control = ProjectPermissionPolicy.hasProjectControl(project, UserContext.userIdOrNull(), UserContext.isAdministrator());
+            result.put(project.getId(), projectPermissions(project, control || writeScope.test(project),
+                    control || manageScope.test(project), comment && ProjectPermissionPolicy.isProjectOperational(project)
+                            && ProjectPermissionPolicy.isProjectReadable(project)));
+        }
+        return result;
+    }
+
+    private Predicate<ProjectDO> scopedPermissionPredicate(String permissionCode) {
+        LoginUser current = UserContext.get();
+        if (current == null || !authorizationService.has(permissionCode)) return project -> false;
+        if (UserContext.isAdministrator() || dataScopeResolver.hasAllCompanyScope(current, permissionCode)) return project -> true;
+        Set<Long> orgIds = new HashSet<>(dataScopeResolver.resolveOrgUnitIds(current, permissionCode));
+        return project -> project.getOrgUnitId() != null && orgIds.contains(project.getOrgUnitId());
+    }
+
+    private ProjectPermissionsDTO projectPermissions(ProjectDO project, boolean writable, boolean manageable, boolean comment) {
+        Long userId = UserContext.userIdOrNull();
         boolean active = ProjectPermissionPolicy.isProjectOperational(project);
         ProjectPermissionsDTO dto = new ProjectPermissionsDTO();
         dto.setCanManageProject(active && writable);
@@ -241,9 +278,7 @@ public class ProjectPermissionService {
         dto.setCanTerminateProject(ProjectPermissionPolicy.canTerminateProject(project, userId, UserContext.isAdministrator(), manageable));
         dto.setCanRestoreProject(ProjectPermissionPolicy.isProjectRestorable(project) && manageable);
         dto.setCanDeleteProject(active && manageable);
-        dto.setCanWriteComment(ProjectPermissionPolicy.isProjectOperational(project)
-                && ProjectPermissionPolicy.isProjectReadable(project)
-                && authorizationService.has(PermissionCode.PROJECT_COMMENT_WRITE));
+        dto.setCanWriteComment(comment);
         return dto;
     }
 
