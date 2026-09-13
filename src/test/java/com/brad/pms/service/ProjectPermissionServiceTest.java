@@ -135,6 +135,22 @@ class ProjectPermissionServiceTest {
     }
 
     @Test
+    void configuredV2ComponentIsAuthorizedFromContentOrder() {
+        ProjectDO project = project(ProjectStatus.ACTIVE.getCode(), 42L, 7L, 8L);
+        project.setWorkflowTemplateVersionId(15L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(11L);
+        node.setProjectId(10L);
+        node.setNodeKey("custom-review");
+        when(projectMapper.selectById(10L)).thenReturn(project);
+        when(workflowTemplateService.getNodeDefinition(15L, "custom-review")).thenReturn(
+                new WorkflowNodeDefinition("custom-review", "Custom review", "", "", "", null,
+                        List.of(), false, null, List.of("component:solution-design", "fields")));
+
+        service().requireNodeComponent(node, WorkflowComponentKey.SOLUTION_DESIGN, "missing component");
+    }
+
+    @Test
     void componentGuardRejectsNodeWithoutTheConfiguredWorkbench() {
         ProjectDO project = project(ProjectStatus.ACTIVE.getCode(), 42L, 7L, 8L);
         project.setWorkflowTemplateVersionId(15L);
@@ -164,6 +180,23 @@ class ProjectPermissionServiceTest {
         when(workflowTemplateService.getDefinition(15L)).thenReturn(new WorkflowTemplateDefinition(1, List.of(
                 new WorkflowNodeDefinition("quality-gate", "质量评审", "", "", "",
                         List.of(WorkflowComponentKey.SOLUTION_DESIGN), List.of(), false, List.of()))));
+        when(nodeMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(node);
+
+        assertThat(service().findNodeWithComponent(10L, WorkflowComponentKey.SOLUTION_DESIGN)).isSameAs(node);
+    }
+
+    @Test
+    void crossWorkbenchLookupFindsV2ComponentsInContentOrder() {
+        ProjectDO project = project(ProjectStatus.ACTIVE.getCode(), 42L, 7L, 8L);
+        project.setWorkflowTemplateVersionId(15L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(13L);
+        node.setProjectId(10L);
+        node.setNodeKey("quality-gate");
+        when(projectMapper.selectById(10L)).thenReturn(project);
+        when(workflowTemplateService.getDefinition(15L)).thenReturn(new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("quality-gate", "质量评审", "", "", "", null, List.of(), false, null,
+                        List.of("component:solution-design", "fields")))));
         when(nodeMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(node);
 
         assertThat(service().findNodeWithComponent(10L, WorkflowComponentKey.SOLUTION_DESIGN)).isSameAs(node);

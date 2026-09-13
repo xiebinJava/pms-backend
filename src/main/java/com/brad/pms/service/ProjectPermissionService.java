@@ -139,7 +139,7 @@ public class ProjectPermissionService {
         ProjectDO project = requireProjectReadable(node.getProjectId());
         WorkflowNodeDefinition definition = workflowTemplateService.getNodeDefinition(
                 project.getWorkflowTemplateVersionId(), node.getNodeKey());
-        if (definition == null || !definition.components().contains(componentKey)) {
+        if (definition == null || !definition.runtimeComponents().contains(componentKey)) {
             throw BusinessException.error(message);
         }
     }
@@ -148,7 +148,7 @@ public class ProjectPermissionService {
         ProjectDO project = requireProjectReadable(projectId);
         WorkflowNodeDefinition definition = workflowTemplateService.getDefinition(project.getWorkflowTemplateVersionId())
                 .nodes().stream()
-                .filter(node -> node.components().contains(componentKey))
+                .filter(node -> node.runtimeComponents().contains(componentKey))
                 .findFirst().orElse(null);
         if (definition == null) return null;
         return nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()

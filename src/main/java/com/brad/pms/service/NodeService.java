@@ -1,6 +1,7 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.brad.pms.common.ProjectScheduleRange;
 import com.brad.pms.common.enums.NodeStatus;
 import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.common.exception.BusinessException;
@@ -309,7 +310,9 @@ public class NodeService {
                 case "description" -> { if (project.getDescription() == null || project.getDescription().isBlank()) missing.add(field.label()); }
                 case "priority" -> { if (project.getPriority() == null) missing.add(field.label()); }
                 case "projectLevel" -> { if (project.getProjectLevel() == null) missing.add(field.label()); }
-                case "schedule" -> { if (project.getStartDate() == null || project.getEndDate() == null) missing.add(field.label()); }
+                case "schedule" -> {
+                    if (!ProjectScheduleRange.isCompleteAndOrdered(project.getStartDate(), project.getEndDate())) missing.add(field.label());
+                }
                 case "businessLine" -> { if (project.getOrgUnitId() == null) missing.add(field.label()); }
                 case "projectManager" -> { if (project.getProjectManagerId() == null) missing.add(field.label()); }
                 case "projectMembers" -> {
@@ -343,7 +346,9 @@ public class NodeService {
                 case "project.description" -> { if (project.getDescription() == null || project.getDescription().isBlank()) missing.add(field.label()); }
                 case "project.priority" -> { if (project.getPriority() == null) missing.add(field.label()); }
                 case "project.projectLevel" -> { if (project.getProjectLevel() == null) missing.add(field.label()); }
-                case "project.schedule" -> { if (project.getStartDate() == null || project.getEndDate() == null) missing.add(field.label()); }
+                case "project.schedule" -> {
+                    if (!ProjectScheduleRange.isCompleteAndOrdered(project.getStartDate(), project.getEndDate())) missing.add(field.label());
+                }
                 case "project.businessLine" -> { if (project.getOrgUnitId() == null) missing.add(field.label()); }
                 case "project.projectManager" -> { if (project.getProjectManagerId() == null) missing.add(field.label()); }
                 case "project.projectMembers" -> {
@@ -500,12 +505,6 @@ public class NodeService {
     }
 
     private List<String> runtimeComponents(WorkflowNodeDefinition definition) {
-        if (definition.contentOrder() == null) {
-            return definition.components() == null ? List.of() : definition.components();
-        }
-        return definition.contentOrder().stream()
-                .filter(entry -> entry.startsWith("component:"))
-                .map(entry -> entry.substring("component:".length()))
-                .collect(Collectors.toList());
+        return definition.runtimeComponents();
     }
 }

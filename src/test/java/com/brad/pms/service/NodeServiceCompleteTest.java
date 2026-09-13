@@ -17,6 +17,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -277,6 +279,30 @@ class NodeServiceCompleteTest {
         assertThatThrownBy(() -> nodeService.complete(1L, 10L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("项目描述");
+        verify(nodeMapper, never()).updateById(node);
+    }
+
+    @Test
+    void blocksCompletionWhenARequiredV2ProjectScheduleIsReversed() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        project.setStartDate(LocalDate.parse("2026-10-05"));
+        project.setEndDate(LocalDate.parse("2026-10-01"));
+        ProjectNodeDO node = completableNode("custom-intake");
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("custom-intake", "自定义登记", "说明", "交付物", "角色",
+                java.util.List.of(), java.util.List.of(new WorkflowFieldDefinition("schedule", "项目周期",
+                WorkflowFieldType.DATE_RANGE, true, java.util.List.of(), true, "project.schedule")),
+                false, java.util.List.of(), java.util.List.of("fields"));
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(workflowTemplateService.getNodeDefinition(17L, "custom-intake")).thenReturn(definition);
+        when(projectMapper.selectById(1L)).thenReturn(project);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("项目周期");
         verify(nodeMapper, never()).updateById(node);
     }
 

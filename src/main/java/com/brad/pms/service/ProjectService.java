@@ -3,6 +3,7 @@ package com.brad.pms.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.brad.pms.common.ProjectScheduleRange;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.common.enums.ProjectLevel;
 import com.brad.pms.common.enums.ProjectStatus;
@@ -73,6 +74,7 @@ public class ProjectService {
 
     @Transactional
     public ProjectDTO create(ProjectCreateCmd cmd) {
+        validateProjectSchedule(cmd.getStartDate(), cmd.getEndDate());
         Long creatorId = UserContext.userId();
         WorkflowTemplateService.WorkflowTemplateBinding workflowBinding = workflowTemplateService == null
                 ? null : workflowTemplateService.resolveForProjectCreation(cmd.getProjectTypeId(), cmd.getWorkflowTemplateVersionId());
@@ -128,6 +130,7 @@ public class ProjectService {
     public ProjectDTO update(Long id, ProjectUpdateCmd cmd) {
         ProjectDO project = permissionService.requireProjectWritable(id, "编辑项目");
         requireCurrentVersion(project.getVersion(), cmd.getVersion(), "项目");
+        validateProjectSchedule(cmd.getStartDate(), cmd.getEndDate());
         Map<String, Object> before = projectAuditSnapshot(project);
         Long previousProjectManagerId = project.getProjectManagerId();
         project.setName(cmd.getName());
@@ -185,6 +188,12 @@ public class ProjectService {
     private void requireCurrentVersion(Integer currentVersion, Integer requestedVersion, String resourceName) {
         if (!Objects.equals(currentVersion, requestedVersion)) {
             throw BusinessException.conflict(resourceName + "已被其他人修改，请刷新后重试");
+        }
+    }
+
+    private void validateProjectSchedule(LocalDate startDate, LocalDate endDate) {
+        if (!ProjectScheduleRange.isOrdered(startDate, endDate)) {
+            throw BusinessException.error("项目开始日期不能晚于结束日期");
         }
     }
 
