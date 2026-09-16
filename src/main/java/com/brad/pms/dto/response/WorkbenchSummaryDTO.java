@@ -8,5 +8,6 @@ public class WorkbenchSummaryDTO {
     private int pendingTaskCount;
     private int inProgressTaskCount;
     private int dueSoonTaskCount;
+    private int overdueTaskCount;
     private int participatingProjectCount;
 }

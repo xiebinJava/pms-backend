@@ -3,6 +3,7 @@ package com.brad.pms.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.common.TaskScheduleCalculator;
 import com.brad.pms.common.enums.ProjectStatus;
+import com.brad.pms.common.enums.TaskScheduleState;
 import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.response.ProjectDTO;
@@ -101,10 +102,15 @@ public class WorkbenchService {
         int pending = 0;
         int inProgress = 0;
         int dueSoon = 0;
+        int overdue = 0;
         for (ProjectTaskDO task : myTasks) {
             int status = task.getStatus() == null ? TaskStatus.TODO.getCode() : task.getStatus();
             if (status == TaskStatus.TODO.getCode()) pending++;
             if (status == TaskStatus.DOING.getCode()) inProgress++;
+            if (TaskScheduleCalculator.calculate(task.getStatus(), task.getDueDate(), today).state()
+                    == TaskScheduleState.OVERDUE) {
+                overdue++;
+            }
             if (status != TaskStatus.DONE.getCode() && task.getDueDate() != null
                     && !task.getDueDate().isBefore(today) && !task.getDueDate().isAfter(dueLimit)) {
                 dueSoon++;
@@ -113,6 +119,7 @@ public class WorkbenchService {
         summary.setPendingTaskCount(pending);
         summary.setInProgressTaskCount(inProgress);
         summary.setDueSoonTaskCount(dueSoon);
+        summary.setOverdueTaskCount(overdue);
         return summary;
     }
 

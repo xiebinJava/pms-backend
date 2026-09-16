@@ -84,6 +84,18 @@ class WorkbenchServiceTest {
     }
 
     @Test
+    void summarizeCountsOnlyUnfinishedOverdueTasks() {
+        List<ProjectTaskDO> tasks = List.of(
+                task(1L, 10L, 0, 2, LocalDate.of(2026, 9, 15)),
+                task(2L, 10L, 2, 2, LocalDate.of(2026, 9, 1)),
+                task(3L, 10L, 1, 2, LocalDate.of(2026, 9, 16))
+        );
+
+        assertThat(WorkbenchService.summarize(tasks, 1, LocalDate.of(2026, 9, 16))
+                .getOverdueTaskCount()).isEqualTo(1);
+    }
+
+    @Test
     void taskItemsSortByStatusDueDatePriorityAndTitle() {
         ProjectDTO project = project(10L, "研发门户", "PRJ-000001");
         List<ProjectTaskDO> tasks = List.of(
