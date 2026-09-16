@@ -296,6 +296,7 @@ public class TaskService {
             if (taskMapper.updateById(child) != 1) {
                 throw BusinessException.conflict("子任务已被其他人修改，请刷新后重试");
             }
+            recordScheduleHistoryIfChanged(child, previousDueDate);
             if (!Objects.equals(previousStatus, child.getStatus())) {
                 operationLogService.record(AuditEvent.success(
                         AuditAction.TASK_STATUS_CHANGED.name(), AuditResourceType.TASK.name(), child.getId(), child.getProjectId(),

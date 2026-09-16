@@ -283,6 +283,13 @@ class TaskServiceTest {
         assertThat(datedChild.getStatus()).isEqualTo(TaskStatus.DONE.getCode());
         assertThat(datedChild.getDueDate()).isEqualTo(LocalDate.of(2026, 9, 8));
         verify(taskMapper, times(3)).updateById(any(ProjectTaskDO.class));
+        ArgumentCaptor<ProjectTaskScheduleHistoryDO> history =
+                ArgumentCaptor.forClass(ProjectTaskScheduleHistoryDO.class);
+        verify(scheduleHistoryMapper).insert(history.capture());
+        assertThat(history.getValue().getTaskId()).isEqualTo(2L);
+        assertThat(history.getValue().getPreviousDueDate()).isNull();
+        assertThat(history.getValue().getNextDueDate()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Shanghai")));
+        assertThat(history.getValue().getChangeType()).isEqualTo(TaskScheduleChangeType.SET);
     }
 
     @Test
