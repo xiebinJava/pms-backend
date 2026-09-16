@@ -204,7 +204,7 @@ paths:
       tags: [项目]
       summary: 当前用户工作台聚合（我的任务、参与项目、最近动态）
       responses:
-        '200': { $ref: '#/components/responses/Success' }
+        '200': { $ref: '#/components/responses/WorkbenchResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /notifications:
@@ -458,7 +458,7 @@ paths:
           in: query
           schema: { type: integer, format: int64 }
       responses:
-        '200': { $ref: '#/components/responses/Success' }
+        '200': { $ref: '#/components/responses/ProjectTaskListResponse' }
     post:
       tags: [任务与节点]
       summary: 新建任务
@@ -471,7 +471,7 @@ paths:
               properties:
                 requirementId: { type: integer, format: int64, nullable: true, description: 关联当前需求澄清节点且已确认的需求编号 }
       responses:
-        '200': { $ref: '#/components/responses/Success' }
+        '200': { $ref: '#/components/responses/ProjectTaskResponse' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /tasks/{id}:
     parameters:
@@ -480,7 +480,7 @@ paths:
       tags: [任务与节点]
       summary: 任务详情（含子任务、任务评论和附件）
       responses:
-        '200': { $ref: '#/components/responses/Success' }
+        '200': { $ref: '#/components/responses/TaskDetailResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     put:
@@ -495,7 +495,7 @@ paths:
                 requirementId: { type: integer, format: int64, nullable: true, description: 替换为当前节点下已确认的需求 }
                 clearRequirement: { type: boolean, description: 清除当前任务的需求关联 }
       responses:
-        '200': { $ref: '#/components/responses/Success' }
+        '200': { $ref: '#/components/responses/ProjectTaskResponse' }
         '409': { $ref: '#/components/responses/Conflict' }
     delete:
       tags: [任务与节点]
@@ -548,7 +548,7 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        '200': { $ref: '#/components/responses/Success' }
+        '200': { $ref: '#/components/responses/ProjectTaskResponse' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /projects/{projectId}/nodes:
     parameters:
@@ -1632,6 +1632,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/ProjectTaskDTO'
         - type: object
+    WorkbenchDTO:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items: { $ref: '#/components/schemas/WorkbenchTaskDTO' }
     LoginRequest:
       type: object
       required: [email, password]
@@ -1963,6 +1969,48 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ApiResponse' }
+    ProjectTaskListResponse:
+      description: 请求成功
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProjectTaskDTO' }
+    ProjectTaskResponse:
+      description: 请求成功
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ProjectTaskDTO' }
+    TaskDetailResponse:
+      description: 请求成功
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  data: { $ref: '#/components/schemas/TaskDetailDTO' }
+    WorkbenchResponse:
+      description: 请求成功
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  data: { $ref: '#/components/schemas/WorkbenchDTO' }
     Unauthorized:
       description: 未认证或会话已失效
       content:
