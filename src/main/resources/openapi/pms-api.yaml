@@ -1613,6 +1613,25 @@ components:
             canRestoreProject: { type: boolean }
             canDeleteProject: { type: boolean }
             canWriteComment: { type: boolean }
+    ProjectTaskDTO:
+      type: object
+      properties:
+        scheduleState:
+          type: string
+          enum: [NO_DUE_DATE, DUE_TODAY, ON_TIME, OVERDUE, COMPLETED]
+          description: Derived from task status, dueDate, and the current Asia/Shanghai calendar date.
+        overdueDays:
+          type: integer
+          minimum: 0
+          description: Days past dueDate for overdue tasks; otherwise zero.
+    TaskDetailDTO:
+      allOf:
+        - $ref: '#/components/schemas/ProjectTaskDTO'
+        - type: object
+    WorkbenchTaskDTO:
+      allOf:
+        - $ref: '#/components/schemas/ProjectTaskDTO'
+        - type: object
     LoginRequest:
       type: object
       required: [email, password]

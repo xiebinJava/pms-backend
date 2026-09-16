@@ -1,6 +1,7 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.brad.pms.common.enums.TaskScheduleState;
 import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.TaskCreateCmd;
@@ -92,6 +93,23 @@ class TaskServiceTest {
 
         assertThat(result).extracting(ProjectTaskDTO::getId).containsExactly(1L);
         assertThat(result.get(0).getSubtaskCount()).isEqualTo(1);
+    }
+
+    @Test
+    void taskDtoIncludesDerivedOverdueState() {
+        ProjectTaskDO task = task(1L, null);
+        task.setStatus(TaskStatus.DOING.getCode());
+        task.setDueDate(LocalDate.now(ZoneId.of("Asia/Shanghai")).minusDays(2));
+        when(taskMapper.selectList(any())).thenReturn(List.of(task));
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(eq(9L), eq(3L))).thenReturn(openNode());
+        when(permissionService.taskPermissions(any(), any(), any())).thenReturn(new TaskPermissionsDTO());
+        when(userService.listByIds(any())).thenReturn(List.of());
+
+        ProjectTaskDTO result = taskService.listByProject(9L, 3L).get(0);
+
+        assertThat(result.getScheduleState()).isEqualTo(TaskScheduleState.OVERDUE);
+        assertThat(result.getOverdueDays()).isEqualTo(2);
     }
 
     @Test

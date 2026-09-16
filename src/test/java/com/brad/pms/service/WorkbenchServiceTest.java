@@ -1,6 +1,7 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.brad.pms.common.enums.TaskScheduleState;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.WorkbenchDTO;
 import com.brad.pms.dto.response.WorkbenchSummaryDTO;
@@ -90,11 +91,23 @@ class WorkbenchServiceTest {
                 task(1L, 10L, 0, 2, LocalDate.of(2026, 8, 29), "补齐接口文档")
         );
 
-        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project)))
+        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project), LocalDate.of(2026, 9, 1)))
                 .extracting(item -> item.getId())
                 .containsExactly(1L, 2L);
-        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project)).get(0).getProjectName())
+        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project), LocalDate.of(2026, 9, 1)).get(0).getProjectName())
                 .isEqualTo("研发门户");
+    }
+
+    @Test
+    void taskItemsIncludeDerivedOverdueState() {
+        ProjectTaskDO overdueTask = task(1L, 10L, 1, 2, LocalDate.of(2026, 9, 14));
+
+        assertThat(WorkbenchService.toTaskItems(List.of(overdueTask), Map.of(), LocalDate.of(2026, 9, 16)))
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.getScheduleState()).isEqualTo(TaskScheduleState.OVERDUE);
+                    assertThat(item.getOverdueDays()).isEqualTo(2);
+                });
     }
 
     @Test

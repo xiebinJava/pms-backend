@@ -1,6 +1,7 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.brad.pms.common.TaskScheduleCalculator;
 import com.brad.pms.common.enums.ProjectStatus;
 import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.convertor.Convertors;
@@ -54,6 +55,7 @@ public class WorkbenchService {
     private final UserService userService;
 
     public WorkbenchDTO load() {
+        LocalDate today = TaskScheduleCalculator.today();
         Long userId = UserContext.userId();
         Set<Long> candidateIds = new LinkedHashSet<>();
         memberMapper.selectList(new LambdaQueryWrapper<ProjectMemberDO>()
@@ -85,8 +87,8 @@ public class WorkbenchService {
                 .collect(Collectors.toList());
 
         WorkbenchDTO dto = new WorkbenchDTO();
-        dto.setSummary(summarize(myTasks, projects.size(), LocalDate.now()));
-        dto.setTasks(toTaskItems(myTasks, projectsById).stream().limit(TASK_LIMIT).collect(Collectors.toList()));
+        dto.setSummary(summarize(myTasks, projects.size(), today));
+        dto.setTasks(toTaskItems(myTasks, projectsById, today).stream().limit(TASK_LIMIT).collect(Collectors.toList()));
         dto.setProjects(projects.stream().limit(PROJECT_LIMIT).collect(Collectors.toList()));
         dto.setActivities(loadActivities(readableIds, projectsById));
         return dto;
@@ -114,12 +116,16 @@ public class WorkbenchService {
         return summary;
     }
 
-    static List<WorkbenchTaskDTO> toTaskItems(List<ProjectTaskDO> tasks, Map<Long, ProjectDTO> projectsById) {
+    static List<WorkbenchTaskDTO> toTaskItems(List<ProjectTaskDO> tasks, Map<Long, ProjectDTO> projectsById, LocalDate today) {
         return tasks.stream()
                 .sorted(taskOrder())
                 .map(task -> {
                     WorkbenchTaskDTO item = new WorkbenchTaskDTO();
                     BeanUtils.copyProperties(Convertors.toTask(task, null), item);
+                    TaskScheduleCalculator.TaskScheduleSnapshot snapshot =
+                            TaskScheduleCalculator.calculate(task.getStatus(), task.getDueDate(), today);
+                    item.setScheduleState(snapshot.state());
+                    item.setOverdueDays(snapshot.overdueDays());
                     ProjectDTO project = projectsById.get(task.getProjectId());
                     item.setProjectName(project == null || project.getName() == null ? "未命名项目" : project.getName());
                     item.setProjectCode(project == null || project.getCode() == null ? "" : project.getCode());

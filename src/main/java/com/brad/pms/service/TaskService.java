@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.audit.AuditAction;
 import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
+import com.brad.pms.common.TaskScheduleCalculator;
 import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.security.ProjectPermissionPolicy;
@@ -56,6 +57,7 @@ public class TaskService {
     private final MemberService memberService;
 
     public List<ProjectTaskDTO> listByProject(Long projectId, Long nodeId) {
+        LocalDate today = TaskScheduleCalculator.today();
         ProjectDO project = permissionService.requireProject(projectId);
         LambdaQueryWrapper<ProjectTaskDO> query = new LambdaQueryWrapper<ProjectTaskDO>()
                 .eq(ProjectTaskDO::getProjectId, projectId);
@@ -75,7 +77,7 @@ public class TaskService {
                 .map(t -> {
                     ProjectTaskDTO dto = toDTO(t, project,
                             t.getNodeId() == null ? null : permissionService.requireNode(projectId, t.getNodeId()),
-                            t.getAssigneeId() == null ? null : userMap.get(t.getAssigneeId()));
+                            t.getAssigneeId() == null ? null : userMap.get(t.getAssigneeId()), today);
                     dto.setSubtaskCount(subtaskCounts.getOrDefault(t.getId(), 0L).intValue());
                     return dto;
                 })
@@ -83,6 +85,7 @@ public class TaskService {
     }
 
     public TaskDetailDTO getDetail(Long id) {
+        LocalDate today = TaskScheduleCalculator.today();
         ProjectTaskDO task = requireTask(id);
         ProjectDO project = permissionService.requireProject(task.getProjectId());
         ProjectNodeDO node = task.getNodeId() == null ? null : permissionService.requireNode(task.getProjectId(), task.getNodeId());
@@ -100,12 +103,12 @@ public class TaskService {
                 .stream().collect(Collectors.toMap(UserDO::getId, u -> u));
         TaskDetailDTO dto = new TaskDetailDTO();
         BeanUtils.copyProperties(
-                toDTO(task, project, node, task.getAssigneeId() == null ? null : userMap.get(task.getAssigneeId())),
+                toDTO(task, project, node, task.getAssigneeId() == null ? null : userMap.get(task.getAssigneeId()), today),
                 dto);
         dto.setSubtaskCount(children.size());
         dto.setSubtasks(children.stream()
                 .map(child -> toDTO(child, project, node,
-                        child.getAssigneeId() == null ? null : userMap.get(child.getAssigneeId())))
+                        child.getAssigneeId() == null ? null : userMap.get(child.getAssigneeId()), today))
                 .collect(Collectors.toList()));
         dto.setComments(toComments(commentMapper.selectList(new LambdaQueryWrapper<ProjectCommentDO>()
                 .eq(ProjectCommentDO::getTaskId, id)
@@ -116,6 +119,7 @@ public class TaskService {
 
     @Transactional
     public ProjectTaskDTO create(TaskCreateCmd cmd) {
+        LocalDate today = TaskScheduleCalculator.today();
         if (cmd.getNodeId() == null) {
             throw BusinessException.error("任务必须归属一个项目节点");
         }
@@ -161,7 +165,7 @@ public class TaskService {
         operationLogService.record(AuditEvent.success(
                 AuditAction.TASK_CREATED.name(), AuditResourceType.TASK.name(), task.getId(), task.getProjectId(),
                 null, null, taskAuditSnapshot(task)));
-        ProjectTaskDTO dto = toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
+        ProjectTaskDTO dto = toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today);
         if (requirement != null) {
             dto.setRequirementId(requirement.getId());
             dto.setRequirementCode(requirement.getCode());
@@ -171,6 +175,7 @@ public class TaskService {
 
     @Transactional
     public ProjectTaskDTO update(Long id, TaskUpdateCmd cmd) {
+        LocalDate today = TaskScheduleCalculator.today();
         ProjectTaskDO task = requireTask(id);
         requireCurrentVersion(task.getVersion(), cmd.getVersion());
         ProjectDO project = permissionService.requireProject(task.getProjectId());
@@ -245,7 +250,7 @@ public class TaskService {
                     null, java.util.Map.of("status", String.valueOf(previousStatus)),
                     java.util.Map.of("status", String.valueOf(task.getStatus()))));
         }
-        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
+        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today);
     }
 
     private void completeDirectSubtasks(ProjectTaskDO parent, LocalDate completionDate) {
@@ -297,6 +302,7 @@ public class TaskService {
 
     @Transactional
     public ProjectTaskDTO move(Long id, TaskMoveCmd cmd) {
+        LocalDate today = TaskScheduleCalculator.today();
         ProjectTaskDO task = requireTask(id);
         requireCurrentVersion(task.getVersion(), cmd.getVersion());
         ProjectDO project = permissionService.requireProject(task.getProjectId());
@@ -318,7 +324,7 @@ public class TaskService {
                 AuditAction.TASK_MOVED.name(), AuditResourceType.TASK.name(), id, task.getProjectId(),
                 null, java.util.Map.of("status", String.valueOf(previousStatus)),
                 java.util.Map.of("status", String.valueOf(task.getStatus()))));
-        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()));
+        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today);
     }
 
     private void requireCurrentVersion(Integer currentVersion, Integer requestedVersion) {
@@ -422,8 +428,9 @@ public class TaskService {
                 .eq(ProjectTaskRequirementDO::getTaskId, taskId));
     }
 
-    private ProjectTaskDTO toDTO(ProjectTaskDO task, ProjectDO project, ProjectNodeDO node, UserDO assignee) {
+    private ProjectTaskDTO toDTO(ProjectTaskDO task, ProjectDO project, ProjectNodeDO node, UserDO assignee, LocalDate today) {
         ProjectTaskDTO dto = Convertors.toTask(task, assignee);
+        enrichSchedule(dto, task, today);
         ProjectTaskRequirementDO link = taskRequirementMapper.selectOne(new LambdaQueryWrapper<ProjectTaskRequirementDO>()
                 .eq(ProjectTaskRequirementDO::getTaskId, task.getId()));
         if (link != null) {
@@ -433,6 +440,13 @@ public class TaskService {
         }
         dto.setPermissions(permissionService.taskPermissions(project, node, task));
         return dto;
+    }
+
+    private void enrichSchedule(ProjectTaskDTO dto, ProjectTaskDO task, LocalDate today) {
+        TaskScheduleCalculator.TaskScheduleSnapshot snapshot =
+                TaskScheduleCalculator.calculate(task.getStatus(), task.getDueDate(), today);
+        dto.setScheduleState(snapshot.state());
+        dto.setOverdueDays(snapshot.overdueDays());
     }
 
     private List<ProjectCommentDTO> toComments(List<ProjectCommentDO> comments, ProjectDO project) {
