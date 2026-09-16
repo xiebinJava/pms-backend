@@ -8,8 +8,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.stereotype.Component;
 
 /** Server-owned Agent and scope policy for DSH delegated PMS access. */
+@Component
 public final class DshAgentScopePolicy {
 
     public static final String PROJECT_ASSISTANT = "project_assistant";
@@ -28,24 +30,24 @@ public final class DshAgentScopePolicy {
      */
     public List<String> resolve(String agentId, Collection<String> requestedScopes) {
         if (agentId == null || agentId.isBlank() || !agentId.matches("[a-zA-Z0-9_-]{1,64}")) {
-            throw BusinessException.forbidden("Agent 标识无效");
+            throw BusinessException.forbidden("PMS_DSH_AGENT_INVALID: Agent 标识无效");
         }
         Set<String> allowed = allowedScopes.get(agentId);
         if (allowed == null) {
-            throw BusinessException.forbidden("Agent 未注册或未启用");
+            throw BusinessException.forbidden("PMS_DSH_AGENT_INVALID: Agent 未注册或未启用");
         }
 
         LinkedHashSet<String> requested = new LinkedHashSet<>();
         if (requestedScopes != null) {
             for (String scope : requestedScopes) {
                 if (scope == null || scope.isBlank()) {
-                    throw BusinessException.forbidden("请求的 DSH 权限范围无效");
+                    throw BusinessException.forbidden("PMS_DSH_SCOPE_FORBIDDEN: 请求的 DSH 权限范围无效");
                 }
                 requested.add(scope.trim());
             }
         }
         if (!requested.isEmpty() && !allowed.containsAll(requested)) {
-            throw BusinessException.forbidden("请求的 DSH 权限范围未获允许");
+            throw BusinessException.forbidden("PMS_DSH_SCOPE_FORBIDDEN: 请求的 DSH 权限范围未获允许");
         }
         return PROJECT_ASSISTANT_SCOPES.stream()
                 .filter(scope -> requested.isEmpty() || requested.contains(scope))
