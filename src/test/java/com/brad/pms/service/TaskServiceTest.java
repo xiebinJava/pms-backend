@@ -2,6 +2,7 @@ package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.brad.pms.common.enums.TaskScheduleState;
+import com.brad.pms.common.enums.TaskScheduleChangeType;
 import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.TaskCreateCmd;
@@ -11,16 +12,20 @@ import com.brad.pms.dto.response.ProjectTaskDTO;
 import com.brad.pms.dto.response.TaskAttachmentDTO;
 import com.brad.pms.dto.response.TaskDetailDTO;
 import com.brad.pms.dto.response.TaskPermissionsDTO;
+import com.brad.pms.dto.response.TaskScheduleHistoryDTO;
 import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeRequirementDO;
 import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.entity.ProjectTaskRequirementDO;
+import com.brad.pms.entity.ProjectTaskScheduleHistoryDO;
+import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.mapper.ProjectTaskRequirementMapper;
+import com.brad.pms.mapper.ProjectTaskScheduleHistoryMapper;
 import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.UserContext;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -53,6 +58,7 @@ class TaskServiceTest {
 
     @Mock ProjectTaskMapper taskMapper;
     @Mock ProjectTaskRequirementMapper taskRequirementMapper;
+    @Mock ProjectTaskScheduleHistoryMapper scheduleHistoryMapper;
     @Mock ProjectNodeRequirementMapper requirementMapper;
     @Mock ProjectCommentMapper commentMapper;
     @Mock UserService userService;
@@ -72,8 +78,10 @@ class TaskServiceTest {
         TableInfoHelper.initTableInfo(assistant, ProjectTaskRequirementDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectNodeRequirementDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectCommentDO.class);
+        TableInfoHelper.initTableInfo(assistant, ProjectTaskScheduleHistoryDO.class);
         UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟", 0, "张伟", "张伟（Alex.Zhang）", 1L));
         lenient().when(taskMapper.updateById(any(ProjectTaskDO.class))).thenReturn(1);
+        lenient().when(scheduleHistoryMapper.selectList(any())).thenReturn(List.of());
     }
 
     @AfterEach
@@ -312,6 +320,7 @@ class TaskServiceTest {
                 .extracting(error -> ((BusinessException) error).getCode())
                 .isEqualTo(BusinessException.ResponseCode.CONFLICT);
         verify(taskMapper, never()).updateById(any(ProjectTaskDO.class));
+        verify(scheduleHistoryMapper, never()).insert(any(ProjectTaskScheduleHistoryDO.class));
     }
 
     @Test
@@ -349,6 +358,193 @@ class TaskServiceTest {
     }
 
     @Test
+    void updatingFromNoDateRecordsSetHistory() {
+        ProjectTaskDO task = task(73L, null);
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setDueDate(LocalDate.of(2026, 9, 15));
+
+        taskService.update(73L, cmd);
+
+        assertHistory(TaskScheduleChangeType.SET, null, LocalDate.of(2026, 9, 15));
+    }
+
+    @Test
+    void updatingToALaterDateRecordsRescheduledHistory() {
+        ProjectTaskDO task = task(73L, null);
+        task.setDueDate(LocalDate.of(2026, 9, 15));
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setDueDate(LocalDate.of(2026, 9, 18));
+
+        taskService.update(73L, cmd);
+
+        assertHistory(TaskScheduleChangeType.RESCHEDULED,
+                LocalDate.of(2026, 9, 15), LocalDate.of(2026, 9, 18));
+    }
+
+    @Test
+    void updatingToAnEarlierDateRecordsMovedEarlierHistory() {
+        ProjectTaskDO task = task(73L, null);
+        task.setDueDate(LocalDate.of(2026, 9, 18));
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setDueDate(LocalDate.of(2026, 9, 15));
+
+        taskService.update(73L, cmd);
+
+        assertHistory(TaskScheduleChangeType.MOVED_EARLIER,
+                LocalDate.of(2026, 9, 18), LocalDate.of(2026, 9, 15));
+    }
+
+    @Test
+    void clearingDueDateRecordsClearedHistory() {
+        ProjectTaskDO task = task(73L, null);
+        task.setDueDate(LocalDate.of(2026, 9, 15));
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setClearDueDate(true);
+
+        taskService.update(73L, cmd);
+
+        assertHistory(TaskScheduleChangeType.CLEARED, LocalDate.of(2026, 9, 15), null);
+    }
+
+    @Test
+    void updatingWithTheSameDueDateDoesNotRecordHistory() {
+        ProjectTaskDO task = task(73L, null);
+        task.setDueDate(LocalDate.of(2026, 9, 15));
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setDueDate(LocalDate.of(2026, 9, 15));
+
+        taskService.update(73L, cmd);
+
+        verify(scheduleHistoryMapper, never()).insert(any(ProjectTaskScheduleHistoryDO.class));
+    }
+
+    @Test
+    void updateDoesNotRecordHistoryWhenPersistenceFails() {
+        ProjectTaskDO task = task(73L, null);
+        task.setDueDate(LocalDate.of(2026, 9, 15));
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+        when(taskMapper.updateById(any(ProjectTaskDO.class))).thenReturn(0);
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setDueDate(LocalDate.of(2026, 9, 18));
+
+        assertThatThrownBy(() -> taskService.update(73L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("任务已被其他人修改");
+
+        verify(scheduleHistoryMapper, never()).insert(any(ProjectTaskScheduleHistoryDO.class));
+    }
+
+    @Test
+    void forbiddenUpdateDoesNotRecordHistory() {
+        ProjectTaskDO task = task(73L, null);
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+        UserContext.set(new LoginUser(8L, "guest", "访客", 0, "访客", "访客（guest）", 1L));
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setDueDate(LocalDate.of(2026, 9, 18));
+
+        assertThatThrownBy(() -> taskService.update(73L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("可以编辑任务");
+
+        verify(scheduleHistoryMapper, never()).insert(any(ProjectTaskScheduleHistoryDO.class));
+    }
+
+    @Test
+    void creatingWithAnInitialDueDateDoesNotRecordHistory() {
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireManageableNode(9L, 3L, "创建任务")).thenReturn(openNode());
+        when(taskMapper.insert(any(ProjectTaskDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, ProjectTaskDO.class).setId(77L);
+            return 1;
+        });
+
+        TaskCreateCmd cmd = new TaskCreateCmd();
+        cmd.setProjectId(9L);
+        cmd.setNodeId(3L);
+        cmd.setTitle("有初始日期的任务");
+        cmd.setDueDate(LocalDate.of(2026, 9, 15));
+
+        taskService.create(cmd);
+
+        verify(scheduleHistoryMapper, never()).insert(any(ProjectTaskScheduleHistoryDO.class));
+    }
+
+    @Test
+    void listByProjectMarksTasksWithRescheduledHistoryWithoutPerTaskQueries() {
+        ProjectTaskDO task = task(73L, null);
+        ProjectTaskScheduleHistoryDO history = scheduleHistory(73L, TaskScheduleChangeType.RESCHEDULED);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+        when(permissionService.taskPermissions(any(), any(), any())).thenReturn(new TaskPermissionsDTO());
+        when(taskMapper.selectList(any())).thenReturn(List.of(task));
+        when(scheduleHistoryMapper.selectList(any())).thenReturn(List.of(history));
+        when(userService.listByIds(any())).thenReturn(List.of());
+
+        ProjectTaskDTO result = taskService.listByProject(9L, 3L).get(0);
+
+        assertThat(result.isRescheduled()).isTrue();
+        verify(scheduleHistoryMapper, times(1)).selectList(any());
+    }
+
+    @Test
+    void getDetailReturnsHistoryWithOperatorNamesFromOneUserQuery() {
+        ProjectTaskScheduleHistoryDO history = scheduleHistory(1L, TaskScheduleChangeType.RESCHEDULED);
+        history.setOperatorId(17L);
+        UserDO operator = new UserDO();
+        operator.setId(17L);
+        operator.setNameZh("操作人");
+        operator.setUsername("operator");
+        when(taskMapper.selectById(1L)).thenReturn(task(1L, null));
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+        when(permissionService.taskPermissions(any(), any(), any())).thenReturn(new TaskPermissionsDTO());
+        when(taskMapper.selectList(any())).thenReturn(List.of());
+        when(commentMapper.selectList(any())).thenReturn(List.of());
+        when(attachmentService.listByTask(1L)).thenReturn(List.of());
+        when(scheduleHistoryMapper.selectList(any())).thenReturn(List.of(history));
+        when(userService.listByIds(any())).thenReturn(List.of(operator));
+
+        TaskDetailDTO detail = taskService.getDetail(1L);
+
+        assertThat(detail.getScheduleHistory()).extracting(TaskScheduleHistoryDTO::getOperatorName)
+                .containsExactly("操作人（operator）");
+        verify(userService, times(1)).listByIds(any());
+    }
+
+    @Test
     void movingParentToDoneAlsoCompletesChildren() {
         ProjectTaskDO parent = task(1L, null);
         ProjectTaskDO child = task(2L, 1L);
@@ -376,6 +572,28 @@ class TaskServiceTest {
         project.setCreatedBy(7L);
         project.setProjectManagerId(7L);
         return project;
+    }
+
+    private void assertHistory(TaskScheduleChangeType changeType, LocalDate previousDueDate, LocalDate nextDueDate) {
+        ArgumentCaptor<ProjectTaskScheduleHistoryDO> history =
+                ArgumentCaptor.forClass(ProjectTaskScheduleHistoryDO.class);
+        verify(scheduleHistoryMapper).insert(history.capture());
+        assertThat(history.getValue().getProjectId()).isEqualTo(9L);
+        assertThat(history.getValue().getTaskId()).isEqualTo(73L);
+        assertThat(history.getValue().getOperatorId()).isEqualTo(7L);
+        assertThat(history.getValue().getChangeType()).isEqualTo(changeType);
+        assertThat(history.getValue().getPreviousDueDate()).isEqualTo(previousDueDate);
+        assertThat(history.getValue().getNextDueDate()).isEqualTo(nextDueDate);
+    }
+
+    private static ProjectTaskScheduleHistoryDO scheduleHistory(Long taskId, TaskScheduleChangeType changeType) {
+        ProjectTaskScheduleHistoryDO history = new ProjectTaskScheduleHistoryDO();
+        history.setId(101L);
+        history.setTaskId(taskId);
+        history.setChangeType(changeType);
+        history.setPreviousDueDate(LocalDate.of(2026, 9, 15));
+        history.setNextDueDate(LocalDate.of(2026, 9, 18));
+        return history;
     }
 
     private static ProjectNodeDO openNode() {

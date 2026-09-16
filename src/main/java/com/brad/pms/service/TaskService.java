@@ -5,6 +5,7 @@ import com.brad.pms.audit.AuditAction;
 import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.common.TaskScheduleCalculator;
+import com.brad.pms.common.enums.TaskScheduleChangeType;
 import com.brad.pms.common.enums.TaskStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.security.ProjectPermissionPolicy;
@@ -16,8 +17,10 @@ import com.brad.pms.dto.request.TaskUpdateCmd;
 import com.brad.pms.dto.response.ProjectCommentDTO;
 import com.brad.pms.dto.response.ProjectTaskDTO;
 import com.brad.pms.dto.response.TaskDetailDTO;
+import com.brad.pms.dto.response.TaskScheduleHistoryDTO;
 import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.ProjectTaskDO;
+import com.brad.pms.entity.ProjectTaskScheduleHistoryDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeRequirementDO;
@@ -26,6 +29,7 @@ import com.brad.pms.entity.ProjectTaskRequirementDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.ProjectTaskScheduleHistoryMapper;
 import com.brad.pms.mapper.ProjectTaskRequirementMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -38,6 +42,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,6 +51,7 @@ import java.util.stream.Stream;
 public class TaskService {
 
     private final ProjectTaskMapper taskMapper;
+    private final ProjectTaskScheduleHistoryMapper scheduleHistoryMapper;
     private final ProjectTaskRequirementMapper taskRequirementMapper;
     private final ProjectNodeRequirementMapper requirementMapper;
     private final ProjectCommentMapper commentMapper;
@@ -64,6 +70,15 @@ public class TaskService {
         if (nodeId != null) query.eq(ProjectTaskDO::getNodeId, nodeId);
         query.orderByAsc(ProjectTaskDO::getSort).orderByDesc(ProjectTaskDO::getCreatedAt);
         List<ProjectTaskDO> tasks = taskMapper.selectList(query);
+        List<ProjectTaskDO> topLevelTasks = tasks.stream()
+                .filter(task -> task.getParentId() == null)
+                .collect(Collectors.toList());
+        Set<Long> rescheduledTaskIds = topLevelTasks.isEmpty() ? Set.of()
+                : scheduleHistoryMapper.selectList(new LambdaQueryWrapper<ProjectTaskScheduleHistoryDO>()
+                                .in(ProjectTaskScheduleHistoryDO::getTaskId,
+                                        topLevelTasks.stream().map(ProjectTaskDO::getId).collect(Collectors.toList()))
+                                .eq(ProjectTaskScheduleHistoryDO::getChangeType, TaskScheduleChangeType.RESCHEDULED))
+                        .stream().map(ProjectTaskScheduleHistoryDO::getTaskId).collect(Collectors.toSet());
         Map<Long, Long> subtaskCounts = tasks.stream()
                 .filter(task -> task.getParentId() != null)
                 .collect(Collectors.groupingBy(ProjectTaskDO::getParentId, Collectors.counting()));
@@ -72,12 +87,11 @@ public class TaskService {
                                 .filter(Objects::nonNull)
                                 .collect(Collectors.toList()))
                 .stream().collect(Collectors.toMap(UserDO::getId, u -> u));
-        return tasks.stream()
-                .filter(task -> task.getParentId() == null)
+        return topLevelTasks.stream()
                 .map(t -> {
                     ProjectTaskDTO dto = toDTO(t, project,
                             t.getNodeId() == null ? null : permissionService.requireNode(projectId, t.getNodeId()),
-                            t.getAssigneeId() == null ? null : userMap.get(t.getAssigneeId()), today);
+                            t.getAssigneeId() == null ? null : userMap.get(t.getAssigneeId()), today, rescheduledTaskIds);
                     dto.setSubtaskCount(subtaskCounts.getOrDefault(t.getId(), 0L).intValue());
                     return dto;
                 })
@@ -93,23 +107,34 @@ public class TaskService {
                 .eq(ProjectTaskDO::getParentId, id)
                 .orderByAsc(ProjectTaskDO::getSort)
                 .orderByDesc(ProjectTaskDO::getCreatedAt));
+        List<ProjectTaskScheduleHistoryDO> scheduleHistory = scheduleHistoryMapper.selectList(
+                new LambdaQueryWrapper<ProjectTaskScheduleHistoryDO>()
+                        .eq(ProjectTaskScheduleHistoryDO::getTaskId, id)
+                        .orderByDesc(ProjectTaskScheduleHistoryDO::getCreatedAt));
         Map<Long, UserDO> userMap = userService.listByIds(
                         Stream.concat(
-                                        Stream.of(task.getAssigneeId()),
-                                        children.stream().map(ProjectTaskDO::getAssigneeId))
+                                        Stream.concat(Stream.of(task.getAssigneeId()),
+                                                children.stream().map(ProjectTaskDO::getAssigneeId)),
+                                        scheduleHistory.stream().map(ProjectTaskScheduleHistoryDO::getOperatorId))
                                 .filter(Objects::nonNull)
                                 .distinct()
                                 .collect(Collectors.toList()))
                 .stream().collect(Collectors.toMap(UserDO::getId, u -> u));
         TaskDetailDTO dto = new TaskDetailDTO();
+        Set<Long> rescheduledTaskIds = scheduleHistory.stream()
+                .filter(history -> history.getChangeType() == TaskScheduleChangeType.RESCHEDULED)
+                .map(ProjectTaskScheduleHistoryDO::getTaskId)
+                .collect(Collectors.toSet());
         BeanUtils.copyProperties(
-                toDTO(task, project, node, task.getAssigneeId() == null ? null : userMap.get(task.getAssigneeId()), today),
+                toDTO(task, project, node, task.getAssigneeId() == null ? null : userMap.get(task.getAssigneeId()), today,
+                        rescheduledTaskIds),
                 dto);
         dto.setSubtaskCount(children.size());
         dto.setSubtasks(children.stream()
                 .map(child -> toDTO(child, project, node,
-                        child.getAssigneeId() == null ? null : userMap.get(child.getAssigneeId()), today))
+                        child.getAssigneeId() == null ? null : userMap.get(child.getAssigneeId()), today, Set.of()))
                 .collect(Collectors.toList()));
+        dto.setScheduleHistory(toScheduleHistoryDTOs(scheduleHistory, userMap));
         dto.setComments(toComments(commentMapper.selectList(new LambdaQueryWrapper<ProjectCommentDO>()
                 .eq(ProjectCommentDO::getTaskId, id)
                 .orderByDesc(ProjectCommentDO::getCreatedAt)), project));
@@ -165,7 +190,7 @@ public class TaskService {
         operationLogService.record(AuditEvent.success(
                 AuditAction.TASK_CREATED.name(), AuditResourceType.TASK.name(), task.getId(), task.getProjectId(),
                 null, null, taskAuditSnapshot(task)));
-        ProjectTaskDTO dto = toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today);
+        ProjectTaskDTO dto = toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today, Set.of());
         if (requirement != null) {
             dto.setRequirementId(requirement.getId());
             dto.setRequirementCode(requirement.getCode());
@@ -184,6 +209,7 @@ public class TaskService {
         String previousDeliverable = task.getDeliverable();
         Integer previousPriority = task.getPriority();
         Integer previousStatus = task.getStatus();
+        LocalDate previousDueDate = task.getDueDate();
         java.util.Map<String, Object> before = taskContentAuditSnapshot(task, false, false);
         Long userId = UserContext.userId();
         boolean administrator = UserContext.isAdministrator();
@@ -218,6 +244,7 @@ public class TaskService {
         if (taskMapper.updateById(task) != 1) {
             throw BusinessException.conflict("任务已被其他人修改，请刷新后重试");
         }
+        recordScheduleHistoryIfChanged(task, previousDueDate);
         if (manager && (cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement()))) {
             replaceTaskRequirementLink(task, requirement);
         }
@@ -250,7 +277,7 @@ public class TaskService {
                     null, java.util.Map.of("status", String.valueOf(previousStatus)),
                     java.util.Map.of("status", String.valueOf(task.getStatus()))));
         }
-        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today);
+        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today, Set.of());
     }
 
     private void completeDirectSubtasks(ProjectTaskDO parent, LocalDate completionDate) {
@@ -324,7 +351,7 @@ public class TaskService {
                 AuditAction.TASK_MOVED.name(), AuditResourceType.TASK.name(), id, task.getProjectId(),
                 null, java.util.Map.of("status", String.valueOf(previousStatus)),
                 java.util.Map.of("status", String.valueOf(task.getStatus()))));
-        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today);
+        return toDTO(task, project, node, loadAssignee(task.getAssigneeId()), today, Set.of());
     }
 
     private void requireCurrentVersion(Integer currentVersion, Integer requestedVersion) {
@@ -428,9 +455,11 @@ public class TaskService {
                 .eq(ProjectTaskRequirementDO::getTaskId, taskId));
     }
 
-    private ProjectTaskDTO toDTO(ProjectTaskDO task, ProjectDO project, ProjectNodeDO node, UserDO assignee, LocalDate today) {
+    private ProjectTaskDTO toDTO(ProjectTaskDO task, ProjectDO project, ProjectNodeDO node, UserDO assignee,
+                                 LocalDate today, Set<Long> rescheduledTaskIds) {
         ProjectTaskDTO dto = Convertors.toTask(task, assignee);
         enrichSchedule(dto, task, today);
+        dto.setRescheduled(rescheduledTaskIds.contains(task.getId()));
         ProjectTaskRequirementDO link = taskRequirementMapper.selectOne(new LambdaQueryWrapper<ProjectTaskRequirementDO>()
                 .eq(ProjectTaskRequirementDO::getTaskId, task.getId()));
         if (link != null) {
@@ -440,6 +469,41 @@ public class TaskService {
         }
         dto.setPermissions(permissionService.taskPermissions(project, node, task));
         return dto;
+    }
+
+    private void recordScheduleHistoryIfChanged(ProjectTaskDO task, LocalDate previousDueDate) {
+        if (Objects.equals(previousDueDate, task.getDueDate())) return;
+        ProjectTaskScheduleHistoryDO history = new ProjectTaskScheduleHistoryDO();
+        history.setProjectId(task.getProjectId());
+        history.setTaskId(task.getId());
+        history.setPreviousDueDate(previousDueDate);
+        history.setNextDueDate(task.getDueDate());
+        history.setChangeType(scheduleChangeType(previousDueDate, task.getDueDate()));
+        history.setOperatorId(UserContext.userId());
+        scheduleHistoryMapper.insert(history);
+    }
+
+    private TaskScheduleChangeType scheduleChangeType(LocalDate previousDueDate, LocalDate nextDueDate) {
+        if (previousDueDate == null) return TaskScheduleChangeType.SET;
+        if (nextDueDate == null) return TaskScheduleChangeType.CLEARED;
+        return nextDueDate.isAfter(previousDueDate)
+                ? TaskScheduleChangeType.RESCHEDULED
+                : TaskScheduleChangeType.MOVED_EARLIER;
+    }
+
+    private List<TaskScheduleHistoryDTO> toScheduleHistoryDTOs(List<ProjectTaskScheduleHistoryDO> history,
+                                                                 Map<Long, UserDO> userMap) {
+        return history.stream().map(row -> {
+            TaskScheduleHistoryDTO dto = new TaskScheduleHistoryDTO();
+            dto.setId(row.getId());
+            dto.setTaskId(row.getTaskId());
+            dto.setPreviousDueDate(row.getPreviousDueDate());
+            dto.setNextDueDate(row.getNextDueDate());
+            dto.setChangeType(row.getChangeType());
+            dto.setOperatorName(Convertors.userDisplayName(userMap.get(row.getOperatorId())));
+            dto.setCreatedAt(row.getCreatedAt());
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     private void enrichSchedule(ProjectTaskDTO dto, ProjectTaskDO task, LocalDate today) {

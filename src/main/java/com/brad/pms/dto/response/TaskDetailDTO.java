@@ -11,6 +11,7 @@ import java.util.List;
 public class TaskDetailDTO extends ProjectTaskDTO {
 
     private List<ProjectTaskDTO> subtasks = new ArrayList<>();
+    private List<TaskScheduleHistoryDTO> scheduleHistory = new ArrayList<>();
     private List<ProjectCommentDTO> comments = new ArrayList<>();
     private List<TaskAttachmentDTO> attachments = new ArrayList<>();
 }

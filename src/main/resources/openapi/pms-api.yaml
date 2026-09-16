@@ -1624,10 +1624,29 @@ components:
           type: integer
           minimum: 0
           description: Days past dueDate for overdue tasks; otherwise zero.
+        rescheduled:
+          type: boolean
+          description: True when the task has at least one later due-date change in its schedule history.
     TaskDetailDTO:
       allOf:
         - $ref: '#/components/schemas/ProjectTaskDTO'
         - type: object
+          properties:
+            scheduleHistory:
+              type: array
+              items: { $ref: '#/components/schemas/TaskScheduleHistoryDTO' }
+    TaskScheduleHistoryDTO:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        taskId: { type: integer, format: int64 }
+        previousDueDate: { type: string, format: date, nullable: true }
+        nextDueDate: { type: string, format: date, nullable: true }
+        changeType:
+          type: string
+          enum: [SET, RESCHEDULED, MOVED_EARLIER, CLEARED]
+        operatorName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
     WorkbenchTaskDTO:
       allOf:
         - $ref: '#/components/schemas/ProjectTaskDTO'

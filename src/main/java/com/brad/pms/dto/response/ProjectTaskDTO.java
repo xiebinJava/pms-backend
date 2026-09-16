@@ -27,6 +27,7 @@ public class ProjectTaskDTO {
     private LocalDate dueDate;
     private TaskScheduleState scheduleState;
     private int overdueDays;
+    private boolean rescheduled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Integer subtaskCount;
