@@ -49,6 +49,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -263,6 +265,7 @@ class TaskServiceTest {
 
     @Test
     void completingParentCompletesChildrenAndBackfillsOnlyMissingDueDates() {
+        LocalDate completionDate = LocalDate.of(2026, 9, 16);
         ProjectTaskDO parent = task(1L, null);
         ProjectTaskDO missingDateChild = task(2L, 1L);
         ProjectTaskDO datedChild = task(3L, 1L);
@@ -271,6 +274,8 @@ class TaskServiceTest {
         when(permissionService.requireProject(9L)).thenReturn(openProject());
         when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
         when(taskMapper.selectList(any())).thenReturn(List.of(missingDateChild, datedChild));
+        taskService = spy(taskService);
+        doReturn(completionDate).when(taskService).currentDate();
 
         TaskUpdateCmd cmd = new TaskUpdateCmd();
         cmd.setVersion(parent.getVersion());
@@ -279,7 +284,7 @@ class TaskServiceTest {
         taskService.update(1L, cmd);
 
         assertThat(missingDateChild.getStatus()).isEqualTo(TaskStatus.DONE.getCode());
-        assertThat(missingDateChild.getDueDate()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Shanghai")));
+        assertThat(missingDateChild.getDueDate()).isEqualTo(completionDate);
         assertThat(datedChild.getStatus()).isEqualTo(TaskStatus.DONE.getCode());
         assertThat(datedChild.getDueDate()).isEqualTo(LocalDate.of(2026, 9, 8));
         verify(taskMapper, times(3)).updateById(any(ProjectTaskDO.class));
@@ -288,7 +293,7 @@ class TaskServiceTest {
         verify(scheduleHistoryMapper).insert(history.capture());
         assertThat(history.getValue().getTaskId()).isEqualTo(2L);
         assertThat(history.getValue().getPreviousDueDate()).isNull();
-        assertThat(history.getValue().getNextDueDate()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Shanghai")));
+        assertThat(history.getValue().getNextDueDate()).isEqualTo(completionDate);
         assertThat(history.getValue().getChangeType()).isEqualTo(TaskScheduleChangeType.SET);
     }
 

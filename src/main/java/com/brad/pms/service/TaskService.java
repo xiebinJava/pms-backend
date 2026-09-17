@@ -38,7 +38,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,7 +62,7 @@ public class TaskService {
     private final MemberService memberService;
 
     public List<ProjectTaskDTO> listByProject(Long projectId, Long nodeId) {
-        LocalDate today = TaskScheduleCalculator.today();
+        LocalDate today = currentDate();
         ProjectDO project = permissionService.requireProject(projectId);
         LambdaQueryWrapper<ProjectTaskDO> query = new LambdaQueryWrapper<ProjectTaskDO>()
                 .eq(ProjectTaskDO::getProjectId, projectId);
@@ -99,7 +98,7 @@ public class TaskService {
     }
 
     public TaskDetailDTO getDetail(Long id) {
-        LocalDate today = TaskScheduleCalculator.today();
+        LocalDate today = currentDate();
         ProjectTaskDO task = requireTask(id);
         ProjectDO project = permissionService.requireProject(task.getProjectId());
         ProjectNodeDO node = task.getNodeId() == null ? null : permissionService.requireNode(task.getProjectId(), task.getNodeId());
@@ -144,7 +143,7 @@ public class TaskService {
 
     @Transactional
     public ProjectTaskDTO create(TaskCreateCmd cmd) {
-        LocalDate today = TaskScheduleCalculator.today();
+        LocalDate today = currentDate();
         if (cmd.getNodeId() == null) {
             throw BusinessException.error("任务必须归属一个项目节点");
         }
@@ -200,7 +199,7 @@ public class TaskService {
 
     @Transactional
     public ProjectTaskDTO update(Long id, TaskUpdateCmd cmd) {
-        LocalDate today = TaskScheduleCalculator.today();
+        LocalDate today = currentDate();
         ProjectTaskDO task = requireTask(id);
         requireCurrentVersion(task.getVersion(), cmd.getVersion());
         ProjectDO project = permissionService.requireProject(task.getProjectId());
@@ -248,7 +247,7 @@ public class TaskService {
         if (manager && (cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement()))) {
             replaceTaskRequirementLink(task, requirement);
         }
-        completeSubtasksIfCompleted(previousStatus, task);
+        completeSubtasksIfCompleted(previousStatus, task, today);
         if (task.getAssigneeId() != null && !Objects.equals(previousAssignee, task.getAssigneeId())) {
             notificationService.notifyTaskAssigned(task.getProjectId(), task.getId(), task.getTitle(), task.getAssigneeId());
         }
@@ -312,11 +311,15 @@ public class TaskService {
         }
     }
 
-    private void completeSubtasksIfCompleted(Integer previousStatus, ProjectTaskDO task) {
+    private void completeSubtasksIfCompleted(Integer previousStatus, ProjectTaskDO task, LocalDate today) {
         if (!Objects.equals(previousStatus, TaskStatus.DONE.getCode())
                 && Objects.equals(task.getStatus(), TaskStatus.DONE.getCode())) {
-            completeDirectSubtasks(task, LocalDate.now(ZoneId.of("Asia/Shanghai")));
+            completeDirectSubtasks(task, today);
         }
+    }
+
+    LocalDate currentDate() {
+        return TaskScheduleCalculator.today();
     }
 
     private void ensureChildStatusAllowed(ProjectTaskDO task, Integer targetStatus) {
@@ -330,7 +333,7 @@ public class TaskService {
 
     @Transactional
     public ProjectTaskDTO move(Long id, TaskMoveCmd cmd) {
-        LocalDate today = TaskScheduleCalculator.today();
+        LocalDate today = currentDate();
         ProjectTaskDO task = requireTask(id);
         requireCurrentVersion(task.getVersion(), cmd.getVersion());
         ProjectDO project = permissionService.requireProject(task.getProjectId());
@@ -347,7 +350,7 @@ public class TaskService {
         if (taskMapper.updateById(task) != 1) {
             throw BusinessException.conflict("任务已被其他人修改，请刷新后重试");
         }
-        completeSubtasksIfCompleted(previousStatus, task);
+        completeSubtasksIfCompleted(previousStatus, task, today);
         operationLogService.record(AuditEvent.success(
                 AuditAction.TASK_MOVED.name(), AuditResourceType.TASK.name(), id, task.getProjectId(),
                 null, java.util.Map.of("status", String.valueOf(previousStatus)),
