@@ -49,18 +49,24 @@ public class FollowerService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
-        List<Long> previous = followerMapper.selectList(new LambdaQueryWrapper<ProjectFollowerDO>()
-                        .eq(ProjectFollowerDO::getProjectId, projectId)
-                        .orderByAsc(ProjectFollowerDO::getId))
-                .stream().map(ProjectFollowerDO::getUserId).collect(Collectors.toList());
-        followerMapper.delete(new LambdaQueryWrapper<ProjectFollowerDO>()
-                .eq(ProjectFollowerDO::getProjectId, projectId));
-        selected.forEach(userId -> {
-            ProjectFollowerDO follower = new ProjectFollowerDO();
-            follower.setProjectId(projectId);
-            follower.setUserId(userId);
-            followerMapper.insert(follower);
-        });
+        List<ProjectFollowerDO> existing = followerMapper.selectList(new LambdaQueryWrapper<ProjectFollowerDO>()
+                .eq(ProjectFollowerDO::getProjectId, projectId)
+                .orderByAsc(ProjectFollowerDO::getId));
+        List<Long> previous = existing.stream()
+                .map(ProjectFollowerDO::getUserId)
+                .collect(Collectors.toList());
+        existing.stream()
+                .filter(follower -> !selected.contains(follower.getUserId()))
+                .forEach(follower -> followerMapper.deleteById(follower.getId()));
+        selected.stream()
+                .filter(userId -> existing.stream().noneMatch(follower -> Objects.equals(follower.getUserId(), userId)))
+                .forEach(userId -> {
+                    if (followerMapper.restoreDeleted(projectId, userId) > 0) return;
+                    ProjectFollowerDO follower = new ProjectFollowerDO();
+                    follower.setProjectId(projectId);
+                    follower.setUserId(userId);
+                    followerMapper.insert(follower);
+                });
         if (!previous.equals(selected)) {
             operationLogService.record(AuditEvent.success(
                     AuditAction.PROJECT_FOLLOWER_CHANGED.name(), AuditResourceType.PROJECT_FOLLOWER.name(), null, projectId,

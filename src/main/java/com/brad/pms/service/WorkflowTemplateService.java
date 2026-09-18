@@ -103,6 +103,11 @@ public class WorkflowTemplateService {
         return toTemplateDTO(requireTemplate(templateId));
     }
 
+    public WorkflowTemplateSummaryDTO getTemplateSummary(Long templateId) {
+        WorkflowTemplateDO template = requireTemplate(templateId);
+        return toSummary(template, projectTypeMapper.selectById(template.getProjectTypeId()));
+    }
+
     @Transactional
     public WorkflowTemplateDTO saveDraft(Long templateId, WorkflowTemplateSaveCmd cmd) {
         WorkflowTemplateDefinition definition;
@@ -126,7 +131,7 @@ public class WorkflowTemplateService {
                 throw BusinessException.conflict("流程模板未能创建，请重试");
             }
         } else {
-            template = requireTemplate(templateId);
+            template = requireTemplateForUpdate(templateId);
             if (cmd.getProjectTypeId() != null && !cmd.getProjectTypeId().equals(template.getProjectTypeId())) {
                 throw BusinessException.error("流程模板所属项目类型不可更改");
             }
@@ -175,7 +180,7 @@ public class WorkflowTemplateService {
 
     @Transactional
     public WorkflowTemplateDTO publish(Long templateId) {
-        WorkflowTemplateDO template = requireTemplate(templateId);
+        WorkflowTemplateDO template = requireTemplateForUpdate(templateId);
         WorkflowTemplateVersionDO draft = findLatestVersion(templateId, "DRAFT");
         if (draft == null) throw BusinessException.error("没有可发布的流程草稿");
         draft.setStatus("PUBLISHED");
@@ -191,8 +196,14 @@ public class WorkflowTemplateService {
     @Transactional
     public ProjectTypeDTO setDefaultTemplate(Long projectTypeId, Long versionId) {
         ProjectTypeDO type = requireActiveType(projectTypeId);
-        WorkflowTemplateVersionDO version = requirePublishedVersion(versionId);
-        WorkflowTemplateDO template = requireTemplate(version.getTemplateId());
+        WorkflowTemplateVersionDO versionReference = versionMapper.selectById(versionId);
+        if (versionReference == null) throw BusinessException.error("只能选择已发布的流程版本");
+        WorkflowTemplateDO template = requireTemplateForUpdate(versionReference.getTemplateId());
+        WorkflowTemplateVersionDO version = versionMapper.selectByIdForUpdate(versionId);
+        if (version == null || !"PUBLISHED".equals(version.getStatus())) {
+            throw BusinessException.error("只能选择已发布的流程版本");
+        }
+        if (!template.getId().equals(version.getTemplateId())) throw BusinessException.error("流程模板版本与模板不匹配");
         if (!projectTypeId.equals(template.getProjectTypeId())) {
             throw BusinessException.error("默认流程必须属于当前项目类型");
         }
@@ -204,6 +215,41 @@ public class WorkflowTemplateService {
                 Map.of("templateVersionId", previous == null ? "NONE" : previous),
                 Map.of("templateVersionId", versionId)));
         return toProjectTypeDTO(type);
+    }
+
+    @Transactional
+    public void archiveVersion(Long templateId, Long versionId) {
+        WorkflowTemplateDO template = requireTemplateForUpdate(templateId);
+        WorkflowTemplateVersionDO version = versionMapper.selectByIdForUpdate(versionId);
+        if (version == null) throw BusinessException.notFound("流程模板版本不存在");
+        if (!templateId.equals(version.getTemplateId())) throw BusinessException.error("该版本不属于当前流程模板");
+        if (!"PUBLISHED".equals(version.getStatus())) throw BusinessException.error("只能归档已发布的流程版本");
+        if (projectTypeMapper.selectCount(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getDefaultTemplateVersionId, versionId)) > 0) {
+            throw BusinessException.conflict("该版本仍是项目类型的默认版本，请先更改默认版本");
+        }
+        version.setStatus("ARCHIVED");
+        if (versionMapper.updateById(version) != 1) throw BusinessException.conflict("流程版本已被其他人修改，请刷新后重试");
+        operationLogService.record(AuditEvent.success(AuditAction.WORKFLOW_TEMPLATE_VERSION_ARCHIVED.name(),
+                AuditResourceType.WORKFLOW_TEMPLATE.name(), template.getId(), null, null,
+                Map.of("versionNo", version.getVersionNo(), "status", "PUBLISHED"),
+                Map.of("versionNo", version.getVersionNo(), "status", "ARCHIVED")));
+    }
+
+    @Transactional
+    public void archiveTemplate(Long templateId) {
+        WorkflowTemplateDO template = requireTemplateForUpdate(templateId);
+        if ("current-process".equals(template.getCode())) throw BusinessException.error("内置模板不能归档");
+        List<Long> versionIds = versions(templateId).stream().map(WorkflowTemplateVersionDO::getId).toList();
+        if (!versionIds.isEmpty() && projectTypeMapper.selectCount(new LambdaQueryWrapper<ProjectTypeDO>()
+                .in(ProjectTypeDO::getDefaultTemplateVersionId, versionIds)) > 0) {
+            throw BusinessException.conflict("该模板包含项目类型的默认版本，请先更改默认版本");
+        }
+        if (templateMapper.deleteById(templateId) != 1) throw BusinessException.conflict("流程模板已被其他人归档，请刷新后重试");
+        operationLogService.record(AuditEvent.success(AuditAction.WORKFLOW_TEMPLATE_ARCHIVED.name(),
+                AuditResourceType.WORKFLOW_TEMPLATE.name(), templateId, null, null,
+                Map.of("name", template.getName(), "deleted", false),
+                Map.of("name", template.getName(), "deleted", true, "versionCount", versionIds.size())));
     }
 
     public ProjectTypeDO requireActiveType(Long typeId) {
@@ -302,6 +348,16 @@ public class WorkflowTemplateService {
             summary.setVersionNo(version.getVersionNo());
             return summary;
         }).toList());
+        dto.setVersions(versions.stream()
+                .sorted(Comparator.comparing(WorkflowTemplateVersionDO::getVersionNo))
+                .map(version -> {
+                    WorkflowTemplateVersionSummaryDTO summary = new WorkflowTemplateVersionSummaryDTO();
+                    summary.setId(version.getId());
+                    summary.setVersionNo(version.getVersionNo());
+                    summary.setStatus(version.getStatus());
+                    summary.setIsDefault(type != null && version.getId().equals(type.getDefaultTemplateVersionId()));
+                    return summary;
+                }).toList());
         dto.setDefaultTemplateVersionId(type == null ? null : type.getDefaultTemplateVersionId());
         dto.setDefaultTemplate(type != null && publishedVersions.stream()
                 .anyMatch(version -> version.getId().equals(type.getDefaultTemplateVersionId())));
@@ -332,6 +388,12 @@ public class WorkflowTemplateService {
 
     private WorkflowTemplateDO requireTemplate(Long id) {
         WorkflowTemplateDO template = templateMapper.selectById(id);
+        if (template == null) throw BusinessException.error("流程模板不存在");
+        return template;
+    }
+
+    private WorkflowTemplateDO requireTemplateForUpdate(Long id) {
+        WorkflowTemplateDO template = templateMapper.selectActiveByIdForUpdate(id);
         if (template == null) throw BusinessException.error("流程模板不存在");
         return template;
     }

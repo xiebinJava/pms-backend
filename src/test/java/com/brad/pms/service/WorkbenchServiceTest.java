@@ -3,6 +3,8 @@ package com.brad.pms.service;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.brad.pms.common.enums.TaskScheduleState;
 import com.brad.pms.dto.response.ProjectDTO;
+import com.brad.pms.dto.response.ProjectActionItemDTO;
+import com.brad.pms.dto.response.WorkbenchActionCenterDTO;
 import com.brad.pms.dto.response.WorkbenchDTO;
 import com.brad.pms.dto.response.WorkbenchSummaryDTO;
 import com.brad.pms.entity.ProjectCommentDO;
@@ -48,6 +50,7 @@ class WorkbenchServiceTest {
     @Mock ProjectTaskMapper taskMapper;
     @Mock ProjectCommentMapper commentMapper;
     @Mock UserService userService;
+    @Mock ProjectAttentionService attentionService;
 
     @InjectMocks WorkbenchService workbenchService;
 
@@ -198,6 +201,33 @@ class WorkbenchServiceTest {
         assertThat(dto.getSummary().getParticipatingProjectCount()).isEqualTo(10);
         assertThat(dto.getTasks()).hasSize(8);
         assertThat(dto.getProjects()).hasSize(6);
+    }
+
+    @Test
+    void loadIncludesServerDerivedActionCenterForAllReadableProjects() {
+        UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟"));
+        ProjectDTO project = project(10L, "成员项目", "PRJ-10");
+        WorkbenchActionCenterDTO actionCenter = new WorkbenchActionCenterDTO();
+        ProjectActionItemDTO issue = new ProjectActionItemDTO();
+        issue.setProjectId(10L);
+        issue.setType("CURRENT_NODE_OWNER_MISSING");
+        actionCenter.setTotalCount(1);
+        actionCenter.setCriticalCount(1);
+        actionCenter.setItems(List.of(issue));
+
+        when(memberMapper.selectList(any())).thenReturn(List.of(member(10L, 7L)));
+        when(taskMapper.selectList(any())).thenReturn(List.of());
+        when(projectMapper.selectList(any())).thenReturn(List.of());
+        when(projectService.listReadableByIds(any())).thenReturn(List.of(project));
+        when(attentionService.loadForProjects(List.of(project))).thenReturn(actionCenter);
+        when(commentMapper.selectList(any())).thenReturn(List.of());
+
+        WorkbenchDTO dto = workbenchService.load();
+
+        assertThat(dto.getActionCenter()).isSameAs(actionCenter);
+        assertThat(dto.getActionCenter().getItems()).singleElement()
+                .extracting(item -> item.getType())
+                .isEqualTo("CURRENT_NODE_OWNER_MISSING");
     }
 
     private static ProjectMemberDO member(Long projectId, Long userId) {

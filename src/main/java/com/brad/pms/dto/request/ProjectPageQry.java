@@ -21,6 +21,9 @@ public class ProjectPageQry extends BasePage {
 
     private Integer projectLevel;
 
+    /** 0：低，1：中，2：高，3：紧急。 */
+    private Integer priority;
+
     /** OVERDUE / NO_MANAGER / ACTIVE / STALE_NODE */
     private String attention;
 

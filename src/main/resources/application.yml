@@ -67,6 +67,9 @@ pms:
     # 生产环境务必通过环境变量/配置文件覆盖
     secret: ${PMS_JWT_SECRET:}
     expire-hours: 168
+  dsh:
+    # Required for server-to-server DSH token exchange; never expose this to browser code.
+    service-key: ${PMS_DSH_SERVICE_KEY:}
   auth:
     access-expire-minutes: ${PMS_ACCESS_EXPIRE_MINUTES:30}
     refresh-expire-days: ${PMS_REFRESH_EXPIRE_DAYS:30}

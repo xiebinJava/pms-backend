@@ -4,7 +4,7 @@
 
 关联设计：[2026-09-16-dsh-pms-workspace-design.md](../specs/2026-09-16-dsh-pms-workspace-design.md)
 
-状态：待执行
+状态：进行中（Phase 0 与 Phase 1 只读闭环已完成，工作区联动与写操作待继续）
 
 ## 1. 实施目标
 

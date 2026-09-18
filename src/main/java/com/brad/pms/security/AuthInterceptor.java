@@ -26,14 +26,24 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final UserMapper userMapper;
     private final AuthSessionMapper authSessionMapper;
     private final AuthorizationService authorizationService;
+    private final AiDelegationRoutePolicy aiDelegationRoutePolicy;
 
     public AuthInterceptor(JwtTokenProvider tokenProvider, UserMapper userMapper,
                            AuthSessionMapper authSessionMapper,
                            AuthorizationService authorizationService) {
+        this(tokenProvider, userMapper, authSessionMapper, authorizationService,
+                new AiDelegationRoutePolicy());
+    }
+
+    public AuthInterceptor(JwtTokenProvider tokenProvider, UserMapper userMapper,
+                           AuthSessionMapper authSessionMapper,
+                           AuthorizationService authorizationService,
+                           AiDelegationRoutePolicy aiDelegationRoutePolicy) {
         this.tokenProvider = tokenProvider;
         this.userMapper = userMapper;
         this.authSessionMapper = authSessionMapper;
         this.authorizationService = authorizationService;
+        this.aiDelegationRoutePolicy = aiDelegationRoutePolicy;
     }
 
     @Override
@@ -48,9 +58,19 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith(BEARER_PREFIX)) {
+        String delegationToken = request.getHeader("X-PMS-AI-Delegation");
+        boolean aiDelegation = delegationToken != null && !delegationToken.isBlank();
+        String tokenHeader = aiDelegation ? BEARER_PREFIX + delegationToken : header;
+        if (tokenHeader != null && tokenHeader.startsWith(BEARER_PREFIX)) {
             try {
-                LoginUser loginUser = tokenProvider.parseToken(header.substring(BEARER_PREFIX.length()));
+                String token = tokenHeader.substring(BEARER_PREFIX.length());
+                LoginUser loginUser = aiDelegation
+                        ? tokenProvider.parseAiDelegationToken(token)
+                        : tokenProvider.parseToken(token);
+                if (aiDelegation && !allowedAiDelegationRoute(request, token)) {
+                    writeError(response, HttpServletResponse.SC_FORBIDDEN, "AI 委托令牌没有访问该接口的权限");
+                    return false;
+                }
                 UserDO persistedUser = userMapper.selectById(loginUser.getId());
                 if (persistedUser == null) {
                     writeUnauthorized(response, "用户不存在");
@@ -93,6 +113,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
         writeUnauthorized(response, "未登录或登录已过期");
         return false;
+    }
+
+    private boolean allowedAiDelegationRoute(HttpServletRequest request, String token) {
+        return aiDelegationRoutePolicy.isAllowed(request, token, tokenProvider);
     }
 
     private void writeUnauthorized(HttpServletResponse response, String message) throws Exception {

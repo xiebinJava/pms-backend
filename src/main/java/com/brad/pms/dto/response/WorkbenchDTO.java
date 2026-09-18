@@ -12,4 +12,5 @@ public class WorkbenchDTO {
     private List<WorkbenchTaskDTO> tasks = new ArrayList<>();
     private List<ProjectDTO> projects = new ArrayList<>();
     private List<WorkbenchActivityDTO> activities = new ArrayList<>();
+    private WorkbenchActionCenterDTO actionCenter = new WorkbenchActionCenterDTO();
 }

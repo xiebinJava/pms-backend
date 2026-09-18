@@ -20,4 +20,13 @@ class TaskScheduleHistoryMigrationTest {
         assertThat(sql).contains("idx_task_schedule_history_task");
         assertThat(sql).contains("task_schedule_history_task_fk");
     }
+
+    @Test
+    void repairMigrationCanRestoreTheTableWhenVersionHistoryAlreadyExists() throws IOException {
+        String sql = Files.readString(Path.of("src/main/resources/db/migration/V46__repair_task_schedule_history.sql"));
+
+        assertThat(sql).contains("CREATE TABLE IF NOT EXISTS project_task_schedule_history");
+        assertThat(sql).contains("idx_task_schedule_history_task");
+        assertThat(sql).contains("task_schedule_history_task_fk");
+    }
 }

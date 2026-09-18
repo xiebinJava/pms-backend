@@ -13,6 +13,7 @@ import com.brad.pms.service.WorkflowTemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -78,5 +79,20 @@ public class AdminWorkflowConfigController {
     @RequirePermission(PermissionCode.WORKFLOW_WRITE)
     public ResponseResult<WorkflowTemplateDTO> publish(@PathVariable Long id) {
         return ResponseResult.success(workflowTemplateService.publish(id));
+    }
+
+    @PostMapping("/templates/{id}/versions/{versionId}/archive")
+    @RequirePermission(PermissionCode.WORKFLOW_WRITE)
+    public ResponseResult<WorkflowTemplateSummaryDTO> archiveVersion(@PathVariable Long id,
+                                                                       @PathVariable Long versionId) {
+        workflowTemplateService.archiveVersion(id, versionId);
+        return ResponseResult.success(workflowTemplateService.getTemplateSummary(id));
+    }
+
+    @DeleteMapping("/templates/{id}")
+    @RequirePermission(PermissionCode.WORKFLOW_WRITE)
+    public ResponseResult<Void> archiveTemplate(@PathVariable Long id) {
+        workflowTemplateService.archiveTemplate(id);
+        return ResponseResult.success();
     }
 }

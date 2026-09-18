@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 class HealthControllerTest {
 
     @Test
-    void defaultReadinessAcceptsLatestConfigurableWorkflowMigration() throws Exception {
+    void defaultReadinessAcceptsLatestTaskScheduleHistoryRepairMigration() throws Exception {
         DataSource dataSource = mock(DataSource.class);
         Connection connection = mock(Connection.class);
         PreparedStatement databaseProbe = mock(PreparedStatement.class);
@@ -30,7 +30,7 @@ class HealthControllerTest {
                 .thenReturn(migrationProbe);
         when(migrationProbe.executeQuery()).thenReturn(migrationResult);
         when(migrationResult.next()).thenReturn(true);
-        when(migrationResult.getString(1)).thenReturn("42");
+        when(migrationResult.getString(1)).thenReturn("46");
 
         HealthController controller = new HealthController(dataSource);
 
@@ -38,7 +38,7 @@ class HealthControllerTest {
         assertThat(controller.readiness().getBody())
                 .containsEntry("status", "UP")
                 .containsEntry("database", "UP")
-                .containsEntry("migration", "42");
+                .containsEntry("migration", "46");
     }
 
     @Test

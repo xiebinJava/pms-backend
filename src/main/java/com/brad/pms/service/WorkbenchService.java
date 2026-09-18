@@ -54,6 +54,7 @@ public class WorkbenchService {
     private final ProjectTaskMapper taskMapper;
     private final ProjectCommentMapper commentMapper;
     private final UserService userService;
+    private final ProjectAttentionService attentionService;
 
     public WorkbenchDTO load() {
         LocalDate today = TaskScheduleCalculator.today();
@@ -92,6 +93,7 @@ public class WorkbenchService {
         dto.setTasks(toTaskItems(myTasks, projectsById, today).stream().limit(TASK_LIMIT).collect(Collectors.toList()));
         dto.setProjects(projects.stream().limit(PROJECT_LIMIT).collect(Collectors.toList()));
         dto.setActivities(loadActivities(readableIds, projectsById));
+        if (attentionService != null) dto.setActionCenter(attentionService.loadForProjects(projects));
         return dto;
     }
 

@@ -16,6 +16,7 @@ public class WorkflowTemplateSummaryDTO {
     private Integer publishedVersionNo;
     private Long publishedVersionId;
     private List<WorkflowTemplateVersionSummaryDTO> publishedVersions;
+    private List<WorkflowTemplateVersionSummaryDTO> versions;
     private Long defaultTemplateVersionId;
     private Boolean defaultTemplate;
 }

@@ -43,4 +43,6 @@ public class ProjectDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private ProjectPermissionsDTO permissions;
+    private ProjectReadinessDTO readiness;
+    private ProjectAttentionSummaryDTO attentionSummary;
 }

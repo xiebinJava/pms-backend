@@ -16,6 +16,7 @@ import com.brad.pms.dto.request.ProjectCreateCmd;
 import com.brad.pms.dto.request.ProjectPageQry;
 import com.brad.pms.dto.request.ProjectUpdateCmd;
 import com.brad.pms.dto.response.ProjectDTO;
+import com.brad.pms.dto.response.ProjectAttentionSummaryDTO;
 import com.brad.pms.dto.response.ProjectListSummaryDTO;
 import com.brad.pms.dto.response.ProjectPermissionsDTO;
 import com.brad.pms.entity.ProjectDO;
@@ -67,10 +68,16 @@ public class ProjectService {
     private final OrgUnitMapper orgUnitMapper;
     private final OperationLogService operationLogService;
     private WorkflowTemplateService workflowTemplateService;
+    private ProjectAttentionService attentionService;
 
     @Autowired
     public void setWorkflowTemplateService(WorkflowTemplateService workflowTemplateService) {
         this.workflowTemplateService = workflowTemplateService;
+    }
+
+    @Autowired
+    public void setAttentionService(ProjectAttentionService attentionService) {
+        this.attentionService = attentionService;
     }
 
     @Transactional
@@ -286,7 +293,9 @@ public class ProjectService {
 
     public ProjectDTO detail(Long id) {
         ProjectDO project = requireProject(id);
-        return enrich(Collections.singletonList(project)).get(0);
+        ProjectDTO result = enrich(Collections.singletonList(project)).get(0);
+        if (attentionService != null) result.setReadiness(attentionService.loadForProject(result));
+        return result;
     }
 
     /**
@@ -369,6 +378,9 @@ public class ProjectService {
         }
         if (qry.getProjectLevel() != null) {
             wrapper.eq(ProjectDO::getProjectLevel, qry.getProjectLevel());
+        }
+        if (qry.getPriority() != null) {
+            wrapper.eq(ProjectDO::getPriority, qry.getPriority());
         }
         applyStatusFilter(wrapper, qry.getStatus());
         if (applyAttention) {
@@ -619,7 +631,7 @@ public class ProjectService {
         // 负责人信息
         Map<Long, UserDO> userMap = loadUsers(userIds);
 
-        return projects.stream().map(p -> {
+        List<ProjectDTO> result = projects.stream().map(p -> {
             p.setStatus(ProjectStatus.normalize(p.getStatus()));
             Long pid = p.getId();
             Map<Integer, Long> stats = taskCountMap.getOrDefault(pid, Collections.emptyMap());
@@ -643,6 +655,11 @@ public class ProjectService {
             dto.setPermissions(preloadedPermissions == null ? permissionService.projectPermissions(p) : preloadedPermissions.get(pid));
             return dto;
         }).collect(Collectors.toList());
+        if (attentionService != null) {
+            Map<Long, ProjectAttentionSummaryDTO> summaries = attentionService.loadSummaries(result);
+            result.forEach(project -> project.setAttentionSummary(summaries.get(project.getId())));
+        }
+        return result;
     }
 
     static ProjectNodeDO currentNodeOf(List<ProjectNodeDO> nodes) {

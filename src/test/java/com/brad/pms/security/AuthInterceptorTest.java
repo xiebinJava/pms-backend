@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Method;
 
@@ -45,6 +46,50 @@ class AuthInterceptorTest {
 
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(response.getContentAsString()).doesNotContain("jwt secret details");
+    }
+
+    @Test
+    void delegationTokenMayReadTaskQueryOnlyWithQueryScope() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/ai/query/tasks");
+        request.setContextPath("/api");
+        when(tokenProvider.hasAiDelegationScope("token", "ai:query:read")).thenReturn(true);
+
+        Boolean allowed = ReflectionTestUtils.invokeMethod(
+                interceptor, "allowedAiDelegationRoute", request, "token");
+        assertThat(allowed).isTrue();
+
+        request.setMethod("GET");
+        Boolean getAllowed = ReflectionTestUtils.invokeMethod(
+                interceptor, "allowedAiDelegationRoute", request, "token");
+        assertThat(getAllowed).isFalse();
+    }
+
+    @Test
+    void delegationTokenMayReadDshProjectListWithPmsProjectScope() {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET", "/api/integration/dsh/v1/projects");
+        request.setContextPath("/api");
+        when(tokenProvider.isDshDelegationToken("token")).thenReturn(true);
+        when(tokenProvider.hasAiDelegationScope("token", "pms:project:read")).thenReturn(true);
+
+        Boolean allowed = ReflectionTestUtils.invokeMethod(
+                interceptor, "allowedAiDelegationRoute", request, "token");
+
+        assertThat(allowed).isTrue();
+    }
+
+    @Test
+    void legacyAiDelegationTokenCannotEnterDshIntegrationFacade() {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET", "/api/integration/dsh/v1/projects");
+        request.setContextPath("/api");
+        when(tokenProvider.isDshDelegationToken("legacy-token")).thenReturn(false);
+        when(tokenProvider.hasAiDelegationScope("legacy-token", "pms:project:read")).thenReturn(true);
+
+        Boolean allowed = ReflectionTestUtils.invokeMethod(
+                interceptor, "allowedAiDelegationRoute", request, "legacy-token");
+
+        assertThat(allowed).isFalse();
     }
 
     private MockHttpServletResponse invoke(String methodName, String authorization) throws Exception {

@@ -138,6 +138,25 @@ class WorkflowTemplateDefinitionValidatorTest {
     }
 
     @Test
+    void templateJsonRoundTripsExplicitFieldWidth() throws Exception {
+        String json = """
+                {"schemaVersion":2,"nodes":[{"key":"intake","name":"立项","description":"",
+                "deliverable":"","roles":"","fields":[{"key":"summary","label":"摘要",
+                "type":"TEXTAREA","required":false,"options":[],"fullWidth":false}],
+                "contentOrder":["fields"]}]}
+                """;
+        ObjectMapper mapper = new ObjectMapper();
+
+        WorkflowTemplateDefinition definition = mapper.readValue(json, WorkflowTemplateDefinition.class);
+        WorkflowTemplateDefinition roundTripped = mapper.readValue(mapper.writeValueAsString(definition),
+                WorkflowTemplateDefinition.class);
+
+        assertThat(mapper.readTree(mapper.writeValueAsString(roundTripped))
+                .at("/nodes/0/fields/0/fullWidth").asBoolean()).isFalse();
+        assertThat(WorkflowTemplateDefinitionValidator.validate(roundTripped)).isEqualTo(roundTripped);
+    }
+
+    @Test
     void rejectsV1BindingAndVisibilityMetadata() {
         WorkflowTemplateDefinition withBinding = new WorkflowTemplateDefinition(1,
                 List.of(node("intake", List.of(v2Field("title", "标题", WorkflowFieldType.TEXT,

@@ -106,6 +106,7 @@ MySQL 8 `pms`（3306）
 - 项目、任务、里程碑、成员、评论、附件和通知
 - Excel/CSV 预览、校验、幂等提交、错误报告和事务回滚
 - 审计日志、请求追踪、健康检查和 Prometheus 指标
+- 为 Work Helper 提供短时委托、按需 AI 上下文和只读任务查询桥接
 
 前端页面和操作说明见兄弟仓库 [`pms-front`](https://github.com/xiebinJava/pms-front) 以及 [使用手册](https://github.com/xiebinJava/pms-front/blob/main/docs/user-manual.md)。
 
@@ -190,6 +191,14 @@ PMS_SMOKE_USERNAME=alex.zhang@example.com PMS_SMOKE_PASSWORD='<本地测试密�
   ./scripts/smoke-test.sh
 ```
 
+### AI 按需查询边界
+
+PMS 页面只向 Work Helper 提供页面类型、路由、项目/节点 ID 和筛选条件等轻量定位信息，
+不把列表行、成员、节点或任务集合自动塞进每轮对话。Work Helper 通过已注册的
+`pms.task.query` 和 `pms.context.inspect` 工具按需读取；PMS 通过短时委托令牌恢复当前用户，
+再次执行项目数据范围校验后返回带 `authoritative`、`dataScope`、`asOfDate` 和分页元数据的结果。
+Work Helper 不接触 PMS 数据库，也不能执行任意 Shell。写操作仍只生成预览并等待用户确认。
+
 不要把密码、JWT、SMTP、对象存储密钥或导入文件放进仓库。提交前可执行隐私扫描：
 
 ```bash
@@ -228,6 +237,7 @@ docs/
 | `POST` | `/api/auth/login` | 邮箱登录 |
 | `GET` | `/api/auth/me` | 当前登录用户 |
 | `GET` | `/api/workbench` | 我的任务、项目和动态 |
+| `POST` | `/api/ai/query/tasks` | 在当前用户数据范围内按需查询任务（AI 委托 scope） |
 | `POST` | `/api/projects/page` | 项目分页 |
 | `GET` | `/api/projects/{id}` | 项目详情 |
 | `GET` | `/api/org/tree` | 项目页可用的组织树 |

@@ -80,7 +80,7 @@ class WorkflowTemplateServiceDraftConcurrencyTest {
         template.setId(7L);
         template.setProjectTypeId(2L);
         template.setLatestVersionNo(3);
-        when(templateMapper.selectById(7L)).thenReturn(template);
+        when(templateMapper.selectActiveByIdForUpdate(7L)).thenReturn(template);
         when(templateMapper.updateById(any(WorkflowTemplateDO.class))).thenReturn(1);
         when(versionMapper.selectOne(any())).thenReturn(null);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
@@ -100,7 +100,7 @@ class WorkflowTemplateServiceDraftConcurrencyTest {
         template.setId(7L);
         template.setProjectTypeId(2L);
         template.setLatestVersionNo(3);
-        when(templateMapper.selectById(7L)).thenReturn(template);
+        when(templateMapper.selectActiveByIdForUpdate(7L)).thenReturn(template);
         when(templateMapper.updateById(any(WorkflowTemplateDO.class))).thenReturn(1);
         when(versionMapper.selectOne(any())).thenReturn(null);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
@@ -132,7 +132,7 @@ class WorkflowTemplateServiceDraftConcurrencyTest {
         template.setId(7L);
         template.setProjectTypeId(2L);
         template.setLatestVersionNo(3);
-        when(templateMapper.selectById(7L)).thenReturn(template);
+        when(templateMapper.selectActiveByIdForUpdate(7L)).thenReturn(template);
 
         WorkflowTemplateVersionDO draft = new WorkflowTemplateVersionDO();
         draft.setId(13L);

@@ -82,15 +82,20 @@ class WorkflowTemplateServiceSelectionTest {
         WorkflowTemplateVersionDO draft = version(23L, 8L, "DRAFT");
         draft.setVersionNo(3);
         draft.setVersion(7);
+        WorkflowTemplateVersionDO archived = version(20L, 8L, "ARCHIVED");
+        archived.setVersionNo(4);
         when(templateMapper.selectList(any())).thenReturn(java.util.List.of(template));
         when(projectTypeMapper.selectList(isNull())).thenReturn(java.util.List.of(type));
-        when(versionMapper.selectList(any())).thenReturn(java.util.List.of(draft, latest, first));
+        when(versionMapper.selectList(any())).thenReturn(java.util.List.of(archived, draft, latest, first));
 
         var summary = service.listTemplates(3L, true).get(0);
 
         assertThat(summary.getPublishedVersionId()).isEqualTo(22L);
         assertThat(summary.getPublishedVersions()).extracting(version -> version.getId())
                 .containsExactly(21L, 22L);
+        assertThat(summary.getVersions()).extracting(version -> version.getStatus())
+                .containsExactly("PUBLISHED", "PUBLISHED", "DRAFT", "ARCHIVED");
+        assertThat(summary.getVersions().get(0).getIsDefault()).isTrue();
         assertThat(summary.getDefaultTemplateVersionId()).isEqualTo(21L);
         assertThat(summary.getDefaultTemplate()).isTrue();
         assertThat(summary.getDraftRevision()).isEqualTo(7);

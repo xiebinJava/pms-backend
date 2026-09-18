@@ -6,4 +6,6 @@ import lombok.Data;
 public class WorkflowTemplateVersionSummaryDTO {
     private Long id;
     private Integer versionNo;
+    private String status;
+    private Boolean isDefault;
 }
