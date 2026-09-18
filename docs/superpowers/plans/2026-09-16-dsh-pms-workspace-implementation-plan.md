@@ -4,7 +4,7 @@
 
 关联设计：[2026-09-16-dsh-pms-workspace-design.md](../specs/2026-09-16-dsh-pms-workspace-design.md)
 
-状态：进行中（Phase 0 与 Phase 1 只读闭环已完成，工作区联动与写操作待继续）
+状态：进行中（Phase 0/1 只读闭环、查询能力，以及任务、节点和项目管理确认式写操作已完成；其余 PMS 管理能力继续按同一协议补充）
 
 ## 1. 实施目标
 
@@ -76,6 +76,7 @@ src/main/java/com/brad/pms/integration/dsh/api/
 4. 新增 DSH 服务端到 PMS 的 Token exchange，要求服务凭证和用户会话断言；浏览器不能直接调用该接口。
 5. 最小权限 scope 固定为：
    - `pms:project:read`
+   - `pms:project:write`
    - `pms:task:read`
    - `pms:command:preview`
    - `pms:command:execute`
@@ -233,13 +234,14 @@ DSH 客户端新增独立 UI 包：
 - 右侧抽屉默认 560px，可拖拽到 360px–720px。
 - 收起、恢复、最大化、新页面打开。
 - 项目切换时更新 PMS 路由和 DSH context tags。
-- 摘要 / 真实 PMS 页面切换。
+- 真实 PMS 页面完整壳体（默认收起；打开后保留 PMS 顶栏、左侧导航和配置管理）。
+- 收起/关闭只隐藏 iframe，不清除当前会话的 PMS locator；新会话默认不绑定 PMS。
 - 加载、断线、无权限和降级状态。
 - 只允许配置的 `frame-ancestors` 来源嵌入。
 
 ### 7.2 iframe 和消息安全
 
-1. 生产环境使用 DSH 同源 `/pms-workspace/*` 路由。
+1. 第一版使用 allowlist 校验后的 PMS URL 直接 iframe；生产环境可切换到 DSH 同源 `/pms-workspace/*` 路由。
 2. PMS 不把长期 Token 放入 iframe URL、查询参数或 localStorage。
 3. 页面刷新和项目切换通过受控服务端会话恢复身份。
 4. DSH 与 iframe 的 `postMessage` 必须校验来源、会话、消息版本和项目上下文。
@@ -251,17 +253,21 @@ DSH 客户端新增独立 UI 包：
 - 项目 12 / 22 切换后真实页面同步。
 - DSH 刷新后会话和当前项目恢复。
 - iframe 未登录、Token 过期、403、CSP 拦截时有明确反馈。
-- 不出现重复 PMS 外层导航。
+- 默认不自动打开 PMS；打开后必须出现完整 PMS 外层导航。
 
 ## 8. Phase 2：确认式写操作
 
 ### 8.1 PMS 命令实现
 
-当前命令注册表已有 `task.create` 和 `task.assign`；先保持现有命令不变，再新增：
+当前命令注册表已有 `task.create` 和 `task.assign`；已按同一 preview/execute 协议补充：
 
-1. `CommandName.TASK_UPDATE`
-2. `TaskUpdateCommand`
-3. 对应参数校验、字段白名单和权限校验。
+1. `CommandName.TASK_UPDATE` / `TaskUpdateCommand`
+2. `CommandName.NODE_OWNER_UPDATE` / `NodeOwnerUpdateCommand`
+3. `CommandName.NODE_SCHEDULE_UPDATE` / `NodeScheduleUpdateCommand`
+4. `CommandName.PROJECT_CREATE` / `CreateProjectCommand`
+5. `CommandName.MEMBER_ADD`、`MEMBER_REMOVE`
+6. `CommandName.PROJECT_ARCHIVE`、`PROJECT_DELETE`
+7. 对应参数校验、项目/节点/成员版本校验和权限校验。
 
 `task.update` 第一版只允许修改明确字段，例如标题、描述、负责人、截止日期和状态；字段和状态流转必须由 PMS 规则校验。
 
@@ -396,6 +402,6 @@ pnpm lint
 - 右侧展示真实 PMS 页面，且不会暴露长期凭证。
 - 项目切换不会污染新消息的当前上下文。
 - 流式输出支持事件去重、取消和断线恢复。
-- task.create、task.assign、task.update 具备幂等和版本冲突保护。
+- task.create、task.assign、task.update、node.owner.update、node.schedule.update、project.create、member.add、member.remove、project.archive、project.delete 均通过统一 preview/execute 生命周期；涉及已有资源的命令具备版本冲突保护，删除和归档保留用户确认理由。
 - PMS、DSH 和 Work Helper 的日志可以通过 `requestId` 串联。
 - 旧 `/api/ai/*` 和原有 Work Helper 对话链路仍可回退。

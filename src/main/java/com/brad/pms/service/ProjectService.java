@@ -207,13 +207,18 @@ public class ProjectService {
 
     @Transactional
     public void delete(Long id) {
+        delete(id, "删除项目");
+    }
+
+    @Transactional
+    public void delete(Long id, String reason) {
         ProjectDO project = permissionService.requireProjectManageable(id, "删除项目");
         int fromStatus = ProjectStatus.normalize(project.getStatus());
         projectMapper.softDeleteProject(id, ProjectStatus.DELETED.getCode());
-        recordLifecycle(id, "DELETE", "删除项目", fromStatus, ProjectStatus.DELETED.getCode());
+        recordLifecycle(id, "DELETE", reason, fromStatus, ProjectStatus.DELETED.getCode());
         operationLogService.record(AuditEvent.success(
                 AuditAction.PROJECT_DELETED.name(), AuditResourceType.PROJECT.name(), id, id,
-                "删除项目", Map.of("status", fromStatus), Map.of("status", ProjectStatus.DELETED.getCode())));
+                reason, Map.of("status", fromStatus), Map.of("status", ProjectStatus.DELETED.getCode())));
     }
 
     @Transactional

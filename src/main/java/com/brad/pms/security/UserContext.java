@@ -3,6 +3,8 @@ package com.brad.pms.security;
 import com.brad.pms.common.enums.SystemRole;
 import com.brad.pms.common.exception.BusinessException;
 
+import java.util.List;
+
 /**
  * 当前登录用户上下文（ThreadLocal 用户上下文）
  */
@@ -51,6 +53,17 @@ public final class UserContext {
     public static boolean isAdministrator() {
         LoginUser user = HOLDER.get();
         return user != null && SystemRole.isAdministrator(user.getSystemRole());
+    }
+
+    public static boolean isDshDelegation() {
+        LoginUser user = HOLDER.get();
+        return user != null && user.getDelegationScopes() != null;
+    }
+
+    public static boolean hasDshScope(String scope) {
+        LoginUser user = HOLDER.get();
+        List<String> scopes = user == null ? null : user.getDelegationScopes();
+        return scopes != null && scopes.contains(scope);
     }
 
     public static void clear() {

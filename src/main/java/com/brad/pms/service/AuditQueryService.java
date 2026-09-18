@@ -90,6 +90,12 @@ public class AuditQueryService {
         dto.setReason(row.getReason());
         dto.setResult(row.getResult());
         dto.setRequestId(row.getRequestId());
+        dto.setDshSessionId(row.getDshSessionId());
+        dto.setDshAgentId(row.getDshAgentId());
+        dto.setDshAgentVersion(row.getDshAgentVersion());
+        dto.setDshWorkspace(row.getDshWorkspace());
+        dto.setDshTool(row.getDshTool());
+        dto.setDshOperationId(row.getDshOperationId());
         dto.setCreatedAt(row.getCreatedAt());
         return dto;
     }

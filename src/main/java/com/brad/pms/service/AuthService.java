@@ -15,9 +15,11 @@ import com.brad.pms.dto.response.LoginResponse;
 import com.brad.pms.dto.response.OidcStartDTO;
 import com.brad.pms.dto.response.UserDTO;
 import com.brad.pms.entity.AuthSessionDO;
+import com.brad.pms.entity.ExternalIdentityDO;
 import com.brad.pms.entity.LoginLogDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.AuthSessionMapper;
+import com.brad.pms.mapper.ExternalIdentityMapper;
 import com.brad.pms.mapper.LoginLogMapper;
 import com.brad.pms.mapper.UserMapper;
 import com.brad.pms.security.JwtTokenProvider;
@@ -27,6 +29,7 @@ import com.brad.pms.security.AuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +53,7 @@ public class AuthService {
     private final AuthProviderCatalog authProviderCatalog;
     private final OidcAuthProvider oidcAuthProvider;
     private final LdapAuthProvider ldapAuthProvider;
+    private final ExternalIdentityMapper externalIdentityMapper;
 
     @Value("${pms.auth.refresh-expire-days:30}")
     private long refreshExpireDays;
@@ -135,7 +139,7 @@ public class AuthService {
     }
 
     LoginResponse completeExternalLogin(AuthenticatedIdentity identity, String ip, String userAgent) {
-        UserDO user = userMapper.findByEmailNormalized(identity.emailNormalized());
+        UserDO user = resolveExternalUser(identity);
         if (user == null) {
             recordLoginAttempt(null, identity.loginName(), "FAILURE", "ACCOUNT_NOT_PROVISIONED", ip, userAgent);
             throw BusinessException.unauthorized("账号未开通，请联系管理员邀请");
@@ -156,6 +160,40 @@ public class AuthService {
         }
         return establishSession(user, identity.loginName(), identity.providerType().toUpperCase() + "_LOGIN_SUCCESS",
                 ip, userAgent, false);
+    }
+
+    /**
+     * OIDC subject is the stable identity. Email is used only once to link an
+     * already provisioned PMS account; subsequent logins never re-bind by email.
+     */
+    private UserDO resolveExternalUser(AuthenticatedIdentity identity) {
+        boolean hasExternalIdentity = identity.externalIssuer() != null && !identity.externalIssuer().isBlank()
+                && identity.externalSubject() != null && !identity.externalSubject().isBlank();
+        if (hasExternalIdentity) {
+            ExternalIdentityDO binding = externalIdentityMapper.findByIssuerAndSubject(
+                    identity.externalIssuer(), identity.externalSubject());
+            if (binding != null) {
+                return userMapper.selectById(binding.getUserId());
+            }
+        }
+        if (identity.emailNormalized() == null || identity.emailNormalized().isBlank()) {
+            return null;
+        }
+        UserDO user = userMapper.findByEmailNormalized(identity.emailNormalized());
+        if (user != null && hasExternalIdentity) {
+            ExternalIdentityDO binding = new ExternalIdentityDO();
+            binding.setIssuer(identity.externalIssuer());
+            binding.setSubject(identity.externalSubject());
+            binding.setUserId(user.getId());
+            binding.setEmailSnapshot(identity.emailNormalized());
+            binding.setProviderType(identity.providerType());
+            try {
+                externalIdentityMapper.insert(binding);
+            } catch (DuplicateKeyException ignored) {
+                // Another concurrent first login won the unique issuer+subject bind.
+            }
+        }
+        return user;
     }
 
     private UserDO lookupLocalUser(boolean emailLogin, String rawIdentifier) {
@@ -214,20 +252,15 @@ public class AuthService {
         if (user == null || !UserStatus.ACTIVE.name().equals(user.getStatus())) {
             throw BusinessException.unauthorized("账号不可用");
         }
-        LocalDateTime now = LocalDateTime.now();
-        if (authSessionMapper.revokeForRotation(session.getId(), user.getId(), oldHash, "REFRESH_ROTATED") != 1) {
+        String rotatedRefreshToken = randomToken();
+        String nextIp = ip == null ? session.getIp() : ip;
+        String nextUserAgent = userAgent == null ? session.getUserAgent() : truncate(userAgent, 500);
+        if (authSessionMapper.rotateRefreshToken(session.getId(), user.getId(), oldHash,
+                sha256(rotatedRefreshToken), nextIp, nextUserAgent) != 1) {
             throw BusinessException.unauthorized("刷新令牌已失效");
         }
-        String rotatedRefreshToken = randomToken();
-        AuthSessionDO rotated = new AuthSessionDO();
-        rotated.setUserId(user.getId());
-        rotated.setRefreshTokenHash(sha256(rotatedRefreshToken));
-        rotated.setExpiresAt(now.plusDays(refreshExpireDays));
-        rotated.setIp(ip == null ? session.getIp() : ip);
-        rotated.setUserAgent(userAgent == null ? session.getUserAgent() : truncate(userAgent, 500));
-        authSessionMapper.insert(rotated);
         LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname(), user.getSystemRole(),
-                user.getNameZh(), Convertors.userDisplayName(user), rotated.getId());
+                user.getNameZh(), Convertors.userDisplayName(user), session.getId());
         UserDTO dto = Convertors.toUser(user);
         dto.setPermissionCodes(authorizationService.effectivePermissionCodes(user.getId()));
         return new LoginResponse(tokenProvider.createToken(loginUser), rotatedRefreshToken, dto);

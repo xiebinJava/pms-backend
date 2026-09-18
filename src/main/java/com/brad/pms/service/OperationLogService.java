@@ -38,6 +38,12 @@ public class OperationLogService {
         log.setRequestId(MDC.get("requestId"));
         log.setIp(requestValue(request -> request.getRemoteAddr(), 64));
         log.setUserAgent(requestValue(request -> request.getHeader("User-Agent"), 500));
+        log.setDshSessionId(requestValue(request -> request.getHeader("X-DSH-Session-Id"), 128));
+        log.setDshAgentId(requestValue(request -> request.getHeader("X-DSH-Agent-Id"), 100));
+        log.setDshAgentVersion(requestValue(request -> request.getHeader("X-DSH-Agent-Version"), 200));
+        log.setDshWorkspace(requestValue(request -> request.getHeader("X-DSH-Workspace"), 80));
+        log.setDshTool(requestValue(request -> request.getHeader("X-DSH-Tool"), 100));
+        log.setDshOperationId(requestValue(request -> request.getHeader("X-DSH-Operation-Id"), 128));
         log.setBeforeJson(auditSanitizer.sanitize(event.before()));
         log.setAfterJson(auditSanitizer.sanitize(event.after()));
         operationLogMapper.insert(log);

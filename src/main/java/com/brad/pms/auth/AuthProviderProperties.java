@@ -23,6 +23,7 @@ public class AuthProviderProperties {
         private String authorizationUri = "";
         private String tokenUri = "";
         private String userinfoUri = "";
+        private String jwksUri = "";
         private String clientId = "";
         private String clientSecret = "";
         private String redirectUri = "http://localhost:5173/login/oidc/callback";

@@ -75,4 +75,34 @@ class OperationLogServiceTest {
         assertThat(persisted.getUserAgent()).isEqualTo("qa-browser");
         assertThat(persisted.getBeforeJson()).doesNotContain("secret-value").contains("REDACTED");
     }
+
+    @Test
+    void capturesDshAgentMetadataForIntegrationAudit() {
+        OperationLogMapper mapper = mock(OperationLogMapper.class);
+        OperationLogService service = new OperationLogService(mapper, new com.brad.pms.audit.AuditSanitizer());
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-DSH-Session-Id", "dsh-session-1");
+        request.addHeader("X-DSH-Agent-Id", "project_assistant");
+        request.addHeader("X-DSH-Agent-Version", "sha256:v1");
+        request.addHeader("X-DSH-Workspace", "pms");
+        request.addHeader("X-DSH-Tool", "pms_command_execute");
+        request.addHeader("X-DSH-Operation-Id", "op-1");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        try {
+            service.record(AuditEvent.success("PROJECT_CREATED", "PROJECT", 7L, 7L,
+                    null, null, Map.of("name", "DSH 测试项目")));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+
+        var captor = org.mockito.ArgumentCaptor.forClass(OperationLogDO.class);
+        verify(mapper).insert(captor.capture());
+        OperationLogDO persisted = captor.getValue();
+        assertThat(persisted.getDshSessionId()).isEqualTo("dsh-session-1");
+        assertThat(persisted.getDshAgentId()).isEqualTo("project_assistant");
+        assertThat(persisted.getDshAgentVersion()).isEqualTo("sha256:v1");
+        assertThat(persisted.getDshWorkspace()).isEqualTo("pms");
+        assertThat(persisted.getDshTool()).isEqualTo("pms_command_execute");
+        assertThat(persisted.getDshOperationId()).isEqualTo("op-1");
+    }
 }

@@ -435,6 +435,12 @@ CREATE TABLE IF NOT EXISTS sys_operation_log (
     request_id    VARCHAR(80),
     ip            VARCHAR(64),
     user_agent    VARCHAR(500),
+    dsh_session_id VARCHAR(128),
+    dsh_agent_id VARCHAR(100),
+    dsh_agent_version VARCHAR(200),
+    dsh_workspace VARCHAR(80),
+    dsh_tool VARCHAR(100),
+    dsh_operation_id VARCHAR(128),
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -443,3 +449,5 @@ CREATE INDEX idx_operation_log_project_created ON sys_operation_log (project_id,
 CREATE INDEX idx_operation_log_operator_created ON sys_operation_log (operator_id, created_at);
 CREATE INDEX idx_operation_log_action_created ON sys_operation_log (action, created_at);
 CREATE INDEX idx_operation_log_result_created ON sys_operation_log (result, created_at);
+CREATE INDEX idx_operation_log_dsh_session ON sys_operation_log (dsh_session_id, created_at);
+CREATE INDEX idx_operation_log_dsh_agent ON sys_operation_log (dsh_agent_id, created_at);

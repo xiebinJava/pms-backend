@@ -136,6 +136,17 @@ public class JwtTokenProvider {
         user.setId(Long.valueOf(claims.getSubject()));
         Number sessionId = claims.get("sid", Number.class);
         user.setSessionId(sessionId == null ? null : sessionId.longValue());
+        if ("AI_DELEGATION".equals(claims.get("kind", String.class))) {
+            Object rawScopes = claims.get("scope");
+            if (rawScopes instanceof java.util.List<?> scopes) {
+                user.setDelegationScopes(scopes.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .toList());
+            } else {
+                user.setDelegationScopes(java.util.List.of());
+            }
+        }
         return user;
     }
 }

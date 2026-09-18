@@ -16,7 +16,11 @@ public final class DshAgentScopePolicy {
 
     public static final String PROJECT_ASSISTANT = "project_assistant";
     public static final List<String> PROJECT_ASSISTANT_SCOPES = List.of(
-            "pms:project:read", "pms:task:read", "pms:workspace:embed");
+            "pms:project:read", "pms:task:read", "pms:query:read",
+            "pms:task:write", "pms:command:preview", "pms:command:execute",
+            "pms:workflow:write",
+            "pms:project:write",
+            "pms:workspace:embed");
 
     private final Map<String, Set<String>> allowedScopes = new LinkedHashMap<>();
 

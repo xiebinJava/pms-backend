@@ -18,7 +18,12 @@ class DshAgentScopePolicyTest {
                 "pms:task:read", "pms:project:read", "pms:task:read")))
                 .containsExactly("pms:project:read", "pms:task:read");
         assertThat(policy.resolve("project_assistant", List.of()))
-                .containsExactly("pms:project:read", "pms:task:read", "pms:workspace:embed");
+                .containsExactly(
+                        "pms:project:read", "pms:task:read", "pms:query:read",
+                        "pms:task:write", "pms:command:preview", "pms:command:execute",
+                        "pms:workflow:write",
+                        "pms:project:write",
+                        "pms:workspace:embed");
     }
 
     @Test
@@ -26,7 +31,7 @@ class DshAgentScopePolicyTest {
         assertThatThrownBy(() -> policy.resolve("unknown_agent", List.of()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Agent");
-        assertThatThrownBy(() -> policy.resolve("project_assistant", List.of("pms:project:write")))
+        assertThatThrownBy(() -> policy.resolve("project_assistant", List.of("pms:admin:write")))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("权限");
     }

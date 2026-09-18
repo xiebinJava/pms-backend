@@ -64,4 +64,18 @@ class GlobalExceptionHandlerTest {
         assertThat(unknown.getStatusCodeValue()).isEqualTo(500);
         assertThat(Objects.requireNonNull(unknown.getBody()).getMsg()).doesNotContain("secret sql");
     }
+
+    @Test
+    void includesRequestIdInUnknownErrorWithoutLeakingExceptionDetails() {
+        org.slf4j.MDC.put("requestId", "req-500");
+
+        ResponseEntity<ResponseResult<Void>> response = handler.handleException(
+                new RuntimeException("secret sql"));
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(500);
+        assertThat(Objects.requireNonNull(response.getBody()).getMsg())
+                .isEqualTo("系统繁忙，请稍后重试（请求编号：req-500）");
+        assertThat(response.getBody().getRequestId()).isEqualTo("req-500");
+        assertThat(response.getBody().getMsg()).doesNotContain("secret sql");
+    }
 }

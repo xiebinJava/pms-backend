@@ -3,6 +3,7 @@ package com.brad.pms.ai.command;
 import com.brad.pms.common.exception.BusinessException;
 
 import java.time.LocalDate;
+import java.util.Set;
 import java.util.Map;
 
 public final class CommandArgumentReader {
@@ -51,6 +52,13 @@ public final class CommandArgumentReader {
         } catch (RuntimeException e) {
             throw BusinessException.error("参数 " + key + " 必须是 yyyy-MM-dd 日期");
         }
+    }
+
+    public static void rejectUnknown(Map<String, Object> arguments, Set<String> allowed, String command) {
+        arguments.keySet().stream()
+                .filter(key -> !allowed.contains(key))
+                .findFirst()
+                .ifPresent(key -> { throw BusinessException.error("不支持的 " + command + " 参数: " + key); });
     }
 
     private static Long longValue(Object raw) {

@@ -20,5 +20,11 @@ public class AuditLogDTO {
     private String reason;
     private String result;
     private String requestId;
+    private String dshSessionId;
+    private String dshAgentId;
+    private String dshAgentVersion;
+    private String dshWorkspace;
+    private String dshTool;
+    private String dshOperationId;
     private LocalDateTime createdAt;
 }

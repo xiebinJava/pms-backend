@@ -1,0 +1,90 @@
+<title>DSH × PMS 多 Agent 协同与智能体广场方案（方案评审版）</title>
+<callout emoji="💡" background-color="light-blue" border-color="blue">
+<p><b>文档定位：</b>这是“DSH 作为 AI 主工作区、PMS 作为业务系统工作区”的多 Agent 协同方案，当前用于产品与技术评审，先产出信息架构、协议、权限和静态原型，不直接修改 PMS/DSH 生产代码。</p>
+</callout>
+<h1>1. 背景</h1>
+<p>当前 DSH 已经可以承载自然语言对话，并通过 PMS 能力查询或操作项目数据。随着需求扩大，单个 PMS 项目助手需要同时处理项目查询、需求拆解、开发执行、测试验证、风险识别和人工升级，继续把所有规则堆在一个 Agent 中会导致提示词膨胀、工具边界混乱、错误难以定位，也不利于复用团队能力。</p>
+<p>本方案把 PMS 项目助手定位为“编排 Agent”，把产品经理、开发、测试、风险分析等角色沉淀为可独立配置的 Agent，并通过 DSH 的“智能体广场”按项目挑选和组装。PMS 仍然是业务数据和权限的真实来源，DSH 负责对话、编排、过程展示与人工决策入口。</p>
+<h1>2. 目标与非目标</h1>
+<table><thead><tr><th background-color="light-blue">目标</th><th background-color="light-blue">说明</th></tr></thead><tbody><tr><td>自然语言驱动</td><td>用户用自然语言描述目标，PMS 项目助手识别意图、拆解任务并调用合适的 Agent。</td></tr><tr><td>角色可组合</td><td>每个 Agent 有独立的 SOUL、AGENTS、Skill、插件/MCP、权限和输出格式，可被多个项目复用。</td></tr><tr><td>项目级编排</td><td>项目可以从智能体广场选择成员，形成自己的 Agent 团队，并定义分派、汇报和人工接管策略。</td></tr><tr><td>可追踪可审计</td><td>每次派发、工具调用、结果回传、人工确认和失败重试都可回放。</td></tr><tr><td>权限不越权</td><td>Agent 只继承当前用户在 PMS 的权限；提示词不能扩大权限，高风险写操作必须预览/确认。</td></tr></tbody></table>
+<p><b>非目标：</b>第一版不做开放式“任意 Agent 自主组队”、不允许 Agent 直接访问 PMS 数据库、不用提示词代替后端鉴权、不把外部市场 Agent 默认授予写权限。</p>
+<h1>3. 核心概念与职责边界</h1>
+<table><thead><tr><th background-color="light-gray">对象</th><th background-color="light-gray">职责</th><th background-color="light-gray">不负责</th></tr></thead><tbody><tr><td>DSH 工作台</td><td>承载对话、Agent 选择、运行过程、人工决策和业务工作区入口。</td><td>不直接实现 PMS 业务规则。</td></tr><tr><td>PMS 项目助手 Agent</td><td>理解项目目标、选择角色、拆解任务、汇总结果、请求人工决策。</td><td>不亲自包办所有专业工作。</td></tr><tr><td>专业 Agent</td><td>在自己的提示词和能力范围内完成产品、开发、测试、风险等子任务。</td><td>不绕过编排者直接修改其他 Agent 或扩大权限。</td></tr><tr><td>PMS 插件/能力目录</td><td>提供标准化查询、预览、执行、成员解析、节点管理等能力。</td><td>不保存 Agent 的人格与流程提示词。</td></tr><tr><td>PMS 系统</td><td>保存项目、任务、成员、权限和审计结果，是业务事实来源。</td><td>不承担 DSH 的对话编排 UI。</td></tr></tbody></table>
+<h1>4. 产品结构</h1>
+<p>DSH 采用“对话区 + 可展开业务工作区”的主布局。默认只显示 AI 对话；用户打开 PMS 后，右侧显示真实 PMS 页面或业务视图，会话自动挂上 PMS 工作区标签。Agent 的选择位于对话输入区下方：默认使用 PMS 项目助手，用户可以切换到当前项目已授权的其他 Agent。</p>
+<whiteboard type="mermaid">flowchart LR
+U[用户自然语言] --> D[DSH AI 对话区]
+D --> O[PMS 项目助手<br/>编排 Agent]
+O --> R[项目 Agent 团队]
+R --> P[产品 Agent]
+R --> C[开发 Agent]
+R --> T[测试 Agent]
+O --> K[能力目录]
+K --> X[PMS 插件]
+X --> API[PMS API / 领域服务]
+API --> DB[(PMS 数据库)]
+P --> O
+C --> O
+T --> O
+O --> H{需要人工决策?}
+H -- 否 --> D
+H -- 是 --> M[人工确认/裁决]
+M --> O</whiteboard>
+<h1>5. 页面与交互方案</h1>
+<h2>5.1 智能体广场</h2>
+<p>参考 <code>gpt-claw-frontend/src/pages/AgentHubPage</code> 的现有结构：页面采用“搜索 + 分类/可见范围筛选 + 卡片列表 + 详情/编辑抽屉”的交互。市场既可以展示系统预设，也可以展示部门共享、公开和个人智能体。</p>
+<table><thead><tr><th background-color="light-blue">区域</th><th background-color="light-blue">内容</th><th background-color="light-blue">关键动作</th></tr></thead><tbody><tr><td>页面头部</td><td>发现并使用智能体、说明文案、创建智能体。</td><td>创建、刷新、进入配置。</td></tr><tr><td>筛选栏</td><td>名称/介绍/标签搜索；智能体分类；可见范围。</td><td>快速找到产品、开发、测试等角色。</td></tr><tr><td>Agent 卡片</td><td>头像、名称、默认/系统/公开标签、介绍、适用场景、Skill 数量。</td><td>查看详情、开始对话、加入项目、克隆、编辑、删除。</td></tr><tr><td>详情/编辑</td><td>SOUL（是谁）、AGENTS（怎么干）、关联能力、可见性、权限级别。</td><td>保存草稿、发布版本、回滚版本。</td></tr></tbody></table>
+<h2>5.2 PMS 项目团队</h2>
+<p>从项目助手进入“项目团队”后，展示当前项目已绑定的 Agent。PMS 项目助手固定为编排者，其余角色作为可替换的执行成员。用户可以从广场添加 Agent、调整顺序、停用成员或打开单个 Agent 配置。</p>
+<ul><li>团队成员：Agent 名称、角色标签、状态、已绑定能力数量、最近一次汇报。</li><li>协同策略：自动路由、串行/并行分派、失败重试次数、人工介入条件。</li><li>项目边界：当前项目、当前节点、当前用户身份、PMS 权限范围。</li></ul>
+<h2>5.3 协同运行看板</h2>
+<p>运行看板展示任务图、Agent 状态、事件时间线、上下文和汇报链。用户能看到“谁在做什么、做到了哪一步、下一步是什么、为什么暂停”，而不是只看到最终一段回答。</p>
+<ul><li>任务图：已完成、执行中、等待中、失败、需要人工决策。</li><li>事件时间线：派发、工具调用、结果、重试、人工确认和升级。</li><li>人工接管：对节点负责人、删除、归档、批量修改等高风险动作提供确认按钮。</li></ul>
+<h2>5.4 Agent 配置中心</h2>
+<p>每个 Agent 使用两段式提示词。<b>SOUL · 是谁</b>描述身份、人格、语气、价值观和立场；<b>AGENTS · 怎么干</b>描述工作流、约束、输出格式、工具调用规范和失败升级规则。Skill、插件和 MCP 通过能力选择器绑定，不直接把所有能力说明塞进一段长提示词。</p>
+<table><thead><tr><th background-color="light-gray">配置项</th><th background-color="light-gray">第一版规则</th></tr></thead><tbody><tr><td>SOUL</td><td>必填；只描述“是谁”和判断立场。</td></tr><tr><td>AGENTS</td><td>必填；描述“怎么干”、步骤、输出和升级条件。</td></tr><tr><td>能力绑定</td><td>插件、Skill、MCP 分组选择；按权限过滤候选项。</td></tr><tr><td>权限</td><td>只读查询、建议模式、可执行写入三档，最终受 PMS 后端鉴权约束。</td></tr><tr><td>发布</td><td>草稿不会影响正在运行的会话；发布后新请求使用新版本，运行中的请求保持版本快照。</td></tr></tbody></table>
+<h1>6. Agent 定义与运行时拼装</h1>
+<p>Agent 的运行时配置由“身份 + 工作规则 + 上下文 + 能力 + 权限 + 输出协议”拼装，不把配置散落在前端代码和系统提示词里。</p>
+<pre lang="json" caption="Agent 配置示例"><code>{
+  "agentId": "pms-product-manager",
+  "name": "产品经理 Agent",
+  "version": 3,
+  "soul": "你是面向 PMS 项目的产品经理……",
+  "agents": "先确认目标，再拆解里程碑和验收标准……",
+  "capabilities": ["pms.context.inspect", "pms.requirement.breakdown"],
+  "permissionMode": "proposal",
+  "outputContract": "markdown.report.v1",
+  "visibility": "team"
+}</code></pre>
+<p><b>上下文顺序：</b>系统安全规则 → 当前用户身份与 PMS 权限 → 当前项目/会话标签 → Agent SOUL → Agent AGENTS → 能力说明 → 本轮用户请求。上下文中明确区分“事实数据”和“用户要求”，避免把页面文本当成系统指令。</p>
+<h1>7. PMS 通讯与通用协议</h1>
+<h2>7.1 PMS 插件</h2>
+<p>PMS 以 DSH 插件接入，不让 DSH 直接连接 PMS 数据库。插件向 DSH 暴露能力清单、查询接口、命令预览/执行接口、错误码和字段中文化映射。每个 PMS 新功能只需补充领域能力实现并注册 manifest，不需要改 DSH 的核心编排器。</p>
+<h2>7.2 能力目录</h2>
+<table><thead><tr><th background-color="light-blue">能力类型</th><th background-color="light-blue">示例</th><th background-color="light-blue">默认风险</th></tr></thead><tbody><tr><td>查询</td><td><code>pms.project.list</code>、<code>pms.person.list</code>、<code>pms.task.list</code></td><td>低</td></tr><tr><td>预览</td><td><code>pms.project.create.preview</code>、<code>pms.task.assign.preview</code></td><td>中</td></tr><tr><td>执行</td><td><code>pms.project.create.execute</code>、<code>pms.project.archive.execute</code></td><td>高</td></tr><tr><td>上下文</td><td><code>pms.context.current</code>、<code>pms.project.snapshot</code></td><td>低</td></tr></tbody></table>
+<h2>7.3 请求与汇报</h2>
+<p>所有能力调用统一携带 <code>requestId</code>、<code>userId</code>、<code>workspaceId</code>、<code>projectId</code>、<code>agentId</code>、<code>agentVersion</code> 和 <code>permissionSnapshot</code>。写操作采用“预览 → 用户确认 → 执行 → 刷新/回读”的闭环；查询必须标记数据时间和来源。</p>
+<pre lang="json" caption="能力调用最小协议"><code>{
+  "requestId": "req_01",
+  "capability": "pms.project.create",
+  "mode": "preview",
+  "input": {"name": "DSH 命令测试项目", "startDate": "2026-09-18", "endDate": "2026-09-30"},
+  "scope": {"projectId": null, "userId": "current-user"}
+}</code></pre>
+<h1>8. 多 Agent 编排流程</h1>
+<ol><li seq="auto">用户在 DSH 对话区提出目标，PMS 项目助手读取会话标签和当前 PMS 工作区。</li><li seq="auto">编排 Agent 将目标拆成子任务，给每个子任务选择角色、能力、输入和完成标准。</li><li seq="auto">专业 Agent 在隔离的任务上下文中执行，只能调用已绑定且被当前用户授权的能力。</li><li seq="auto">专业 Agent 按统一汇报协议返回结果、证据、风险、阻塞和建议下一步。</li><li seq="auto">编排 Agent 汇总结果；如果需要高风险写操作或发生阻塞，创建人工决策点。</li><li seq="auto">人工确认后继续执行，最终回读 PMS 数据并向用户输出可核验的结果。</li></ol>
+<h1>9. 数据模型与存储建议</h1>
+<table><thead><tr><th background-color="light-gray">数据</th><th background-color="light-gray">建议存储位置</th><th background-color="light-gray">说明</th></tr></thead><tbody><tr><td>Agent 基础信息、SOUL、AGENTS、版本</td><td>DSH Agent Registry</td><td>支持草稿、发布、版本快照和回滚。</td></tr><tr><td>Skill/插件/MCP manifest</td><td>DSH 能力目录</td><td>包含输入输出 schema、权限、风险等级、版本和来源。</td></tr><tr><td>项目 Agent 团队绑定</td><td>DSH 项目协同表</td><td>只保存 Agent ID、版本策略、角色和编排规则。</td></tr><tr><td>项目、任务、人员、权限</td><td>PMS 数据库</td><td>PMS 是业务数据唯一事实源，DSH 通过插件访问。</td></tr><tr><td>调用日志、审计、运行事件</td><td>DSH Audit/Run Store</td><td>保存请求、结果摘要、操作人、授权快照和关联项目。</td></tr></tbody></table>
+<h1>10. 安全、权限与失败处理</h1>
+<ul><li><b>同一身份：</b>DSH 只代表当前 SSO 用户向 PMS 发起请求，Agent 不拥有独立超越用户的权限。</li><li><b>后端强校验：</b>能力目录和提示词只是路由与约束，PMS 后端仍需校验用户、角色、数据范围和操作权限。</li><li><b>敏感写入：</b>删除、归档、批量变更、人员调整等必须给出中文预览、影响范围和确认入口。</li><li><b>防止幻觉：</b>回答必须引用本轮工具返回的数据；查不到、过期或失败时明确说“未读取到”，不得使用历史快照冒充当前结果。</li><li><b>失败闭环：</b>区分鉴权失败、能力不存在、参数错误、业务校验失败、超时和下游不可用，并给出重试/人工处理建议。</li></ul>
+<h1>11. 分阶段实施计划</h1>
+<table><thead><tr><th background-color="light-blue">阶段</th><th background-color="light-blue">交付内容</th><th background-color="light-blue">完成标准</th></tr></thead><tbody><tr><td>0. 协议冻结</td><td>Agent、能力 manifest、任务派发、汇报和错误码协议。</td><td>有 JSON schema、示例和版本策略。</td></tr><tr><td>1. 能力目录</td><td>PMS 插件、查询能力、预览/执行闭环、中文字段映射。</td><td>查询与写入各完成一条端到端链路。</td></tr><tr><td>2. 智能体广场</td><td>列表、搜索、筛选、详情、创建/编辑、SOUL/AGENTS、能力绑定。</td><td>可创建并发布一个专业 Agent。</td></tr><tr><td>3. 项目团队</td><td>按项目添加 Agent、角色、策略、权限和版本快照。</td><td>对话能将任务路由到指定角色。</td></tr><tr><td>4. 协同运行</td><td>任务图、事件流、汇报链、人工接管、断点恢复。</td><td>产品→开发→测试的闭环可追踪。</td></tr><tr><td>5. 市场治理</td><td>发布审核、来源可信度、评分、克隆、停用、回滚。</td><td>外部 Agent 不能默认获得 PMS 写权限。</td></tr></tbody></table>
+<h1>12. 验收场景</h1>
+<ol><li seq="auto">在智能体广场搜索并加入“产品经理 Agent”，配置 SOUL、AGENTS 和 PMS 读取 Skill。</li><li seq="auto">在项目团队中同时绑定产品、开发、测试 Agent，确认 PMS 项目助手为唯一编排者。</li><li seq="auto">用户说“完成当前节点的方案评审”，系统展示拆解过程和每个 Agent 的汇报。</li><li seq="auto">用户说“创建一个项目”，系统先输出中文预览，用户确认后执行，执行后回读新项目。</li><li seq="auto">模拟 PMS 授权过期、参数错误和 Agent 阻塞，系统不编造结果，并能进入重试或人工决策。</li></ol>
+<h1>13. 参考项目与原型说明</h1>
+<p><b>fs-claw-new：</b>借鉴 AgentScope 的 Agent Team、Hub/MCP Hub/Skill Hub、权限边界和可扩展插件思路；它适合作为运行时编排与能力发现的参考，不直接复制 PMS 业务模型。</p>
+<p><b>gpt-claw-frontend：</b>重点参考 AgentHubPage 的卡片市场、搜索/筛选、详情/编辑抽屉，以及配置页中“SOUL · 是谁”和“AGENTS · 怎么干”的分离方式。</p>
+<p>本方案已生成静态 Demo：<code>/Users/fs/Desktop/Project/pms-backend/docs/agent-orchestration-demo/index.html</code>，本地运行后可在四个视图之间切换：智能体广场、PMS 项目团队、协同运行、能力与配置。</p>
+<h1>14. 静态 Demo 截图</h1>
+<p>下方依次为智能体广场、PMS 项目团队、协同运行看板和 Agent 配置中心。截图用于说明信息架构与关键交互，不代表最终视觉稿或生产页面。</p>
+<hr/>

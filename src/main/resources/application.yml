@@ -87,6 +87,7 @@ pms:
       authorization-uri: ${PMS_OIDC_AUTHORIZATION_URI:}
       token-uri: ${PMS_OIDC_TOKEN_URI:}
       userinfo-uri: ${PMS_OIDC_USERINFO_URI:}
+      jwks-uri: ${PMS_OIDC_JWKS_URI:}
       client-id: ${PMS_OIDC_CLIENT_ID:}
       client-secret: ${PMS_OIDC_CLIENT_SECRET:}
       redirect-uri: ${PMS_OIDC_REDIRECT_URI:http://localhost:5173/login/oidc/callback}

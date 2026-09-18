@@ -47,6 +47,18 @@ class MysqlRuntimeConfigurationTest {
     }
 
     @Test
+    void oidcDefaultsToThePmsFrontendCallbackPort() throws Exception {
+        List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
+                "application", new FileSystemResource("src/main/resources/application.yml"));
+        PropertySource<?> source = sources.get(0);
+
+        assertThat(source.getProperty("pms.auth.oidc.enabled"))
+                .isEqualTo("${PMS_OIDC_ENABLED:false}");
+        assertThat(source.getProperty("pms.auth.oidc.redirect-uri"))
+                .isEqualTo("${PMS_OIDC_REDIRECT_URI:http://localhost:5173/login/oidc/callback}");
+    }
+
+    @Test
     void composeUsesMysqlAndTheApplicationAccount() throws Exception {
         String compose = Files.readString(Path.of("docker-compose.example.yml"));
 

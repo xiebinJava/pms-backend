@@ -9,9 +9,11 @@ import com.brad.pms.dto.response.LoginResponse;
 import com.brad.pms.entity.AuthSessionDO;
 import com.brad.pms.entity.LoginLogDO;
 import com.brad.pms.entity.UserDO;
+import com.brad.pms.entity.ExternalIdentityDO;
 import com.brad.pms.mapper.AuthSessionMapper;
 import com.brad.pms.mapper.LoginLogMapper;
 import com.brad.pms.mapper.UserMapper;
+import com.brad.pms.mapper.ExternalIdentityMapper;
 import com.brad.pms.security.JwtTokenProvider;
 import com.brad.pms.security.AuthorizationService;
 import com.brad.pms.security.LoginUser;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AuthServiceTest {
     @Mock UserMapper userMapper;
+    @Mock ExternalIdentityMapper externalIdentityMapper;
     @Mock AuthSessionMapper sessionMapper;
     @Mock LoginLogMapper loginLogMapper;
     @Mock JwtTokenProvider tokenProvider;
@@ -53,7 +56,7 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         authService = new AuthService(userMapper, sessionMapper, loginLogMapper, tokenProvider, authorizationService,
-                authProviderCatalog, oidcAuthProvider, ldapAuthProvider);
+                authProviderCatalog, oidcAuthProvider, ldapAuthProvider, externalIdentityMapper);
         when(authorizationService.effectivePermissionCodes(anyLong())).thenReturn(java.util.List.of("admin:user:read"));
         ReflectionTestUtils.setField(authService, "maxFailedLogins", 5);
         ReflectionTestUtils.setField(authService, "lockMinutes", 15L);
@@ -172,7 +175,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void refreshRotatesRefreshTokenAndPersistsNewSession() {
+    void refreshRotatesRefreshTokenWithoutReplacingTheLoginSession() {
         AuthSessionDO session = new AuthSessionDO();
         session.setId(99L);
         session.setUserId(7L);
@@ -181,22 +184,18 @@ class AuthServiceTest {
         session.setIp("10.0.0.1");
         session.setUserAgent("old-agent");
         when(sessionMapper.findByRefreshTokenHash(anyString())).thenReturn(session);
-        when(sessionMapper.revokeForRotation(eq(99L), eq(7L), anyString(), eq("REFRESH_ROTATED"))).thenReturn(1);
-        when(sessionMapper.insert(any(AuthSessionDO.class))).thenAnswer(invocation -> {
-            invocation.getArgument(0, AuthSessionDO.class).setId(100L);
-            return 1;
-        });
+        when(sessionMapper.rotateRefreshToken(eq(99L), eq(7L), eq(AuthService.sha256("refresh")),
+                anyString(), eq("10.0.0.2"), eq("new-agent"))).thenReturn(1);
         when(tokenProvider.createToken(any(LoginUser.class))).thenReturn("rotated-access");
 
         LoginResponse response = authService.refresh("refresh", "10.0.0.2", "new-agent");
 
         assertThat(response.getAccessToken()).isEqualTo("rotated-access");
         assertThat(response.getRefreshToken()).isNotEqualTo("refresh").isNotBlank();
-        verify(sessionMapper).revokeForRotation(eq(99L), eq(7L), eq(AuthService.sha256("refresh")), eq("REFRESH_ROTATED"));
-        verify(sessionMapper).insert(ArgumentMatchers.<AuthSessionDO>argThat(next -> next.getId().equals(100L)
-                && next.getUserId().equals(7L)
-                && "10.0.0.2".equals(next.getIp())
-                && "new-agent".equals(next.getUserAgent())));
+        verify(tokenProvider).createToken(ArgumentMatchers.argThat(loginUser -> loginUser.getSessionId().equals(99L)));
+        verify(sessionMapper).rotateRefreshToken(eq(99L), eq(7L), eq(AuthService.sha256("refresh")),
+                anyString(), eq("10.0.0.2"), eq("new-agent"));
+        verify(sessionMapper, never()).insert(any(AuthSessionDO.class));
     }
 
     @Test
@@ -235,6 +234,24 @@ class AuthServiceTest {
         assertThat(response.getAccessToken()).isEqualTo("access");
         verify(loginLogMapper).insert(ArgumentMatchers.<LoginLogDO>argThat(log ->
                 "SUCCESS".equals(log.getResult()) && "OIDC_LOGIN_SUCCESS".equals(log.getReason())));
+    }
+
+    @Test
+    void oidcLoginBindsIssuerAndSubjectToExistingPmsUser() {
+        user.setEmailNormalized("alex.zhang@example.com");
+        when(oidcAuthProvider.exchange("code-2", "state-2"))
+                .thenReturn(new com.brad.pms.auth.AuthenticatedIdentity("alex.zhang@example.com", "subject-1", "oidc",
+                        "https://sso.example.com/realms/pms", "subject-1"));
+        when(externalIdentityMapper.findByIssuerAndSubject("https://sso.example.com/realms/pms", "subject-1"))
+                .thenReturn(null);
+        when(userMapper.findByEmailNormalized("alex.zhang@example.com")).thenReturn(user);
+
+        authService.loginOidc("code-2", "state-2", "10.0.0.8", "test-agent");
+
+        verify(externalIdentityMapper).insert(ArgumentMatchers.<ExternalIdentityDO>argThat(identity ->
+                identity.getUserId().equals(7L)
+                        && identity.getIssuer().equals("https://sso.example.com/realms/pms")
+                        && identity.getSubject().equals("subject-1")));
     }
 
     @Test
