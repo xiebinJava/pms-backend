@@ -11,7 +11,7 @@
 
 ## Global Constraints
 
-- 只修改 pms-backend、pms-front、deepseek-harness 中本计划列出的文件；不启动、不修改、不删除 /Users/fs/Desktop/Project/work-helper。
+- 只修改 pms-backend、pms-front、deepseek-harness 中本计划列出的文件；不启动、不修改、不删除 work-helper。
 - 任何生产代码前必须先添加一个能证明缺陷或缺失能力的失败测试；每个任务执行 red、green、回归三步。
 - 浏览器只允许传递一次性 authorizationCode；PMS 用户 JWT、DSH service key、兑换后的 PMS delegation JWT 不进入 URL、localStorage、sessionStorage、postMessage 或日志。
 - 授权码和短期令牌都按 DSH session 隔离；PMS 登录会话撤销或过期后不得继续兑换。
@@ -84,11 +84,11 @@
 
 **Files:**
 
-- Add: /Users/fs/Desktop/Project/pms-front/src/api/dsh-auth.ts
-- Add: /Users/fs/Desktop/Project/pms-front/src/components/ai/dsh-auth-bridge.ts
-- Add: /Users/fs/Desktop/Project/pms-front/src/api/dsh-auth.test.mjs
-- Add: /Users/fs/Desktop/Project/pms-front/src/components/ai/dsh-auth-bridge.test.mjs
-- Modify: /Users/fs/Desktop/Project/pms-front/src/layout/Index.vue
+- Add: pms-front/src/api/dsh-auth.ts
+- Add: pms-front/src/components/ai/dsh-auth-bridge.ts
+- Add: pms-front/src/api/dsh-auth.test.mjs
+- Add: pms-front/src/components/ai/dsh-auth-bridge.test.mjs
+- Modify: pms-front/src/layout/Index.vue
 
 **Steps:**
 
@@ -104,19 +104,19 @@
 
 **Files:**
 
-- Add: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/auth/pms-auth-store.ts
-- Add: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/auth/pms-auth-store.test.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/config.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/remote.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/index.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/README.md
+- Add: deepseek-harness/packages/pms/dsh-pms/src/auth/pms-auth-store.ts
+- Add: deepseek-harness/packages/pms/dsh-pms/src/auth/pms-auth-store.test.ts
+- Modify: deepseek-harness/packages/pms/dsh-pms/src/config.ts
+- Modify: deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts
+- Modify: deepseek-harness/packages/pms/dsh-pms/src/remote.ts
+- Modify: deepseek-harness/packages/pms/dsh-pms/src/index.ts
+- Modify: deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts
+- Modify: deepseek-harness/packages/pms/dsh-pms/README.md
 
 **Steps:**
 
 1. 先写 Vitest：PmsAuthStore 按 sessionId 保存和清理 code；不同 session 互不读取；设置新 code 会替换旧 code；client 在 code 存在时调用 /integration/dsh/v1/token/exchange 并发送 X-DSH-Service-Key；兑换 token 缓存按 expiresAt 提前续租；无 code 时仍走 static accessToken 或 legacy pmsUserToken fallback。
-2. 运行 cd /Users/fs/Desktop/Project/deepseek-harness && pnpm exec vitest run packages/pms/dsh-pms/tests/dsh-pms.spec.ts packages/pms/dsh-pms/src/auth/pms-auth-store.test.ts，确认新测试先失败。
+2. 运行 cd deepseek-harness && pnpm exec vitest run packages/pms/dsh-pms/tests/dsh-pms.spec.ts packages/pms/dsh-pms/src/auth/pms-auth-store.test.ts，确认新测试先失败。
 3. 实现 PmsAuthStore 为内存 Map，值只包含 authorizationCode、agentId、scopes、receivedAt；不写文件、环境变量或日志。扩展 PmsIntegrationClient options 增加 authStore，并将 browser auth code 作为最高优先级但低于显式 accessToken。
 4. 增加 token/exchange 请求：body 包含 authorizationCode、当前 dshSessionId、agentId、scopes；serviceKey 仅由 Host 进程配置；响应 token 只进入 session cache。兑换失败返回 PMS_AUTH_CONTEXT_MISSING、PMS_AUTH_CODE_EXCHANGE_FAILED 等安全错误，不打印 code 或 token。
 5. 在 PmsContextController 增加 setAuthCode(sessionId, payload) 和 clearAuthCode(sessionId) Remote；在插件 index 创建并注入 authStore，确保 tool handler 使用调用方 sessionId 查询正确的令牌。
@@ -127,17 +127,17 @@
 
 **Files:**
 
-- Add: /Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-pms-workspace/src/client/pms-auth-bridge.ts
-- Add: /Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-pms-workspace/tests/pms-auth-bridge.client.spec.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-pms-workspace/src/client/PmsWorkspace.tsx
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-pms-workspace/src/client/index.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-pms-workspace/src/client/workspace-url.ts only if auth origin must reuse its allowlist helper
-- Modify: /Users/fs/.dsh/profiles/web/cordis.patch.yml
+- Add: deepseek-harness/packages/client/ui-pms-workspace/src/client/pms-auth-bridge.ts
+- Add: deepseek-harness/packages/client/ui-pms-workspace/tests/pms-auth-bridge.client.spec.ts
+- Modify: deepseek-harness/packages/client/ui-pms-workspace/src/client/PmsWorkspace.tsx
+- Modify: deepseek-harness/packages/client/ui-pms-workspace/src/client/index.ts
+- Modify: deepseek-harness/packages/client/ui-pms-workspace/src/client/workspace-url.ts only if auth origin must reuse its allowlist helper
+- Modify: ~/.dsh/profiles/web/cordis.patch.yml
 
 **Steps:**
 
 1. 先写 client test：iframe load 后发送 pms.dsh.auth.request；只接受来自 iframe contentWindow 且 origin 精确匹配 PMS origin 的 pms.dsh.auth.sync；requestId 不匹配的响应忽略；收到 code 后调用 bridge.setAuthCode；每 60 秒重新请求；unmount 时清理 listener、timer、authStore；换 PMS tab/session 时旧 session code 被 clear。
-2. 运行 cd /Users/fs/Desktop/Project/deepseek-harness && pnpm exec vitest run packages/client/ui-pms-workspace/tests/pms-auth-bridge.client.spec.ts packages/client/ui-pms-workspace/tests/pms-context-bridge.client.spec.ts，确认新测试先失败。
+2. 运行 cd deepseek-harness && pnpm exec vitest run packages/client/ui-pms-workspace/tests/pms-auth-bridge.client.spec.ts packages/client/ui-pms-workspace/tests/pms-context-bridge.client.spec.ts，确认新测试先失败。
 3. 实现 pms-auth-bridge.ts，生成 requestId，按 DSH sessionId、agentId 和只读 scopes 发 request；解析同步消息时校验 source pms、type pms.dsh.auth.sync、version 1、requestId、code 非空和 TTL 合法；保持旧 code 直到新兑换成功。
 4. 接入 PmsWorkspace：复用现有 PMS origin allowlist；将 auth bridge 的 setAuthCode/clearAuthCode 传给 dsh-pms Remote；与现有 page context bridge 分离，任何 auth message 不进入 locator store。
 5. 在 cordis.patch.yml 的 pms config 增加 serviceKey: process.env.PMS_DSH_SERVICE_KEY ?? ''；确认该值只由 DSH Host 读取，浏览器 URL 和页面配置不出现 service key。

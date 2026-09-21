@@ -69,7 +69,7 @@
 
 ## Phase 3：在 DSH 中实现“节点进入即必读”
 
-工作目录为 `/Users/fs/Desktop/Project/deepseek-harness`；不把 PMS 的 YAML 复制到 DSH，避免两份规则漂移。契约获取由 DSH PMS plugin 的内部 client 完成，不加入 `ctx.tools.register` 的模型工具集合。
+工作目录为 `deepseek-harness`；不把 PMS 的 YAML 复制到 DSH，避免两份规则漂移。契约获取由 DSH PMS plugin 的内部 client 完成，不加入 `ctx.tools.register` 的模型工具集合。
 
 - [x] 在 `packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts` 增加内部 `getAgentContract(agentId, contractKey)` 方法，复用现有 PMS session/token 生命周期、capability snapshot 和错误分类；更新 `PmsCapabilities` 类型以读取契约描述。
 - [x] 在 `PmsContextLocator`/上下文快照中补充可稳定获取的 `currentNodeKey`，或明确通过一次 `pms_project_get` 解析节点键；不能只用 `nodeId` 与契约字符串匹配。
@@ -106,7 +106,7 @@
 
 ### Phase 4 执行记录（2026-09-21）
 
-- 记录文档：`docs/agent-contracts/pms/project-kickoff-e2e-record.md`；驱动脚本：`/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/pms-kickoff-contract.live.spec.ts`（无 `PMS_E2E_*` 环境变量时自动跳过）。
+- 记录文档：`docs/agent-contracts/pms/project-kickoff-e2e-record.md`；驱动脚本：`deepseek-harness/packages/pms/dsh-pms/tests/pms-kickoff-contract.live.spec.ts`（无 `PMS_E2E_*` 环境变量时自动跳过）。
 - 真实联调结果：`6 passed`（登录 → 授权码 → 委派 token → 契约加载 → 注入 → 只读 → 预览 → 确认门禁 → 幂等执行 → 结果核验 → 单次刷新 → 节点完成判断），契约 `1.0.0`，摘要 `557dd9be…`。
 - 全量回归：PMS `mvn test` 562 项 / 0 error（1 项 `CommandPreviewServiceScopeTest` 为 HEAD 上已存在的失效断言，与本计划无关）；DSH `dsh-pms` 45 项通过。
 - 联调发现并修复一处缺陷：命令预览会把当前页面的 `projectId/nodeId` 注入所有命令，导致项目详情页的 `project.create` 被 PMS 拒绝（`不支持的 project.create 参数: projectId`）。现改为按 PMS 能力目录声明的参数注入，并保持“无契约不发起任何 PMS 请求”的 fail-closed 顺序。

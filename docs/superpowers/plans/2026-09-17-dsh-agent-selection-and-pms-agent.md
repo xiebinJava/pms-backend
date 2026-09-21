@@ -25,12 +25,12 @@
 ### Task 1: Freeze the Agent manifest and workspace contract
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/metadata.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/preset.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/types.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/index.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/metadata.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/remote.spec.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/metadata.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/preset.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/types.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/index.ts`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/metadata.spec.ts`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/remote.spec.ts`
 
 **Interfaces:**
 - Add optional metadata fields `workspaceTypes: readonly string[]` and `capabilities: readonly string[]` to `PresetMetadata`, `AgentPreset`, `AgentPresetRow`, and `AgentPresetDocument`.
@@ -47,11 +47,11 @@
 ### Task 2: Define the PMS Agent composition
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/presets/pms-project-assistant/agent.cordis.yml`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/presets/pms-project-assistant/preset.yml`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
+- Create: `deepseek-harness/packages/preset/agent-presets/presets/pms-project-assistant/agent.cordis.yml`
+- Create: `deepseek-harness/packages/preset/agent-presets/presets/pms-project-assistant/preset.yml`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/index.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
+- Test: `deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
 
 **Interfaces:**
 - The preset composition loads `@deepseek-ai/dsh-pms` under the Agent scope.
@@ -72,12 +72,12 @@
 ### Task 3: Add workspace-aware Agent roster and selection state
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/seat-store.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/settings-store.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/tests/section-store.client.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/tests/components.client.spec.tsx`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/seat-store.ts`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/settings-store.ts`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/index.ts`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts`
+- Test: `deepseek-harness/packages/client/ui-agent-preset/tests/section-store.client.spec.ts`
+- Test: `deepseek-harness/packages/client/ui-agent-preset/tests/components.client.spec.tsx`
 
 **Interfaces:**
 - Add `workspaceType` to the roster query and selection state.
@@ -99,14 +99,14 @@
 ### Task 4: Move the Agent selector into the composer footer
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.module.css`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationContent.tsx`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/tests/components.client.spec.tsx`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/tests/apply.client.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-conversation/tests/input-bar.client.spec.tsx`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-conversation/tests/skeleton.client.spec.tsx`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.module.css`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/index.ts`
+- Modify: `deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationContent.tsx`
+- Test: `deepseek-harness/packages/client/ui-agent-preset/tests/components.client.spec.tsx`
+- Test: `deepseek-harness/packages/client/ui-agent-preset/tests/apply.client.spec.ts`
+- Test: `deepseek-harness/packages/client/ui-conversation/tests/input-bar.client.spec.tsx`
+- Test: `deepseek-harness/packages/client/ui-conversation/tests/skeleton.client.spec.tsx`
 
 **Interfaces:**
 - Register the selector as a composer footer seat, reusing the existing menu and roster controller.
@@ -127,19 +127,19 @@
 ### Task 5: Carry Agent identity and version through DSH message submission
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/session.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/types.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/api/session-controller/src/types.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/api/session-controller/src/agent.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/api/session-controller/src/commands.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/api/session-controller/src/client/contract/snapshot.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/api/session-controller/src/client/sessions/session.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/session.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/mount.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/remote.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/api/session-controller/tests/session.client.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/api/session-controller/tests/session-presets.host.spec.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/session.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/types.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/index.ts`
+- Modify: `deepseek-harness/packages/api/session-controller/src/types.ts`
+- Modify: `deepseek-harness/packages/api/session-controller/src/agent.ts`
+- Modify: `deepseek-harness/packages/api/session-controller/src/commands.ts`
+- Modify: `deepseek-harness/packages/api/session-controller/src/client/contract/snapshot.ts`
+- Modify: `deepseek-harness/packages/api/session-controller/src/client/sessions/session.ts`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/session.spec.ts`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/mount.spec.ts`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/remote.spec.ts`
+- Test: `deepseek-harness/packages/api/session-controller/tests/session.client.spec.ts`
+- Test: `deepseek-harness/packages/api/session-controller/tests/session-presets.host.spec.ts`
 
 **Interfaces:**
 - Every submitted turn carries the session's immutable `agentPreset` and optional `agentCompositionFingerprint`.
@@ -161,22 +161,22 @@
 ### Task 6: Enforce host-side Agent, Skill, plugin, and user-permission intersection
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/mount.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/remote.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/auth/pms-auth-store.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/entity/OperationLogDO.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/OperationLogService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/AuditQueryService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/dto/response/AuditLogDTO.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/resources/db/migration/V46__dsh_operation_audit_metadata.sql`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/resources/schema.sql`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/remote.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/pms-auth-client.spec.ts`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/service/OperationLogServiceTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/index.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/mount.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/remote.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/auth/pms-auth-store.ts`
+- Modify: `src/main/java/com/brad/pms/entity/OperationLogDO.java`
+- Modify: `src/main/java/com/brad/pms/service/OperationLogService.java`
+- Modify: `src/main/java/com/brad/pms/service/AuditQueryService.java`
+- Modify: `src/main/java/com/brad/pms/dto/response/AuditLogDTO.java`
+- Create: `src/main/resources/db/migration/V46__dsh_operation_audit_metadata.sql`
+- Modify: `src/main/resources/schema.sql`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/remote.spec.ts`
+- Test: `deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
+- Test: `deepseek-harness/packages/pms/dsh-pms/tests/pms-auth-client.spec.ts`
+- Test: `src/test/java/com/brad/pms/service/OperationLogServiceTest.java`
+- Test: `src/test/java/com/brad/pms/config/EnterpriseSchemaMigrationTest.java`
 
 **Interfaces:**
 - Host remote selection accepts only a discovered, healthy, published Agent preset.
@@ -197,18 +197,18 @@
 ### Task 7: Add the Agent configuration page and publish workflow
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSection.tsx`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSection.module.css`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/section-store.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/types.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/authoring.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/src/metadata.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/tests/section.client.spec.tsx`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-agent-preset/tests/section-store.client.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/authoring.spec.ts`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSection.tsx`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSection.module.css`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/section-store.ts`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/index.ts`
+- Modify: `deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/types.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/index.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/authoring.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/src/metadata.ts`
+- Test: `deepseek-harness/packages/client/ui-agent-preset/tests/section.client.spec.tsx`
+- Test: `deepseek-harness/packages/client/ui-agent-preset/tests/section-store.client.spec.ts`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/authoring.spec.ts`
 
 **Interfaces:**
 - The page edits a draft manifest containing identity prompt, behavior prompt, selected Skills, selected plugins, and workspace bindings.
@@ -230,17 +230,17 @@
 ### Task 8: Add PMS-specific integration tests and end-to-end verification
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandRegistry.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshIntegrationController.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/controller/DshIntegrationControllerTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/controller/DshCapabilityControllerTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/controller/DshCommandControllerTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/controller/DshTokenExchangeControllerTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/integration/dsh/security/DshAgentScopePolicyTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/command/PmsCommandRegistryTest.java`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-pms-workspace/tests/pms-context-bridge.client.spec.ts`
+- Modify: `src/main/java/com/brad/pms/ai/command/PmsCommandRegistry.java`
+- Modify: `src/main/java/com/brad/pms/ai/query/DshQueryService.java`
+- Modify: `src/main/java/com/brad/pms/controller/DshIntegrationController.java`
+- Test: `src/test/java/com/brad/pms/controller/DshIntegrationControllerTest.java`
+- Test: `src/test/java/com/brad/pms/controller/DshCapabilityControllerTest.java`
+- Test: `src/test/java/com/brad/pms/controller/DshCommandControllerTest.java`
+- Test: `src/test/java/com/brad/pms/controller/DshTokenExchangeControllerTest.java`
+- Test: `src/test/java/com/brad/pms/integration/dsh/security/DshAgentScopePolicyTest.java`
+- Test: `src/test/java/com/brad/pms/ai/command/PmsCommandRegistryTest.java`
+- Test: `deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
+- Test: `deepseek-harness/packages/client/ui-pms-workspace/tests/pms-context-bridge.client.spec.ts`
 
 **Interfaces:**
 - PMS keeps final permission checks and preview/execute operation semantics.

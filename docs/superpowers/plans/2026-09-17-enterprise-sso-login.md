@@ -207,14 +207,14 @@ Files:
 
 Files:
 
-- Modify: /Users/fs/Desktop/Project/pms-front/src/auth/sso.ts
-- Modify: /Users/fs/Desktop/Project/pms-front/src/views/login/index.vue
-- Modify: /Users/fs/Desktop/Project/pms-front/src/views/login/oidc-callback.vue
-- Modify: /Users/fs/Desktop/Project/pms-front/src/api/auth.ts
-- Modify: /Users/fs/Desktop/Project/pms-front/src/router/index.ts
-- Modify: /Users/fs/Desktop/Project/pms-front/src/router/admin-guard.ts
-- Test: /Users/fs/Desktop/Project/pms-front/src/auth/sso.test.mjs
-- Test: /Users/fs/Desktop/Project/pms-front/src/integration/dsh-auth-bridge.test.mjs
+- Modify: pms-front/src/auth/sso.ts
+- Modify: pms-front/src/views/login/index.vue
+- Modify: pms-front/src/views/login/oidc-callback.vue
+- Modify: pms-front/src/api/auth.ts
+- Modify: pms-front/src/router/index.ts
+- Modify: pms-front/src/router/admin-guard.ts
+- Test: pms-front/src/auth/sso.test.mjs
+- Test: pms-front/src/integration/dsh-auth-bridge.test.mjs
 
 Interfaces:
 
@@ -246,13 +246,13 @@ Interfaces:
 
 Files:
 
-- Create: /Users/fs/Desktop/Project/deepseek-harness/packages/integrations/pms-sso/src/index.ts
-- Create: /Users/fs/Desktop/Project/deepseek-harness/packages/integrations/pms-sso/src/types.ts
-- Create: /Users/fs/Desktop/Project/deepseek-harness/packages/integrations/pms-sso/tests/pkce.spec.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/src/bin.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/apps/web/src/main.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/tests/web-auth.e2e.ts
-- Create: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/tests/pms-sso.e2e.ts
+- Create: deepseek-harness/packages/integrations/pms-sso/src/index.ts
+- Create: deepseek-harness/packages/integrations/pms-sso/src/types.ts
+- Create: deepseek-harness/packages/integrations/pms-sso/tests/pkce.spec.ts
+- Modify: deepseek-harness/apps/cli/src/bin.ts
+- Modify: deepseek-harness/apps/web/src/main.ts
+- Modify: deepseek-harness/apps/cli/tests/web-auth.e2e.ts
+- Create: deepseek-harness/apps/cli/tests/pms-sso.e2e.ts
 
 Interfaces:
 
@@ -291,8 +291,8 @@ Files:
 - Test: src/test/java/com/brad/pms/service/SsoIdentityBackfillServiceTest.java
 - Test: src/test/java/com/brad/pms/sso/SsoLogoutServiceTest.java
 - Test: src/test/java/com/brad/pms/e2e/EnterpriseSsoE2eTest.java
-- Create: /Users/fs/Desktop/Project/pms-front/tests/sso.e2e.mjs
-- Create: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/tests/pms-sso-cross-app.e2e.ts
+- Create: pms-front/tests/sso.e2e.mjs
+- Create: deepseek-harness/apps/cli/tests/pms-sso-cross-app.e2e.ts
 - Modify: README.md
 
 - [ ] Step 1: 先写用户预览和迁移测试。按规范化 verified email 一对一匹配；重复邮箱、无邮箱和禁用用户必须分别报告；重复执行必须幂等。
@@ -312,7 +312,7 @@ Files:
 - [ ] Step 7: 更新 README，记录 issuer、client、redirect URI、密钥轮换、数据库备份、回滚开关和本地启动命令。
 - [ ] Step 8: 提交。
 
-    git add src/main/java/com/brad/pms/service src/main/java/com/brad/pms/controller src/main/resources/db/migration src/test/java/com/brad/pms /Users/fs/Desktop/Project/pms-front/tests/sso.e2e.mjs /Users/fs/Desktop/Project/deepseek-harness/apps/cli/tests/pms-sso-cross-app.e2e.ts README.md
+    git add src/main/java/com/brad/pms/service src/main/java/com/brad/pms/controller src/main/resources/db/migration src/test/java/com/brad/pms pms-front/tests/sso.e2e.mjs deepseek-harness/apps/cli/tests/pms-sso-cross-app.e2e.ts README.md
     git commit -m "test: verify enterprise sso end to end"
 
 ## 方案自审

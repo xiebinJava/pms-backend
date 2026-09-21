@@ -84,7 +84,7 @@ M --> O</whiteboard>
 <h1>13. 参考项目与原型说明</h1>
 <p><b>fs-claw-new：</b>借鉴 AgentScope 的 Agent Team、Hub/MCP Hub/Skill Hub、权限边界和可扩展插件思路；它适合作为运行时编排与能力发现的参考，不直接复制 PMS 业务模型。</p>
 <p><b>gpt-claw-frontend：</b>重点参考 AgentHubPage 的卡片市场、搜索/筛选、详情/编辑抽屉，以及配置页中“SOUL · 是谁”和“AGENTS · 怎么干”的分离方式。</p>
-<p>本方案已生成静态 Demo：<code>/Users/fs/Desktop/Project/pms-backend/docs/agent-orchestration-demo/index.html</code>，本地运行后可在四个视图之间切换：智能体广场、PMS 项目团队、协同运行、能力与配置。</p>
+<p>本方案已生成静态 Demo：<code>docs/agent-orchestration-demo/index.html</code>，本地运行后可在四个视图之间切换：智能体广场、PMS 项目团队、协同运行、能力与配置。</p>
 <h1>14. 静态 Demo 截图</h1>
 <p>下方依次为智能体广场、PMS 项目团队、协同运行看板和 Agent 配置中心。截图用于说明信息架构与关键交互，不代表最终视觉稿或生产页面。</p>
 <hr/>

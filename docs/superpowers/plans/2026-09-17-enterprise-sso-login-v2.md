@@ -31,8 +31,8 @@ Files:
 - Create: docs/superpowers/specs/2026-09-17-enterprise-sso-provider-registration.md
 - Modify: src/main/resources/application.yml
 - Modify: src/main/resources/application-mysql.yml
-- Modify: /Users/fs/Desktop/Project/pms-front/.env.example
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/.env.example
+- Modify: pms-front/.env.example
+- Modify: deepseek-harness/.env.example
 - Test: src/test/java/com/brad/pms/config/SsoConfigurationTest.java
 
 Required decisions:
@@ -155,13 +155,13 @@ Interfaces:
 
 Files:
 
-- Modify: /Users/fs/Desktop/Project/pms-front/src/auth/sso.ts
-- Modify: /Users/fs/Desktop/Project/pms-front/src/views/login/index.vue
-- Modify: /Users/fs/Desktop/Project/pms-front/src/views/login/oidc-callback.vue
-- Modify: /Users/fs/Desktop/Project/pms-front/src/api/auth.ts
-- Modify: /Users/fs/Desktop/Project/pms-front/src/router/index.ts
-- Modify: /Users/fs/Desktop/Project/pms-front/src/router/admin-guard.ts
-- Test: /Users/fs/Desktop/Project/pms-front/src/auth/sso.test.mjs
+- Modify: pms-front/src/auth/sso.ts
+- Modify: pms-front/src/views/login/index.vue
+- Modify: pms-front/src/views/login/oidc-callback.vue
+- Modify: pms-front/src/api/auth.ts
+- Modify: pms-front/src/router/index.ts
+- Modify: pms-front/src/router/admin-guard.ts
+- Test: pms-front/src/auth/sso.test.mjs
 
 - [ ] Step 1: 写 state、nonce、PKCE、callback 重放、logout 和错误回调测试。
 - [ ] Step 2: 实现 pms-web Authorization Code + PKCE。浏览器不保存 client secret 和 Refresh Token。
@@ -181,13 +181,13 @@ Files:
 
 Files:
 
-- Create: /Users/fs/Desktop/Project/deepseek-harness/packages/integrations/pms-sso/src/index.ts
-- Create: /Users/fs/Desktop/Project/deepseek-harness/packages/integrations/pms-sso/src/types.ts
-- Create: /Users/fs/Desktop/Project/deepseek-harness/packages/integrations/pms-sso/tests/pkce.spec.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/src/bin.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/apps/web/src/main.ts
-- Modify: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/tests/web-auth.e2e.ts
-- Create: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/tests/pms-sso.e2e.ts
+- Create: deepseek-harness/packages/integrations/pms-sso/src/index.ts
+- Create: deepseek-harness/packages/integrations/pms-sso/src/types.ts
+- Create: deepseek-harness/packages/integrations/pms-sso/tests/pkce.spec.ts
+- Modify: deepseek-harness/apps/cli/src/bin.ts
+- Modify: deepseek-harness/apps/web/src/main.ts
+- Modify: deepseek-harness/apps/cli/tests/web-auth.e2e.ts
+- Create: deepseek-harness/apps/cli/tests/pms-sso.e2e.ts
 
 Interfaces:
 
@@ -236,11 +236,11 @@ Files:
 
 - Create: src/main/java/com/brad/pms/controller/AdminSsoConfigurationController.java
 - Create: src/main/java/com/brad/pms/dto/response/SsoRuntimeStatusDTO.java
-- Create: /Users/fs/Desktop/Project/pms-front/src/views/admin/sso/index.vue
-- Create: /Users/fs/Desktop/Project/pms-front/src/api/admin-sso.ts
+- Create: pms-front/src/views/admin/sso/index.vue
+- Create: pms-front/src/api/admin-sso.ts
 - Test: src/test/java/com/brad/pms/controller/AdminSsoConfigurationControllerTest.java
-- Test: /Users/fs/Desktop/Project/pms-front/src/views/admin/sso/sso-admin.test.mjs
-- Create: /Users/fs/Desktop/Project/deepseek-harness/apps/cli/tests/pms-sso-cross-app.e2e.ts
+- Test: pms-front/src/views/admin/sso/sso-admin.test.mjs
+- Create: deepseek-harness/apps/cli/tests/pms-sso-cross-app.e2e.ts
 
 Management UI scope:
 

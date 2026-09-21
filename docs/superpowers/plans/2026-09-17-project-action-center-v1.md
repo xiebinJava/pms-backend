@@ -8,7 +8,7 @@
 
 **Tech Stack:** Spring Boot 3 / Java 17 / MyBatis-Plus / JUnit 5；Vue 3 / TypeScript / Ant Design Vue / Vue I18n / Node test runner。
 
-**Spec:** `/Users/fs/Desktop/Project/pms-backend/.worktrees/project-action-center-design/docs/superpowers/specs/2026-09-17-project-action-center-v1-design.md`
+**Spec:** `.worktrees/project-action-center-design/docs/superpowers/specs/2026-09-17-project-action-center-v1-design.md`
 
 ## Global Constraints
 
@@ -171,15 +171,15 @@
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/components/ProjectReadinessCard.vue`
-- Create: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/project-attention.ts`
-- Create: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/project-attention.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/api/project.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/types/domain.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/locales/zh-CN.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/locales/en-US.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/styles/pms-theme.css` only for shared action-item tokens if scoped styles are insufficient
+- Create: `pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/components/ProjectReadinessCard.vue`
+- Create: `pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/project-attention.ts`
+- Create: `pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/project-attention.test.mjs`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/api/project.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/types/domain.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/index.vue`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/locales/zh-CN.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/locales/en-US.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/styles/pms-theme.css` only for shared action-item tokens if scoped styles are insufficient
 
 **Interfaces:**
 
@@ -247,15 +247,15 @@
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/action-center.ts`
-- Create: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/action-center.test.mjs`
-- Create: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/WorkbenchActionCenter.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/api/workbench.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/workbench.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/locales/zh-CN.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/locales/en-US.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/styles/pms-theme.css` or a new scoped style block in the component
+- Create: `pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/action-center.ts`
+- Create: `pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/action-center.test.mjs`
+- Create: `pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/WorkbenchActionCenter.vue`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/api/workbench.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/index.vue`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/workbench/workbench.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/locales/zh-CN.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/locales/en-US.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/styles/pms-theme.css` or a new scoped style block in the component
 
 **Interfaces:**
 
@@ -323,15 +323,15 @@
 
 **Files:**
 
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project/list/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/enterprise-board.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/enterprise-board.d.mts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project/list/index.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/enterprise-board.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/index.vue` only if action query handling needs to be extended
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/locales/zh-CN.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/.worktrees/task-overdue-reschedule/src/locales/en-US.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project/list/index.vue`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/index.vue`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/enterprise-board.mjs`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/enterprise-board.d.mts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project/list/index.test.mjs`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project-dashboard/enterprise-board.test.mjs`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/views/project/detail/index.vue` only if action query handling needs to be extended
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/locales/zh-CN.ts`
+- Modify: `pms-front/.worktrees/task-overdue-reschedule/src/locales/en-US.ts`
 
 **Interfaces:**
 

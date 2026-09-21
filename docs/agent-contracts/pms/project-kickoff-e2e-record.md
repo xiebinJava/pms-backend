@@ -5,7 +5,7 @@
 - 执行时间：2026-09-21 14:28（Asia/Shanghai）
 - PMS 后端：`4887031`（分支 `feature/configurable-project-workflows`，工作区含未提交的契约交付）
 - DSH：`15e07a1`（分支 `codex/pms-dsh-capability-protocol`，工作区含未提交的契约交付）
-- 驱动脚本：`/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/pms-kickoff-contract.live.spec.ts`
+- 驱动脚本：`deepseek-harness/packages/pms/dsh-pms/tests/pms-kickoff-contract.live.spec.ts`
 - 原始证据：`docs/agent-contracts/pms/project-kickoff-e2e-evidence.json`（18 步，含每一步的时间、requestId、预览编号与返回内容）
 
 ## 结论
@@ -17,15 +17,15 @@
 1. Docker（本机是 Colima，socket 不在默认位置）：
 
    ```bash
-   export DOCKER_HOST="unix://$HOME/.colima/fsclaw/docker.sock"
+   export DOCKER_HOST="unix://$HOME/.colima/<colima-profile>/docker.sock"
    export TESTCONTAINERS_RYUK_DISABLED=true
-   cd /Users/fs/Desktop/Project/pms-backend && bash scripts/start-local-mysql.sh
+   cd pms-backend && bash scripts/start-local-mysql.sh
    ```
 
 2. 启动后端（MySQL profile，读取 `.env.mysql.local`）：
 
    ```bash
-   cd /Users/fs/Desktop/Project/pms-backend
+   cd pms-backend
    set -a && source .env.mysql.local && set +a
    java -jar target/pms-backend-1.0.7.jar --spring.profiles.active=mysql --spring.flyway.validate-on-migrate=false
    ```
@@ -33,8 +33,8 @@
 3. 运行 live E2E（缺少 env 时该 spec 自动跳过，不影响默认测试套件）：
 
    ```bash
-   cd /Users/fs/Desktop/Project/deepseek-harness
-   set -a && source /Users/fs/Desktop/Project/pms-backend/.env.mysql.local && set +a
+   cd deepseek-harness
+   set -a && source .env.mysql.local && set +a
    PMS_E2E_BASE_URL=http://127.0.0.1:8080 \
    PMS_E2E_SERVICE_KEY="$PMS_DSH_SERVICE_KEY" \
    PMS_E2E_USER_EMAIL=e2e.kickoff@pms.com \

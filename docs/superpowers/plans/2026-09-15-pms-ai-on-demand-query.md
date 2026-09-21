@@ -25,10 +25,10 @@
 **Files:**
 - Create: `src/test/java/com/brad/pms/ai/query/AiTaskQueryServiceTest.java`
 - Modify: `src/test/java/com/brad/pms/controller/AiCommandControllerTest.java` or create `src/test/java/com/brad/pms/controller/AiQueryControllerTest.java`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_pms_tools.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_chat_service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_agents.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_extensions.py`
+- Modify: `work-helper/tests/test_pms_tools.py`
+- Modify: `work-helper/tests/test_chat_service.py`
+- Modify: `work-helper/tests/test_agents.py`
+- Modify: `work-helper/tests/test_extensions.py`
 
 **Interfaces:**
 - Backend will provide `AiTaskQueryService.query(AiTaskQueryRequest)` and `POST /ai/query/tasks`.
@@ -57,7 +57,7 @@
 
   ```bash
   mvn -q -Dtest=AiTaskQueryServiceTest,AiQueryControllerTest test
-  cd /Users/fs/Desktop/Project/work-helper && uv run pytest tests/test_pms_tools.py tests/test_chat_service.py tests/test_agents.py tests/test_extensions.py -q
+  cd work-helper && uv run pytest tests/test_pms_tools.py tests/test_chat_service.py tests/test_agents.py tests/test_extensions.py -q
   ```
 
   Expected: compilation/import or assertion failures because the query service, endpoint, tool, and new Agent policy do not exist yet.
@@ -110,16 +110,16 @@
 ### Task 3: Register on-demand tools in Work Helper and stop ChatService prefetch
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/tools/pms.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/extensions.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/registry.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/prompts.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/chat/context.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/chat/service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_pms_tools.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_chat_service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_agents.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_extensions.py`
+- Modify: `work-helper/app/tools/pms.py`
+- Modify: `work-helper/app/agents/extensions.py`
+- Modify: `work-helper/app/agents/registry.py`
+- Modify: `work-helper/app/agents/prompts.py`
+- Modify: `work-helper/app/chat/context.py`
+- Modify: `work-helper/app/chat/service.py`
+- Modify: `work-helper/tests/test_pms_tools.py`
+- Modify: `work-helper/tests/test_chat_service.py`
+- Modify: `work-helper/tests/test_agents.py`
+- Modify: `work-helper/tests/test_extensions.py`
 
 **Interfaces:**
 - `PmsApiClient.task_query(arguments: dict[str, Any], token: str) -> dict[str, object]` posts to `/api/ai/query/tasks`.
@@ -147,18 +147,18 @@
   Run:
 
   ```bash
-  cd /Users/fs/Desktop/Project/work-helper
+  cd work-helper
   uv run pytest tests/test_pms_tools.py tests/test_chat_service.py tests/test_agents.py tests/test_extensions.py -q
   ```
 
 ### Task 4: Keep frontend context lightweight and verify end-to-end behavior
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/components/ai/page-context.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/list/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/layout/Index.vue`
+- Modify: `pms-front/src/components/ai/page-context.ts`
+- Modify: `pms-front/src/views/project/list/index.vue`
+- Modify: `pms-front/src/views/project/detail/index.vue`
+- Modify: `pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue`
+- Modify: `pms-front/src/layout/Index.vue`
 - Create/modify: frontend context contract tests next to the affected views.
 
 **Interfaces:**
@@ -183,7 +183,7 @@
   Run:
 
   ```bash
-  cd /Users/fs/Desktop/Project/pms-front
+  cd pms-front
   node --test src/views/project/list/project-list-context.test.mjs src/views/project/detail/project-detail-context.test.mjs src/layout/index.test.mjs
   pnpm build
   ```
@@ -191,8 +191,8 @@
 ### Task 5: Review the full tool contract and document the test flow
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-backend/README.md`
-- Modify: `/Users/fs/Desktop/Project/work-helper/README.md`
+- Modify: `README.md`
+- Modify: `work-helper/README.md`
 - Test/verify: all focused suites from Tasks 2–4.
 
 - [ ] **Step 1: Document the runtime distinction.**

@@ -8,7 +8,7 @@
 
 **Tech Stack:** PMS：Spring Boot 3、Java 17、MyBatis-Plus、JUnit 5、现有 Command/Service/API；DSH：TypeScript、Cordis、Vitest、现有 `dsh-pms` 插件和 Agent preset；PMS 前端：Vue 3、TypeScript、Ant Design Vue、现有 DSH refresh bridge；兜底：OpenCLI Adapter；长流程：先使用 PMS 自有状态机，稳定后再评估 LangGraph.js。
 
-**Spec:** `/Users/fs/Desktop/Project/pms-backend/docs/product-specs/pms-dsh-agent-platform.md`
+**Spec:** `docs/product-specs/pms-dsh-agent-platform.md`
 
 ## Global Constraints
 
@@ -30,54 +30,54 @@
 ### PMS 后端
 
 - 能力和命令核心：
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommand.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandRegistry.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandMetadata.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandDescriptor.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/CommandName.java`
+  - `src/main/java/com/brad/pms/ai/command/PmsCommand.java`
+  - `src/main/java/com/brad/pms/ai/command/PmsCommandRegistry.java`
+  - `src/main/java/com/brad/pms/ai/command/PmsCommandMetadata.java`
+  - `src/main/java/com/brad/pms/ai/command/PmsCommandDescriptor.java`
+  - `src/main/java/com/brad/pms/ai/command/CommandName.java`
 - 查询和上下文：
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryService.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryRequest.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryResult.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/context/`
+  - `src/main/java/com/brad/pms/ai/query/DshQueryService.java`
+  - `src/main/java/com/brad/pms/ai/query/DshQueryRequest.java`
+  - `src/main/java/com/brad/pms/ai/query/DshQueryResult.java`
+  - `src/main/java/com/brad/pms/ai/context/`
 - DSH 集成接口：
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshCapabilityController.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshQueryController.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshCommandController.java`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/dsh/api/`
-  - `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/dsh/security/DshAgentScopePolicy.java`
+  - `src/main/java/com/brad/pms/controller/DshCapabilityController.java`
+  - `src/main/java/com/brad/pms/controller/DshQueryController.java`
+  - `src/main/java/com/brad/pms/controller/DshCommandController.java`
+  - `src/main/java/com/brad/pms/integration/dsh/api/`
+  - `src/main/java/com/brad/pms/integration/dsh/security/DshAgentScopePolicy.java`
 - 现有业务命令：`command/project`、`command/task`、`command/node`、`command/member`。
 
 ### DSH
 
 - PMS 客户端：
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/types.ts`
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/remote.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/types.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/remote.ts`
 - PMS 工具：
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/query.ts`
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/project-list.ts`
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/project-detail.ts`
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/task-list.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/tools/query.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/tools/project-list.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/tools/project-detail.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/tools/task-list.ts`
 - PMS Agent 组合和提示词：
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/index.ts`
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/`
+  - `deepseek-harness/packages/pms/dsh-pms/src/index.ts`
+  - `deepseek-harness/packages/preset/agent-presets/`
 - 会话和页面刷新：
-  - `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/context/`
-  - `/Users/fs/Desktop/Project/pms-front/src/integration/dsh-refresh-bridge.ts`
+  - `deepseek-harness/packages/pms/dsh-pms/src/context/`
+  - `pms-front/src/integration/dsh-refresh-bridge.ts`
 
 ### PMS 前端
 
 - 页面和业务组件：
-  - `/Users/fs/Desktop/Project/pms-front/src/views/project/list/index.vue`
-  - `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/index.vue`
-  - `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/TaskKanban.vue`
-  - `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/Members.vue`
-  - `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/WorkflowCustomFields.vue`
+  - `pms-front/src/views/project/list/index.vue`
+  - `pms-front/src/views/project/detail/index.vue`
+  - `pms-front/src/views/project/detail/components/TaskKanban.vue`
+  - `pms-front/src/views/project/detail/components/Members.vue`
+  - `pms-front/src/views/project/detail/components/WorkflowCustomFields.vue`
 - 共享类型和 API：
-  - `/Users/fs/Desktop/Project/pms-front/src/types/domain.ts`
-  - `/Users/fs/Desktop/Project/pms-front/src/api/project.ts`
+  - `pms-front/src/types/domain.ts`
+  - `pms-front/src/api/project.ts`
 
 ### OpenCLI 适配层
 
@@ -102,10 +102,10 @@ type PmsUiFallbackAdapter = {
 
 **Files:**
 
-- Read: `/Users/fs/Desktop/Project/pms-backend/docs/product-specs/pms-dsh-agent-platform.md`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/README.md`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/AgentCapabilityContractTest.java`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/agent-capability-contract.spec.ts`
+- Read: `docs/product-specs/pms-dsh-agent-platform.md`
+- Modify: `README.md`
+- Create: `src/test/java/com/brad/pms/ai/AgentCapabilityContractTest.java`
+- Create: `deepseek-harness/packages/pms/dsh-pms/tests/agent-capability-contract.spec.ts`
 
 **Interfaces:**
 
@@ -121,7 +121,7 @@ type PmsUiFallbackAdapter = {
 - [ ] 写批量操作验收用例：创建两个任务只产生一个刷新事件。
 - [ ] 写权限验收用例：用户权限不足时能力被过滤，不能通过 Agent 配置绕过。
 - [ ] 运行 `mvn -q -Dtest=AgentCapabilityContractTest test`，确认基线测试先失败或覆盖现有行为。
-- [ ] 运行 `cd /Users/fs/Desktop/Project/deepseek-harness && node_modules/.bin/vitest run packages/pms/dsh-pms/tests/agent-capability-contract.spec.ts`。
+- [ ] 运行 `cd deepseek-harness && node_modules/.bin/vitest run packages/pms/dsh-pms/tests/agent-capability-contract.spec.ts`。
 
 ### Review checkpoint
 
@@ -137,16 +137,16 @@ type PmsUiFallbackAdapter = {
 
 **Files:**
 
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandMetadata.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandDescriptor.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandRegistry.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/CommandName.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshCapabilityController.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/dsh/api/DshCapabilityDTO.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/dsh/api/DshCommandCapabilityDTO.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/dsh/api/DshFieldSchemaDTO.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/dsh/api/DshCapabilityRisk.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/command/PmsCommandRegistryContractTest.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/PmsCommandMetadata.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/PmsCommandDescriptor.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/PmsCommandRegistry.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/CommandName.java`
+- Modify: `src/main/java/com/brad/pms/controller/DshCapabilityController.java`
+- Modify: `src/main/java/com/brad/pms/integration/dsh/api/DshCapabilityDTO.java`
+- Modify: `src/main/java/com/brad/pms/integration/dsh/api/DshCommandCapabilityDTO.java`
+- Create: `src/main/java/com/brad/pms/integration/dsh/api/DshFieldSchemaDTO.java`
+- Create: `src/main/java/com/brad/pms/integration/dsh/api/DshCapabilityRisk.java`
+- Create: `src/test/java/com/brad/pms/ai/command/PmsCommandRegistryContractTest.java`
 
 **Interfaces:**
 
@@ -194,18 +194,18 @@ public record DshCapabilityDTO(
 
 **Files:**
 
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryRequest.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryResult.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshQueryController.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshResourceType.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshReferenceResolver.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/query/DshQueryScope.java`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/query.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/types.ts`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/query/DshQueryServiceTest.java`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
+- Modify: `src/main/java/com/brad/pms/ai/query/DshQueryRequest.java`
+- Modify: `src/main/java/com/brad/pms/ai/query/DshQueryResult.java`
+- Modify: `src/main/java/com/brad/pms/ai/query/DshQueryService.java`
+- Modify: `src/main/java/com/brad/pms/controller/DshQueryController.java`
+- Create: `src/main/java/com/brad/pms/ai/query/DshResourceType.java`
+- Create: `src/main/java/com/brad/pms/ai/query/DshReferenceResolver.java`
+- Create: `src/main/java/com/brad/pms/ai/query/DshQueryScope.java`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/tools/query.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/types.ts`
+- Test: `src/test/java/com/brad/pms/ai/query/DshQueryServiceTest.java`
+- Test: `deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
 
 **Interfaces:**
 
@@ -260,21 +260,21 @@ type PmsQueryResult = {
 
 **Files:**
 
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/CommandPreviewRequest.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/CommandPreview.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/CommandPreviewService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/CommandExecutionService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/CommandResult.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/BatchCommandResult.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/RefreshScope.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshCommandController.java`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/context/pms-context-store.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/integration/dsh-refresh-bridge.ts`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/command/CommandExecutionServiceTest.java`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
-- Test: `/Users/fs/Desktop/Project/pms-front/src/integration/dsh-refresh-bridge.test.mjs`
+- Modify: `src/main/java/com/brad/pms/ai/command/CommandPreviewRequest.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/CommandPreview.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/CommandPreviewService.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/CommandExecutionService.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/CommandResult.java`
+- Create: `src/main/java/com/brad/pms/ai/command/BatchCommandResult.java`
+- Create: `src/main/java/com/brad/pms/ai/command/RefreshScope.java`
+- Modify: `src/main/java/com/brad/pms/controller/DshCommandController.java`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/context/pms-context-store.ts`
+- Modify: `pms-front/src/integration/dsh-refresh-bridge.ts`
+- Test: `src/test/java/com/brad/pms/ai/command/CommandExecutionServiceTest.java`
+- Test: `deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
+- Test: `pms-front/src/integration/dsh-refresh-bridge.test.mjs`
 
 **Interfaces:**
 
@@ -322,18 +322,18 @@ public record BatchCommandResult(
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/workflow/PmsWorkflow.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/workflow/PmsWorkflowRegistry.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/workflow/PmsWorkflowContext.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/workflow/PmsWorkflowResult.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/workflow/node/CompleteNodeWorkflow.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/workflow/project/InitializeProjectWorkflow.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshCommandController.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshWorkflowController.java`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/workflow.ts`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/workflow/CompleteNodeWorkflowTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/workflow/InitializeProjectWorkflowTest.java`
+- Create: `src/main/java/com/brad/pms/ai/workflow/PmsWorkflow.java`
+- Create: `src/main/java/com/brad/pms/ai/workflow/PmsWorkflowRegistry.java`
+- Create: `src/main/java/com/brad/pms/ai/workflow/PmsWorkflowContext.java`
+- Create: `src/main/java/com/brad/pms/ai/workflow/PmsWorkflowResult.java`
+- Create: `src/main/java/com/brad/pms/ai/workflow/node/CompleteNodeWorkflow.java`
+- Create: `src/main/java/com/brad/pms/ai/workflow/project/InitializeProjectWorkflow.java`
+- Modify: `src/main/java/com/brad/pms/controller/DshCommandController.java`
+- Create: `src/main/java/com/brad/pms/controller/DshWorkflowController.java`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
+- Create: `deepseek-harness/packages/pms/dsh-pms/src/tools/workflow.ts`
+- Test: `src/test/java/com/brad/pms/ai/workflow/CompleteNodeWorkflowTest.java`
+- Test: `src/test/java/com/brad/pms/ai/workflow/InitializeProjectWorkflowTest.java`
 
 **Interfaces:**
 
@@ -372,16 +372,16 @@ public interface PmsWorkflow {
 
 **Files:**
 
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/index.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/query.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/capabilities.ts`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/tools/workflow.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/types.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
-- Test: `/Users/fs/Desktop/Project/deepseek-harness/packages/preset/agent-presets/tests/`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/index.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/tools/query.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/tools/command.ts`
+- Create: `deepseek-harness/packages/pms/dsh-pms/src/tools/capabilities.ts`
+- Create: `deepseek-harness/packages/pms/dsh-pms/src/tools/workflow.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/types.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
+- Modify: `deepseek-harness/packages/preset/agent-presets/`
+- Test: `deepseek-harness/packages/pms/dsh-pms/tests/dsh-pms.spec.ts`
+- Test: `deepseek-harness/packages/preset/agent-presets/tests/`
 
 **Interfaces:**
 
@@ -399,7 +399,7 @@ public interface PmsWorkflow {
 - [ ] 增加 Agent 选择后只加载 PMS 能力的测试。
 - [ ] 增加 generic Agent 无法发现或调用 PMS 工具的测试。
 - [ ] 增加授权失败、能力过滤和中文字段展示测试。
-- [ ] 运行 `cd /Users/fs/Desktop/Project/deepseek-harness && node_modules/.bin/vitest run packages/pms/dsh-pms/tests packages/preset/agent-presets/tests`。
+- [ ] 运行 `cd deepseek-harness && node_modules/.bin/vitest run packages/pms/dsh-pms/tests packages/preset/agent-presets/tests`。
 
 ### Review checkpoint
 
@@ -416,13 +416,13 @@ public interface PmsWorkflow {
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/integrations/opencli-pms/README.md`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/integrations/opencli-pms/src/adapter.ts`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/integrations/opencli-pms/src/manifest.ts`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/integrations/opencli-pms/src/verification.ts`
-- Create: `/Users/fs/Desktop/Project/deepseek-harness/packages/integrations/opencli-pms/tests/adapter.spec.ts`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/command/PmsCommandMetadata.java`
+- Create: `deepseek-harness/packages/integrations/opencli-pms/README.md`
+- Create: `deepseek-harness/packages/integrations/opencli-pms/src/adapter.ts`
+- Create: `deepseek-harness/packages/integrations/opencli-pms/src/manifest.ts`
+- Create: `deepseek-harness/packages/integrations/opencli-pms/src/verification.ts`
+- Create: `deepseek-harness/packages/integrations/opencli-pms/tests/adapter.spec.ts`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/src/client/PmsIntegrationClient.ts`
+- Modify: `src/main/java/com/brad/pms/ai/command/PmsCommandMetadata.java`
 
 **Interfaces:**
 
@@ -465,15 +465,15 @@ type UiFallbackManifest = {
 
 **Files:**
 
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/entity/OperationLogDO.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/OperationLogService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshCommandController.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/DshQueryController.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/integration/dsh/DshAgentEndToEndContractTest.java`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/tests/pms-auth-client.spec.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/integration/dsh-refresh-bridge.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/README.md`
-- Modify: `/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/README.md`
+- Modify: `src/main/java/com/brad/pms/entity/OperationLogDO.java`
+- Modify: `src/main/java/com/brad/pms/service/OperationLogService.java`
+- Modify: `src/main/java/com/brad/pms/controller/DshCommandController.java`
+- Modify: `src/main/java/com/brad/pms/controller/DshQueryController.java`
+- Create: `src/test/java/com/brad/pms/integration/dsh/DshAgentEndToEndContractTest.java`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/tests/pms-auth-client.spec.ts`
+- Modify: `pms-front/src/integration/dsh-refresh-bridge.test.mjs`
+- Modify: `README.md`
+- Modify: `deepseek-harness/packages/pms/dsh-pms/README.md`
 
 ### Tasks
 

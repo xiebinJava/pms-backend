@@ -25,9 +25,9 @@
 
 **Files:**
 - Create: `docs/superpowers/specs/2026-09-15-pms-ai-conversation-intent-repair.md`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_chat_service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_agent_providers.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_pms_tools.py`
+- Modify: `work-helper/tests/test_chat_service.py`
+- Modify: `work-helper/tests/test_agent_providers.py`
+- Modify: `work-helper/tests/test_pms_tools.py`
 - Modify: `src/test/java/com/brad/pms/ai/AiCommandContractTest.java`
 - Modify: `src/test/java/com/brad/pms/controller/AiCommandControllerTest.java`
 
@@ -51,9 +51,9 @@
 - [ ] **Step 4: 运行测试确认当前实现失败。**
 
   ```bash
-  cd /Users/fs/Desktop/Project/work-helper
+  cd work-helper
   uv run pytest tests/test_chat_service.py tests/test_agent_providers.py tests/test_pms_tools.py -q
-  cd /Users/fs/Desktop/Project/pms-backend
+  cd pms-backend
   mvn -q -Dtest=AiCommandContractTest,AiCommandControllerTest test
   ```
 
@@ -62,16 +62,16 @@
 ### Task 2: 实现 Work Helper 的会话历史恢复
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/chat/models.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/chat/service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/sessions/service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/sessions/store.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/runtime/runtime.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/providers/openai.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/providers/dashscope.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/providers/mock.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_chat_service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_agent_providers.py`
+- Modify: `work-helper/app/chat/models.py`
+- Modify: `work-helper/app/chat/service.py`
+- Modify: `work-helper/app/sessions/service.py`
+- Modify: `work-helper/app/sessions/store.py`
+- Modify: `work-helper/app/agents/runtime/runtime.py`
+- Modify: `work-helper/app/agents/providers/openai.py`
+- Modify: `work-helper/app/agents/providers/dashscope.py`
+- Modify: `work-helper/app/agents/providers/mock.py`
+- Modify: `work-helper/tests/test_chat_service.py`
+- Modify: `work-helper/tests/test_agent_providers.py`
 
 **Interfaces:**
 - `ChatService` 在调用 `prepare_turn` 前得到 `prior_messages`；当前请求保存后只把 `prior_messages` 传给 Runtime。
@@ -97,22 +97,22 @@
 - [ ] **Step 5: 运行 Work Helper focused tests。**
 
   ```bash
-  cd /Users/fs/Desktop/Project/work-helper
+  cd work-helper
   uv run pytest tests/test_chat_service.py tests/test_agent_providers.py tests/test_conversation_persistence.py -q
   ```
 
 ### Task 3: 增加持久化的待处理意图和确认状态
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/work-helper/app/chat/intent.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/chat/models.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/sessions/models.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/sessions/store.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/sessions/service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/db/models.py`
-- Create: `/Users/fs/Desktop/Project/work-helper/migrations/versions/0007_pending_actions.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_conversation_persistence.py`
-- Create: `/Users/fs/Desktop/Project/work-helper/tests/test_chat_intent.py`
+- Create: `work-helper/app/chat/intent.py`
+- Modify: `work-helper/app/chat/models.py`
+- Modify: `work-helper/app/sessions/models.py`
+- Modify: `work-helper/app/sessions/store.py`
+- Modify: `work-helper/app/sessions/service.py`
+- Modify: `work-helper/app/db/models.py`
+- Create: `work-helper/migrations/versions/0007_pending_actions.py`
+- Modify: `work-helper/tests/test_conversation_persistence.py`
+- Create: `work-helper/tests/test_chat_intent.py`
 
 **Interfaces:**
 - `TaskCreateDraft`：`project_ref`、`node_ref`、`tasks[]`；每个 task 含 `title`、`assignee_ref`、`due_date`。
@@ -138,19 +138,19 @@
 - [ ] **Step 5: 运行持久化测试。**
 
   ```bash
-  cd /Users/fs/Desktop/Project/work-helper
+  cd work-helper
   uv run pytest tests/test_chat_intent.py tests/test_conversation_persistence.py tests/test_migrations.py -q
   ```
 
 ### Task 4: 收紧任务预览工具并绑定权威 PMS 上下文
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/tools/pms.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/chat/service.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/registry.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/agents/prompts.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_pms_tools.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/tests/test_agents.py`
+- Modify: `work-helper/app/tools/pms.py`
+- Modify: `work-helper/app/chat/service.py`
+- Modify: `work-helper/app/agents/registry.py`
+- Modify: `work-helper/app/agents/prompts.py`
+- Modify: `work-helper/tests/test_pms_tools.py`
+- Modify: `work-helper/tests/test_agents.py`
 
 **Interfaces:**
 - 新增注册工具 `pms.task.create.preview`，输入只允许：
@@ -186,7 +186,7 @@
 - [ ] **Step 5: 运行工具和 Agent 测试。**
 
   ```bash
-  cd /Users/fs/Desktop/Project/work-helper
+  cd work-helper
   uv run pytest tests/test_pms_tools.py tests/test_agents.py tests/test_extensions.py -q
   ```
 
@@ -221,18 +221,18 @@
 - [ ] **Step 4: 运行 PMS AI focused tests。**
 
   ```bash
-  cd /Users/fs/Desktop/Project/pms-backend
+  cd pms-backend
   mvn -q -Dtest=AiCommandContractTest,AiCommandControllerTest,AiDelegationControllerTest,PageContextServiceTest test
   ```
 
 ### Task 6: 支持多预览展示、自然语言确认和页面刷新恢复
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/work-helper.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/components/ai/page-context.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/components/ai/page-context.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/project-detail-context.test.mjs`
+- Modify: `pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue`
+- Modify: `pms-front/src/api/work-helper.ts`
+- Modify: `pms-front/src/components/ai/page-context.ts`
+- Modify: `pms-front/src/components/ai/page-context.test.mjs`
+- Modify: `pms-front/src/views/project/detail/project-detail-context.test.mjs`
 
 **Interfaces:**
 - 前端将 `pendingPreview` 改为 `pendingPreviews`，保留旧单预览 SSE payload 的兼容解析。
@@ -258,7 +258,7 @@
 - [ ] **Step 5: 运行前端测试和构建。**
 
   ```bash
-  cd /Users/fs/Desktop/Project/pms-front
+  cd pms-front
   node --test src/components/ai/page-context.test.mjs src/views/project/detail/project-detail-context.test.mjs
   pnpm build
   ```
@@ -266,9 +266,9 @@
 ### Task 7: 端到端验收和可观测性
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/work-helper/README.md`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/README.md`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue` only if acceptance telemetry needs a UI marker.
+- Modify: `work-helper/README.md`
+- Modify: `README.md`
+- Modify: `pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue` only if acceptance telemetry needs a UI marker.
 
 - [ ] **Step 1: 增加不含密钥的链路日志。**
 
@@ -286,11 +286,11 @@
 - [ ] **Step 3: 运行完整相关测试。**
 
   ```bash
-  cd /Users/fs/Desktop/Project/work-helper
+  cd work-helper
   uv run pytest tests/test_chat.py tests/test_chat_service.py tests/test_chat_intent.py tests/test_pms_tools.py tests/test_conversation_persistence.py -q
-  cd /Users/fs/Desktop/Project/pms-backend
+  cd pms-backend
   mvn -q -Dtest=AiCommandContractTest,AiCommandControllerTest,AiDelegationControllerTest,PageContextServiceTest test
-  cd /Users/fs/Desktop/Project/pms-front
+  cd pms-front
   node --test src/components/ai/page-context.test.mjs src/views/project/detail/project-detail-context.test.mjs
   pnpm build
   ```

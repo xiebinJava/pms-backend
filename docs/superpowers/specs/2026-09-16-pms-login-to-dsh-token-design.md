@@ -27,11 +27,11 @@
 
 本功能只修改以下三个代码库：
 
-- `/Users/fs/Desktop/Project/pms-backend`：授权码存储、签发、兑换和令牌安全校验。
-- `/Users/fs/Desktop/Project/pms-front`：PMS iframe 的认证消息响应和登录态请求。
-- `/Users/fs/Desktop/Project/deepseek-harness`：DSH Client 桥接、Host Remote、授权码缓存和 PMS 插件兑换。
+- `pms-backend`：授权码存储、签发、兑换和令牌安全校验。
+- `pms-front`：PMS iframe 的认证消息响应和登录态请求。
+- `deepseek-harness`：DSH Client 桥接、Host Remote、授权码缓存和 PMS 插件兑换。
 
-`/Users/fs/Desktop/Project/work-helper` 不属于本功能的实现范围，也不再作为当前工作区的协作依赖；保留其本地仓库和历史代码，不删除、不启动、不修改。
+`work-helper` 不属于本功能的实现范围，也不再作为当前工作区的协作依赖；保留其本地仓库和历史代码，不删除、不启动、不修改。
 
 `pms-front` 中现有的 `src/api/work-helper.ts`、旧 AI 抽屉和 Agent 配置调用属于历史兼容代码。本功能不调用这些接口，也不因为移出 `worker-helper` 而直接删除它们；待 DSH 主工作区完成替代验证后，另立“旧 Work Helper 入口下线”任务，逐项移除旧 UI、API 类型和环境变量，避免本次认证改造引入无关回归。
 

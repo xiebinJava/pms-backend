@@ -14,9 +14,9 @@
 
 本计划涉及三个代码库：
 
-- PMS 后端：`/Users/fs/Desktop/Project/pms-backend`
-- DSH：`/Users/fs/Desktop/Project/deepseek-harness`
-- Work Helper 迁移兼容层：`/Users/fs/Desktop/Project/work-helper`
+- PMS 后端：`pms-backend`
+- DSH：`deepseek-harness`
+- Work Helper 迁移兼容层：`work-helper`
 
 当前 5174 页面对应的 PMS 前端工程不在上述三个目录中。Phase 0 必须先确认其实际仓库路径和启动方式；在路径确认前，只改 PMS 后端集成契约和 DSH 客户端包，不把前端改动写入错误仓库。
 
@@ -153,7 +153,7 @@ src/main/java/com/brad/pms/integration/dsh/
 在 DSH 中新增：
 
 ```text
-/Users/fs/Desktop/Project/deepseek-harness/packages/pms/dsh-pms/
+deepseek-harness/packages/pms/dsh-pms/
 ├── package.json
 ├── cordis.patch.yml
 ├── src/
@@ -221,7 +221,7 @@ error
 DSH 客户端新增独立 UI 包：
 
 ```text
-/Users/fs/Desktop/Project/deepseek-harness/packages/client/ui-pms-workspace/
+deepseek-harness/packages/client/ui-pms-workspace/
 ├── package.json
 ├── src/index.ts
 ├── src/PmsWorkspacePanel.tsx

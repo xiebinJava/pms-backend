@@ -163,12 +163,12 @@ POST /api/ai/delegation
 ### Task 5: Add Work Helper PMS tools
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/tools/registry.py`
-- Create: `/Users/fs/Desktop/Project/work-helper/app/tools/pms.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/api/routes/tools.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/api/routes/chat.py`
-- Modify: `/Users/fs/Desktop/Project/work-helper/app/api/schemas/chat.py`
-- Create: `/Users/fs/Desktop/Project/work-helper/tests/test_pms_tools.py`
+- Modify: `work-helper/app/tools/registry.py`
+- Create: `work-helper/app/tools/pms.py`
+- Modify: `work-helper/app/api/routes/tools.py`
+- Modify: `work-helper/app/api/routes/chat.py`
+- Modify: `work-helper/app/api/schemas/chat.py`
+- Create: `work-helper/tests/test_pms_tools.py`
 
 **Interfaces:**
 
@@ -188,13 +188,13 @@ def pms_command_preview(command: str, arguments: dict, context_id: str) -> dict:
 ### Task 6: Connect frontend page context and confirmation UI
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-front/src/components/ai/page-context.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/layout/Index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/work-helper.ts`
-- Test: `/Users/fs/Desktop/Project/pms-front/src/components/ai/page-context.test.mjs`
-- Test: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/workflow.test.mjs`
+- Create: `pms-front/src/components/ai/page-context.ts`
+- Modify: `pms-front/src/layout/Index.vue`
+- Modify: `pms-front/src/views/project/detail/index.vue`
+- Modify: `pms-front/src/views/project/detail/components/AiProjectAssistantDrawer.vue`
+- Modify: `pms-front/src/api/work-helper.ts`
+- Test: `pms-front/src/components/ai/page-context.test.mjs`
+- Test: `pms-front/src/views/project/detail/workflow.test.mjs`
 
 - [ ] Define a `PageContextProvider` that returns the page type, route, IDs, filters and current version metadata.
 - [ ] Register providers for project list, dashboard, project detail and workflow template pages.
@@ -208,13 +208,13 @@ def pms_command_preview(command: str, arguments: dict, context_id: str) -> dict:
 ### Task 7: Add a thin Codex-style `pms-cli`
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-cli/pom.xml`
-- Create: `/Users/fs/Desktop/Project/pms-cli/src/main/java/com/brad/pms/cli/PmsCliApplication.java`
-- Create: `/Users/fs/Desktop/Project/pms-cli/src/main/java/com/brad/pms/cli/PmsCli.java`
-- Create: `/Users/fs/Desktop/Project/pms-cli/src/main/java/com/brad/pms/cli/commands/ContextCommand.java`
-- Create: `/Users/fs/Desktop/Project/pms-cli/src/main/java/com/brad/pms/cli/commands/TaskCommand.java`
-- Create: `/Users/fs/Desktop/Project/pms-cli/src/main/java/com/brad/pms/cli/commands/OperationCommand.java`
-- Test: `/Users/fs/Desktop/Project/pms-cli/src/test/java/com/brad/pms/cli/PmsCliTest.java`
+- Create: `pms-cli/pom.xml`
+- Create: `pms-cli/src/main/java/com/brad/pms/cli/PmsCliApplication.java`
+- Create: `pms-cli/src/main/java/com/brad/pms/cli/PmsCli.java`
+- Create: `pms-cli/src/main/java/com/brad/pms/cli/commands/ContextCommand.java`
+- Create: `pms-cli/src/main/java/com/brad/pms/cli/commands/TaskCommand.java`
+- Create: `pms-cli/src/main/java/com/brad/pms/cli/commands/OperationCommand.java`
+- Test: `pms-cli/src/test/java/com/brad/pms/cli/PmsCliTest.java`
 
 - [ ] Use a top-level parser with subcommands `context`, `task` and `operation`, following Codex's centralized subcommand model.
 - [ ] Implement `pms context inspect --project --node --json`.
@@ -228,10 +228,10 @@ def pms_command_preview(command: str, arguments: dict, context_id: str) -> dict:
 ### Task 8: End-to-end verification and rollout
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/AiCommandEndToEndTest.java`
-- Create: `/Users/fs/Desktop/Project/work-helper/tests/test_pms_command_flow.py`
-- Modify: `/Users/fs/Desktop/Project/pms-front/tests/e2e/project-ai-assistant.spec.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/README.md`
+- Create: `src/test/java/com/brad/pms/ai/AiCommandEndToEndTest.java`
+- Create: `work-helper/tests/test_pms_command_flow.py`
+- Modify: `pms-front/tests/e2e/project-ai-assistant.spec.ts`
+- Modify: `README.md`
 
 - [ ] Test `project-detail` context inspection from the current project page.
 - [ ] Test natural-language task creation through Work Helper and verify the preview contains the current project and node.
