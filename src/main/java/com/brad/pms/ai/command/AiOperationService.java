@@ -79,6 +79,7 @@ public class AiOperationService {
         validateContractBinding(operation.getContractId(), operation.getContractVersion(), operation.getCommandName());
 
         CommandName commandName = parseCommandName(operation.getCommandName());
+        PmsCommandScopeGuard.requireScope(commandName);
         CommandResult result = registry.require(commandName).execute(operation);
         operation.setIdempotencyKey(request.idempotencyKey());
         operation.setResultJson(write(result));

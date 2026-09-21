@@ -14,6 +14,7 @@ public class CommandPreviewService {
 
     @Transactional
     public CommandPreview preview(CommandPreviewRequest request) {
+        PmsCommandScopeGuard.requireScope(request.name());
         PmsCommand command = registry.require(request.name());
         CommandPreview proposal = command.preview(request);
         return operationService.persistPreview(UserContext.userId(), request, proposal);
