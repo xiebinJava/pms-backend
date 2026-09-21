@@ -1,0 +1,77 @@
+contractId: pms-project-assistant/project-kickoff
+agentId: project_assistant
+contractKey: project-kickoff
+workflowNodeKeys:
+  - kickoff
+contractVersion: 1.0.0
+required: true
+locale: zh-CN
+principalRole: PMS 项目助手独立履行项目经理职责
+specializedAgents: []
+readCapabilities:
+  - 查询当前项目、节点、成员和任务（以当前已发布工具返回字段为准）
+readToolBindings:
+  project-list: pms_project_list
+  project-context: pms_project_get
+  task-context: pms_task_list
+  bounded-query: pms_query
+writeCommands:
+  - project.create
+  - project.update
+  - member.add
+  - node.owner.update
+  - node.schedule.update
+  - task.create
+  - task.assign
+  - task.update
+  - node.complete
+confirmationPolicies:
+  project.create: preview-and-confirm
+  project.update: preview-and-confirm
+  member.add: preview-and-confirm
+  node.owner.update: preview-and-confirm
+  node.schedule.update: preview-and-confirm
+  task.create: preview-and-confirm
+  task.assign: preview-and-confirm
+  task.update: preview-and-confirm
+  node.complete: preview-and-confirm
+entryConditions:
+  - 当前节点为项目立项与启动（kickoff）
+  - 用户已登录且当前 PMS 用户具备对应项目权限
+  - PMS 项目创建、节点初始化和任务写入能力可用
+inputs:
+  - 项目名称、目标、范围、成功标准
+  - 项目经理、项目成员、关注人和组织单元
+  - 项目优先级、项目等级、开始日期和截止日期
+  - 当前节点、节点负责人、节点排期和启动任务
+missingInputRules:
+  - 只使用用户明确提供的信息和 PMS 返回的事实
+  - 不猜测用户身份、组织、权限、负责人和关键日期
+  - 缺少关键字段时先询问，不生成写入预览
+  - 工作流有明确默认值时必须在预览中展示默认值
+executionSteps:
+  - 先读取项目、工作流节点、成员和任务状态
+  - 识别缺失信息并向用户补充询问
+  - 汇总项目字段、成员、负责人、排期和任务变更
+  - 对批量变更统一生成一份预览并等待用户明确确认
+  - 使用原操作编号和幂等键执行，不重复执行未知结果的操作
+  - 核验 PMS 返回结果，成功后统一刷新一次当前 PMS 页面
+  - 汇报结果并生成下一节点预览，不自动推进节点
+completionCriteria:
+  - 项目必填字段完整且已保存
+  - 项目经理、成员、节点负责人和排期符合当前权限与流程要求
+  - 启动任务已按用户要求创建、分配并保存
+  - 节点交付物、检查项和摘要已填写
+  - PMS 当前节点状态已核验
+failureStrategies:
+  - 鉴权失败立即停止写入并提示重新建立 PMS 登录态
+  - 参数校验失败时指出字段并回到补充信息
+  - 系统繁忙或超时时先按幂等键查询状态，不盲目重试
+  - 短暂网络失败最多使用同一幂等键重试三次
+  - 执行结果未知时标记待核验，禁止重新创建同一业务对象
+terminationConditions:
+  - 用户明确取消或暂不执行
+  - 关键输入缺失且用户无法补充
+  - 当前用户无权限或 PMS 能力不可用
+  - 连续三轮无法完成或发生数据冲突
+  - 写入结果无法核验

@@ -3,7 +3,9 @@ package com.brad.pms.controller;
 import com.brad.pms.ai.command.CommandName;
 import com.brad.pms.ai.command.PmsCommandDescriptor;
 import com.brad.pms.ai.command.PmsCommandMetadata;
+import com.brad.pms.ai.contract.PmsAgentContractRegistry;
 import com.brad.pms.common.response.ResponseResult;
+import com.brad.pms.integration.dsh.api.DshAgentContractCapabilityDTO;
 import com.brad.pms.integration.dsh.api.DshCommandCapabilityDTO;
 import com.brad.pms.integration.dsh.api.DshCapabilityDTO;
 import com.brad.pms.integration.dsh.api.DshQueryCapabilityDTO;
@@ -12,6 +14,7 @@ import com.brad.pms.security.UserContext;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +25,17 @@ import java.util.function.Predicate;
 @RestController
 @RequestMapping("/integration/dsh/v1")
 public class DshCapabilityController {
+
+    private final PmsAgentContractRegistry contractRegistry;
+
+    public DshCapabilityController() {
+        this.contractRegistry = null;
+    }
+
+    @Autowired
+    public DshCapabilityController(PmsAgentContractRegistry contractRegistry) {
+        this.contractRegistry = contractRegistry;
+    }
 
     @GetMapping("/capabilities")
     public ResponseResult<DshCapabilityDTO> capabilities() {
@@ -60,6 +74,20 @@ public class DshCapabilityController {
         DshAgentScopePolicy.PROJECT_ASSISTANT_SCOPES.stream()
                 .filter(scopeAvailable)
                 .forEach(scopes::add);
+        List<DshAgentContractCapabilityDTO> agentContracts = contractRegistry == null
+                || !contractRegistry.healthy()
+                || !scopeAvailable("pms:query:read")
+                ? List.of()
+                : contractRegistry.list().stream()
+                .map(contract -> new DshAgentContractCapabilityDTO(
+                        contract.agentId(),
+                        contract.contractKey(),
+                        contract.workflowNodeKeys(),
+                        contract.contractVersion(),
+                        "/integration/dsh/v1/agent-contracts/{agentId}/{contractKey}",
+                        "pms:query:read",
+                        contract.required()))
+                .toList();
         return ResponseResult.success(new DshCapabilityDTO(
                 "v1",
                 tools,
@@ -70,7 +98,8 @@ public class DshCapabilityController {
                         "project-dashboard",
                         "workflow-template"),
                 queryAvailable ? queries : List.of(),
-                commands));
+                commands,
+                agentContracts));
     }
 
     private boolean scopeAvailable(String scope) {

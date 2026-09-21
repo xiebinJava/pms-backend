@@ -37,6 +37,13 @@ public final class AiDelegationRoutePolicy {
         if ("GET".equalsIgnoreCase(method) && "/integration/dsh/v1/capabilities".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
         }
+        if ("GET".equalsIgnoreCase(method)
+                && path.matches("/integration/dsh/v1/agent-contracts/[^/]+/[^/]+")) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
+        }
+        if ("POST".equalsIgnoreCase(method) && "/integration/dsh/v1/query".equals(path)) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
+        }
         if ("GET".equalsIgnoreCase(method) && "/integration/dsh/v1/projects".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
         }

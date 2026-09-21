@@ -9,7 +9,18 @@ public record DshCapabilityDTO(
         List<String> scopes,
         List<String> pageTypes,
         List<DshQueryCapabilityDTO> queries,
-        List<DshCommandCapabilityDTO> commands) {
+        List<DshCommandCapabilityDTO> commands,
+        List<DshAgentContractCapabilityDTO> agentContracts) {
+
+    public DshCapabilityDTO(
+            String version,
+            List<String> tools,
+            List<String> scopes,
+            List<String> pageTypes,
+            List<DshQueryCapabilityDTO> queries,
+            List<DshCommandCapabilityDTO> commands) {
+        this(version, tools, scopes, pageTypes, queries, commands, List.of());
+    }
 
     public DshCapabilityDTO {
         tools = tools == null ? List.of() : List.copyOf(tools);
@@ -17,5 +28,6 @@ public record DshCapabilityDTO(
         pageTypes = pageTypes == null ? List.of() : List.copyOf(pageTypes);
         queries = queries == null ? List.of() : List.copyOf(queries);
         commands = commands == null ? List.of() : List.copyOf(commands);
+        agentContracts = agentContracts == null ? List.of() : List.copyOf(agentContracts);
     }
 }
