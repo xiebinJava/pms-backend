@@ -34,7 +34,7 @@ export PMS_DB_PASSWORD='仅在当前 shell 注入，不要提交到仓库'
 
    预检还会确认登录审计、会话表及其索引已经就绪，并要求所有项目具备组织归属且数据库中只有一个有效根组织。
 
-3. 启动带新迁移的后端。Flyway 会按 V1–V41 顺序只执行缺失版本；V37 增加计划节点迭代计划及故事关联字段，V38/V39 更新计划节点文案，V40 增加知识沉淀与标准改进工作台，V41 增加方案评审版本字段。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`。
+3. 启动带新迁移的后端。Flyway 会按 V1–V49 顺序只执行缺失版本；V37 增加计划节点迭代计划及故事关联字段，V38/V39 更新计划节点文案，V40 增加知识沉淀与标准改进工作台，V41 增加方案评审版本字段。`spring.sql.init.mode` 已关闭，不会重复执行 `schema.sql`。
 
    启动应用时使用 `--spring.profiles.active=mysql`，并提供 `MYSQL_HOST/PORT/DB/USER/PASSWORD`。不要使用 MySQL `root` 作为应用账号。
 
@@ -105,7 +105,7 @@ export PMS_CORS_ALLOWED_ORIGINS='https://pms.example.com'
 ## 8. 容器化与健康检查
 
 开源试用可从 `docker-compose.example.yml` 启动 MySQL、后端和前端。示例仅适用于新建
-空库；后端启动时由 Flyway 按 V1–V41 执行缺失版本，不再单独执行 `schema.sql`。已有生产库
+空库；后端启动时由 Flyway 按 V1–V49 执行缺失版本，不再单独执行 `schema.sql`。已有生产库
 必须使用本手册的备份、预检和升级流程；检测到旧 Flyway 历史时，需先核对发布包并显式设置 `PMS_ACCEPT_FLYWAY_BASELINE=true`。
 
 后端提供无需登录的 `GET /api/health` 和 `GET /api/healthz`：数据库可用返回 HTTP 200 与

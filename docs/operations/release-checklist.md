@@ -49,7 +49,7 @@
 - [ ] 已完成数据库备份与恢复演练，并保存校验值。
 - [ ] 备份文件包含 schema 版本、`.sha256` 校验文件和元数据，恢复仅使用显式空目标库。
 - [ ] 执行 `scripts/enterprise-preflight.sh` 通过。
-- [ ] 由后端 Flyway 按 V1–V41 顺序执行迁移；空库首次启动即可完成，不要改已发布的迁移文件 checksum。
+- [ ] 由后端 Flyway 按 V1–V49 顺序执行迁移；空库首次启动即可完成，不要改已发布的迁移文件 checksum。
 - [x] 执行迁移后 `scripts/verify-enterprise-migration.sh` 和 `scripts/enterprise-preflight.sh` 通过。
 - [ ] 生产应用只使用 `mysql` profile。
 - [ ] 迁移失败时不直接删除业务表，按升级手册恢复到新数据库。

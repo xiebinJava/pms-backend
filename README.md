@@ -59,10 +59,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V41）和前端：
+首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V49）和前端：
 
 ```text
-MySQL → uploads-init → backend（Flyway V1–V41）→ frontend
+MySQL → uploads-init → backend（Flyway V1–V49）→ frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -141,7 +141,7 @@ set +a
 ./scripts/verify-enterprise-migration.sh
 ```
 
-当前基线为 V1–V41。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+当前基线为 V1–V49。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
 ## 本地直接启动后端（已有 MySQL 时）
 
@@ -220,7 +220,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V41 MySQL / Flyway 迁移脚本
+├── db/migration/  V1–V49 MySQL / Flyway 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/
