@@ -17,8 +17,13 @@ import java.util.Map;
 /** Minimal liveness/readiness probe for self-hosted deployments. */
 @RestController
 public class HealthController {
-    /** Keep readiness aligned with the highest checked-in Flyway migration. */
-    private static final int LATEST_MIGRATION_VERSION = 46;
+    /**
+     * Keep readiness aligned with the highest checked-in Flyway migration.
+     * `scripts/release-consistency.test.sh` fails when this drifts from the
+     * migration directory, because a stale value makes every container
+     * healthcheck report the backend as unhealthy.
+     */
+    private static final int LATEST_MIGRATION_VERSION = 49;
 
     private final DataSource dataSource;
     private final int expectedMigrationVersion;
