@@ -1,5 +1,6 @@
 package com.brad.pms.ai.command;
 
+import com.brad.pms.ai.contract.PmsAgentContractRegistry;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.entity.AiOperationDO;
 import com.brad.pms.mapper.AiOperationMapper;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -28,10 +30,12 @@ public class AiOperationService {
     private final AiOperationMapper operationMapper;
     private final PmsCommandRegistry registry;
     private final ObjectMapper objectMapper;
+    private final PmsAgentContractRegistry contractRegistry;
 
     @Transactional
     public CommandPreview persistPreview(Long userId, CommandPreviewRequest request, CommandPreview proposal) {
         if (userId == null) throw BusinessException.unauthorized("未登录");
+        validateContractBinding(request.contractId(), request.contractVersion(), request.name().code());
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(PREVIEW_TTL_MINUTES);
         String operationId = UUID.randomUUID().toString();
         AiOperationDO operation = new AiOperationDO();
@@ -40,6 +44,8 @@ public class AiOperationService {
         operation.setUserId(userId);
         operation.setContextId(request.contextId());
         operation.setContextVersion(request.contextVersion());
+        operation.setContractId(request.contractId());
+        operation.setContractVersion(request.contractVersion());
         operation.setArgumentsJson(write(request.arguments()));
         operation.setPreviewJson(write(proposal));
         operation.setExpectedVersionsJson(write(proposal.changes()));
@@ -69,6 +75,8 @@ public class AiOperationService {
             operationMapper.updateById(operation);
             throw BusinessException.conflict("操作预览已过期，请重新生成预览");
         }
+        validateExecutionBinding(operation, request);
+        validateContractBinding(operation.getContractId(), operation.getContractVersion(), operation.getCommandName());
 
         CommandName commandName = parseCommandName(operation.getCommandName());
         CommandResult result = registry.require(commandName).execute(operation);
@@ -86,6 +94,29 @@ public class AiOperationService {
 
     public List<Map<String, Object>> expectedChanges(AiOperationDO operation) {
         return read(operation.getExpectedVersionsJson(), new TypeReference<>() { });
+    }
+
+    private void validateContractBinding(String contractId, String contractVersion, String commandName) {
+        if (contractId == null && contractVersion == null) return;
+        if (!contractRegistry.isCommandAllowed(contractId, contractVersion, commandName)) {
+            throw BusinessException.conflict("契约版本或操作命令未获授权，请重新生成预览");
+        }
+    }
+
+    private void validateExecutionBinding(AiOperationDO operation, OperationExecuteRequest request) {
+        if (operation.getContractId() != null
+                && (!Objects.equals(operation.getContractId(), request.contractId())
+                || !Objects.equals(operation.getContractVersion(), request.contractVersion()))) {
+            throw BusinessException.conflict("执行请求与原契约不一致，请重新生成预览");
+        }
+        if (request.contextId() != null
+                && (!Objects.equals(request.contextId(), operation.getContextId())
+                || !Objects.equals(request.contextVersion(), operation.getContextVersion()))) {
+            throw BusinessException.conflict("执行请求与原项目上下文不一致，请重新生成预览");
+        }
+        if (operation.getContractId() == null && request.contractId() != null) {
+            throw BusinessException.conflict("原操作预览未绑定契约，请重新生成预览");
+        }
     }
 
     private CommandName parseCommandName(String value) {

@@ -18,6 +18,8 @@ public class AiOperationDO {
     private Long userId;
     private String contextId;
     private String contextVersion;
+    private String contractId;
+    private String contractVersion;
     private String argumentsJson;
     private String previewJson;
     private String expectedVersionsJson;
