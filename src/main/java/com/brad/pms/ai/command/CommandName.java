@@ -14,6 +14,7 @@ public enum CommandName {
     PROJECT_ARCHIVE("project.archive"),
     PROJECT_CREATE("project.create"),
     PROJECT_DELETE("project.delete"),
+    PROJECT_UPDATE("project.update"),
     TASK_CREATE("task.create"),
     TASK_ASSIGN("task.assign"),
     TASK_UPDATE("task.update");

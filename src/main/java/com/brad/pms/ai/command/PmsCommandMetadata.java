@@ -11,7 +11,7 @@ public final class PmsCommandMetadata {
 
     public static String domainScope(CommandName name) {
         return switch (name) {
-            case MEMBER_ADD, MEMBER_REMOVE, PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE -> "pms:project:write";
+            case MEMBER_ADD, MEMBER_REMOVE, PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE -> "pms:project:write";
             case NODE_COMPLETE, NODE_ROLLBACK -> "pms:workflow:write";
             case NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> "pms:workflow:write";
             case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> "pms:task:write";
@@ -79,6 +79,25 @@ public final class PmsCommandMetadata {
             case PROJECT_DELETE -> descriptor(name, "删除项目（软删除）", "high", List.of(
                     Map.entry("projectId", Map.of("type", "integer", "required", true)),
                     Map.entry("reason", Map.of("type", "string", "required", true))));
+            case PROJECT_UPDATE -> new PmsCommandDescriptor(
+                    name,
+                    "更新项目名称、描述、优先级、等级、组织单元或整体排期",
+                    "write",
+                    "high",
+                    true,
+                    List.of("pms:project:write", "pms:command:preview", "pms:command:execute"),
+                    Map.ofEntries(
+                            Map.entry("projectId", Map.of("type", "integer", "required", true)),
+                            Map.entry("name", Map.of("type", "string")),
+                            Map.entry("description", Map.of("type", "string")),
+                            Map.entry("priority", Map.of("type", "integer")),
+                            Map.entry("projectLevel", Map.of("type", "integer")),
+                            Map.entry("orgUnitId", Map.of("type", "integer")),
+                            Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                            Map.entry("endDate", Map.of("type", "string", "format", "date"))),
+                    true,
+                    true,
+                    List.of("project-detail", "project-list", "project-dashboard"));
             case TASK_CREATE -> new PmsCommandDescriptor(
                     name,
                     "在指定项目节点创建任务",
