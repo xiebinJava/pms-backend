@@ -26,7 +26,7 @@ public class PmsAgentContractRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(PmsAgentContractRegistry.class);
     private static final Set<String> PUBLISHED_READ_TOOLS = Set.of(
-            "pms_project_list", "pms_project_get", "pms_task_list", "pms_query");
+            "pms_project_list", "pms_project_get", "pms_task_list", "pms_people_list", "pms_query");
     private static final String RESOURCE_PATTERN = "classpath*:agent-contracts/**/*.yaml";
 
     private final PmsAgentContractLoader loader;

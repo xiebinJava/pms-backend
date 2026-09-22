@@ -16,6 +16,14 @@ public final class PmsAgentContractLoader {
 
     private static final Pattern AGENT_ID = Pattern.compile("[a-zA-Z0-9_-]{1,64}");
     private static final Pattern VERSION = Pattern.compile("\\d+\\.\\d+\\.\\d+");
+    /**
+     * Accepted confirmation policies. `preview-and-confirm` keeps the human in
+     * the loop; `preview-then-execute` is the same preview/execute chain without
+     * waiting for a per-write confirmation, for deployments whose caller already
+     * holds the account's own write authority.
+     */
+    private static final Set<String> CONFIRMATION_POLICIES =
+            Set.of("preview-and-confirm", "preview-then-execute");
 
     private final ObjectMapper yamlMapper;
     private final Set<String> supportedWriteCommands;
@@ -94,7 +102,7 @@ public final class PmsAgentContractLoader {
             }
         }
         for (Map.Entry<String, String> policy : contract.confirmationPolicies().entrySet()) {
-            if (!"preview-and-confirm".equals(policy.getValue())) {
+            if (!CONFIRMATION_POLICIES.contains(policy.getValue())) {
                 throw new IllegalArgumentException("确认策略无效: " + policy.getValue());
             }
         }

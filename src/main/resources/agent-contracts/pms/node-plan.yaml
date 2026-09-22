@@ -1,16 +1,16 @@
-contractId: pms-project-assistant/project-kickoff
+contractId: pms-project-assistant/plan
 agentId: project_assistant
-contractKey: project-kickoff
+contractKey: plan
 workflowNodeKeys:
-  - kickoff
-contractVersion: 1.2.0
+  - plan
+contractVersion: 1.0.0
 required: true
 locale: zh-CN
 principalRole: PMS 项目助手独立履行项目经理职责
 specializedAgents: []
 readCapabilities:
   - 查询当前项目、节点、成员和任务（以当前已发布工具返回字段为准）
-  - 按姓名或邮箱查询可选人员目录，用于把“项目经理、成员、关注人”解析成账号
+  - 按姓名或邮箱查询可选人员目录，用于把负责人、成员、关注人解析成账号
 readToolBindings:
   project-list: pms_project_list
   project-context: pms_project_get
@@ -18,68 +18,50 @@ readToolBindings:
   people-directory: pms_people_list
   bounded-query: pms_query
 writeCommands:
-  - project.create
-  - project.update
-  - member.add
-  - member.remove
-  - follower.add
-  - follower.remove
+  - node.field.update
   - node.owner.update
   - node.schedule.update
   - task.create
   - task.assign
   - task.update
   - node.complete
-  - node.field.update
   - batch.write
-  # 软删除项目：从常规列表隐藏，恢复需走 PMS 管理流程。
-  - project.delete
 confirmationPolicies:
-  project.create: preview-then-execute
-  project.update: preview-then-execute
-  member.add: preview-then-execute
-  member.remove: preview-then-execute
-  follower.add: preview-then-execute
-  follower.remove: preview-then-execute
+  node.field.update: preview-then-execute
   node.owner.update: preview-then-execute
   node.schedule.update: preview-then-execute
   task.create: preview-then-execute
   task.assign: preview-then-execute
   task.update: preview-then-execute
   node.complete: preview-then-execute
-  node.field.update: preview-then-execute
   batch.write: preview-then-execute
-  project.delete: preview-then-execute
 entryConditions:
-  - 当前节点为项目立项与启动（kickoff）
+  - 当前节点为计划、资源与风险基线（plan）
   - 用户已登录且当前 PMS 用户具备对应项目权限
-  - PMS 项目创建、节点初始化和任务写入能力可用
+  - 计划资源风险工作台和任务写入能力可用
 inputs:
-  - 项目名称、目标、范围、成功标准
-  - 项目经理、项目成员、关注人和组织单元
-  - 项目优先级、项目等级、开始日期和截止日期
-  - 当前节点、节点负责人、节点排期和启动任务
-  - 节点自定义字段（如页面已配置）
-  - 批量操作（例如一次性创建多个任务或添加多个成员）的子操作清单
+  - 计划资源风险工作台字段（工作台标识 plan-resource-risk），包括迭代计划、资源清单和风险登记册
+  - WBS 与项目计划、范围及优先级清单、资源及依赖清单、风险登记册
+  - 页面已配置的节点自定义字段
+  - 节点负责人、节点排期和本节点任务
 missingInputRules:
   - 只使用用户明确提供的信息和 PMS 返回的事实
   - 不猜测用户身份、组织、权限、负责人和关键日期
   - 缺少关键字段时先询问，不生成写入预览
   - 工作流有明确默认值时必须在预览中展示默认值
 executionSteps:
-  - 先读取项目、工作流节点、成员和任务状态
+  - 先读取项目、当前节点、计划资源风险工作台字段和任务状态
   - 识别缺失信息并向用户补充询问
-  - 汇总项目字段、成员、负责人、排期和任务变更
+  - 汇总迭代计划、资源、风险、负责人、排期和任务变更
   - 对批量变更统一生成一份预览并直接执行，无需等待用户逐次确认
   - 使用原操作编号和幂等键执行，不重复执行未知结果的操作
   - 核验 PMS 返回结果，成功后统一刷新一次当前 PMS 页面
   - 汇报结果并生成下一节点预览，不自动推进节点
 completionCriteria:
-  - 项目必填字段完整且已保存
-  - 项目经理、成员、节点负责人和排期符合当前权限与流程要求
-  - 启动任务已按用户要求创建、分配并保存
-  - 批量请求已作为一次操作完成并可核验
-  - 节点交付物、检查项和摘要已填写
+  - 迭代计划、资源清单和风险登记册已填写并保存
+  - 计划基线符合当前权限与流程要求
+  - 节点负责人、节点排期和本节点任务已按用户要求维护
+  - 页面已配置的自定义字段和检查项已填写
   - PMS 当前节点状态已核验
 failureStrategies:
   - 鉴权失败立即停止写入并提示重新建立 PMS 登录态

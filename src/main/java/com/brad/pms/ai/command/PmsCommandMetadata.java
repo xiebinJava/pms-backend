@@ -11,22 +11,43 @@ public final class PmsCommandMetadata {
 
     public static String domainScope(CommandName name) {
         return switch (name) {
-            case MEMBER_ADD, MEMBER_REMOVE, PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE -> "pms:project:write";
+            case BATCH_WRITE -> "pms:command:preview";
+            case FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE,
+                 PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE -> "pms:project:write";
             case NODE_COMPLETE, NODE_ROLLBACK -> "pms:workflow:write";
-            case NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> "pms:workflow:write";
+            case NODE_FIELD_UPDATE, NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> "pms:workflow:write";
             case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> "pms:task:write";
         };
     }
 
     public static PmsCommandDescriptor descriptor(CommandName name) {
         return switch (name) {
+            case BATCH_WRITE -> new PmsCommandDescriptor(
+                    name,
+                    "在一次操作中批量执行多条已注册的 PMS 写入命令（例如批量创建任务或成员），失败整体回滚",
+                    "write",
+                    "high",
+                    true,
+                    List.of("pms:command:preview", "pms:command:execute"),
+                    Map.of("operations", Map.of("type", "array", "required", true,
+                            "description", "最多 20 条 {command, arguments} 子操作")),
+                    true,
+                    true,
+                    List.of("project-detail", "project-list", "project-dashboard", "task-board"));
+            case FOLLOWER_ADD -> descriptor(name, "为项目添加关注人", "medium", List.of(
+                    Map.entry("projectId", Map.of("type", "integer", "required", true)),
+                    Map.entry("userId", Map.of("type", "integer", "required", true))));
+            case FOLLOWER_REMOVE -> descriptor(name, "移除项目关注人", "medium", List.of(
+                    Map.entry("projectId", Map.of("type", "integer", "required", true)),
+                    Map.entry("userId", Map.of("type", "integer", "required", true))));
             case MEMBER_ADD -> descriptor(name, "向项目添加成员", "medium", List.of(
                     Map.entry("projectId", Map.of("type", "integer", "required", true)),
                     Map.entry("userId", Map.of("type", "integer", "required", true)),
                     Map.entry("role", Map.of("type", "integer", "enum", List.of(1, 2)))));
             case MEMBER_REMOVE -> descriptor(name, "从项目移除成员", "high", List.of(
                     Map.entry("projectId", Map.of("type", "integer", "required", true)),
-                    Map.entry("memberId", Map.of("type", "integer", "required", true))));
+                    Map.entry("memberId", Map.of("type", "integer")),
+                    Map.entry("userId", Map.of("type", "integer"))));
             case NODE_COMPLETE -> new PmsCommandDescriptor(
                     name,
                     "完成指定项目节点并推进项目流程",
@@ -37,6 +58,25 @@ public final class PmsCommandMetadata {
                     Map.of(
                             "projectId", Map.of("type", "integer", "required", true),
                             "nodeId", Map.of("type", "integer", "required", true)),
+                    true,
+                    true,
+                    List.of("project-detail", "project-dashboard", "task-board"));
+            case NODE_FIELD_UPDATE -> new PmsCommandDescriptor(
+                    name,
+                    "更新节点工作台字段（需求范围、方案设计、计划资源风险、开发测试、验收、发布、价值验证、知识沉淀、自定义字段）",
+                    "write",
+                    "medium",
+                    true,
+                    List.of("pms:workflow:write", "pms:command:preview", "pms:command:execute"),
+                    Map.ofEntries(
+                            Map.entry("projectId", Map.of("type", "integer", "required", true)),
+                            Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                            Map.entry("workbench", Map.of("type", "string", "required", true,
+                                    "description", "工作台标识：requirement-scope / solution-design / plan-resource-risk / "
+                                            + "solution-decision / development-control / business-acceptance / release-handover / "
+                                            + "value-review / knowledge-standard / custom-fields；与节点 components 名称一致")),
+                            Map.entry("fields", Map.of("type", "object", "required", true,
+                                    "description", "仅包含需要修改的字段；未提供的字段保留原值"))),
                     true,
                     true,
                     List.of("project-detail", "project-dashboard", "task-board"));
@@ -66,7 +106,7 @@ public final class PmsCommandMetadata {
             case PROJECT_ARCHIVE -> descriptor(name, "归档（终止）一个进行中的项目", "high", List.of(
                     Map.entry("projectId", Map.of("type", "integer", "required", true)),
                     Map.entry("reason", Map.of("type", "string", "required", true))));
-            case PROJECT_CREATE -> descriptor(name, "创建项目并初始化项目流程", "high", List.of(
+            case PROJECT_CREATE -> descriptor(name, "创建项目并初始化项目流程；priority：3=紧急、2=高、1=普通、0=低；项目负责人与创建人自动为当前登录账号", "high", List.of(
                     Map.entry("name", Map.of("type", "string", "required", true)),
                     Map.entry("description", Map.of("type", "string")),
                     Map.entry("priority", Map.of("type", "integer")),
@@ -81,7 +121,7 @@ public final class PmsCommandMetadata {
                     Map.entry("reason", Map.of("type", "string", "required", true))));
             case PROJECT_UPDATE -> new PmsCommandDescriptor(
                     name,
-                    "更新项目名称、描述、优先级、等级、组织单元或整体排期",
+                    "更新项目名称、描述、优先级（3=紧急、2=高、1=普通、0=低）、等级、组织单元、项目经理或整体排期",
                     "write",
                     "high",
                     true,
@@ -93,6 +133,7 @@ public final class PmsCommandMetadata {
                             Map.entry("priority", Map.of("type", "integer")),
                             Map.entry("projectLevel", Map.of("type", "integer")),
                             Map.entry("orgUnitId", Map.of("type", "integer")),
+                            Map.entry("projectManagerId", Map.of("type", "integer")),
                             Map.entry("startDate", Map.of("type", "string", "format", "date")),
                             Map.entry("endDate", Map.of("type", "string", "format", "date"))),
                     true,

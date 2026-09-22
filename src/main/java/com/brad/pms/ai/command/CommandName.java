@@ -5,9 +5,13 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 /** Stable names for user-facing PMS commands. */
 public enum CommandName {
+    BATCH_WRITE("batch.write"),
+    FOLLOWER_ADD("follower.add"),
+    FOLLOWER_REMOVE("follower.remove"),
     MEMBER_ADD("member.add"),
     MEMBER_REMOVE("member.remove"),
     NODE_COMPLETE("node.complete"),
+    NODE_FIELD_UPDATE("node.field.update"),
     NODE_ROLLBACK("node.rollback"),
     NODE_OWNER_UPDATE("node.owner.update"),
     NODE_SCHEDULE_UPDATE("node.schedule.update"),

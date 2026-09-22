@@ -23,10 +23,12 @@ class PmsAgentContractRegistryTest {
     }
 
     private static final Set<String> WRITE_COMMANDS = Set.of(
-            "project.create", "member.add", "node.owner.update", "node.schedule.update",
-            "task.create", "task.assign", "task.update", "node.complete", "project.update");
+            "batch.write", "project.create", "member.add", "member.remove", "follower.add", "follower.remove",
+            "node.owner.update", "node.schedule.update",
+            "task.create", "task.assign", "task.update", "node.complete", "node.field.update",
+            "project.update", "project.delete");
     private static final Set<String> READ_TOOLS = Set.of(
-            "pms_project_list", "pms_project_get", "pms_task_list", "pms_query");
+            "pms_project_list", "pms_project_get", "pms_task_list", "pms_people_list", "pms_query");
 
     @Test
     void loadsTheKickoffContractWithTheRealWorkflowNodeAndExecutableBindings() {
@@ -42,8 +44,11 @@ class PmsAgentContractRegistryTest {
         assertThat(contract.required()).isTrue();
         assertThat(contract.specializedAgents()).isEmpty();
         assertThat(contract.writeCommands()).containsExactlyElementsOf(List.of(
-                "project.create", "project.update", "member.add", "node.owner.update", "node.schedule.update",
-                "task.create", "task.assign", "task.update", "node.complete"));
+                "project.create", "project.update", "member.add", "member.remove",
+                "follower.add", "follower.remove",
+                "node.owner.update", "node.schedule.update",
+                "task.create", "task.assign", "task.update", "node.complete",
+                "node.field.update", "batch.write", "project.delete"));
         assertThat(contract.readToolBindings()).containsEntry("project-context", "pms_project_get");
         assertThat(contract.completionCriteria()).isNotEmpty();
         assertThat(contract.failureStrategies()).isNotEmpty();
@@ -52,21 +57,21 @@ class PmsAgentContractRegistryTest {
     @Test
     void rejectsAWriteCommandThatIsNotRegisteredByPms() {
         PmsAgentContractLoader loader = new PmsAgentContractLoader(WRITE_COMMANDS, READ_TOOLS);
-        String yaml = validYaml("project.delete", "pms_project_get");
+        String yaml = validYaml("project.purge", "pms_project_get");
 
         assertThatThrownBy(() -> loader.load(new ByteArrayResource(yaml.getBytes(StandardCharsets.UTF_8))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("未注册的写入命令: project.delete");
+                .hasMessageContaining("未注册的写入命令: project.purge");
     }
 
     @Test
     void rejectsAReadToolThatIsNotPublishedByDsh() {
         PmsAgentContractLoader loader = new PmsAgentContractLoader(WRITE_COMMANDS, READ_TOOLS);
-        String yaml = validYaml("project.create", "pms_people_list");
+        String yaml = validYaml("project.create", "pms_admin_console");
 
         assertThatThrownBy(() -> loader.load(new ByteArrayResource(yaml.getBytes(StandardCharsets.UTF_8))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("未发布的读取工具: pms_people_list");
+                .hasMessageContaining("未发布的读取工具: pms_admin_console");
     }
 
     @Test
@@ -105,6 +110,7 @@ class PmsAgentContractRegistryTest {
         assertThat(first.readToolBindings()).isEqualTo(Map.of(
                 "project-context", "pms_project_get",
                 "task-context", "pms_task_list",
+                "people-directory", "pms_people_list",
                 "project-list", "pms_project_list",
                 "bounded-query", "pms_query"));
     }

@@ -1,0 +1,75 @@
+# Chinese labels for the fields the PMS Agent may write through `node.field.update`.
+# This file is data, not code: add a label here when a workbench gains a field,
+# and the covered-fields test will keep the list honest.
+# Kept outside agent-contracts/: that folder is scanned for Agent contracts.
+workbenches:
+  requirement-scope:
+    label: 需求范围与基线
+    fields:
+      scopeItems: 范围清单
+      requirements: 需求清单
+  solution-design:
+    label: 方案设计与评审
+    fields:
+      productSolution: 产品方案
+      technicalSolution: 技术方案
+  solution-decision:
+    label: 方案决策
+    fields:
+      result: 方案决策结果
+      conditions: 通过条件与遗留事项
+  # 评审子操作（按评审类型提交意见/指派评审人）还需要 reviewType 参数，尚未接入 node.field.update。
+  solution-review:
+    label: 方案评审
+    fields:
+      comment: 评审意见
+      reviewerId: 评审负责人
+  plan-resource-risk:
+    label: 计划资源与风险
+    fields:
+      iterationPlans: 迭代计划
+      resources: 资源清单
+      risks: 风险登记册
+  development-control:
+    label: 开发测试与项目控制
+    fields:
+      currentIteration: 当前迭代
+      topics: 开发专题
+  business-acceptance:
+    label: 业务验收与缺陷闭环
+    fields:
+      result: 验收结论
+      residualItems: 遗留事项
+      items: 验收用例
+  release-handover:
+    label: 发布决策与运营交接
+    fields:
+      releaseVersion: 发布版本
+      releaseWindowStart: 发布窗口开始
+      releaseWindowEnd: 发布窗口结束
+      releaseType: 发布类型
+      packageReady: 发布包就绪
+      configConfirmed: 配置确认
+      rollbackReady: 回滚预案就绪
+      monitoringConfirmed: 监控告警确认
+      onCallConfirmed: 值班安排确认
+      decisionResult: 发布决策结果
+      decisionNote: 决策说明
+      handoverNotes: 交接说明
+      observationItems: 发布后观察事项
+      emergencyContact: 值班与应急联系人
+  value-review:
+    label: 价值验证与项目复盘
+    fields:
+      resultStatus: 验证结论
+      actualResult: 实际价值结果
+      retrospectiveConclusion: 复盘结论
+      followUpActions: 改进行动
+  knowledge-standard:
+    label: 知识沉淀与标准改进
+    fields:
+      assets: 知识资产
+      actions: 标准改进行动
+  custom-fields:
+    label: 节点自定义字段
+    fields: {}
