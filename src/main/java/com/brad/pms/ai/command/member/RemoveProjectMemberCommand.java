@@ -1,5 +1,6 @@
 package com.brad.pms.ai.command.member;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.ai.command.CommandArgumentReader;
 import com.brad.pms.ai.command.CommandName;
 import com.brad.pms.ai.command.CommandPreview;
@@ -30,7 +31,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RemoveProjectMemberCommand implements PmsCommand {
 
-    private static final Set<String> ALLOWED_ARGUMENTS = Set.of("projectId", "memberId");
+    private static final Set<String> ALLOWED_ARGUMENTS = Set.of("projectId", "memberId", "userId");
 
     private final MemberService memberService;
     private final ProjectPermissionService permissionService;
@@ -46,9 +47,9 @@ public class RemoveProjectMemberCommand implements PmsCommand {
     public CommandPreview preview(CommandPreviewRequest request) {
         CommandArgumentReader.rejectUnknown(request.arguments(), ALLOWED_ARGUMENTS, "member.remove");
         Long projectId = CommandArgumentReader.requiredLong(request.arguments(), "projectId");
-        Long memberId = CommandArgumentReader.requiredLong(request.arguments(), "memberId");
         ProjectDO project = permissionService.requireProjectManageable(projectId, "维护项目成员");
-        ProjectMemberDO member = requireRemovableMember(projectId, memberId);
+        ProjectMemberDO member = requireRemovableMember(projectId, resolveMember(request.arguments(), projectId));
+        Long memberId = member.getId();
 
         Map<String, Object> change = new LinkedHashMap<>();
         change.put("entity", "project-member");
@@ -69,9 +70,9 @@ public class RemoveProjectMemberCommand implements PmsCommand {
         Map<String, Object> arguments = readArguments(operation.getArgumentsJson());
         CommandArgumentReader.rejectUnknown(arguments, ALLOWED_ARGUMENTS, "member.remove");
         Long projectId = CommandArgumentReader.requiredLong(arguments, "projectId");
-        Long memberId = CommandArgumentReader.requiredLong(arguments, "memberId");
         ProjectDO project = permissionService.requireProjectManageable(projectId, "维护项目成员");
-        ProjectMemberDO member = requireRemovableMember(projectId, memberId);
+        ProjectMemberDO member = requireRemovableMember(projectId, resolveMember(arguments, projectId));
+        Long memberId = member.getId();
         assertFresh(operation, project.getVersion(), member.getVersion());
         memberService.remove(projectId, memberId);
         return new CommandResult(operation.getId(), "SUCCEEDED", "项目成员已移除", Map.of(
@@ -79,14 +80,33 @@ public class RemoveProjectMemberCommand implements PmsCommand {
                 List.of("project-detail", "project-list", "project-dashboard"));
     }
 
-    private ProjectMemberDO requireRemovableMember(Long projectId, Long memberId) {
-        ProjectMemberDO member = memberMapper.selectById(memberId);
+    private ProjectMemberDO requireRemovableMember(Long projectId, ProjectMemberDO member) {
         if (member == null || !projectId.equals(member.getProjectId())) {
             throw BusinessException.error("成员不存在");
         }
         if (member.getRole() == null || member.getRole() == 0) {
             throw BusinessException.error("项目负责人不可移除");
         }
+        return member;
+    }
+
+    /**
+     * Members can be named either by the member row id returned by PMS or by the
+     * user id, so a natural-language request does not need to know which one the
+     * caller happens to hold.
+     */
+    private ProjectMemberDO resolveMember(Map<String, Object> arguments, Long projectId) {
+        Long memberId = CommandArgumentReader.optionalLong(arguments, "memberId");
+        if (memberId != null) return memberMapper.selectById(memberId);
+        Long userId = CommandArgumentReader.optionalLong(arguments, "userId");
+        if (userId == null) {
+            throw BusinessException.error("成员移除需要提供 memberId 或 userId");
+        }
+        ProjectMemberDO member = memberMapper.selectOne(new LambdaQueryWrapper<ProjectMemberDO>()
+                .eq(ProjectMemberDO::getProjectId, projectId)
+                .eq(ProjectMemberDO::getUserId, userId)
+                .last("LIMIT 1"));
+        if (member == null) throw BusinessException.error("该用户不是项目成员");
         return member;
     }
 

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -72,5 +73,23 @@ public class FollowerService {
                     AuditAction.PROJECT_FOLLOWER_CHANGED.name(), AuditResourceType.PROJECT_FOLLOWER.name(), null, projectId,
                     null, java.util.Map.of("userIds", previous), java.util.Map.of("userIds", selected)));
         }
+    }
+
+    /** Adds one follower without touching the followers the caller did not name. */
+    @Transactional
+    public void add(Long projectId, Long userId) {
+        List<Long> selected = new ArrayList<>(listUserIds(projectId));
+        if (!selected.contains(userId)) {
+            selected.add(userId);
+        }
+        replace(projectId, selected);
+    }
+
+    /** Removes one follower; a user who is not following the project stays untouched. */
+    @Transactional
+    public void remove(Long projectId, Long userId) {
+        List<Long> selected = new ArrayList<>(listUserIds(projectId));
+        selected.remove(userId);
+        replace(projectId, selected);
     }
 }

@@ -89,6 +89,32 @@ class MemberCommandTest {
         assertThat(result.message()).isEqualTo("项目成员已移除");
     }
 
+    @Test
+    void removeMemberAcceptsAUserIdSoNaturalLanguageDoesNotNeedTheMemberRowId() {
+        when(permissionService.requireProjectManageable(22L, "维护项目成员")).thenReturn(project(4));
+        ProjectMemberDO member = new ProjectMemberDO();
+        member.setId(51L);
+        member.setProjectId(22L);
+        member.setUserId(31L);
+        member.setRole(MemberRole.MEMBER.getCode());
+        member.setVersion(2);
+        when(memberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(member);
+        RemoveProjectMemberCommand command = new RemoveProjectMemberCommand(memberService, permissionService,
+                memberMapper, new ObjectMapper());
+
+        CommandPreview preview = command.preview(new CommandPreviewRequest(CommandName.MEMBER_REMOVE,
+                Map.of("projectId", 22L, "userId", 31L), "project-detail", "v1"));
+
+        assertThat(preview.changes()).singleElement().satisfies(change -> {
+            assertThat(change).containsEntry("memberId", 51L);
+            assertThat(change).containsEntry("userId", 31L);
+        });
+        CommandResult result = command.execute(operation("{\"projectId\":22,\"userId\":31}",
+                "[{\"projectVersion\":4,\"memberVersion\":2}]"));
+        verify(memberService).remove(22L, 51L);
+        assertThat(result.message()).isEqualTo("项目成员已移除");
+    }
+
     private static ProjectDO project(int version) {
         ProjectDO project = new ProjectDO();
         project.setId(22L);

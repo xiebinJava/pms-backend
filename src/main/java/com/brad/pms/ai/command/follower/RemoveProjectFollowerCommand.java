@@ -1,0 +1,102 @@
+package com.brad.pms.ai.command.follower;
+
+import com.brad.pms.ai.command.CommandArgumentReader;
+import com.brad.pms.ai.command.CommandName;
+import com.brad.pms.ai.command.CommandPreview;
+import com.brad.pms.ai.command.CommandPreviewRequest;
+import com.brad.pms.ai.command.CommandResult;
+import com.brad.pms.ai.command.PmsCommand;
+import com.brad.pms.ai.command.PmsCommandVersionGuard;
+import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.entity.AiOperationDO;
+import com.brad.pms.entity.ProjectDO;
+import com.brad.pms.service.FollowerService;
+import com.brad.pms.service.ProjectPermissionService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Removes one project follower. Like {@link AddProjectFollowerCommand} this is
+ * a single-person change, so the rest of the follower list is never rewritten.
+ */
+@Component
+@RequiredArgsConstructor
+public class RemoveProjectFollowerCommand implements PmsCommand {
+
+    private static final Set<String> ALLOWED_ARGUMENTS = Set.of("projectId", "userId");
+
+    private static final List<String> REFRESH_SCOPES =
+            List.of("project-detail", "project-list", "project-dashboard");
+
+    private final FollowerService followerService;
+    private final ProjectPermissionService permissionService;
+    private final ObjectMapper objectMapper;
+
+    @Override
+    public CommandName name() {
+        return CommandName.FOLLOWER_REMOVE;
+    }
+
+    @Override
+    public CommandPreview preview(CommandPreviewRequest request) {
+        Map<String, Object> arguments = request.arguments();
+        CommandArgumentReader.rejectUnknown(arguments, ALLOWED_ARGUMENTS, "follower.remove");
+        Long projectId = CommandArgumentReader.requiredLong(arguments, "projectId");
+        Long userId = CommandArgumentReader.requiredLong(arguments, "userId");
+        ProjectDO project = permissionService.requireProjectManageable(projectId, "维护项目关注人");
+        if (!followerService.listUserIds(projectId).contains(userId)) {
+            throw BusinessException.error("该用户不是项目关注人");
+        }
+
+        Map<String, Object> change = new LinkedHashMap<>();
+        change.put("entity", "project-follower");
+        change.put("action", "remove");
+        change.put("projectId", projectId);
+        change.put("userId", userId);
+        change.put("projectVersion", project.getVersion());
+        return new CommandPreview(null, name(), Instant.now().plusSeconds(600), request.contextVersion(),
+                List.of("只移除这一位关注人，其他关注人保持不变"), List.of(change), REFRESH_SCOPES);
+    }
+
+    @Override
+    public CommandResult execute(AiOperationDO operation) {
+        Map<String, Object> arguments = readArguments(operation.getArgumentsJson());
+        CommandArgumentReader.rejectUnknown(arguments, ALLOWED_ARGUMENTS, "follower.remove");
+        Long projectId = CommandArgumentReader.requiredLong(arguments, "projectId");
+        Long userId = CommandArgumentReader.requiredLong(arguments, "userId");
+        ProjectDO project = permissionService.requireProjectManageable(projectId, "维护项目关注人");
+        assertFresh(operation, project.getVersion());
+        followerService.remove(projectId, userId);
+        return new CommandResult(operation.getId(), "SUCCEEDED", "关注人已移除", Map.of(
+                "projectId", projectId, "userId", userId), REFRESH_SCOPES);
+    }
+
+    private void assertFresh(AiOperationDO operation, Integer projectVersion) {
+        try {
+            List<Map<String, Object>> changes = objectMapper.readValue(
+                    operation.getExpectedVersionsJson(), new TypeReference<>() { });
+            if (!changes.isEmpty()) {
+                PmsCommandVersionGuard.requireMatch("项目", changes.get(0).get("projectVersion"), projectVersion);
+            }
+        } catch (JsonProcessingException e) {
+            throw BusinessException.error("关注人移除预览版本信息无效");
+        }
+    }
+
+    private Map<String, Object> readArguments(String json) {
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() { });
+        } catch (JsonProcessingException e) {
+            throw BusinessException.error("关注人移除参数无效");
+        }
+    }
+}

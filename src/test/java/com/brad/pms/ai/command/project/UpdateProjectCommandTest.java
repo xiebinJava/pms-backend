@@ -91,6 +91,46 @@ class UpdateProjectCommandTest {
     }
 
     @Test
+    void updateAssignsAProjectManagerAndNeverClearsOneSilently() {
+        when(permissionService.requireProjectWritable(22L, "编辑项目")).thenReturn(project(7));
+        when(permissionService.requireProjectManageable(22L, "变更项目经理")).thenReturn(project(7));
+        ProjectDTO updated = new ProjectDTO();
+        updated.setId(22L);
+        when(projectService.update(eq(22L), any(ProjectUpdateCmd.class))).thenReturn(updated);
+
+        CommandPreview preview = command().preview(new CommandPreviewRequest(CommandName.PROJECT_UPDATE, Map.of(
+                "projectId", 22L,
+                "projectManagerId", 31L), "project-detail", "v1"));
+
+        assertThat(preview.changes()).singleElement().satisfies(change -> {
+            assertThat(change).containsEntry("fromProjectManagerId", null);
+            assertThat(change).containsEntry("toProjectManagerId", 31L);
+        });
+
+        command().execute(operation("{\"projectId\":22,\"projectManagerId\":31}",
+                "[{\"projectVersion\":7}]"));
+        ArgumentCaptor<ProjectUpdateCmd> captor = ArgumentCaptor.forClass(ProjectUpdateCmd.class);
+        verify(projectService).update(eq(22L), captor.capture());
+        assertThat(captor.getValue().getProjectManagerId()).isEqualTo(31L);
+        assertThat(captor.getValue().getMemberIds()).isNull();
+        assertThat(captor.getValue().getFollowerIds()).isNull();
+    }
+
+    @Test
+    void updateRejectsClearingTheProjectManagerThroughAnExplicitNull() {
+        when(permissionService.requireProjectWritable(22L, "编辑项目")).thenReturn(project(7));
+        Map<String, Object> arguments = new HashMap<>();
+        arguments.put("projectId", 22L);
+        arguments.put("projectManagerId", null);
+
+        assertThatThrownBy(() -> command().preview(new CommandPreviewRequest(
+                CommandName.PROJECT_UPDATE, arguments, "project-detail", "v1")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("项目经理不能通过项目更新清空");
+        verifyNoInteractions(projectService);
+    }
+
+    @Test
     void updateExecuteMergesCurrentValuesAndNeverTouchesComposition() {
         when(permissionService.requireProjectWritable(22L, "编辑项目")).thenReturn(project(7));
         ProjectDTO updated = new ProjectDTO();

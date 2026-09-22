@@ -38,7 +38,8 @@ import java.util.Set;
 public class UpdateProjectCommand implements PmsCommand {
 
     private static final Set<String> ALLOWED_ARGUMENTS = Set.of(
-            "projectId", "name", "description", "priority", "projectLevel", "orgUnitId", "startDate", "endDate");
+            "projectId", "name", "description", "priority", "projectLevel", "orgUnitId",
+            "projectManagerId", "startDate", "endDate");
 
     private static final List<String> REFRESH_SCOPES =
             List.of("project-detail", "project-list", "project-dashboard");
@@ -72,6 +73,7 @@ public class UpdateProjectCommand implements PmsCommand {
         Integer projectLevel = resolveInteger(arguments, "projectLevel");
         Long orgUnitId = arguments.containsKey("orgUnitId")
                 ? CommandArgumentReader.optionalLong(arguments, "orgUnitId") : null;
+        Long projectManagerId = resolveProjectManager(projectId, arguments);
 
         Map<String, Object> change = new LinkedHashMap<>();
         change.put("entity", "project");
@@ -98,10 +100,14 @@ public class UpdateProjectCommand implements PmsCommand {
             change.put("fromOrgUnitId", project.getOrgUnitId());
             change.put("toOrgUnitId", orgUnitId);
         }
+        if (arguments.containsKey("projectManagerId")) {
+            change.put("fromProjectManagerId", project.getProjectManagerId());
+            change.put("toProjectManagerId", projectManagerId);
+        }
         change.put("projectVersion", project.getVersion());
         return new CommandPreview(null, name(), Instant.now().plusSeconds(600), request.contextVersion(),
                 List.of("未提供的字段保留原值；显式传 null 可清空描述或日期",
-                        "项目更新不会改动项目成员、关注人和项目经理"),
+                        "项目更新不会改动项目成员、关注人和项目负责人"),
                 List.of(change), REFRESH_SCOPES);
     }
 
@@ -128,6 +134,7 @@ public class UpdateProjectCommand implements PmsCommand {
         command.setProjectLevel(resolveInteger(arguments, "projectLevel"));
         command.setOrgUnitId(arguments.containsKey("orgUnitId")
                 ? CommandArgumentReader.optionalLong(arguments, "orgUnitId") : null);
+        command.setProjectManagerId(resolveProjectManager(projectId, arguments));
 
         ProjectDTO updated = projectService.update(projectId, command);
         return new CommandResult(operation.getId(), "SUCCEEDED", "项目已更新", Map.of("project", updated), REFRESH_SCOPES);
@@ -139,6 +146,21 @@ public class UpdateProjectCommand implements PmsCommand {
 
     private Integer resolveInteger(Map<String, Object> arguments, String key) {
         return arguments.containsKey(key) ? CommandArgumentReader.optionalInteger(arguments, key, null) : null;
+    }
+
+    /**
+     * Assigning a project manager also makes that person a project member, which
+     * is exactly what the PMS page does. The command never clears an existing
+     * manager, so a partial update cannot leave the project without one.
+     */
+    private Long resolveProjectManager(Long projectId, Map<String, Object> arguments) {
+        if (!arguments.containsKey("projectManagerId")) return null;
+        Long managerId = CommandArgumentReader.optionalLong(arguments, "projectManagerId");
+        if (managerId == null || managerId < 1) {
+            throw BusinessException.error("项目经理不能通过项目更新清空，请指定新的项目经理");
+        }
+        permissionService.requireProjectManageable(projectId, "变更项目经理");
+        return managerId;
     }
 
     private void assertFresh(AiOperationDO operation, Integer projectVersion) {
