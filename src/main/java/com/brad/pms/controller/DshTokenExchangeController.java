@@ -28,8 +28,14 @@ import java.util.Set;
 public class DshTokenExchangeController {
 
     private static final int EXPIRES_IN_SECONDS = 120;
-    private static final Set<String> SUPPORTED_SCOPES = Set.of(
-            "pms:project:read", "pms:task:read", "pms:workspace:embed");
+    /**
+     * Scopes this exchange will mint. It mirrors the first-party Agent policy
+     * ({@code DshAgentScopePolicy.PROJECT_ASSISTANT_SCOPES}) so a DSH session that
+     * authenticated through SSO can use the same assistant capabilities as one
+     * bridged from an embedded PMS page; PMS still authorises every call.
+     */
+    private static final Set<String> SUPPORTED_SCOPES = Set.copyOf(
+            com.brad.pms.integration.dsh.security.DshAgentScopePolicy.PROJECT_ASSISTANT_SCOPES);
 
     private final JwtTokenProvider tokenProvider;
     private final String serviceKey;

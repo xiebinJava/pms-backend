@@ -9,8 +9,11 @@ import com.brad.pms.integration.dsh.api.DshAgentContractCapabilityDTO;
 import com.brad.pms.integration.dsh.api.DshCommandCapabilityDTO;
 import com.brad.pms.integration.dsh.api.DshCapabilityDTO;
 import com.brad.pms.integration.dsh.api.DshQueryCapabilityDTO;
+import com.brad.pms.integration.dsh.api.DshViewerDTO;
 import com.brad.pms.integration.dsh.security.DshAgentScopePolicy;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.dto.response.UserDTO;
+import com.brad.pms.service.UserService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,21 +23,28 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.time.LocalDate;
 import java.util.function.Predicate;
 
 @RestController
 @RequestMapping("/integration/dsh/v1")
 public class DshCapabilityController {
 
+    /** PMS runs on this business timezone, so "today" must not depend on the caller's host. */
+    private static final java.time.ZoneId BUSINESS_ZONE = java.time.ZoneId.of("Asia/Shanghai");
+
     private final PmsAgentContractRegistry contractRegistry;
+    private final UserService userService;
 
     public DshCapabilityController() {
         this.contractRegistry = null;
+        this.userService = null;
     }
 
     @Autowired
-    public DshCapabilityController(PmsAgentContractRegistry contractRegistry) {
+    public DshCapabilityController(PmsAgentContractRegistry contractRegistry, UserService userService) {
         this.contractRegistry = contractRegistry;
+        this.userService = userService;
     }
 
     @GetMapping("/capabilities")
@@ -61,7 +71,7 @@ public class DshCapabilityController {
 
         boolean queryAvailable = scopeAvailable("pms:query:read");
         List<String> tools = new ArrayList<>(List.of(
-                "pms_project_list", "pms_project_get", "pms_task_list"));
+                "pms_project_list", "pms_project_get", "pms_task_list", "pms_people_list"));
         if (queryAvailable) tools.add("pms_query");
         if (commands.stream().anyMatch(DshCommandCapabilityDTO::supportsPreview)) {
             tools.add("pms_command_preview");
@@ -99,7 +109,28 @@ public class DshCapabilityController {
                         "workflow-template"),
                 queryAvailable ? queries : List.of(),
                 commands,
-                agentContracts));
+                agentContracts,
+                viewer(),
+                LocalDate.now(BUSINESS_ZONE).toString()));
+    }
+
+    /**
+     * The acting account and the PMS business date are published with the
+     * capability catalog so a first turn can already resolve "我" and "今天"
+     * without an extra round trip.
+     */
+    private DshViewerDTO viewer() {
+        if (userService == null) return null;
+        Long userId = UserContext.userIdOrNull();
+        if (userId == null) return null;
+        return userService.listByIds(List.of(userId)).stream().findFirst()
+                .map(user -> new DshViewerDTO(user.getId(), userDisplayName(user), user.getUsername(), user.getEmail()))
+                .orElse(null);
+    }
+
+    private static String userDisplayName(com.brad.pms.entity.UserDO user) {
+        String display = com.brad.pms.convertor.Convertors.userDisplayName(user);
+        return display == null || display.isBlank() ? user.getUsername() : display;
     }
 
     private boolean scopeAvailable(String scope) {

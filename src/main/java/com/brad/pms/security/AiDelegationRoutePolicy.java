@@ -54,6 +54,9 @@ public final class AiDelegationRoutePolicy {
                 && path.matches("/integration/dsh/v1/projects/[^/]+/tasks")) {
             return tokenProvider.hasAiDelegationScope(token, "pms:task:read");
         }
+        if ("GET".equalsIgnoreCase(method) && "/integration/dsh/v1/people".equals(path)) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
+        }
         if ("POST".equalsIgnoreCase(method) && "/integration/dsh/v1/commands/preview".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:command:preview");
         }

@@ -41,4 +41,20 @@ class AiDelegationRoutePolicyTest {
         when(tokenProvider.hasAiDelegationScope("token", "pms:query:read")).thenReturn(true);
         assertThat(new AiDelegationRoutePolicy().isAllowed(request, "token", tokenProvider)).isTrue();
     }
+
+    @Test
+    void peopleDirectoryRequiresTheProjectReadScope() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/integration/dsh/v1/people");
+        when(request.getContextPath()).thenReturn("/api");
+        when(request.getMethod()).thenReturn("GET");
+        JwtTokenProvider tokenProvider = mock(JwtTokenProvider.class);
+        when(tokenProvider.isDshDelegationToken("token")).thenReturn(true);
+        when(tokenProvider.hasAiDelegationScope("token", "pms:task:read")).thenReturn(true);
+
+        assertThat(new AiDelegationRoutePolicy().isAllowed(request, "token", tokenProvider)).isFalse();
+
+        when(tokenProvider.hasAiDelegationScope("token", "pms:project:read")).thenReturn(true);
+        assertThat(new AiDelegationRoutePolicy().isAllowed(request, "token", tokenProvider)).isTrue();
+    }
 }

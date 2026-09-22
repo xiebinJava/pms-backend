@@ -64,8 +64,10 @@ class DshTokenExchangeControllerTest {
         UserContext.set(new LoginUser(7L, "alex", "张伟", 1, null, null, 9L));
         DshTokenExchangeController controller = new DshTokenExchangeController(mock(JwtTokenProvider.class), "server-key");
 
+        // The exchange mints exactly the first-party Agent policy; anything else —
+        // here an administrative scope the assistant never had — is refused.
         assertThatThrownBy(() -> controller.exchange(
-                "server-key", new DshTokenExchangeRequest("dsh-1", "project_assistant", Set.of("pms:project:write"))))
+                "server-key", new DshTokenExchangeRequest("dsh-1", "project_assistant", Set.of("pms:admin:write"))))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getCode()).isEqualTo(ResponseResult.FORBIDDEN));
     }

@@ -70,6 +70,11 @@ pms:
   dsh:
     # Required for server-to-server DSH token exchange; never expose this to browser code.
     service-key: ${PMS_DSH_SERVICE_KEY:}
+    # Plan A: let DSH relay the SSO ID token it already verified so the PMS
+    # assistant keeps a persistent PMS session. Off by default; enable per
+    # deployment and allow-list the clients whose tokens may be relayed.
+    sso-session-enabled: ${PMS_DSH_SSO_SESSION_ENABLED:false}
+    sso-allowed-clients: ${PMS_DSH_SSO_ALLOWED_CLIENTS:dsh-web}
   auth:
     access-expire-minutes: ${PMS_ACCESS_EXPIRE_MINUTES:30}
     refresh-expire-days: ${PMS_REFRESH_EXPIRE_DAYS:30}

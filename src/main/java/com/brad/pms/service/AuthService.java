@@ -117,6 +117,18 @@ public class AuthService {
         return completeExternalLogin(identity, ip, userAgent);
     }
 
+    /**
+     * Establishes a normal PMS session for an identity another trusted
+     * first-party client already verified with the same IdP (the DSH host).
+     * Account resolution, status checks, session creation and audit are exactly
+     * the same as the browser SSO login.
+     */
+    @Transactional(noRollbackFor = BusinessException.class)
+    public LoginResponse loginFromVerifiedIdentity(AuthenticatedIdentity identity, String ip, String userAgent) {
+        if (identity == null) throw BusinessException.unauthorized("SSO 身份不可用");
+        return completeExternalLogin(identity, ip, userAgent);
+    }
+
     @Transactional(noRollbackFor = BusinessException.class)
     public LoginResponse loginLdap(LoginRequest request, String ip, String userAgent) {
         boolean emailLogin = request.getEmail() != null && !request.getEmail().isBlank();

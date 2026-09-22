@@ -19,6 +19,7 @@ import java.util.Base64;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.math.BigInteger;
 
 import io.jsonwebtoken.Claims;
@@ -69,6 +70,32 @@ public class DefaultOidcTokenClient implements OidcTokenClient {
                                                OidcEndpoints endpoints,
                                                String idToken,
                                                String nonce) {
+        Claims claims = verifiedClaims(oidc, endpoints, idToken, Set.of(oidc.getClientId()), nonce);
+        return toValidatedClaims(claims);
+    }
+
+    @Override
+    public OidcValidatedClaims validateRelayedIdToken(AuthProviderProperties.Oidc oidc,
+                                                      OidcEndpoints endpoints,
+                                                      String idToken,
+                                                      Set<String> allowedAudiences) {
+        if (allowedAudiences == null || allowedAudiences.isEmpty()) {
+            throw BusinessException.forbidden("未配置允许的 SSO 客户端");
+        }
+        Claims claims = verifiedClaims(oidc, endpoints, idToken, allowedAudiences, null);
+        return toValidatedClaims(claims);
+    }
+
+    /**
+     * Shared signature/issuer/audience verification. `nonce` is only required for
+     * the browser login flow; a relayed token is verified against the audiences
+     * the deployment allow-lists instead.
+     */
+    private Claims verifiedClaims(AuthProviderProperties.Oidc oidc,
+                                  OidcEndpoints endpoints,
+                                  String idToken,
+                                  Set<String> allowedAudiences,
+                                  String nonce) {
         if (idToken == null || idToken.isBlank()) {
             throw BusinessException.unauthorized("SSO 未返回 ID Token");
         }
@@ -95,25 +122,44 @@ public class DefaultOidcTokenClient implements OidcTokenClient {
             PublicKey publicKey = rsaPublicKey(jwk.path("n").asText(), jwk.path("e").asText());
             String issuer = firstNonBlank(endpoints.issuer(), oidc.getIssuer());
             if (issuer.isBlank()) throw new IllegalArgumentException("SSO 发行方为空");
-            Claims claims = Jwts.parserBuilder()
+            io.jsonwebtoken.JwtParserBuilder builder = Jwts.parserBuilder()
                     .setSigningKey(publicKey)
-                    .requireIssuer(issuer)
-                    .requireAudience(oidc.getClientId())
-                    .require("nonce", nonce)
-                    .build()
-                    .parseClaimsJws(idToken)
-                    .getBody();
+                    .requireIssuer(issuer);
+            if (nonce != null) builder = builder.require("nonce", nonce);
+            Claims claims = builder.build().parseClaimsJws(idToken).getBody();
             if (claims.getSubject() == null || claims.getSubject().isBlank()) {
                 throw new IllegalArgumentException("ID Token 缺少 subject");
             }
-            String email = claims.get("email", String.class);
-            Boolean verified = claims.get("email_verified", Boolean.class);
-            return new OidcValidatedClaims(issuer, claims.getSubject(), email, verified == null || verified);
+            requireAllowedAudience(audiencesOf(claims), allowedAudiences);
+            return claims;
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             throw BusinessException.unauthorized("SSO ID Token 校验失败");
         }
+    }
+
+    /** `aud` is a string or a list depending on the token, so normalise both. */
+    static Set<String> audiencesOf(Claims claims) {
+        Object raw = claims.get("aud");
+        if (raw instanceof java.util.Collection<?> values) {
+            return values.stream().map(String::valueOf).collect(java.util.stream.Collectors.toSet());
+        }
+        return raw == null ? Set.of() : Set.of(String.valueOf(raw));
+    }
+
+    /** Rejects a token minted for a client this deployment did not allow-list. */
+    static void requireAllowedAudience(Set<String> tokenAudiences, Set<String> allowedAudiences) {
+        if (tokenAudiences == null || tokenAudiences.stream().noneMatch(allowedAudiences::contains)) {
+            throw BusinessException.forbidden("SSO 令牌的客户端不在允许列表内");
+        }
+    }
+
+    private static OidcValidatedClaims toValidatedClaims(Claims claims) {
+        String email = claims.get("email", String.class);
+        Boolean verified = claims.get("email_verified", Boolean.class);
+        return new OidcValidatedClaims(claims.getIssuer(), claims.getSubject(), email,
+                verified == null || verified);
     }
 
     @Override
