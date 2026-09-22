@@ -18,6 +18,49 @@ import static org.mockito.Mockito.when;
 
 class AuditQueryServiceTest {
     @Test
+    void getsSystemAuditRowWithoutOperatorOrProject() {
+        OperationLogMapper operationLogMapper = mock(OperationLogMapper.class);
+        UserService userService = mock(UserService.class);
+        ProjectMapper projectMapper = mock(ProjectMapper.class);
+        OperationLogDO row = new OperationLogDO();
+        row.setId(7L);
+        row.setAction("AUDIT_RETENTION_RUN");
+        row.setResourceType("AUDIT");
+        row.setResult("SUCCESS");
+        when(operationLogMapper.selectById(7L)).thenReturn(row);
+
+        AuditLogDTO result = new AuditQueryService(operationLogMapper, userService, projectMapper).get(7L);
+
+        assertThat(result.getId()).isEqualTo(7L);
+        assertThat(result.getOperatorDisplayName()).isNull();
+        assertThat(result.getProjectName()).isNull();
+    }
+
+    @Test
+    void listsSystemAuditRowsWithoutOperatorOrProject() {
+        OperationLogMapper operationLogMapper = mock(OperationLogMapper.class);
+        UserService userService = mock(UserService.class);
+        ProjectMapper projectMapper = mock(ProjectMapper.class);
+        OperationLogDO row = new OperationLogDO();
+        row.setId(6L);
+        row.setAction("AUTHORIZATION_DENIED");
+        row.setResourceType("USER");
+        row.setResult("FAILURE");
+        Page<OperationLogDO> page = new Page<>(1, 20);
+        page.setTotal(1);
+        page.setRecords(List.of(row));
+        when(operationLogMapper.selectPage(any(), any())).thenReturn(page);
+
+        AuditLogDTO result = new AuditQueryService(operationLogMapper, userService, projectMapper)
+                .page(new AuditQueryService.Query(null, null, null, null, null, null, null, null, null, 1, 20))
+                .getList().get(0);
+
+        assertThat(result.getId()).isEqualTo(6L);
+        assertThat(result.getOperatorDisplayName()).isNull();
+        assertThat(result.getProjectName()).isNull();
+    }
+
+    @Test
     void enrichesAuditRowsWithOperatorAndDeletedProjectContext() {
         OperationLogMapper operationLogMapper = mock(OperationLogMapper.class);
         UserService userService = mock(UserService.class);

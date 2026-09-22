@@ -33,7 +33,9 @@ public class AuditQueryService {
         Map<Long, UserDO> users = loadUsers(page.getRecords());
         Map<Long, ProjectDO> projects = loadProjects(page.getRecords());
         List<AuditLogDTO> records = page.getRecords().stream()
-                .map(row -> toDto(row, users.get(row.getOperatorId()), projects.get(row.getProjectId())))
+                .map(row -> toDto(row,
+                        row.getOperatorId() == null ? null : users.get(row.getOperatorId()),
+                        row.getProjectId() == null ? null : projects.get(row.getProjectId())))
                 .collect(Collectors.toList());
         return PageResult.of(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
@@ -43,7 +45,9 @@ public class AuditQueryService {
         if (row == null) throw BusinessException.error("审计记录不存在");
         Map<Long, UserDO> users = loadUsers(List.of(row));
         Map<Long, ProjectDO> projects = loadProjects(List.of(row));
-        return toDto(row, users.get(row.getOperatorId()), projects.get(row.getProjectId()));
+        return toDto(row,
+                row.getOperatorId() == null ? null : users.get(row.getOperatorId()),
+                row.getProjectId() == null ? null : projects.get(row.getProjectId()));
     }
 
     static QueryWrapper<OperationLogDO> buildQuery(Query query) {
