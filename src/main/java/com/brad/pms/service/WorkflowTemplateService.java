@@ -59,18 +59,34 @@ public class WorkflowTemplateService {
                 .stream().map(this::toProjectTypeDTO).toList();
     }
 
+    private List<ProjectTypeDTO> listProjectCreationTypes() {
+        return projectTypeMapper.selectList(new LambdaQueryWrapper<ProjectTypeDO>()
+                        .eq(ProjectTypeDO::getStatus, 1)
+                        .ne(ProjectTypeDO::getProjectCreationEnabled, false)
+                        .orderByAsc(ProjectTypeDO::getSort)
+                        .orderByAsc(ProjectTypeDO::getId))
+                .stream().map(this::toProjectTypeDTO).toList();
+    }
+
+    @Transactional
     public ProjectTypeDTO createProjectType(ProjectTypeSaveCmd cmd) {
         ProjectTypeDO type = new ProjectTypeDO();
-        type.setCode(cmd.getCode().trim());
+        type.setCode("process-type-pending-" + UUID.randomUUID().toString().replace("-", ""));
         type.setName(cmd.getName().trim());
         type.setDescription(trimToNull(cmd.getDescription()));
         type.setSort(cmd.getSort() == null ? 0 : cmd.getSort());
         type.setStatus(1);
+        type.setProjectCreationEnabled(false);
         type.setDeleted(false);
         try {
             projectTypeMapper.insert(type);
+            if (type.getId() == null) throw BusinessException.error("流程类型创建失败，请重试");
+            type.setCode("process-type-" + type.getId());
+            if (projectTypeMapper.updateById(type) != 1) {
+                throw BusinessException.error("流程类型创建失败，请重试");
+            }
         } catch (DataIntegrityViolationException e) {
-            throw BusinessException.conflict("项目类型标识已存在");
+            throw BusinessException.conflict("流程类型创建失败，请重试");
         }
         operationLogService.record(AuditEvent.success(AuditAction.PROJECT_TYPE_CREATED.name(),
                 AuditResourceType.PROJECT_TYPE.name(), type.getId(), null, null, null,
@@ -94,8 +110,12 @@ public class WorkflowTemplateService {
 
     public WorkflowTemplateOptionsDTO options() {
         WorkflowTemplateOptionsDTO options = new WorkflowTemplateOptionsDTO();
-        options.setProjectTypes(listProjectTypes());
-        options.setTemplates(listTemplates(null, true));
+        List<ProjectTypeDTO> projectTypes = listProjectCreationTypes();
+        var projectTypeIds = projectTypes.stream().map(ProjectTypeDTO::getId).collect(Collectors.toSet());
+        options.setProjectTypes(projectTypes);
+        options.setTemplates(listTemplates(null, true).stream()
+                .filter(template -> projectTypeIds.contains(template.getProjectTypeId()))
+                .toList());
         return options;
     }
 
@@ -268,12 +288,37 @@ public class WorkflowTemplateService {
         } else {
             type = requireActiveType(projectTypeId);
         }
+        requireProjectCreationType(type);
         Long selectedVersionId = versionId == null ? type.getDefaultTemplateVersionId() : versionId;
         if (selectedVersionId == null) throw BusinessException.error("该项目类型尚未配置默认流程模板");
         WorkflowTemplateVersionDO version = requirePublishedVersion(selectedVersionId);
         WorkflowTemplateDO template = requireTemplate(version.getTemplateId());
         if (!type.getId().equals(template.getProjectTypeId())) throw BusinessException.error("所选流程模板与项目类型不匹配");
         return new WorkflowTemplateBinding(type, version, template);
+    }
+
+    /**
+     * Returns the configured published default for a non-project workflow type.
+     * A missing active process type or an unset default means the workflow is not
+     * configured yet; callers may still create the development item without a flow.
+     */
+    public WorkflowTemplateBinding resolveDefaultForProcessType(String processTypeCode) {
+        ProjectTypeDO type = projectTypeMapper.selectOne(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getCode, processTypeCode)
+                .eq(ProjectTypeDO::getStatus, 1));
+        if (type == null || type.getDefaultTemplateVersionId() == null) return null;
+        WorkflowTemplateVersionDO version = requirePublishedVersion(type.getDefaultTemplateVersionId());
+        WorkflowTemplateDO template = requireTemplate(version.getTemplateId());
+        if (!type.getId().equals(template.getProjectTypeId())) {
+            throw BusinessException.error("默认流程模板与流程类型不匹配");
+        }
+        return new WorkflowTemplateBinding(type, version, template);
+    }
+
+    private void requireProjectCreationType(ProjectTypeDO type) {
+        if (Boolean.FALSE.equals(type.getProjectCreationEnabled())) {
+            throw BusinessException.error("该流程类型不可用于新建项目");
+        }
     }
 
     public WorkflowTemplateDefinition getDefinition(Long versionId) {
@@ -310,6 +355,7 @@ public class WorkflowTemplateService {
         dto.setName(type.getName());
         dto.setDescription(type.getDescription());
         dto.setStatus(type.getStatus());
+        dto.setProjectCreationEnabled(type.getProjectCreationEnabled());
         dto.setSort(type.getSort());
         dto.setDefaultTemplateVersionId(type.getDefaultTemplateVersionId());
         if (type.getDefaultTemplateVersionId() != null) {

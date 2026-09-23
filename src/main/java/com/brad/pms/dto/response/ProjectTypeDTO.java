@@ -9,6 +9,7 @@ public class ProjectTypeDTO {
     private String name;
     private String description;
     private Integer status;
+    private Boolean projectCreationEnabled;
     private Integer sort;
     private Long defaultTemplateVersionId;
     private Long defaultTemplateId;

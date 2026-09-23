@@ -30,7 +30,7 @@ class HealthControllerTest {
                 .thenReturn(migrationProbe);
         when(migrationProbe.executeQuery()).thenReturn(migrationResult);
         when(migrationResult.next()).thenReturn(true);
-        when(migrationResult.getString(1)).thenReturn("49");
+        when(migrationResult.getString(1)).thenReturn("52");
 
         HealthController controller = new HealthController(dataSource);
 
@@ -38,7 +38,7 @@ class HealthControllerTest {
         assertThat(controller.readiness().getBody())
                 .containsEntry("status", "UP")
                 .containsEntry("database", "UP")
-                .containsEntry("migration", "49");
+                .containsEntry("migration", "52");
     }
 
     @Test

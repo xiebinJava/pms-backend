@@ -24,6 +24,7 @@ import com.brad.pms.mapper.ProjectNodeDevelopmentBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -54,6 +55,7 @@ public class NodeDevelopmentControlService {
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final OperationLogService operationLogService;
+    private final DevelopmentItemWorkflowService developmentItemWorkflowService;
 
     public NodeDevelopmentControlDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
@@ -224,6 +226,8 @@ public class NodeDevelopmentControlService {
             if (topic.getId() == null) {
                 topic.setCreatedBy(UserContext.userIdOrNull());
                 if (topicMapper.insert(topic) != 1) throw BusinessException.conflict("专题保存失败，请刷新后重试");
+                developmentItemWorkflowService.createIfDefaultExists(
+                        DevelopmentItemType.TOPIC, topic.getId(), projectId, nodeId);
             } else if (topicMapper.updateById(topic) != 1) {
                 throw BusinessException.conflict("专题已被其他人修改，请刷新后重试");
             }
@@ -233,6 +237,8 @@ public class NodeDevelopmentControlService {
                 if (story.getId() == null) {
                     story.setCreatedBy(UserContext.userIdOrNull());
                     if (storyMapper.insert(story) != 1) throw BusinessException.conflict("故事保存失败，请刷新后重试");
+                    developmentItemWorkflowService.createIfDefaultExists(
+                            DevelopmentItemType.STORY, story.getId(), projectId, nodeId);
                 } else if (storyMapper.updateById(story) != 1) {
                     throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
                 }
@@ -245,11 +251,19 @@ public class NodeDevelopmentControlService {
                 .filter(storyId -> !retainedStoryIds.contains(storyId))
                 .collect(Collectors.toList());
         if (!removedStoryIds.isEmpty()) {
-            removedStoryIds.forEach(storyMapper::deleteById);
+            removedStoryIds.forEach(storyId -> {
+                storyMapper.selectByIdForUpdate(storyId);
+                developmentItemWorkflowService.remove(DevelopmentItemType.STORY, storyId);
+                storyMapper.deleteById(storyId);
+            });
         }
         existingTopics.stream()
                 .filter(topic -> topic.getId() != null && !retainedTopicIds.contains(topic.getId()))
-                .forEach(topicMapper::deleteById);
+                .forEach(topic -> {
+                    topicMapper.selectByIdForUpdate(topic.getId());
+                    developmentItemWorkflowService.remove(DevelopmentItemType.TOPIC, topic.getId());
+                    topicMapper.deleteById(topic.getId());
+                });
     }
 
     private ProjectNodeDevelopmentTopicDO findOrCreateTopic(Long projectId, Long nodeId,

@@ -33,18 +33,12 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        ProjectTypeDO general = projectTypeMapper.selectOne(new LambdaQueryWrapper<ProjectTypeDO>()
-                .eq(ProjectTypeDO::getCode, "general"));
-        if (general == null) {
-            general = new ProjectTypeDO();
-            general.setCode("general");
-            general.setName("通用项目");
-            general.setDescription("适用于未分类项目的默认类型");
-            general.setStatus(1);
-            general.setSort(0);
-            general.setDeleted(false);
-            projectTypeMapper.insert(general);
-        }
+        ProjectTypeDO general = ensureProjectType(
+                "general", "项目管理", "适用于普通项目的默认流程类型", 0, true);
+        ensureProjectType(
+                "topic-management", "专题管理", "用于配置专题管理流程模板", 10, false);
+        ensureProjectType(
+                "story-management", "故事管理", "用于配置故事管理流程模板", 20, false);
 
         WorkflowTemplateDO template = templateMapper.selectOne(new LambdaQueryWrapper<WorkflowTemplateDO>()
                 .eq(WorkflowTemplateDO::getCode, "current-process"));
@@ -81,6 +75,41 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
             projectTypeMapper.updateById(general);
         }
         projectMapper.bindMissingWorkflowConfiguration(general.getId(), published.getId());
+    }
+
+    private ProjectTypeDO ensureProjectType(String code, String name, String description,
+                                            int sort, boolean projectCreationEnabled) {
+        ProjectTypeDO type = projectTypeMapper.selectOne(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getCode, code));
+        if (type == null) {
+            type = new ProjectTypeDO();
+            type.setCode(code);
+            type.setName(name);
+            type.setDescription(description);
+            type.setStatus(1);
+            type.setProjectCreationEnabled(projectCreationEnabled);
+            type.setSort(sort);
+            type.setDeleted(false);
+            projectTypeMapper.insert(type);
+            return type;
+        }
+
+        boolean changed = false;
+        if (type.getStatus() == null || !Integer.valueOf(1).equals(type.getStatus())) {
+            type.setStatus(1);
+            changed = true;
+        }
+        if (type.getProjectCreationEnabled() == null) {
+            type.setProjectCreationEnabled(projectCreationEnabled);
+            changed = true;
+        }
+        if ("general".equals(code) && "通用项目".equals(type.getName())) {
+            type.setName(name);
+            type.setDescription(description);
+            changed = true;
+        }
+        if (changed) projectTypeMapper.updateById(type);
+        return type;
     }
 
     private String serializeCompatibilityDefinition() {

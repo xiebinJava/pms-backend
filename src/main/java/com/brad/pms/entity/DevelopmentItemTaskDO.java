@@ -7,24 +7,29 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("pms_project_type")
-public class ProjectTypeDO {
+@TableName("pms_development_item_task")
+public class DevelopmentItemTaskDO {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String code;
-    private String name;
+    private Long workflowId;
+    private Long nodeId;
+    private Long parentId;
+    private String title;
     private String description;
     private Integer status;
-    private Boolean projectCreationEnabled;
+    private Integer priority;
+    private Long assigneeId;
+    private LocalDate dueDate;
     private Integer sort;
-    private Long defaultTemplateVersionId;
     @TableLogic(value = "false", delval = "true")
     private Boolean deleted;
     @Version
     private Integer version;
+    private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

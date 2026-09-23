@@ -38,7 +38,11 @@ final class ProjectBoardCalculator {
         Integer openRisks = risks == null ? null : (int) risks.stream().filter(risk -> "OPEN".equals(risk.getStatus())).count();
         Integer highRisks = riskCount(risks, "HIGH");
         Integer mediumRisks = riskCount(risks, "MEDIUM");
-        boolean nodeSchedule = !validNodes.isEmpty() && unfinished.stream().allMatch(node -> node.getEndDate() != null);
+        ProjectNodeDO currentNode = validNodes.stream()
+                .filter(node -> node.getStatus() == 1)
+                .min(nodeOrder())
+                .orElse(null);
+        boolean nodeSchedule = !validNodes.isEmpty() && (currentNode == null || currentNode.getEndDate() != null);
         List<String> issues = new ArrayList<>();
         if (active) {
             if (expected == null) issues.add("PROJECT_DATES_MISSING");
@@ -91,6 +95,11 @@ final class ProjectBoardCalculator {
     private static boolean unfinished(ProjectNodeDO node) { return node.getStatus() == 0 || node.getStatus() == 1; }
     private static boolean before(LocalDate date, LocalDate today) { return date != null && date.isBefore(today); }
     private static boolean positive(Integer count) { return count != null && count > 0; }
+
+    private static Comparator<ProjectNodeDO> nodeOrder() {
+        return Comparator.comparing(ProjectNodeDO::getSort, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProjectNodeDO::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+    }
 
     private static Integer riskCount(List<ProjectNodeRiskDO> risks, String level) {
         return risks == null ? null : (int) risks.stream()

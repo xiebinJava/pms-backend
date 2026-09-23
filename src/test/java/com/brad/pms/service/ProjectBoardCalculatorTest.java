@@ -105,6 +105,19 @@ class ProjectBoardCalculatorTest {
     }
 
     @Test
+    void ignoresMissingScheduleOnFutureNodes() {
+        var current = node(1, TODAY);
+        current.setId(1L);
+        var future = node(0, null);
+        future.setId(2L);
+
+        var result = calculate(project(1, 50), List.of(current, future), List.of());
+
+        assertThat(result.health()).isEqualTo("HEALTHY");
+        assertThat(result.dataIssues()).doesNotContain("NODE_SCHEDULE_MISSING");
+    }
+
+    @Test
     void sharedProjectProgressIgnoresDeletedAndInvalidStateNodes() {
         var completed = node(2, TODAY);
         var invalid = node(99, TODAY);

@@ -16,6 +16,7 @@ import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.workflow.WorkflowComponentKey;
+import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,7 @@ class NodeDevelopmentControlServiceTest {
     @Mock ProjectPermissionService permissionService;
     @Mock UserService userService;
     @Mock OperationLogService operationLogService;
+    @Mock DevelopmentItemWorkflowService developmentItemWorkflowService;
 
     @InjectMocks NodeDevelopmentControlService service;
 
@@ -278,8 +280,16 @@ class NodeDevelopmentControlServiceTest {
         when(baselineMapper.updateById(any(ProjectNodeDevelopmentBaselineDO.class))).thenReturn(1);
         when(topicMapper.selectList(any())).thenReturn(List.of());
         when(storyMapper.selectList(any())).thenReturn(List.of());
-        when(topicMapper.insert(any(ProjectNodeDevelopmentTopicDO.class))).thenReturn(1);
-        when(storyMapper.insert(any(ProjectNodeDevelopmentStoryDO.class))).thenReturn(1);
+        when(topicMapper.insert(any(ProjectNodeDevelopmentTopicDO.class))).thenAnswer(invocation -> {
+            ProjectNodeDevelopmentTopicDO inserted = invocation.getArgument(0);
+            inserted.setId(20L);
+            return 1;
+        });
+        when(storyMapper.insert(any(ProjectNodeDevelopmentStoryDO.class))).thenAnswer(invocation -> {
+            ProjectNodeDevelopmentStoryDO inserted = invocation.getArgument(0);
+            inserted.setId(30L);
+            return 1;
+        });
 
         NodeDevelopmentControlUpdateCmd cmd = new NodeDevelopmentControlUpdateCmd();
         cmd.setVersion(2);
@@ -295,6 +305,8 @@ class NodeDevelopmentControlServiceTest {
         service.save(1L, 10L, cmd);
 
         verify(storyMapper).insert(argThat((ProjectNodeDevelopmentStoryDO row) -> row.getProgress().equals(100)));
+        verify(developmentItemWorkflowService).createIfDefaultExists(DevelopmentItemType.TOPIC, 20L, 1L, 10L);
+        verify(developmentItemWorkflowService).createIfDefaultExists(DevelopmentItemType.STORY, 30L, 1L, 10L);
     }
 
     @Test
