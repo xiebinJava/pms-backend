@@ -11,7 +11,9 @@ import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
+import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -22,9 +24,11 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class NodeServiceCompleteTest {
@@ -45,9 +49,16 @@ class NodeServiceCompleteTest {
     @Mock NodeValueReviewService valueReviewService;
     @Mock MemberService memberService;
     @Mock WorkflowTemplateService workflowTemplateService;
+    @Mock WorkflowComponentBindingService workflowComponentBindingService;
     @Mock NodeCustomFieldService nodeCustomFieldService;
 
     @InjectMocks NodeService nodeService;
+
+    @BeforeEach
+    void keepUnconfiguredComponentBindingsUnchanged() {
+        lenient().when(workflowComponentBindingService.applyTopicBinding(any(), any(), anyCollection()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+    }
 
     @Test
     void rejectsCompleteWhenTheNodeStillHasUnfinishedTasks() {
@@ -66,6 +77,69 @@ class NodeServiceCompleteTest {
         assertThatThrownBy(() -> nodeService.complete(1L, 10L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("未完成任务");
+        verify(nodeMapper, never()).updateById(node);
+    }
+
+    @Test
+    void rendersTheDerivedDevelopmentControlOnTheConfiguredNode() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        project.setCreatedBy(3L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(10L);
+        node.setProjectId(1L);
+        node.setNodeKey("topic-host");
+        node.setOwnerId(3L);
+        WorkflowNodeDefinition storedNode = new WorkflowNodeDefinition("topic-host", "专题宿主", "", "", "",
+                java.util.List.of(), java.util.List.of(), false, java.util.List.of());
+        WorkflowNodeDefinition effectiveNode = new WorkflowNodeDefinition("topic-host", "专题宿主", "", "", "",
+                java.util.List.of("development-control"), java.util.List.of(), false, java.util.List.of());
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(nodeMapper.selectList(any())).thenReturn(java.util.List.of(node));
+        WorkflowTemplateDefinition storedDefinition = new WorkflowTemplateDefinition(1, java.util.List.of(storedNode));
+        WorkflowTemplateDefinition effectiveDefinition = new WorkflowTemplateDefinition(1, java.util.List.of(effectiveNode));
+        when(workflowTemplateService.getDefinition(17L)).thenReturn(storedDefinition);
+        when(workflowComponentBindingService.applyTopicBinding(project, storedDefinition, java.util.List.of(node)))
+                .thenReturn(effectiveDefinition);
+        when(userService.listByIds(any())).thenReturn(java.util.List.of());
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+        nodeService.setWorkflowComponentBindingService(workflowComponentBindingService);
+        nodeService.setNodeCustomFieldService(null);
+
+        var result = nodeService.list(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getComponents()).contains("development-control");
+        verify(workflowComponentBindingService).applyTopicBinding(project, storedDefinition, java.util.List.of(node));
+    }
+
+    @Test
+    void validatesDerivedDevelopmentControlBeforeCompletingItsConfiguredNode() {
+        ProjectDO project = new ProjectDO();
+        project.setId(1L);
+        project.setWorkflowTemplateVersionId(17L);
+        project.setCreatedBy(3L);
+        ProjectNodeDO node = completableNode("topic-host");
+        WorkflowNodeDefinition storedNode = new WorkflowNodeDefinition("topic-host", "专题宿主", "", "", "",
+                java.util.List.of(), java.util.List.of(), false, java.util.List.of());
+        WorkflowNodeDefinition effectiveNode = new WorkflowNodeDefinition("topic-host", "专题宿主", "", "", "",
+                java.util.List.of("development-control"), java.util.List.of(), false, java.util.List.of());
+        when(permissionService.requireProject(1L)).thenReturn(project);
+        when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
+        when(taskMapper.selectCount(any())).thenReturn(0L);
+        when(workflowTemplateService.getNodeDefinition(17L, "topic-host")).thenReturn(storedNode);
+        when(workflowComponentBindingService.applyTopicBinding(project, new WorkflowTemplateDefinition(1,
+                java.util.List.of(storedNode)), java.util.List.of(node))).thenReturn(
+                new WorkflowTemplateDefinition(1, java.util.List.of(effectiveNode)));
+        org.mockito.Mockito.doThrow(BusinessException.error("请先完成开发控制工作台"))
+                .when(developmentControlService).requireCompleted(1L, 10L);
+        nodeService.setWorkflowTemplateService(workflowTemplateService);
+        nodeService.setWorkflowComponentBindingService(workflowComponentBindingService);
+
+        assertThatThrownBy(() -> nodeService.complete(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("开发控制工作台");
         verify(nodeMapper, never()).updateById(node);
     }
 
@@ -362,7 +436,8 @@ class NodeServiceCompleteTest {
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(nodeMapper.selectList(any())).thenReturn(java.util.List.of(node));
         when(userService.listByIds(java.util.List.of(3L))).thenReturn(java.util.List.of());
-        when(workflowTemplateService.getNodeDefinition(17L, "custom-intake")).thenReturn(definition);
+        when(workflowTemplateService.getDefinition(17L)).thenReturn(
+                new WorkflowTemplateDefinition(2, java.util.List.of(definition)));
         nodeService.setWorkflowTemplateService(workflowTemplateService);
 
         var dto = nodeService.list(1L).get(0);

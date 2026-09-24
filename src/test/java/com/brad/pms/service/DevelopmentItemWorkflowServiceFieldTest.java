@@ -33,7 +33,7 @@ class DevelopmentItemWorkflowServiceFieldTest {
             mock(ProjectNodeDevelopmentStoryMapper.class), mock(ProjectNodeMapper.class),
             mock(ProjectNodeIterationPlanMapper.class), mock(WorkflowTemplateVersionMapper.class),
             mock(ProjectPermissionService.class), mock(UserService.class), workflowTemplateService,
-            new ObjectMapper());
+            mock(ProjectMemberAssignmentService.class), new ObjectMapper());
 
     @Test
     void nodeDtoIncludesTemplateFieldDefinitionsAndSavedValues() {

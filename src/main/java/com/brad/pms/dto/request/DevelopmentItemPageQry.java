@@ -17,4 +17,7 @@ public class DevelopmentItemPageQry extends BasePage {
     private Long ownerId;
 
     private String status;
+
+    /** Topic-only deleted scope. Null/false lists active topics; true lists recoverable topics. */
+    private Boolean deleted;
 }

@@ -1,6 +1,8 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.NodeDevelopmentControlUpdateCmd;
 import com.brad.pms.dto.request.NodeDevelopmentStoryCmd;
@@ -27,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.time.LocalDate;
+import java.lang.reflect.Field;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,19 +50,87 @@ class NodeDevelopmentControlServiceTest {
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
     @Mock IterationPlanService iterationPlanService;
     @Mock ProjectMemberMapper memberMapper;
-    @Mock MemberService memberService;
     @Mock ProjectPermissionService permissionService;
     @Mock UserService userService;
     @Mock OperationLogService operationLogService;
     @Mock DevelopmentItemWorkflowService developmentItemWorkflowService;
+    @Mock WorkflowComponentBindingService workflowComponentBindingService;
+    @Mock ProjectMemberAssignmentService assignmentService;
 
     @InjectMocks NodeDevelopmentControlService service;
 
     @BeforeEach
     void initTableInfo() {
+        if (TableInfoHelper.getTableInfo(ProjectNodeDevelopmentStoryDO.class) == null) {
+            TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new Configuration(), "node-development-test"),
+                    ProjectNodeDevelopmentStoryDO.class);
+        }
         org.mockito.Mockito.lenient().when(iterationPlanService.listByProject(any())).thenReturn(List.of());
         org.mockito.Mockito.lenient().when(iterationPlanService.listForDevelopment(any(), any())).thenReturn(List.of());
         org.mockito.Mockito.lenient().when(iterationPlanService.confirmedPlanIds(any())).thenReturn(java.util.Set.of());
+        org.mockito.Mockito.lenient().when(workflowComponentBindingService.topicCreationAllowed(any())).thenReturn(true);
+    }
+
+    @Test
+    void rejectsOnlyNewTopicsOnHistoricalNodesAfterTheTemplateBindingMoves() {
+        ProjectNodeDO historicalNode = node("old-topic-host");
+        when(permissionService.requireManageableNode(1L, 10L, "保存开发测试与项目控制")).thenReturn(historicalNode);
+        when(workflowComponentBindingService.topicCreationAllowed(historicalNode)).thenReturn(false);
+
+        NodeDevelopmentControlUpdateCmd cmd = new NodeDevelopmentControlUpdateCmd();
+        cmd.setVersion(2);
+        NodeDevelopmentTopicCmd topic = new NodeDevelopmentTopicCmd();
+        topic.setTitle("新专题");
+        cmd.setTopics(List.of(topic));
+
+        assertThatThrownBy(() -> service.save(1L, 10L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("专题模板配置节点");
+        verify(topicMapper, never()).insert(any(ProjectNodeDevelopmentTopicDO.class));
+    }
+
+    @Test
+    void stillAllowsEditingAnExistingTopicOnItsHistoricalNode() {
+        ProjectNodeDO historicalNode = node("old-topic-host");
+        ProjectNodeDevelopmentTopicDO existingTopic = topic(20L, "旧名称");
+        when(permissionService.requireManageableNode(1L, 10L, "保存开发测试与项目控制")).thenReturn(historicalNode);
+        when(workflowComponentBindingService.topicCreationAllowed(historicalNode)).thenReturn(false);
+        when(baselineMapper.selectOne(any())).thenReturn(baseline());
+        when(baselineMapper.updateById(any(ProjectNodeDevelopmentBaselineDO.class))).thenReturn(1);
+        when(topicMapper.selectList(any())).thenReturn(List.of(existingTopic));
+        when(storyMapper.selectList(any())).thenReturn(List.of());
+        when(topicMapper.selectByIdForUpdate(20L)).thenReturn(existingTopic);
+        when(topicMapper.updateById(any(ProjectNodeDevelopmentTopicDO.class))).thenReturn(1);
+
+        NodeDevelopmentControlUpdateCmd cmd = new NodeDevelopmentControlUpdateCmd();
+        cmd.setVersion(2);
+        NodeDevelopmentTopicCmd topic = new NodeDevelopmentTopicCmd();
+        topic.setId(20L);
+        topic.setTitle("维护后的名称");
+        cmd.setTopics(List.of(topic));
+
+        NodeDevelopmentControlDTO result = service.save(1L, 10L, cmd);
+
+        assertThat(existingTopic.getTitle()).isEqualTo("维护后的名称");
+        assertThat(result.isTopicCreationAllowed()).isFalse();
+        verify(topicMapper, never()).insert(any(ProjectNodeDevelopmentTopicDO.class));
+    }
+
+    @Test
+    void exposesWhetherTheCurrentNodeCanCreateTopics() throws Exception {
+        ProjectNodeDO configuredNode = node("develop");
+        when(permissionService.requireProjectReadable(1L)).thenReturn(new ProjectDO());
+        when(permissionService.requireNode(1L, 10L)).thenReturn(configuredNode);
+        when(workflowComponentBindingService.topicCreationAllowed(configuredNode)).thenReturn(true);
+        when(topicMapper.selectList(any())).thenReturn(List.of());
+
+        NodeDevelopmentControlDTO result = service.get(1L, 10L);
+        assertThat(java.util.Arrays.stream(NodeDevelopmentControlDTO.class.getDeclaredFields())
+                .map(Field::getName)).contains("topicCreationAllowed");
+        Field eligibility = NodeDevelopmentControlDTO.class.getDeclaredField("topicCreationAllowed");
+        eligibility.setAccessible(true);
+
+        assertThat(eligibility.getBoolean(result)).isTrue();
     }
 
     @Test
@@ -97,6 +168,8 @@ class NodeDevelopmentControlServiceTest {
         when(baselineMapper.updateById(any(ProjectNodeDevelopmentBaselineDO.class))).thenReturn(1);
         when(topicMapper.selectList(any())).thenReturn(List.of(existingTopic));
         when(storyMapper.selectList(any())).thenReturn(List.of(existingStory));
+        when(topicMapper.selectByIdForUpdate(20L)).thenReturn(existingTopic);
+        when(storyMapper.selectByIdForUpdate(30L)).thenReturn(existingStory);
         when(topicMapper.updateById(any(ProjectNodeDevelopmentTopicDO.class))).thenReturn(1);
         when(storyMapper.updateById(any(ProjectNodeDevelopmentStoryDO.class))).thenReturn(1);
 
@@ -178,7 +251,7 @@ class NodeDevelopmentControlServiceTest {
     }
 
     @Test
-    void addsStoryOwnerToTheProjectWhenSaving() {
+    void validatesStoryOwnerWithoutAddingProjectMembershipWhenSaving() {
         ProjectNodeDO node = node("develop");
         when(permissionService.requireManageableNode(1L, 10L, "保存开发测试与项目控制")).thenReturn(node);
         when(baselineMapper.selectOne(any())).thenReturn(null);
@@ -195,7 +268,7 @@ class NodeDevelopmentControlServiceTest {
 
         assertThatThrownBy(() -> service.save(1L, 10L, cmd))
                 .hasMessageContaining("stop-after-ensure");
-        verify(memberService).ensureMembers(eq(1L), argThat(ids -> ids != null && ids.contains(99L)));
+        verify(userService).requireActiveUser(99L);
     }
 
     @Test
@@ -243,6 +316,8 @@ class NodeDevelopmentControlServiceTest {
         when(baselineMapper.updateById(any(ProjectNodeDevelopmentBaselineDO.class))).thenReturn(1);
         when(topicMapper.selectList(any())).thenReturn(List.of(existingTopic));
         when(storyMapper.selectList(any())).thenReturn(List.of(existingStory));
+        when(topicMapper.selectByIdForUpdate(20L)).thenReturn(existingTopic);
+        when(storyMapper.selectByIdForUpdate(30L)).thenReturn(existingStory);
         when(topicMapper.updateById(any(ProjectNodeDevelopmentTopicDO.class))).thenReturn(1);
         when(storyMapper.updateById(any(ProjectNodeDevelopmentStoryDO.class))).thenReturn(1);
 
@@ -270,6 +345,59 @@ class NodeDevelopmentControlServiceTest {
         verify(storyMapper).updateById(argThat((ProjectNodeDevelopmentStoryDO row) -> row.getId().equals(30L)
                 && LocalDate.of(2026, 9, 15).equals(row.getStartDate())
                 && LocalDate.of(2026, 9, 18).equals(row.getDueDate())));
+    }
+
+    @Test
+    void rejectsAStaleWorkbenchSaveAfterTopicWasReboundToAnotherProject() {
+        ProjectNodeDO sourceNode = node("develop");
+        ProjectNodeDevelopmentTopicDO staleTopic = topic(20L, "订单中心");
+        ProjectNodeDevelopmentTopicDO reboundTopic = topic(20L, "订单中心");
+        reboundTopic.setProjectId(2L);
+        reboundTopic.setNodeId(22L);
+        when(permissionService.requireManageableNode(1L, 10L, "保存开发测试与项目控制")).thenReturn(sourceNode);
+        when(baselineMapper.selectOne(any())).thenReturn(baseline());
+        when(baselineMapper.updateById(any(ProjectNodeDevelopmentBaselineDO.class))).thenReturn(1);
+        when(topicMapper.selectList(any())).thenReturn(List.of(staleTopic));
+        when(topicMapper.selectByIdForUpdate(20L)).thenReturn(reboundTopic);
+        when(storyMapper.selectList(any())).thenReturn(List.of());
+
+        NodeDevelopmentControlUpdateCmd cmd = new NodeDevelopmentControlUpdateCmd();
+        cmd.setVersion(2);
+        cmd.setTopics(List.of());
+
+        assertThatThrownBy(() -> service.save(1L, 10L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("已被其他人修改");
+        assertThat(reboundTopic.getProjectId()).isEqualTo(2L);
+        assertThat(reboundTopic.getNodeId()).isEqualTo(22L);
+        assertThat(reboundTopic.getDeleted()).isNull();
+        verify(topicMapper, never()).updateById(any(ProjectNodeDevelopmentTopicDO.class));
+    }
+
+    @Test
+    void omittingATopicSoftDeletesItWithoutRemovingItsStoriesOrWorkflow() {
+        ProjectNodeDO node = node("develop");
+        ProjectNodeDevelopmentTopicDO existingTopic = topic(20L, "订单中心");
+        ProjectNodeDevelopmentStoryDO existingStory = story(20L, "统一订单状态", "IN_PROGRESS", 60);
+        existingStory.setId(30L);
+        when(permissionService.requireManageableNode(1L, 10L, "保存开发测试与项目控制")).thenReturn(node);
+        when(baselineMapper.selectOne(any())).thenReturn(baseline());
+        when(baselineMapper.updateById(any(ProjectNodeDevelopmentBaselineDO.class))).thenReturn(1);
+        when(topicMapper.selectList(any())).thenReturn(List.of(existingTopic), List.of(existingTopic), List.of());
+        when(storyMapper.selectList(any())).thenReturn(List.of(existingStory), List.of(existingStory));
+        when(topicMapper.selectByIdForUpdate(20L)).thenReturn(existingTopic);
+        when(storyMapper.selectByIdForUpdate(30L)).thenReturn(existingStory);
+        when(topicMapper.updateById(existingTopic)).thenReturn(1);
+
+        NodeDevelopmentControlUpdateCmd cmd = new NodeDevelopmentControlUpdateCmd();
+        cmd.setVersion(2);
+        cmd.setTopics(List.of());
+
+        service.save(1L, 10L, cmd);
+
+        assertThat(existingTopic.getDeleted()).isTrue();
+        verify(storyMapper, never()).deleteById(30L);
+        verify(developmentItemWorkflowService, never()).remove(any(), any());
     }
 
     @Test
@@ -334,7 +462,6 @@ class NodeDevelopmentControlServiceTest {
         when(permissionService.requireProjectReadable(1L)).thenReturn(new ProjectDO());
         when(permissionService.requireNode(1L, 10L)).thenReturn(node);
         when(topicMapper.selectList(any())).thenReturn(List.of());
-        when(storyMapper.selectList(any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.requireCompleted(1L, 10L))
                 .isInstanceOf(BusinessException.class)
@@ -413,6 +540,8 @@ class NodeDevelopmentControlServiceTest {
 
     private ProjectNodeDevelopmentStoryDO story(Long topicId, String title, String status, int progress) {
         ProjectNodeDevelopmentStoryDO story = new ProjectNodeDevelopmentStoryDO();
+        story.setProjectId(1L);
+        story.setNodeId(10L);
         story.setTopicId(topicId);
         story.setTitle(title);
         story.setStatus(status);

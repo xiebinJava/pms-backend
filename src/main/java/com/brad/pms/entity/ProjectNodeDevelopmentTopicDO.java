@@ -24,6 +24,7 @@ public class ProjectNodeDevelopmentTopicDO {
     private String testStatus;
     private Integer sort;
     private Long createdBy;
+    private Boolean deleted;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

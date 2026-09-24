@@ -44,6 +44,7 @@ public class ProjectPermissionService {
     private final DataScopeResolver dataScopeResolver;
     private final AuthorizationService authorizationService;
     private final WorkflowTemplateService workflowTemplateService;
+    private final WorkflowComponentBindingService workflowComponentBindingService;
 
     /** Backward-compatible name used by read paths; it now means readable. */
     public ProjectDO requireProject(Long projectId) {
@@ -145,6 +146,11 @@ public class ProjectPermissionService {
         ProjectDO project = requireProjectReadable(node.getProjectId());
         WorkflowNodeDefinition definition = workflowTemplateService.getNodeDefinition(
                 project.getWorkflowTemplateVersionId(), node.getNodeKey());
+        if (definition != null) {
+            definition = workflowComponentBindingService.applyTopicBinding(project,
+                    new com.brad.pms.workflow.WorkflowTemplateDefinition(1, java.util.List.of(definition)),
+                    java.util.List.of(node)).nodes().get(0);
+        }
         if (definition == null || !definition.runtimeComponents().contains(componentKey)) {
             throw BusinessException.error(message);
         }
@@ -152,14 +158,15 @@ public class ProjectPermissionService {
 
     public ProjectNodeDO findNodeWithComponent(Long projectId, String componentKey) {
         ProjectDO project = requireProjectReadable(projectId);
-        WorkflowNodeDefinition definition = workflowTemplateService.getDefinition(project.getWorkflowTemplateVersionId())
-                .nodes().stream()
-                .filter(node -> node.runtimeComponents().contains(componentKey))
-                .findFirst().orElse(null);
+        java.util.List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
+                .eq(ProjectNodeDO::getProjectId, projectId));
+        com.brad.pms.workflow.WorkflowTemplateDefinition definition = workflowComponentBindingService.applyTopicBinding(
+                project, workflowTemplateService.getDefinition(project.getWorkflowTemplateVersionId()), nodes);
         if (definition == null) return null;
-        return nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
-                .eq(ProjectNodeDO::getProjectId, projectId)
-                .eq(ProjectNodeDO::getNodeKey, definition.key()));
+        Set<String> nodeKeys = definition.nodes().stream()
+                .filter(node -> node.runtimeComponents().contains(componentKey))
+                .map(WorkflowNodeDefinition::key).collect(java.util.stream.Collectors.toSet());
+        return nodes.stream().filter(node -> nodeKeys.contains(node.getNodeKey())).findFirst().orElse(null);
     }
 
     /** Requires an open project and an unlocked node for a designated reviewer action. */

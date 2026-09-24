@@ -56,4 +56,29 @@ class FlywayMigrationVersionTest {
                 .as("health probe must expect the highest Flyway migration")
                 .isEqualTo(latestMigration);
     }
+
+    @Test
+    void topicSoftDeleteMigrationAddsRecoverableFlag() throws IOException {
+        Path migration = Path.of("src/main/resources/db/migration/V53__development_topic_soft_delete.sql");
+        assertThat(Files.exists(migration)).isTrue();
+        assertThat(Files.readString(migration)).contains("project_node_development_topic", "deleted BOOLEAN",
+                "NOT NULL DEFAULT FALSE");
+    }
+
+    @Test
+    void optionalDevelopmentContextMigrationContractIsPresent() throws IOException {
+        Path migration = Path.of("src/main/resources/db/migration/V54__optional_development_item_project_context.sql");
+        assertThat(Files.exists(migration)).isTrue();
+        String sql = Files.readString(migration);
+        assertThat(sql).contains("MODIFY COLUMN project_id BIGINT NULL",
+                "MODIFY COLUMN node_id BIGINT NULL",
+                "MODIFY COLUMN source_node_id BIGINT NULL",
+                "MODIFY COLUMN topic_id BIGINT NULL",
+                "pms_project_member_auto_managed",
+                "pms_project_member_assignment_ref",
+                "TOPIC_OWNER",
+                "STORY_OWNER",
+                "WORKFLOW_NODE_OWNER",
+                "TASK_ASSIGNEE");
+    }
 }

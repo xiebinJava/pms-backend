@@ -12,6 +12,7 @@ import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeRiskMapper;
 import com.brad.pms.workflow.WorkflowComponentKey;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
+import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,23 +35,34 @@ public class ProjectBoardService {
     private final ProjectNodeRiskMapper riskMapper;
     private final ProjectNodeDevelopmentStoryMapper storyMapper;
     private final ProjectNodeAcceptanceDefectMapper defectMapper;
+    private final WorkflowComponentBindingService workflowComponentBindingService;
     private final Clock clock;
 
     @Autowired
     public ProjectBoardService(ProjectService projectService, WorkflowTemplateService workflowService,
             ProjectNodeRiskMapper riskMapper, ProjectNodeDevelopmentStoryMapper storyMapper,
-            ProjectNodeAcceptanceDefectMapper defectMapper) {
-        this(projectService, workflowService, riskMapper, storyMapper, defectMapper, Clock.systemDefaultZone());
+            ProjectNodeAcceptanceDefectMapper defectMapper,
+            WorkflowComponentBindingService workflowComponentBindingService) {
+        this(projectService, workflowService, riskMapper, storyMapper, defectMapper,
+                workflowComponentBindingService, Clock.systemDefaultZone());
     }
 
     ProjectBoardService(ProjectService projectService, WorkflowTemplateService workflowService,
             ProjectNodeRiskMapper riskMapper, ProjectNodeDevelopmentStoryMapper storyMapper,
             ProjectNodeAcceptanceDefectMapper defectMapper, Clock clock) {
+        this(projectService, workflowService, riskMapper, storyMapper, defectMapper, null, clock);
+    }
+
+    ProjectBoardService(ProjectService projectService, WorkflowTemplateService workflowService,
+            ProjectNodeRiskMapper riskMapper, ProjectNodeDevelopmentStoryMapper storyMapper,
+            ProjectNodeAcceptanceDefectMapper defectMapper,
+            WorkflowComponentBindingService workflowComponentBindingService, Clock clock) {
         this.projectService = projectService;
         this.workflowService = workflowService;
         this.riskMapper = riskMapper;
         this.storyMapper = storyMapper;
         this.defectMapper = defectMapper;
+        this.workflowComponentBindingService = workflowComponentBindingService;
         this.clock = clock;
     }
 
@@ -67,15 +79,21 @@ public class ProjectBoardService {
 
         var definitions = workflowService.getDefinitions(snapshot.projects().stream()
                 .map(ProjectDTO::getWorkflowTemplateVersionId).collect(Collectors.toSet()));
+        Map<Long, Long> versionIdsByProjectId = new HashMap<>();
+        snapshot.projects().forEach(project -> versionIdsByProjectId.put(project.getId(), project.getWorkflowTemplateVersionId()));
+        Map<Long, WorkflowTemplateDefinition> effectiveDefinitions = workflowComponentBindingService == null
+                ? versionIdsByProjectId.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                        entry -> definitions.get(entry.getValue())))
+                : workflowComponentBindingService.applyTopicBindings(versionIdsByProjectId, definitions, snapshot.nodes());
         Map<Long, Map<String, WorkflowNodeDefinition>> definitionNodes = new HashMap<>();
-        definitions.forEach((id, definition) -> definitionNodes.put(id, definition.nodes().stream()
+        effectiveDefinitions.forEach((projectId, definition) -> definitionNodes.put(projectId, definition.nodes().stream()
                 .collect(Collectors.toMap(WorkflowNodeDefinition::key, Function.identity()))));
         Map<Long, ProjectDTO> projects = snapshot.projects().stream().collect(Collectors.toMap(ProjectDTO::getId, Function.identity()));
         Map<Long, List<ProjectNodeDO>> nodesByProject = new HashMap<>();
         Map<Long, Long> riskNodes = new HashMap<>(), storyNodes = new HashMap<>(), acceptanceNodes = new HashMap<>();
         Set<Long> riskConfiguredProjects = new HashSet<>(), storyConfiguredProjects = new HashSet<>(), acceptanceConfiguredProjects = new HashSet<>();
         for (ProjectDTO project : snapshot.projects()) {
-            var boundNodes = definitionNodes.get(project.getWorkflowTemplateVersionId());
+            var boundNodes = definitionNodes.get(project.getId());
             if (boundNodes == null) continue;
             if (hasComponent(boundNodes, WorkflowComponentKey.PLAN_RESOURCE_RISK)) riskConfiguredProjects.add(project.getId());
             if (hasComponent(boundNodes, WorkflowComponentKey.DEVELOPMENT_CONTROL)) storyConfiguredProjects.add(project.getId());
@@ -85,7 +103,8 @@ public class ProjectBoardService {
             ProjectDTO project = projects.get(node.getProjectId());
             if (project == null || Boolean.TRUE.equals(node.getDeleted())) continue;
             nodesByProject.computeIfAbsent(project.getId(), ignored -> new ArrayList<>()).add(node);
-            var definition = definitionNodes.get(project.getWorkflowTemplateVersionId()).get(node.getNodeKey());
+            var projectDefinitions = definitionNodes.get(project.getId());
+            var definition = projectDefinitions == null ? null : projectDefinitions.get(node.getNodeKey());
             if (definition == null || node.getId() == null) continue;
             // runtimeComponents is authoritative for both legacy components and v2 contentOrder.
             var components = definition.runtimeComponents();

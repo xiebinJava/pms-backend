@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.audit.AuditAction;
 import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
+import com.brad.pms.common.enums.DevelopmentAssignmentType;
 import com.brad.pms.common.enums.NodeStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.convertor.Convertors;
@@ -51,11 +52,12 @@ public class NodeDevelopmentControlService {
     private final ProjectNodeDevelopmentTopicMapper topicMapper;
     private final ProjectNodeDevelopmentStoryMapper storyMapper;
     private final IterationPlanService iterationPlanService;
-    private final MemberService memberService;
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final OperationLogService operationLogService;
     private final DevelopmentItemWorkflowService developmentItemWorkflowService;
+    private final WorkflowComponentBindingService workflowComponentBindingService;
+    private final ProjectMemberAssignmentService assignmentService;
 
     public NodeDevelopmentControlDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
@@ -96,8 +98,12 @@ public class NodeDevelopmentControlService {
         ProjectNodeDO node = requireDevelopNode(permissionService.requireManageableNode(
                 projectId, nodeId, "保存开发测试与项目控制"));
         validatePayload(cmd);
+        if (!workflowComponentBindingService.topicCreationAllowed(node)
+                && cmd.getTopics().stream().anyMatch(topic -> !isPersistedId(topic.getId()))) {
+            throw BusinessException.error("当前节点不是专题模板配置节点，不能新增专题");
+        }
         validateIterationPlans(projectId, nodeId, cmd);
-        validateProjectOwners(projectId, cmd);
+        validateProjectOwners(projectId, nodeId, cmd);
 
         ProjectNodeDevelopmentBaselineDO baseline = findBaseline(projectId, nodeId);
         if (baseline == null) {
@@ -177,8 +183,14 @@ public class NodeDevelopmentControlService {
         List<ProjectNodeDevelopmentStoryDO> existingStories = storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
                 .eq(ProjectNodeDevelopmentStoryDO::getProjectId, projectId)
                 .eq(ProjectNodeDevelopmentStoryDO::getNodeId, nodeId));
+        Set<Long> activeTopicIds = safeList(topicMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
+                .eq(ProjectNodeDevelopmentTopicDO::getProjectId, projectId)
+                .eq(ProjectNodeDevelopmentTopicDO::getNodeId, nodeId)
+                .eq(ProjectNodeDevelopmentTopicDO::getDeleted, false))).stream()
+                .map(ProjectNodeDevelopmentTopicDO::getId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, Long> existingPlanByStoryId = (existingStories == null ? List.<ProjectNodeDevelopmentStoryDO>of() : existingStories).stream()
-                .filter(story -> story.getId() != null && story.getIterationPlanId() != null)
+                .filter(story -> story.getId() != null && story.getIterationPlanId() != null
+                        && activeTopicIds.contains(story.getTopicId()))
                 .collect(Collectors.toMap(ProjectNodeDevelopmentStoryDO::getId, ProjectNodeDevelopmentStoryDO::getIterationPlanId, (left, right) -> left));
         cmd.getTopics().stream()
                 .flatMap(topic -> topic.getStories().stream())
@@ -191,24 +203,52 @@ public class NodeDevelopmentControlService {
         }
     }
 
-    private void validateProjectOwners(Long projectId, NodeDevelopmentControlUpdateCmd cmd) {
-        Set<Long> ownerIds = cmd.getTopics().stream().flatMap(topic -> {
-            List<Long> topicAndStoryOwners = new ArrayList<>();
-            if (topic.getOwnerId() != null) topicAndStoryOwners.add(topic.getOwnerId());
-            topic.getStories().stream().map(NodeDevelopmentStoryCmd::getOwnerId)
-                    .filter(Objects::nonNull).forEach(topicAndStoryOwners::add);
-            return topicAndStoryOwners.stream();
-        }).collect(Collectors.toCollection(HashSet::new));
-        memberService.ensureMembers(projectId, ownerIds);
+    private void validateProjectOwners(Long projectId, Long nodeId, NodeDevelopmentControlUpdateCmd cmd) {
+        Map<Long, ProjectNodeDevelopmentTopicDO> existingTopics = safeList(topicMapper.selectList(
+                new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
+                        .eq(ProjectNodeDevelopmentTopicDO::getProjectId, projectId)
+                        .eq(ProjectNodeDevelopmentTopicDO::getNodeId, nodeId)
+                        .eq(ProjectNodeDevelopmentTopicDO::getDeleted, false))).stream()
+                .filter(topic -> topic.getId() != null)
+                .collect(Collectors.toMap(ProjectNodeDevelopmentTopicDO::getId, topic -> topic));
+        Map<Long, ProjectNodeDevelopmentStoryDO> existingStories = safeList(storyMapper.selectList(
+                new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
+                        .eq(ProjectNodeDevelopmentStoryDO::getProjectId, projectId)
+                        .eq(ProjectNodeDevelopmentStoryDO::getNodeId, nodeId))).stream()
+                .filter(story -> story.getId() != null)
+                .collect(Collectors.toMap(ProjectNodeDevelopmentStoryDO::getId, story -> story));
+
+        for (NodeDevelopmentTopicCmd topicCmd : cmd.getTopics()) {
+            ProjectNodeDevelopmentTopicDO existingTopic = existingTopics.get(topicCmd.getId());
+            if (topicCmd.getOwnerId() != null && (existingTopic == null
+                    || !Objects.equals(existingTopic.getOwnerId(), topicCmd.getOwnerId()))) {
+                userService.requireActiveUser(topicCmd.getOwnerId());
+            }
+            for (NodeDevelopmentStoryCmd storyCmd : topicCmd.getStories()) {
+                ProjectNodeDevelopmentStoryDO existingStory = existingStories.get(storyCmd.getId());
+                if (storyCmd.getOwnerId() != null && (existingStory == null
+                        || !Objects.equals(existingStory.getOwnerId(), storyCmd.getOwnerId()))) {
+                    userService.requireActiveUser(storyCmd.getOwnerId());
+                }
+            }
+        }
     }
 
     private void replaceTopicsAndStories(Long projectId, Long nodeId, List<NodeDevelopmentTopicCmd> topics) {
-        List<ProjectNodeDevelopmentTopicDO> existingTopics = topicMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
+        List<ProjectNodeDevelopmentTopicDO> topicCandidates = safeList(topicMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
                 .eq(ProjectNodeDevelopmentTopicDO::getProjectId, projectId)
-                .eq(ProjectNodeDevelopmentTopicDO::getNodeId, nodeId));
-        List<ProjectNodeDevelopmentStoryDO> existingStories = storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
-                .eq(ProjectNodeDevelopmentStoryDO::getProjectId, projectId)
-                .eq(ProjectNodeDevelopmentStoryDO::getNodeId, nodeId));
+                .eq(ProjectNodeDevelopmentTopicDO::getNodeId, nodeId)
+                .eq(ProjectNodeDevelopmentTopicDO::getDeleted, false)
+                .orderByAsc(ProjectNodeDevelopmentTopicDO::getId)));
+        List<ProjectNodeDevelopmentTopicDO> existingTopics = lockTopicsInScope(projectId, nodeId, topicCandidates);
+        Set<Long> activeTopicIds = existingTopics.stream().map(ProjectNodeDevelopmentTopicDO::getId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        List<ProjectNodeDevelopmentStoryDO> storyCandidates = activeTopicIds.isEmpty() ? List.of()
+                : safeList(storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
+                        .in(ProjectNodeDevelopmentStoryDO::getTopicId, activeTopicIds)
+                        .orderByAsc(ProjectNodeDevelopmentStoryDO::getId)));
+        List<ProjectNodeDevelopmentStoryDO> existingStories = lockStoriesInScope(projectId, nodeId,
+                activeTopicIds, storyCandidates);
 
         Map<Long, ProjectNodeDevelopmentTopicDO> topicsById = existingTopics.stream()
                 .filter(topic -> topic.getId() != null)
@@ -231,6 +271,8 @@ public class NodeDevelopmentControlService {
             } else if (topicMapper.updateById(topic) != 1) {
                 throw BusinessException.conflict("专题已被其他人修改，请刷新后重试");
             }
+            assignmentService.replaceAssignment(projectId, DevelopmentItemType.TOPIC, topic.getId(),
+                    DevelopmentAssignmentType.TOPIC_OWNER, topic.getId(), topic.getOwnerId());
             for (NodeDevelopmentStoryCmd storyCmd : topicCmd.getStories()) {
                 ProjectNodeDevelopmentStoryDO story = findOrCreateStory(projectId, nodeId, topic, storyCmd, storiesById, retainedStoryIds);
                 applyStoryFields(story, topic, storyCmd);
@@ -242,6 +284,8 @@ public class NodeDevelopmentControlService {
                 } else if (storyMapper.updateById(story) != 1) {
                     throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
                 }
+                assignmentService.replaceAssignment(projectId, DevelopmentItemType.STORY, story.getId(),
+                        DevelopmentAssignmentType.STORY_OWNER, story.getId(), story.getOwnerId());
             }
         }
 
@@ -252,7 +296,10 @@ public class NodeDevelopmentControlService {
                 .collect(Collectors.toList());
         if (!removedStoryIds.isEmpty()) {
             removedStoryIds.forEach(storyId -> {
-                storyMapper.selectByIdForUpdate(storyId);
+                ProjectNodeDevelopmentStoryDO removedStory = storiesById.get(storyId);
+                if (removedStory == null) return;
+                assignmentService.synchronizeItemAssignments(projectId, null, DevelopmentItemType.STORY, storyId);
+                if (!retainedTopicIds.contains(removedStory.getTopicId())) return;
                 developmentItemWorkflowService.remove(DevelopmentItemType.STORY, storyId);
                 storyMapper.deleteById(storyId);
             });
@@ -260,10 +307,47 @@ public class NodeDevelopmentControlService {
         existingTopics.stream()
                 .filter(topic -> topic.getId() != null && !retainedTopicIds.contains(topic.getId()))
                 .forEach(topic -> {
-                    topicMapper.selectByIdForUpdate(topic.getId());
-                    developmentItemWorkflowService.remove(DevelopmentItemType.TOPIC, topic.getId());
-                    topicMapper.deleteById(topic.getId());
+                    assignmentService.synchronizeItemAssignments(projectId, null, DevelopmentItemType.TOPIC, topic.getId());
+                    topic.setDeleted(true);
+                    if (topicMapper.updateById(topic) != 1) {
+                        throw BusinessException.conflict("专题已被其他人修改，请刷新后重试");
+                    }
                 });
+    }
+
+    private List<ProjectNodeDevelopmentTopicDO> lockTopicsInScope(
+            Long projectId, Long nodeId, List<ProjectNodeDevelopmentTopicDO> candidates) {
+        List<ProjectNodeDevelopmentTopicDO> locked = new ArrayList<>(candidates.size());
+        for (ProjectNodeDevelopmentTopicDO candidate : candidates.stream()
+                .filter(topic -> topic.getId() != null)
+                .sorted(java.util.Comparator.comparing(ProjectNodeDevelopmentTopicDO::getId)).toList()) {
+            ProjectNodeDevelopmentTopicDO current = topicMapper.selectByIdForUpdate(candidate.getId());
+            if (current == null || Boolean.TRUE.equals(current.getDeleted())
+                    || !Objects.equals(current.getProjectId(), projectId)
+                    || !Objects.equals(current.getNodeId(), nodeId)) {
+                throw BusinessException.conflict("专题已被其他人修改，请刷新后重试");
+            }
+            locked.add(current);
+        }
+        return locked;
+    }
+
+    private List<ProjectNodeDevelopmentStoryDO> lockStoriesInScope(
+            Long projectId, Long nodeId, Set<Long> activeTopicIds,
+            List<ProjectNodeDevelopmentStoryDO> candidates) {
+        List<ProjectNodeDevelopmentStoryDO> locked = new ArrayList<>(candidates.size());
+        for (ProjectNodeDevelopmentStoryDO candidate : candidates.stream()
+                .filter(story -> story.getId() != null)
+                .sorted(java.util.Comparator.comparing(ProjectNodeDevelopmentStoryDO::getId)).toList()) {
+            ProjectNodeDevelopmentStoryDO current = storyMapper.selectByIdForUpdate(candidate.getId());
+            if (current == null || !Objects.equals(current.getProjectId(), projectId)
+                    || !Objects.equals(current.getNodeId(), nodeId)
+                    || !activeTopicIds.contains(current.getTopicId())) {
+                throw BusinessException.conflict("专题下的故事已被其他人修改，请刷新后重试");
+            }
+            locked.add(current);
+        }
+        return locked;
     }
 
     private ProjectNodeDevelopmentTopicDO findOrCreateTopic(Long projectId, Long nodeId,
@@ -333,13 +417,16 @@ public class NodeDevelopmentControlService {
         List<ProjectNodeDevelopmentTopicDO> topics = safeList(topicMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
                 .eq(ProjectNodeDevelopmentTopicDO::getProjectId, node.getProjectId())
                 .eq(ProjectNodeDevelopmentTopicDO::getNodeId, node.getId())
+                .eq(ProjectNodeDevelopmentTopicDO::getDeleted, false)
                 .orderByAsc(ProjectNodeDevelopmentTopicDO::getSort)
                 .orderByAsc(ProjectNodeDevelopmentTopicDO::getId)));
-        List<ProjectNodeDevelopmentStoryDO> stories = safeList(storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
-                .eq(ProjectNodeDevelopmentStoryDO::getProjectId, node.getProjectId())
-                .eq(ProjectNodeDevelopmentStoryDO::getNodeId, node.getId())
-                .orderByAsc(ProjectNodeDevelopmentStoryDO::getSort)
-                .orderByAsc(ProjectNodeDevelopmentStoryDO::getId)));
+        List<Long> activeTopicIds = topics.stream().map(ProjectNodeDevelopmentTopicDO::getId)
+                .filter(Objects::nonNull).toList();
+        List<ProjectNodeDevelopmentStoryDO> stories = activeTopicIds.isEmpty() ? List.of()
+                : safeList(storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
+                        .in(ProjectNodeDevelopmentStoryDO::getTopicId, activeTopicIds)
+                        .orderByAsc(ProjectNodeDevelopmentStoryDO::getSort)
+                        .orderByAsc(ProjectNodeDevelopmentStoryDO::getId)));
         Set<Long> referencedIterationPlanIds = stories.stream()
                 .map(ProjectNodeDevelopmentStoryDO::getIterationPlanId)
                 .filter(Objects::nonNull)
@@ -353,7 +440,7 @@ public class NodeDevelopmentControlService {
                 .filter(Objects::nonNull).forEach(ownerIds::add);
         stories.stream().map(ProjectNodeDevelopmentStoryDO::getOwnerId)
                 .filter(Objects::nonNull).forEach(ownerIds::add);
-        List<UserDO> owners = ownerIds.isEmpty() ? List.of() : userService.listByIds(new ArrayList<>(ownerIds));
+        List<UserDO> owners = ownerIds.isEmpty() ? List.of() : userService.listByIdsIncludingDeleted(new ArrayList<>(ownerIds));
         Map<Long, UserDO> userMap = Convertors.userMap(owners == null ? List.of() : owners);
         Map<Long, List<ProjectNodeDevelopmentStoryDO>> storiesByTopic = stories.stream()
                 .collect(Collectors.groupingBy(ProjectNodeDevelopmentStoryDO::getTopicId));
@@ -363,6 +450,7 @@ public class NodeDevelopmentControlService {
         dto.setVersion(baseline == null ? null : baseline.getVersion());
         dto.setCurrentIteration(baseline == null ? null : baseline.getCurrentIteration());
         dto.setCanEdit(!NodeStatus.isReadOnly(node.getStatus()));
+        dto.setTopicCreationAllowed(workflowComponentBindingService.topicCreationAllowed(node));
         dto.setUpdatedAt(baseline == null ? null : baseline.getUpdatedAt());
         List<NodeDevelopmentTopicDTO> topicDTOs = topics.stream()
                 .map(topic -> toTopicDTO(topic, storiesByTopic.getOrDefault(topic.getId(), List.of()), userMap, iterationPlanNamesById))

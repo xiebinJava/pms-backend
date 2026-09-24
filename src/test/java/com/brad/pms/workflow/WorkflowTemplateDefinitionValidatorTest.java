@@ -1,6 +1,7 @@
 package com.brad.pms.workflow;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -135,6 +136,23 @@ class WorkflowTemplateDefinitionValidatorTest {
         assertThat(definition.nodes().get(0).fields().get(0).binding()).isNull();
         assertThat(definition.nodes().get(0).contentOrder()).isNull();
         assertThat(WorkflowTemplateDefinitionValidator.validate(definition)).isEqualTo(definition);
+    }
+
+    @Test
+    void roundTripsTopicSourceProjectNodeKeyWithoutBreakingUnknownLegacyMetadata() throws Exception {
+        String json = """
+                {"schemaVersion":1,"sourceProjectNodeKey":"develop","nodes":[{"key":"intake",
+                "name":"立项","description":"","deliverable":"","roles":"","components":[],
+                "fields":[],"projectBasicInfo":false,"projectBasicInfoFields":[]}]}
+                """;
+        ObjectMapper mapper = new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        WorkflowTemplateDefinition definition = mapper.readValue(json, WorkflowTemplateDefinition.class);
+        String serialized = mapper.writeValueAsString(definition);
+        WorkflowTemplateDefinition roundTripped = mapper.readValue(serialized, WorkflowTemplateDefinition.class);
+
+        assertThat(mapper.readTree(serialized).path("sourceProjectNodeKey").asText()).isEqualTo("develop");
+        assertThat(WorkflowTemplateDefinitionValidator.validate(roundTripped)).isEqualTo(roundTripped);
     }
 
     @Test

@@ -23,7 +23,7 @@ public class HealthController {
      * migration directory, because a stale value makes every container
      * healthcheck report the backend as unhealthy.
      */
-    private static final int LATEST_MIGRATION_VERSION = 52;
+    private static final int LATEST_MIGRATION_VERSION = 54;
 
     private final DataSource dataSource;
     private final int expectedMigrationVersion;

@@ -1,5 +1,6 @@
 package com.brad.pms.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
@@ -8,6 +9,7 @@ import com.brad.pms.dto.response.DevelopmentStoryListDTO;
 import com.brad.pms.dto.response.DevelopmentTopicListDTO;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
@@ -18,6 +20,7 @@ import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
+import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,8 @@ import static org.mockito.Mockito.when;
 class DevelopmentItemServiceTest {
 
     @Mock ProjectService projectService;
+    @Mock ProjectMapper projectMapper;
+    @Mock ProjectPermissionService permissionService;
     @Mock ProjectNodeMapper nodeMapper;
     @Mock ProjectNodeDevelopmentTopicMapper topicMapper;
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
@@ -54,6 +59,7 @@ class DevelopmentItemServiceTest {
         Configuration configuration = new Configuration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "test");
         TableInfoHelper.initTableInfo(assistant, ProjectNodeDO.class);
+        TableInfoHelper.initTableInfo(assistant, ProjectDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectNodeDevelopmentTopicDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectNodeDevelopmentStoryDO.class);
         TableInfoHelper.initTableInfo(assistant, ProjectNodeIterationPlanDO.class);
@@ -129,6 +135,90 @@ class DevelopmentItemServiceTest {
         assertThat(service.pageStories(query).getList()).isEmpty();
     }
 
+    @Test
+    void activeTopicAndStoryPagesFilterDeletedTopicsAndTheirStories() {
+        ProjectDTO project = project(7L, "PMS 重构");
+        ProjectNodeDO node = node(70L, 7L, "开发测试与项目控制", 4);
+        ProjectNodeDevelopmentTopicDO activeTopic = topic(701L, 7L, 70L, "有效专题", null);
+        ProjectNodeDevelopmentTopicDO deletedTopic = topic(702L, 7L, 70L, "已删除专题", null);
+        deletedTopic.setDeleted(true);
+        ProjectNodeDevelopmentStoryDO story = story(801L, 7L, 70L, 701L, "有效故事", null, "NOT_STARTED", 0);
+        when(projectService.listReadableIds()).thenReturn(List.of(7L));
+        when(projectService.listReadableByIds(any())).thenReturn(List.of(project));
+        when(nodeMapper.selectList(any())).thenReturn(List.of(node));
+        when(topicMapper.selectList(any())).thenAnswer(invocation -> {
+            LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO> query = invocation.getArgument(0);
+            assertThat(query.getSqlSegment()).contains("deleted");
+            return List.of(activeTopic);
+        });
+        when(storyMapper.selectList(any())).thenAnswer(invocation -> {
+            LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO> query = invocation.getArgument(0);
+            assertThat(query.getSqlSegment()).contains("topicId IN");
+            assertThat(query.getParamNameValuePairs().values()).contains(701L).doesNotContain(702L);
+            return List.of(story);
+        });
+        when(iterationPlanMapper.selectList(any())).thenReturn(List.of());
+
+        DevelopmentItemPageQry query = new DevelopmentItemPageQry();
+
+        assertThat(service.pageTopics(query).getList()).extracting(DevelopmentTopicListDTO::getId).containsExactly(701L);
+        assertThat(service.pageStories(query).getList()).extracting(DevelopmentStoryListDTO::getId).containsExactly(801L);
+    }
+
+    @Test
+    void listsIndependentTopicsAndStoriesWithoutReadableProjects() {
+        ProjectNodeDevelopmentTopicDO topic = topic(701L, null, null, "独立专题", null);
+        ProjectNodeDevelopmentStoryDO topicStory = story(801L, null, null, 701L, "专题故事", null, "IN_PROGRESS", 20);
+        ProjectNodeDevelopmentStoryDO independentStory = story(802L, null, null, null, "独立故事", null, "NOT_STARTED", 0);
+        when(projectService.listReadableIds()).thenReturn(List.of());
+        when(topicMapper.selectUnbound(false)).thenReturn(List.of(topic));
+        when(storyMapper.selectList(any())).thenReturn(List.of(topicStory));
+        when(storyMapper.selectIndependent()).thenReturn(List.of(independentStory));
+        when(workflowMapper.selectList(any())).thenReturn(List.of());
+        when(workflowTemplateService.resolveDefaultForProcessType(any())).thenReturn(null);
+
+        DevelopmentItemPageQry query = new DevelopmentItemPageQry();
+
+        assertThat(service.pageTopics(query).getList()).extracting(DevelopmentTopicListDTO::getId)
+                .containsExactly(701L);
+        assertThat(service.pageStories(query).getList()).extracting(DevelopmentStoryListDTO::getId)
+                .containsExactly(802L, 801L);
+        assertThat(service.pageTopics(query).getList().get(0).getProjectId()).isNull();
+        assertThat(service.pageStories(query).getList()).allSatisfy(item -> assertThat(item.getProjectId()).isNull());
+    }
+
+    @Test
+    void deletedTopicScopeCanDisplayTopicsFromManageableClosedProjects() {
+        ProjectNodeDevelopmentTopicDO deletedTopic = topic(702L, 7L, 70L, "已删除专题", null);
+        deletedTopic.setDeleted(true);
+        ProjectDO closedProject = new ProjectDO();
+        closedProject.setId(7L);
+        closedProject.setCode("PRJ-000007");
+        closedProject.setName("已归档项目");
+        closedProject.setStatus(4);
+        ProjectNodeDO node = node(70L, 7L, "开发测试与项目控制", 4);
+        ProjectNodeDevelopmentStoryDO preservedStory = story(801L, 7L, 70L, 702L, "保留的故事", null, "IN_PROGRESS", 40);
+        when(topicMapper.selectList(any())).thenAnswer(invocation -> {
+            LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO> query = invocation.getArgument(0);
+            assertThat(query.getSqlSegment()).contains("deleted");
+            return List.of(deletedTopic);
+        });
+        when(projectMapper.selectIncludingDeletedByIds(any())).thenReturn(List.of(closedProject));
+        when(permissionService.canManageProject(closedProject)).thenReturn(true);
+        when(nodeMapper.selectList(any())).thenReturn(List.of(node));
+        when(storyMapper.selectList(any())).thenReturn(List.of(preservedStory));
+        when(iterationPlanMapper.selectList(any())).thenReturn(List.of());
+
+        DevelopmentItemPageQry query = new DevelopmentItemPageQry();
+        query.setDeleted(true);
+
+        DevelopmentTopicListDTO result = service.pageTopics(query).getList().get(0);
+
+        assertThat(result.getTitle()).isEqualTo("已删除专题");
+        assertThat(result.getProjectName()).isEqualTo("已归档项目");
+        assertThat(result.getStoryCount()).isEqualTo(1);
+    }
+
     private void stubData(List<ProjectDTO> projects,
                           List<ProjectNodeDO> nodes,
                           List<ProjectNodeDevelopmentTopicDO> topics,
@@ -144,7 +234,7 @@ class DevelopmentItemServiceTest {
         owner.setId(9L);
         owner.setNameZh("张伟");
         owner.setUsername("alex.zhang");
-        when(userService.listByIds(any())).thenReturn(List.of(owner));
+        when(userService.listByIdsIncludingDeleted(any())).thenReturn(List.of(owner));
     }
 
     private ProjectDTO project(Long id, String name) {

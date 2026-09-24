@@ -9,6 +9,7 @@ import com.brad.pms.entity.DevelopmentItemWorkflowDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.entity.WorkflowTemplateVersionDO;
@@ -35,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 class DevelopmentItemWorkflowServiceNodeEditTest {
 
@@ -57,6 +59,37 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
             assertThat(node.getEndDate()).isEqualTo(LocalDate.of(2026, 10, 3));
         });
         verify(fixture.nodeMapper).updateById(fixture.node);
+    }
+
+    @Test
+    void loadsUnboundTopicWorkflowWithoutDereferencingProjectContext() {
+        Fixture fixture = new Fixture(0);
+        fixture.topic.setProjectId(null);
+        fixture.topic.setNodeId(null);
+        fixture.workflow.setProjectId(null);
+        fixture.workflow.setSourceNodeId(null);
+        when(fixture.topicMapper.selectById(7L)).thenReturn(fixture.topic);
+        when(fixture.workflowMapper.selectByItem("TOPIC", 7L)).thenReturn(fixture.workflow);
+
+        DevelopmentItemWorkflowDetailDTO result = fixture.service.detail(DevelopmentItemType.TOPIC, 7L);
+
+        assertThat(result.getProjectId()).isNull();
+        assertThat(result.getSourceNodeId()).isNull();
+        assertThat(result.getNodes()).hasSize(1);
+    }
+
+    @Test
+    void rejectsInactiveAccountForNewNodeAssignment() {
+        Fixture fixture = new Fixture(0);
+        doThrow(BusinessException.error("只能选择已激活的账号"))
+                .when(fixture.userService).requireActiveUser(77L);
+        DevelopmentItemNodeUpdateCmd cmd = new DevelopmentItemNodeUpdateCmd();
+        cmd.setOwnerId(77L);
+        cmd.setVersion(0);
+
+        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("激活");
     }
 
     @Test
@@ -115,6 +148,61 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @Test
+    void hidesDeletedTopicWorkflowDetails() {
+        Fixture fixture = new Fixture(0);
+        ProjectNodeDevelopmentTopicDO deletedTopic = new ProjectNodeDevelopmentTopicDO();
+        deletedTopic.setId(7L);
+        deletedTopic.setProjectId(5L);
+        deletedTopic.setNodeId(9L);
+        deletedTopic.setDeleted(true);
+        when(fixture.topicMapper.selectById(7L)).thenReturn(deletedTopic);
+
+        assertThatThrownBy(() -> fixture.service.detail(DevelopmentItemType.TOPIC, 7L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("专题不存在");
+    }
+
+    @Test
+    void hidesStoryWorkflowDetailsWhenParentTopicWasDeleted() {
+        Fixture fixture = new Fixture(0);
+        ProjectNodeDevelopmentStoryDO story = new ProjectNodeDevelopmentStoryDO();
+        story.setId(8L);
+        story.setProjectId(5L);
+        story.setNodeId(9L);
+        story.setTopicId(7L);
+        when(fixture.storyMapper.selectById(8L)).thenReturn(story);
+        ProjectNodeDevelopmentTopicDO deletedTopic = new ProjectNodeDevelopmentTopicDO();
+        deletedTopic.setId(7L);
+        deletedTopic.setProjectId(5L);
+        deletedTopic.setNodeId(9L);
+        deletedTopic.setDeleted(true);
+        when(fixture.topicMapper.selectById(7L)).thenReturn(deletedTopic);
+
+        assertThatThrownBy(() -> fixture.service.detail(DevelopmentItemType.STORY, 8L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("故事所属专题不存在");
+    }
+
+    @Test
+    void rejectsNodeEditsWhenTheTopicWasReboundAfterThePageLoaded() {
+        Fixture fixture = new Fixture(0);
+        ProjectNodeDevelopmentTopicDO reboundTopic = new ProjectNodeDevelopmentTopicDO();
+        reboundTopic.setId(7L);
+        reboundTopic.setProjectId(6L);
+        reboundTopic.setNodeId(10L);
+        when(fixture.topicMapper.selectByIdForUpdate(7L)).thenReturn(reboundTopic);
+        DevelopmentItemNodeUpdateCmd cmd = new DevelopmentItemNodeUpdateCmd();
+        cmd.setVersion(0);
+        cmd.setOwnerId(42L);
+
+        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("不属于当前项目节点");
+        verify(fixture.workflowMapper, org.mockito.Mockito.never()).selectForUpdate("TOPIC", 7L);
+        verify(fixture.nodeMapper, org.mockito.Mockito.never()).updateById(any(DevelopmentItemWorkflowNodeDO.class));
+    }
+
     private static final class Fixture {
         private final DevelopmentItemWorkflowMapper workflowMapper = mock(DevelopmentItemWorkflowMapper.class);
         private final DevelopmentItemWorkflowNodeMapper nodeMapper = mock(DevelopmentItemWorkflowNodeMapper.class);
@@ -127,29 +215,30 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
         private final ProjectPermissionService permissionService = mock(ProjectPermissionService.class);
         private final UserService userService = mock(UserService.class);
         private final WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
+        private final ProjectMemberAssignmentService assignmentService = mock(ProjectMemberAssignmentService.class);
         private final DevelopmentItemWorkflowService service;
+        private final ProjectDO project = new ProjectDO();
+        private final ProjectNodeDO sourceNode = new ProjectNodeDO();
+        private final ProjectNodeDevelopmentTopicDO topic = new ProjectNodeDevelopmentTopicDO();
+        private final DevelopmentItemWorkflowDO workflow = new DevelopmentItemWorkflowDO();
         private final DevelopmentItemWorkflowNodeDO node = new DevelopmentItemWorkflowNodeDO();
         private final List<DevelopmentItemTaskDO> savedTasks = new ArrayList<>();
 
         private Fixture(int status) {
             service = new DevelopmentItemWorkflowService(workflowMapper, nodeMapper, taskMapper, topicMapper,
                     storyMapper, projectNodeMapper, iterationPlanMapper, templateVersionMapper,
-                    permissionService, userService, workflowTemplateService, new ObjectMapper());
+                    permissionService, userService, workflowTemplateService, assignmentService, new ObjectMapper());
 
-            ProjectDO project = new ProjectDO();
             project.setId(5L);
             project.setName("项目");
             project.setCode("PRJ-0001");
-            ProjectNodeDO sourceNode = new ProjectNodeDO();
             sourceNode.setId(9L);
             sourceNode.setProjectId(5L);
-            ProjectNodeDevelopmentTopicDO topic = new ProjectNodeDevelopmentTopicDO();
             topic.setId(7L);
             topic.setTitle("专题");
             topic.setProjectId(5L);
             topic.setNodeId(9L);
 
-            DevelopmentItemWorkflowDO workflow = new DevelopmentItemWorkflowDO();
             workflow.setId(31L);
             workflow.setItemType("TOPIC");
             workflow.setItemId(7L);
@@ -183,7 +272,7 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
                 return 1;
             });
             when(templateVersionMapper.selectById(88L)).thenReturn(new WorkflowTemplateVersionDO());
-            when(userService.listByIds(anyList())).thenAnswer(invocation -> {
+            when(userService.listByIdsIncludingDeleted(anyList())).thenAnswer(invocation -> {
                 List<Long> ids = invocation.getArgument(0);
                 if (!ids.contains(42L)) return List.of();
                 UserDO owner = new UserDO();

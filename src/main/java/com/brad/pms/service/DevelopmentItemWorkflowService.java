@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.common.enums.DevelopmentAssignmentType;
 import com.brad.pms.dto.request.DevelopmentItemNodeUpdateCmd;
 import com.brad.pms.dto.request.DevelopmentItemTaskSaveCmd;
 import com.brad.pms.dto.response.DevelopmentItemTaskDTO;
@@ -72,16 +73,17 @@ public class DevelopmentItemWorkflowService {
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final WorkflowTemplateService workflowTemplateService;
+    private final ProjectMemberAssignmentService assignmentService;
     private final ObjectMapper objectMapper;
 
     /** Creates a pinned snapshot of the current default, when one is configured. */
     @Transactional
     public DevelopmentItemWorkflowDO createIfDefaultExists(
             DevelopmentItemType itemType, Long itemId, Long projectId, Long sourceNodeId) {
-        if (itemId == null || projectId == null || sourceNodeId == null) {
+        if (itemId == null || (projectId == null) != (sourceNodeId == null)) {
             throw BusinessException.error("研发事项信息不完整，无法绑定流程");
         }
-        permissionService.requireProjectReadable(projectId);
+        if (projectId != null) permissionService.requireProjectReadable(projectId);
         requireItemScope(itemType, itemId, projectId, sourceNodeId);
         DevelopmentItemWorkflowDO existing = workflowMapper.selectByItem(itemType.name(), itemId);
         if (existing != null) {
@@ -146,7 +148,8 @@ public class DevelopmentItemWorkflowService {
     public DevelopmentItemWorkflowDetailDTO detail(DevelopmentItemType itemType, Long itemId) {
         ItemContext context = loadContext(itemType, itemId);
         DevelopmentItemWorkflowDO workflow = createIfDefaultExists(
-                itemType, itemId, context.project().getId(), context.sourceNode().getId());
+                itemType, itemId, context.project() == null ? null : context.project().getId(),
+                context.sourceNode() == null ? null : context.sourceNode().getId());
         return toDetail(context, workflow);
     }
 
@@ -162,7 +165,10 @@ public class DevelopmentItemWorkflowService {
         if (cmd.getStartDate() != null && cmd.getEndDate() != null && cmd.getStartDate().isAfter(cmd.getEndDate())) {
             throw BusinessException.error("节点开始日期不能晚于结束日期");
         }
-        if (cmd.getOwnerId() != null) permissionService.requireProjectMember(context.project().getId(), cmd.getOwnerId());
+        if (!Objects.equals(cmd.getOwnerId(), node.getOwnerId())) {
+            replaceAssignment(context, itemType, itemId, DevelopmentAssignmentType.WORKFLOW_NODE_OWNER,
+                    nodeId, node.getOwnerId(), cmd.getOwnerId());
+        }
         node.setOwnerId(cmd.getOwnerId());
         node.setStartDate(cmd.getStartDate());
         node.setEndDate(cmd.getEndDate());
@@ -176,7 +182,8 @@ public class DevelopmentItemWorkflowService {
             } catch (IllegalArgumentException exception) {
                 throw BusinessException.error(exception.getMessage());
             }
-            validateFieldPeople(context.project().getId(), definition.fields(), values);
+            validateFieldPeople(definition.fields(), values,
+                    readFieldValues(node.getFieldValuesJson()));
             node.setFieldValuesJson(writeFieldValues(values));
         }
         if (nodeMapper.updateById(node) != 1) {
@@ -245,8 +252,12 @@ public class DevelopmentItemWorkflowService {
         Integer priority = cmd.getPriority() == null ? 1 : cmd.getPriority();
         if (status < TASK_TODO || status > TASK_DONE) throw BusinessException.error("任务状态不正确");
         if (priority < 0 || priority > 2) throw BusinessException.error("任务优先级不正确");
-        if (cmd.getAssigneeId() != null) permissionService.requireProjectMember(context.project().getId(), cmd.getAssigneeId());
+        Long existingAssigneeId = existingTask == null ? null : existingTask.getAssigneeId();
+        if (cmd.getAssigneeId() != null && !Objects.equals(cmd.getAssigneeId(), existingAssigneeId)) {
+            userService.requireActiveUser(cmd.getAssigneeId());
+        }
 
+        Long savedTaskId;
         if (taskId == null) {
             DevelopmentItemTaskDO task = new DevelopmentItemTaskDO();
             task.setWorkflowId(workflow.getId());
@@ -256,6 +267,7 @@ public class DevelopmentItemWorkflowService {
             task.setVersion(0);
             applyTaskFields(task, cmd, status, priority);
             if (taskMapper.insert(task) != 1) throw BusinessException.conflict("任务创建失败，请重试");
+            savedTaskId = task.getId();
         } else {
             DevelopmentItemTaskDO task = requireTask(workflow.getId(), nodeId, taskId);
             requireExpectedVersion(task.getVersion(), cmd.getVersion(), "任务已被其他人修改，请刷新后重试");
@@ -266,6 +278,11 @@ public class DevelopmentItemWorkflowService {
             if (taskMapper.updateById(task) != 1) {
                 throw BusinessException.conflict("任务已被其他人修改，请刷新后重试");
             }
+            savedTaskId = task.getId();
+        }
+        if (!Objects.equals(existingAssigneeId, cmd.getAssigneeId())) {
+            replaceAssignment(context, itemType, itemId, DevelopmentAssignmentType.TASK_ASSIGNEE,
+                    savedTaskId, existingAssigneeId, cmd.getAssigneeId());
         }
         return detail(itemType, itemId);
     }
@@ -286,9 +303,18 @@ public class DevelopmentItemWorkflowService {
                     .eq(DevelopmentItemTaskDO::getWorkflowId, workflow.getId())
                     .eq(DevelopmentItemTaskDO::getNodeId, node.getId())
                     .eq(DevelopmentItemTaskDO::getParentId, task.getId()));
-            children.forEach(child -> taskMapper.deleteById(child.getId()));
+            children.forEach(child -> {
+                if (taskMapper.deleteById(child.getId()) == 1 && child.getAssigneeId() != null) {
+                    assignmentService.releaseAssignment(context.project() == null ? null : context.project().getId(),
+                            itemType, itemId, DevelopmentAssignmentType.TASK_ASSIGNEE, child.getId());
+                }
+            });
         }
         if (taskMapper.deleteById(taskId) != 1) throw BusinessException.conflict("任务已被其他人修改，请刷新后重试");
+        if (task.getAssigneeId() != null) {
+            assignmentService.releaseAssignment(context.project() == null ? null : context.project().getId(),
+                    itemType, itemId, DevelopmentAssignmentType.TASK_ASSIGNEE, task.getId());
+        }
         return detail(itemType, itemId);
     }
 
@@ -297,11 +323,11 @@ public class DevelopmentItemWorkflowService {
         dto.setItemType(context.itemType().name().toLowerCase());
         dto.setId(context.itemId());
         dto.setTitle(context.title());
-        dto.setProjectId(context.project().getId());
-        dto.setProjectCode(context.project().getCode());
-        dto.setProjectName(context.project().getName());
-        dto.setSourceNodeId(context.sourceNode().getId());
-        dto.setSourceNodeName(context.sourceNode().getName());
+        dto.setProjectId(context.project() == null ? null : context.project().getId());
+        dto.setProjectCode(context.project() == null ? null : context.project().getCode());
+        dto.setProjectName(context.project() == null ? null : context.project().getName());
+        dto.setSourceNodeId(context.sourceNode() == null ? null : context.sourceNode().getId());
+        dto.setSourceNodeName(context.sourceNode() == null ? null : context.sourceNode().getName());
         dto.setTopicId(context.topicId());
         dto.setTopicTitle(context.topicTitle());
         dto.setOwnerId(context.ownerId());
@@ -392,18 +418,19 @@ public class DevelopmentItemWorkflowService {
         return dto;
     }
 
-    private void validateFieldPeople(Long projectId, List<WorkflowFieldDefinition> fields,
-                                     Map<String, JsonNode> values) {
+    private void validateFieldPeople(List<WorkflowFieldDefinition> fields,
+                                     Map<String, JsonNode> values, Map<String, JsonNode> previousValues) {
         Map<String, WorkflowFieldDefinition> fieldsByKey = fields.stream()
                 .collect(Collectors.toMap(WorkflowFieldDefinition::key, field -> field));
         for (Map.Entry<String, JsonNode> entry : values.entrySet()) {
             WorkflowFieldDefinition field = fieldsByKey.get(entry.getKey());
             JsonNode value = entry.getValue();
             if (field == null || value == null || value.isNull()) continue;
+            if (value.equals(previousValues.get(entry.getKey()))) continue;
             if (field.type() == WorkflowFieldType.PERSON && value.isIntegralNumber()) {
-                permissionService.requireProjectMember(projectId, value.asLong());
+                userService.requireActiveUser(value.asLong());
             } else if (field.type() == WorkflowFieldType.PERSON_MULTI && value.isArray()) {
-                value.forEach(personId -> permissionService.requireProjectMember(projectId, personId.asLong()));
+                value.forEach(personId -> userService.requireActiveUser(personId.asLong()));
             }
         }
     }
@@ -462,7 +489,7 @@ public class DevelopmentItemWorkflowService {
 
         if (itemType == DevelopmentItemType.TOPIC) {
             ProjectNodeDevelopmentTopicDO topic = topicMapper.selectById(itemId);
-            if (topic == null) throw BusinessException.notFound("专题不存在");
+            if (topic == null || Boolean.TRUE.equals(topic.getDeleted())) throw BusinessException.notFound("专题不存在");
             title = topic.getTitle();
             projectId = topic.getProjectId();
             sourceNodeId = topic.getNodeId();
@@ -488,20 +515,29 @@ public class DevelopmentItemWorkflowService {
             blocker = story.getBlocker();
             topicId = story.getTopicId();
             ProjectNodeDevelopmentTopicDO topic = topicId == null ? null : topicMapper.selectById(topicId);
-            if (topic == null || !Objects.equals(topic.getProjectId(), projectId)
-                    || !Objects.equals(topic.getNodeId(), sourceNodeId)) {
-                throw BusinessException.notFound("故事所属专题不存在");
+            if (topicId == null) {
+                if (projectId != null || sourceNodeId != null) {
+                    throw BusinessException.notFound("未关联专题的故事不能绑定项目节点");
+                }
+            } else {
+                if (topic == null || Boolean.TRUE.equals(topic.getDeleted())
+                        || !Objects.equals(topic.getProjectId(), projectId)
+                        || !Objects.equals(topic.getNodeId(), sourceNodeId)) {
+                    throw BusinessException.notFound("故事所属专题不存在");
+                }
+                topicTitle = topic.getTitle();
             }
-            topicTitle = topic.getTitle();
             ProjectNodeIterationPlanDO plan = story.getIterationPlanId() == null
                     ? null : iterationPlanMapper.selectById(story.getIterationPlanId());
             iterationPlanName = plan == null ? null : plan.getName();
         }
-        ProjectDO project = permissionService.requireProjectReadable(projectId);
-        ProjectNodeDO sourceNode = projectNodeMapper.selectById(sourceNodeId);
-        if (sourceNode == null || !Objects.equals(sourceNode.getProjectId(), projectId)) {
+        ProjectDO project = projectId == null ? null : permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO sourceNode = sourceNodeId == null ? null : projectNodeMapper.selectById(sourceNodeId);
+        if ((projectId == null) != (sourceNodeId == null)
+                || (sourceNode != null && !Objects.equals(sourceNode.getProjectId(), projectId))) {
             throw BusinessException.notFound("研发事项来源节点不存在");
         }
+        if (sourceNodeId != null && sourceNode == null) throw BusinessException.notFound("研发事项来源节点不存在");
         return new ItemContext(itemType, itemId, title, project, sourceNode, topicId, topicTitle, ownerId,
                 developmentStatus, developmentProgress, storyPoints, startDate, dueDate, blocker,
                 latestBuildVersion, testStatus, iterationPlanName);
@@ -509,20 +545,23 @@ public class DevelopmentItemWorkflowService {
 
     private ItemContext requireWritableItem(DevelopmentItemType itemType, Long itemId, String action) {
         ItemContext context = loadContext(itemType, itemId);
-        permissionService.requireProjectWritable(context.project().getId(), action);
+        if (context.project() != null) permissionService.requireProjectWritable(context.project().getId(), action);
         return context;
     }
 
     private DevelopmentItemWorkflowDO requireWorkflowForUpdate(DevelopmentItemType itemType, Long itemId) {
         ItemContext context = loadContext(itemType, itemId);
+        Long projectId = context.project() == null ? null : context.project().getId();
+        Long sourceNodeId = context.sourceNode() == null ? null : context.sourceNode().getId();
+        requireItemScope(itemType, itemId, projectId, sourceNodeId);
         DevelopmentItemWorkflowDO workflow = workflowMapper.selectByItem(itemType.name(), itemId);
         if (workflow != null) workflow = workflowMapper.selectForUpdate(itemType.name(), itemId);
         if (workflow == null) {
-            workflow = createIfDefaultExists(itemType, itemId, context.project().getId(), context.sourceNode().getId());
+            workflow = createIfDefaultExists(itemType, itemId, projectId, sourceNodeId);
         }
         if (workflow == null) throw BusinessException.conflict("流程尚未配置，请先为该类型发布并设置默认流程模板");
-        if (!Objects.equals(workflow.getProjectId(), context.project().getId())
-                || !Objects.equals(workflow.getSourceNodeId(), context.sourceNode().getId())
+        if (!Objects.equals(workflow.getProjectId(), projectId)
+                || !Objects.equals(workflow.getSourceNodeId(), sourceNodeId)
                 || !Objects.equals(workflow.getItemId(), itemId)
                 || !Objects.equals(workflow.getItemType(), itemType.name())) {
             throw BusinessException.notFound("研发事项流程不存在");
@@ -583,6 +622,24 @@ public class DevelopmentItemWorkflowService {
     }
 
     private void requireItemScope(DevelopmentItemType itemType, Long itemId, Long projectId, Long sourceNodeId) {
+        if ((projectId == null) != (sourceNodeId == null)) {
+            throw BusinessException.notFound("研发事项来源节点不存在");
+        }
+        if (projectId == null) {
+            if (itemType == DevelopmentItemType.TOPIC) {
+                ProjectNodeDevelopmentTopicDO topic = topicMapper.selectByIdForUpdate(itemId);
+                if (topic == null || Boolean.TRUE.equals(topic.getDeleted())
+                        || topic.getProjectId() != null || topic.getNodeId() != null) {
+                    throw BusinessException.notFound("研发事项不属于独立事项范围");
+                }
+                return;
+            }
+            ProjectNodeDevelopmentStoryDO story = storyMapper.selectByIdForUpdate(itemId);
+            if (story == null || story.getTopicId() != null || story.getProjectId() != null || story.getNodeId() != null) {
+                throw BusinessException.notFound("研发事项不属于独立事项范围");
+            }
+            return;
+        }
         ProjectNodeDO sourceNode = projectNodeMapper.selectById(sourceNodeId);
         if (sourceNode == null || !projectId.equals(sourceNode.getProjectId())) {
             throw BusinessException.notFound("研发事项来源节点不存在");
@@ -590,10 +647,17 @@ public class DevelopmentItemWorkflowService {
         boolean belongsToScope;
         if (itemType == DevelopmentItemType.TOPIC) {
             ProjectNodeDevelopmentTopicDO topic = topicMapper.selectByIdForUpdate(itemId);
-            belongsToScope = topic != null && projectId.equals(topic.getProjectId()) && sourceNodeId.equals(topic.getNodeId());
+            belongsToScope = topic != null && !Boolean.TRUE.equals(topic.getDeleted())
+                    && projectId.equals(topic.getProjectId()) && sourceNodeId.equals(topic.getNodeId());
         } else {
-            ProjectNodeDevelopmentStoryDO story = storyMapper.selectByIdForUpdate(itemId);
-            belongsToScope = story != null && projectId.equals(story.getProjectId()) && sourceNodeId.equals(story.getNodeId());
+            ProjectNodeDevelopmentStoryDO observedStory = storyMapper.selectById(itemId);
+            ProjectNodeDevelopmentTopicDO topic = observedStory == null || observedStory.getTopicId() == null
+                    ? null : topicMapper.selectByIdForUpdate(observedStory.getTopicId());
+            ProjectNodeDevelopmentStoryDO story = topic == null ? null : storyMapper.selectByIdForUpdate(itemId);
+            belongsToScope = story != null && topic != null
+                    && Objects.equals(story.getTopicId(), topic.getId())
+                    && !Boolean.TRUE.equals(topic.getDeleted())
+                    && projectId.equals(story.getProjectId()) && sourceNodeId.equals(story.getNodeId());
         }
         if (!belongsToScope) throw BusinessException.notFound("研发事项不存在或不属于当前项目节点");
     }
@@ -604,13 +668,23 @@ public class DevelopmentItemWorkflowService {
         ids.addAll(assigneeIds);
         List<Long> distinct = ids.stream().filter(Objects::nonNull).distinct().toList();
         if (distinct.isEmpty()) return Collections.emptyMap();
-        return userService.listByIds(distinct).stream().collect(Collectors.toMap(UserDO::getId, user -> user, (left, right) -> left));
+        return userService.listByIdsIncludingDeleted(distinct).stream()
+                .collect(Collectors.toMap(UserDO::getId, user -> user, (left, right) -> left));
     }
 
     private String displayName(Long userId) {
         if (userId == null) return null;
-        return userService.listByIds(List.of(userId)).stream().findFirst()
+        return userService.listByIdsIncludingDeleted(List.of(userId)).stream().findFirst()
                 .map(com.brad.pms.convertor.Convertors::userDisplayName).orElse(null);
+    }
+
+    private void replaceAssignment(ItemContext context, DevelopmentItemType itemType, Long itemId,
+                                   DevelopmentAssignmentType assignmentType, Long assignmentId,
+                                   Long oldUserId, Long newUserId) {
+        if (newUserId != null) userService.requireActiveUser(newUserId);
+        assignmentService.replaceAssignment(
+                context.project() == null ? null : context.project().getId(),
+                itemType, itemId, assignmentType, assignmentId, newUserId);
     }
 
     private String displayName(UserDO user) {

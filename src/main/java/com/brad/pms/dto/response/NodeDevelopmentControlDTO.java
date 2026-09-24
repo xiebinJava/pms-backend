@@ -14,6 +14,7 @@ public class NodeDevelopmentControlDTO {
     private Integer version;
     private String currentIteration;
     private boolean canEdit;
+    private boolean topicCreationAllowed;
     private LocalDateTime updatedAt;
     private NodeDevelopmentSummaryDTO summary;
     private List<NodeDevelopmentTopicDTO> topics = new ArrayList<>();

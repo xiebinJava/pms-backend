@@ -5,6 +5,7 @@ import com.brad.pms.entity.UserDO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface UserMapper extends BaseMapper<UserDO> {
@@ -22,6 +23,14 @@ public interface UserMapper extends BaseMapper<UserDO> {
     @Select("SELECT * FROM sys_user WHERE id = #{id} AND deleted = FALSE FOR UPDATE")
     UserDO selectForUpdate(@Param("id") Long id);
 
-    @Select("SELECT * FROM sys_user WHERE deleted = FALSE AND (nickname LIKE CONCAT('%', #{keyword}, '%') OR name_zh LIKE CONCAT('%', #{keyword}, '%') OR username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%')) LIMIT 20")
+    @Select("SELECT * FROM sys_user WHERE status = 'ACTIVE' AND deleted = FALSE AND (nickname LIKE CONCAT('%', #{keyword}, '%') OR name_zh LIKE CONCAT('%', #{keyword}, '%') OR username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%')) LIMIT 20")
     List<UserDO> search(@Param("keyword") String keyword);
+
+    @Select({
+            "<script>",
+            "SELECT * FROM sys_user WHERE id IN",
+            "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+            "</script>"
+    })
+    List<UserDO> selectByIdsIncludingDeleted(@Param("ids") Collection<Long> ids);
 }

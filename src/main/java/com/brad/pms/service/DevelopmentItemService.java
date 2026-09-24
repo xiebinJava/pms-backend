@@ -7,6 +7,7 @@ import com.brad.pms.dto.request.DevelopmentItemPageQry;
 import com.brad.pms.dto.response.DevelopmentStoryListDTO;
 import com.brad.pms.dto.response.DevelopmentTopicListDTO;
 import com.brad.pms.dto.response.ProjectDTO;
+import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
@@ -18,6 +19,7 @@ import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
+import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.workflow.DevelopmentItemType;
@@ -44,6 +46,8 @@ import java.util.stream.Collectors;
 public class DevelopmentItemService {
 
     private final ProjectService projectService;
+    private final ProjectMapper projectMapper;
+    private final ProjectPermissionService permissionService;
     private final ProjectNodeMapper nodeMapper;
     private final DevelopmentItemWorkflowMapper workflowMapper;
     private final DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
@@ -55,8 +59,7 @@ public class DevelopmentItemService {
 
     public PageResult<DevelopmentTopicListDTO> pageTopics(DevelopmentItemPageQry qry) {
         DevelopmentItemPageQry query = qry == null ? new DevelopmentItemPageQry() : qry;
-        QueryContext context = loadContext(query.getProjectId());
-        if (context.projects().isEmpty()) return emptyPage(query);
+        QueryContext context = loadContext(query.getProjectId(), Boolean.TRUE.equals(query.getDeleted()));
 
         Map<Long, List<ProjectNodeDevelopmentStoryDO>> storiesByTopic = context.stories().stream()
                 .filter(story -> story.getTopicId() != null)
@@ -74,8 +77,7 @@ public class DevelopmentItemService {
 
     public PageResult<DevelopmentStoryListDTO> pageStories(DevelopmentItemPageQry qry) {
         DevelopmentItemPageQry query = qry == null ? new DevelopmentItemPageQry() : qry;
-        QueryContext context = loadContext(query.getProjectId());
-        if (context.projects().isEmpty()) return emptyPage(query);
+        QueryContext context = loadContext(query.getProjectId(), false);
 
         Map<Long, FlowSummary> workflowSummaries = workflowSummaries(DevelopmentItemType.STORY,
                 context.stories().stream().map(ProjectNodeDevelopmentStoryDO::getId).toList());
@@ -87,34 +89,68 @@ public class DevelopmentItemService {
         return page(items, query);
     }
 
-    private QueryContext loadContext(Long projectId) {
-        List<Long> readableIds = safeIds(projectService.listReadableIds());
-        if (projectId != null) {
-            if (!readableIds.contains(projectId)) return QueryContext.empty();
-            readableIds = List.of(projectId);
+    private QueryContext loadContext(Long projectId, boolean deletedTopicScope) {
+        List<ProjectNodeDevelopmentTopicDO> topics;
+        Map<Long, ProjectDTO> projectsById;
+        List<Long> projectIds;
+        if (deletedTopicScope) {
+            LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO> topicQuery = new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
+                    .eq(ProjectNodeDevelopmentTopicDO::getDeleted, true)
+                    .orderByAsc(ProjectNodeDevelopmentTopicDO::getSort)
+                    .orderByAsc(ProjectNodeDevelopmentTopicDO::getId);
+            if (projectId != null) topicQuery.eq(ProjectNodeDevelopmentTopicDO::getProjectId, projectId);
+            else topicQuery.isNotNull(ProjectNodeDevelopmentTopicDO::getProjectId);
+            topics = safeList(topicMapper.selectList(topicQuery));
+            if (projectId == null) topics = new ArrayList<>(topics);
+            if (projectId == null) topics.addAll(safeList(topicMapper.selectUnbound(true)));
+            if (topics.isEmpty()) return QueryContext.empty();
+            List<Long> referencedProjectIds = topics.stream().map(ProjectNodeDevelopmentTopicDO::getProjectId)
+                    .filter(Objects::nonNull).distinct().toList();
+            projectsById = safeList(referencedProjectIds.isEmpty()
+                            ? List.of() : projectMapper.selectIncludingDeletedByIds(referencedProjectIds)).stream()
+                    .filter(permissionService::canManageProject)
+                    .map(this::toProjectSummary)
+                    .collect(Collectors.toMap(ProjectDTO::getId, Function.identity(), (left, right) -> left, LinkedHashMap::new));
+            topics = topics.stream().filter(topic -> topic.getProjectId() == null
+                    || projectsById.containsKey(topic.getProjectId())).toList();
+            projectIds = projectsById.keySet().stream().toList();
+        } else {
+            List<Long> readableIds = safeIds(projectService.listReadableIds());
+            if (projectId != null) {
+                if (!readableIds.contains(projectId)) return QueryContext.empty();
+                readableIds = List.of(projectId);
+            }
+            List<ProjectDTO> projects = readableIds.isEmpty() ? List.of() : safeList(projectService.listReadableByIds(readableIds));
+            projectsById = projects.stream().filter(project -> project.getId() != null)
+                    .collect(Collectors.toMap(ProjectDTO::getId, Function.identity(), (left, right) -> left, LinkedHashMap::new));
+            projectIds = projectsById.keySet().stream().toList();
+            List<ProjectNodeDevelopmentTopicDO> boundTopics = projectIds.isEmpty() ? List.of()
+                    : safeList(topicMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
+                            .in(ProjectNodeDevelopmentTopicDO::getProjectId, projectIds)
+                            .eq(ProjectNodeDevelopmentTopicDO::getDeleted, false)
+                            .orderByAsc(ProjectNodeDevelopmentTopicDO::getSort)
+                            .orderByAsc(ProjectNodeDevelopmentTopicDO::getId)));
+            topics = projectId == null ? new ArrayList<>(boundTopics) : new ArrayList<>(boundTopics);
+            if (projectId == null) topics.addAll(safeList(topicMapper.selectUnbound(false)));
         }
-        if (readableIds.isEmpty()) return QueryContext.empty();
 
-        List<ProjectDTO> projects = safeList(projectService.listReadableByIds(readableIds));
-        List<Long> projectIds = projects.stream().map(ProjectDTO::getId).filter(Objects::nonNull).distinct().toList();
-        if (projectIds.isEmpty()) return QueryContext.empty();
-
-        List<ProjectNodeDO> nodes = safeList(nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
-                .in(ProjectNodeDO::getProjectId, projectIds)
-                .orderByAsc(ProjectNodeDO::getSort)
-                .orderByAsc(ProjectNodeDO::getId)));
-        List<ProjectNodeDevelopmentTopicDO> topics = safeList(topicMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
-                .in(ProjectNodeDevelopmentTopicDO::getProjectId, projectIds)
-                .orderByAsc(ProjectNodeDevelopmentTopicDO::getSort)
-                .orderByAsc(ProjectNodeDevelopmentTopicDO::getId)));
-        List<ProjectNodeDevelopmentStoryDO> stories = safeList(storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
-                .in(ProjectNodeDevelopmentStoryDO::getProjectId, projectIds)
-                .orderByAsc(ProjectNodeDevelopmentStoryDO::getSort)
-                .orderByAsc(ProjectNodeDevelopmentStoryDO::getId)));
-        List<ProjectNodeIterationPlanDO> plans = safeList(iterationPlanMapper.selectList(new LambdaQueryWrapper<ProjectNodeIterationPlanDO>()
-                .in(ProjectNodeIterationPlanDO::getProjectId, projectIds)
-                .orderByAsc(ProjectNodeIterationPlanDO::getSort)
-                .orderByAsc(ProjectNodeIterationPlanDO::getId)));
+        List<ProjectNodeDO> nodes = projectIds.isEmpty() ? List.of()
+                : safeList(nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
+                        .in(ProjectNodeDO::getProjectId, projectIds)
+                        .orderByAsc(ProjectNodeDO::getSort)
+                        .orderByAsc(ProjectNodeDO::getId)));
+        List<Long> topicIds = topics.stream().map(ProjectNodeDevelopmentTopicDO::getId).filter(Objects::nonNull).toList();
+        List<ProjectNodeDevelopmentStoryDO> stories = new ArrayList<>(topicIds.isEmpty() ? List.of()
+                : safeList(storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
+                        .in(ProjectNodeDevelopmentStoryDO::getTopicId, topicIds)
+                        .orderByAsc(ProjectNodeDevelopmentStoryDO::getSort)
+                        .orderByAsc(ProjectNodeDevelopmentStoryDO::getId))));
+        if (!deletedTopicScope && projectId == null) stories.addAll(safeList(storyMapper.selectIndependent()));
+        List<ProjectNodeIterationPlanDO> plans = projectIds.isEmpty() ? List.of()
+                : safeList(iterationPlanMapper.selectList(new LambdaQueryWrapper<ProjectNodeIterationPlanDO>()
+                        .in(ProjectNodeIterationPlanDO::getProjectId, projectIds)
+                        .orderByAsc(ProjectNodeIterationPlanDO::getSort)
+                        .orderByAsc(ProjectNodeIterationPlanDO::getId)));
 
         Set<Long> ownerIds = new java.util.HashSet<>();
         topics.stream().map(ProjectNodeDevelopmentTopicDO::getOwnerId).filter(Objects::nonNull).forEach(ownerIds::add);
@@ -123,11 +159,20 @@ public class DevelopmentItemService {
         return new QueryContext(
                 topics,
                 stories,
-                projects.stream().collect(Collectors.toMap(ProjectDTO::getId, Function.identity(), (left, right) -> left, LinkedHashMap::new)),
+                projectsById,
                 nodes.stream().filter(node -> node.getId() != null).collect(Collectors.toMap(ProjectNodeDO::getId, Function.identity(), (left, right) -> left, LinkedHashMap::new)),
                 users,
                 plans.stream().filter(plan -> plan.getId() != null).collect(Collectors.toMap(ProjectNodeIterationPlanDO::getId, ProjectNodeIterationPlanDO::getName, (left, right) -> left, LinkedHashMap::new))
         );
+    }
+
+    private ProjectDTO toProjectSummary(ProjectDO project) {
+        ProjectDTO dto = new ProjectDTO();
+        dto.setId(project.getId());
+        dto.setCode(project.getCode());
+        dto.setName(project.getName());
+        dto.setStatus(project.getStatus());
+        return dto;
     }
 
     private DevelopmentTopicListDTO toTopic(ProjectNodeDevelopmentTopicDO topic,
@@ -286,7 +331,7 @@ public class DevelopmentItemService {
 
     private Map<Long, UserDO> userMap(Collection<Long> ids) {
         if (ids == null || ids.isEmpty()) return Collections.emptyMap();
-        List<UserDO> users = safeList(userService.listByIds(new ArrayList<>(ids)));
+        List<UserDO> users = safeList(userService.listByIdsIncludingDeleted(new ArrayList<>(ids)));
         return Convertors.userMap(users);
     }
 
