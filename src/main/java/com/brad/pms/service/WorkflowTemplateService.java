@@ -8,13 +8,16 @@ import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.ProjectTypeSaveCmd;
 import com.brad.pms.dto.request.WorkflowTemplateSaveCmd;
 import com.brad.pms.dto.response.ProjectTypeDTO;
+import com.brad.pms.dto.response.WorkflowProjectNodeOptionDTO;
 import com.brad.pms.dto.response.WorkflowTemplateDTO;
 import com.brad.pms.dto.response.WorkflowTemplateOptionsDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
 import com.brad.pms.dto.response.WorkflowTemplateVersionSummaryDTO;
+import com.brad.pms.dto.response.DevelopmentWorkflowTemplateOptionsDTO;
 import com.brad.pms.entity.ProjectTypeDO;
 import com.brad.pms.entity.WorkflowTemplateDO;
 import com.brad.pms.entity.WorkflowTemplateVersionDO;
+import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectTypeMapper;
 import com.brad.pms.mapper.WorkflowTemplateMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
@@ -36,16 +39,21 @@ import java.util.Comparator;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class WorkflowTemplateService {
+    private static final String LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY = "develop";
+
     private final ProjectTypeMapper projectTypeMapper;
+    private final ProjectMapper projectMapper;
     private final WorkflowTemplateMapper templateMapper;
     private final WorkflowTemplateVersionMapper versionMapper;
     private final OperationLogService operationLogService;
@@ -59,18 +67,34 @@ public class WorkflowTemplateService {
                 .stream().map(this::toProjectTypeDTO).toList();
     }
 
+    private List<ProjectTypeDTO> listProjectCreationTypes() {
+        return projectTypeMapper.selectList(new LambdaQueryWrapper<ProjectTypeDO>()
+                        .eq(ProjectTypeDO::getStatus, 1)
+                        .ne(ProjectTypeDO::getProjectCreationEnabled, false)
+                        .orderByAsc(ProjectTypeDO::getSort)
+                        .orderByAsc(ProjectTypeDO::getId))
+                .stream().map(this::toProjectTypeDTO).toList();
+    }
+
+    @Transactional
     public ProjectTypeDTO createProjectType(ProjectTypeSaveCmd cmd) {
         ProjectTypeDO type = new ProjectTypeDO();
-        type.setCode(cmd.getCode().trim());
+        type.setCode("process-type-pending-" + UUID.randomUUID().toString().replace("-", ""));
         type.setName(cmd.getName().trim());
         type.setDescription(trimToNull(cmd.getDescription()));
         type.setSort(cmd.getSort() == null ? 0 : cmd.getSort());
         type.setStatus(1);
+        type.setProjectCreationEnabled(false);
         type.setDeleted(false);
         try {
             projectTypeMapper.insert(type);
+            if (type.getId() == null) throw BusinessException.error("流程类型创建失败，请重试");
+            type.setCode("process-type-" + type.getId());
+            if (projectTypeMapper.updateById(type) != 1) {
+                throw BusinessException.error("流程类型创建失败，请重试");
+            }
         } catch (DataIntegrityViolationException e) {
-            throw BusinessException.conflict("项目类型标识已存在");
+            throw BusinessException.conflict("流程类型创建失败，请重试");
         }
         operationLogService.record(AuditEvent.success(AuditAction.PROJECT_TYPE_CREATED.name(),
                 AuditResourceType.PROJECT_TYPE.name(), type.getId(), null, null, null,
@@ -94,9 +118,84 @@ public class WorkflowTemplateService {
 
     public WorkflowTemplateOptionsDTO options() {
         WorkflowTemplateOptionsDTO options = new WorkflowTemplateOptionsDTO();
-        options.setProjectTypes(listProjectTypes());
-        options.setTemplates(listTemplates(null, true));
+        List<ProjectTypeDTO> projectTypes = listProjectCreationTypes();
+        var projectTypeIds = projectTypes.stream().map(ProjectTypeDTO::getId).collect(Collectors.toSet());
+        options.setProjectTypes(projectTypes);
+        options.setTemplates(listTemplates(null, true).stream()
+                .filter(template -> projectTypeIds.contains(template.getProjectTypeId()))
+                .toList());
         return options;
+    }
+
+    public DevelopmentWorkflowTemplateOptionsDTO developmentOptions() {
+        DevelopmentWorkflowTemplateOptionsDTO options = new DevelopmentWorkflowTemplateOptionsDTO();
+        options.setTopicTemplates(listTemplatesForProcessType("topic-management"));
+        options.setStoryTemplates(listTemplatesForProcessType("story-management"));
+        return options;
+    }
+
+    private List<WorkflowTemplateSummaryDTO> listTemplatesForProcessType(String processTypeCode) {
+        ProjectTypeDO type = projectTypeMapper.selectOne(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getCode, processTypeCode)
+                .eq(ProjectTypeDO::getStatus, 1));
+        return type == null ? List.of() : listTemplates(type.getId(), true);
+    }
+
+    /**
+     * Lists project workflow nodes that can host a topic workflow. Published versions remain selectable
+     * while offered for new projects; archived versions remain selectable while active projects pin them.
+     */
+    public List<WorkflowProjectNodeOptionDTO> listTopicSourceNodeOptions() {
+        List<ProjectTypeDO> selectableTypes = projectTypeMapper.selectList(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getStatus, 1)
+                .ne(ProjectTypeDO::getProjectCreationEnabled, false)
+                .orderByAsc(ProjectTypeDO::getSort)
+                .orderByAsc(ProjectTypeDO::getId));
+        Set<Long> selectableTypeIds = selectableTypes.stream().map(ProjectTypeDO::getId).collect(Collectors.toSet());
+        List<WorkflowTemplateDO> selectableTemplates = selectableTypeIds.isEmpty() ? List.of()
+                : templateMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateDO>()
+                        .in(WorkflowTemplateDO::getProjectTypeId, selectableTypeIds)
+                        .orderByAsc(WorkflowTemplateDO::getId));
+        Set<Long> selectableTemplateIds = selectableTemplates.stream().map(WorkflowTemplateDO::getId)
+                .collect(Collectors.toSet());
+
+        List<WorkflowTemplateVersionDO> publishedVersions = selectableTemplateIds.isEmpty() ? List.of()
+                : versionMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
+                        .in(WorkflowTemplateVersionDO::getTemplateId, selectableTemplateIds)
+                        .eq(WorkflowTemplateVersionDO::getStatus, "PUBLISHED")
+                        .orderByDesc(WorkflowTemplateVersionDO::getVersionNo)
+                        .orderByDesc(WorkflowTemplateVersionDO::getId));
+        List<Long> activePinnedVersionIds = projectMapper.selectActiveWorkflowTemplateVersionIds();
+        List<WorkflowTemplateVersionDO> archivedPinnedVersions = activePinnedVersionIds == null
+                || activePinnedVersionIds.isEmpty() ? List.of()
+                : versionMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
+                        .in(WorkflowTemplateVersionDO::getId, activePinnedVersionIds)
+                        .eq(WorkflowTemplateVersionDO::getStatus, "ARCHIVED")
+                        .orderByDesc(WorkflowTemplateVersionDO::getVersionNo)
+                        .orderByDesc(WorkflowTemplateVersionDO::getId));
+
+        Map<String, WorkflowNodeDefinition> nodesByKey = new LinkedHashMap<>();
+        publishedVersions.forEach(version -> addNodes(nodesByKey, parse(version.getDefinitionJson())));
+        archivedPinnedVersions.forEach(version -> addNodes(nodesByKey, parse(version.getDefinitionJson())));
+        // Keep current project workflow labels authoritative when keys overlap; fill remaining gaps for legacy projects.
+        addNodes(nodesByKey, BuiltInWorkflowTemplate.compatibilityDefinition());
+
+        Map<String, Long> nameCounts = nodesByKey.values().stream()
+                .collect(Collectors.groupingBy(WorkflowNodeDefinition::name, Collectors.counting()));
+        return nodesByKey.values().stream()
+                .sorted(Comparator.comparing(WorkflowNodeDefinition::name)
+                        .thenComparing(WorkflowNodeDefinition::key))
+                .map(node -> new WorkflowProjectNodeOptionDTO(node.key(),
+                        nameCounts.getOrDefault(node.name(), 0L) > 1
+                                ? node.name() + " (" + node.key() + ")" : node.name()))
+                .toList();
+    }
+
+    private void addNodes(Map<String, WorkflowNodeDefinition> nodesByKey, WorkflowTemplateDefinition definition) {
+        for (WorkflowNodeDefinition node : definition.nodes()) {
+            // Stable keys are the identity. Keep the first definition for any repeated key.
+            nodesByKey.putIfAbsent(node.key(), node);
+        }
     }
 
     public WorkflowTemplateDTO getTemplate(Long templateId) {
@@ -119,6 +218,7 @@ public class WorkflowTemplateService {
         WorkflowTemplateDO template;
         if (templateId == null) {
             ProjectTypeDO type = requireActiveType(cmd.getProjectTypeId());
+            validateTopicSourceProjectNodeKey(type, definition);
             template = new WorkflowTemplateDO();
             template.setCode("wf-" + UUID.randomUUID().toString().replace("-", ""));
             template.setProjectTypeId(type.getId());
@@ -135,6 +235,7 @@ public class WorkflowTemplateService {
             if (cmd.getProjectTypeId() != null && !cmd.getProjectTypeId().equals(template.getProjectTypeId())) {
                 throw BusinessException.error("流程模板所属项目类型不可更改");
             }
+            validateTopicSourceProjectNodeKey(projectTypeMapper.selectById(template.getProjectTypeId()), definition);
         }
 
         WorkflowTemplateVersionDO draft = findLatestVersion(template.getId(), "DRAFT");
@@ -178,11 +279,47 @@ public class WorkflowTemplateService {
         return toTemplateDTO(template);
     }
 
+    private void validateTopicSourceProjectNodeKey(ProjectTypeDO type, WorkflowTemplateDefinition definition) {
+        validateSourceNodeKeys(type, definition);
+    }
+
+    private void validateSourceNodeKeys(ProjectTypeDO type, WorkflowTemplateDefinition definition) {
+        if (type == null || definition == null) return;
+        String projectNodeKey = trimToNull(definition.sourceProjectNodeKey());
+        String topicNodeKey = trimToNull(definition.sourceTopicNodeKey());
+        if ("topic-management".equals(type.getCode())) {
+            if (topicNodeKey != null) throw BusinessException.error("专题流程不能配置专题节点挂载点");
+            if (projectNodeKey == null) throw BusinessException.error("专题流程必须配置项目节点挂载点");
+            boolean selectable = listTopicSourceNodeOptions().stream()
+                    .anyMatch(option -> projectNodeKey.equals(option.key()));
+            if (!selectable) throw BusinessException.error("专题流程绑定的项目节点不存在或不可用");
+            return;
+        }
+        if ("story-management".equals(type.getCode())) {
+            if (projectNodeKey != null) throw BusinessException.error("故事流程不能配置项目节点挂载点");
+            if (topicNodeKey == null) throw BusinessException.error("故事流程必须配置专题节点挂载点");
+            boolean selectable = listStorySourceTopicNodeOptions().stream()
+                    .anyMatch(option -> topicNodeKey.equals(option.key()));
+            if (!selectable) throw BusinessException.error("故事流程绑定的专题节点不存在或不可用");
+            return;
+        }
+        if (projectNodeKey != null || topicNodeKey != null) {
+            throw BusinessException.error("当前流程类型不支持事项挂载点");
+        }
+    }
+
     @Transactional
     public WorkflowTemplateDTO publish(Long templateId) {
         WorkflowTemplateDO template = requireTemplateForUpdate(templateId);
         WorkflowTemplateVersionDO draft = findLatestVersion(templateId, "DRAFT");
         if (draft == null) throw BusinessException.error("没有可发布的流程草稿");
+        WorkflowTemplateDefinition definition;
+        try {
+            definition = WorkflowTemplateDefinitionValidator.validate(parse(draft.getDefinitionJson()));
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.error(e.getMessage());
+        }
+        validateSourceNodeKeys(projectTypeMapper.selectById(template.getProjectTypeId()), definition);
         draft.setStatus("PUBLISHED");
         draft.setPublishedAt(LocalDateTime.now());
         if (versionMapper.updateById(draft) != 1) throw BusinessException.conflict("流程版本已被其他人修改");
@@ -268,12 +405,95 @@ public class WorkflowTemplateService {
         } else {
             type = requireActiveType(projectTypeId);
         }
+        requireProjectCreationType(type);
         Long selectedVersionId = versionId == null ? type.getDefaultTemplateVersionId() : versionId;
         if (selectedVersionId == null) throw BusinessException.error("该项目类型尚未配置默认流程模板");
         WorkflowTemplateVersionDO version = requirePublishedVersion(selectedVersionId);
         WorkflowTemplateDO template = requireTemplate(version.getTemplateId());
         if (!type.getId().equals(template.getProjectTypeId())) throw BusinessException.error("所选流程模板与项目类型不匹配");
         return new WorkflowTemplateBinding(type, version, template);
+    }
+
+    /**
+     * Returns the configured published default for a non-project workflow type.
+     * A missing active process type or an unset default means the workflow is not
+     * configured yet; callers may still create the development item without a flow.
+     */
+    public WorkflowTemplateBinding resolveDefaultForProcessType(String processTypeCode) {
+        return resolveForProcessType(processTypeCode, null);
+    }
+
+    public WorkflowTemplateBinding resolveForProcessType(String processTypeCode, Long requestedVersionId) {
+        ProjectTypeDO type = projectTypeMapper.selectOne(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getCode, processTypeCode)
+                .eq(ProjectTypeDO::getStatus, 1));
+        if (type == null) return null;
+        Long selectedVersionId = requestedVersionId == null
+                ? type.getDefaultTemplateVersionId() : requestedVersionId;
+        if (selectedVersionId == null) return null;
+        WorkflowTemplateVersionDO version = requirePublishedVersion(selectedVersionId);
+        WorkflowTemplateDO template = requireTemplate(version.getTemplateId());
+        if (!type.getId().equals(template.getProjectTypeId())) {
+            throw BusinessException.error("所选流程模板与流程类型不匹配");
+        }
+        return new WorkflowTemplateBinding(type, version, template);
+    }
+
+    /** Resolves the configured topic host node, retaining the compatibility node for legacy templates. */
+    public String resolveTopicSourceProjectNodeKey() {
+        WorkflowTemplateBinding binding = resolveDefaultForProcessType("topic-management");
+        return binding == null
+                ? LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY
+                : resolveTopicSourceProjectNodeKeyForRuntime(binding.version().getId());
+    }
+
+    public String resolveTopicSourceProjectNodeKey(Long templateVersionId) {
+        if (templateVersionId == null) return null;
+        return trimToNull(getDefinition(templateVersionId).sourceProjectNodeKey());
+    }
+
+    /**
+     * Resolves a topic host node for runtime creation. Published templates created
+     * before the mount-key field existed retain the original compatibility node.
+     */
+    public String resolveTopicSourceProjectNodeKeyForRuntime(Long templateVersionId) {
+        String configuredKey = resolveTopicSourceProjectNodeKey(templateVersionId);
+        return configuredKey == null ? LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY : configuredKey;
+    }
+
+    public String resolveStorySourceTopicNodeKey(Long templateVersionId) {
+        if (templateVersionId == null) return null;
+        return trimToNull(getDefinition(templateVersionId).sourceTopicNodeKey());
+    }
+
+    /** Lists stable node keys from all published Topic Management templates for Story Management binding. */
+    public List<WorkflowProjectNodeOptionDTO> listStorySourceTopicNodeOptions() {
+        List<ProjectTypeDO> topicTypes = projectTypeMapper.selectList(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getCode, "topic-management")
+                .eq(ProjectTypeDO::getStatus, 1)
+                .eq(ProjectTypeDO::getDeleted, false));
+        Set<Long> typeIds = topicTypes.stream().map(ProjectTypeDO::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (typeIds.isEmpty()) return List.of();
+        List<WorkflowTemplateDO> templates = templateMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateDO>()
+                .in(WorkflowTemplateDO::getProjectTypeId, typeIds)
+                .eq(WorkflowTemplateDO::getDeleted, false));
+        Set<Long> templateIds = templates.stream().map(WorkflowTemplateDO::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (templateIds.isEmpty()) return List.of();
+        List<WorkflowTemplateVersionDO> versions = versionMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
+                .in(WorkflowTemplateVersionDO::getTemplateId, templateIds)
+                .eq(WorkflowTemplateVersionDO::getStatus, "PUBLISHED"));
+        Map<String, WorkflowNodeDefinition> nodesByKey = new LinkedHashMap<>();
+        versions.forEach(version -> addNodes(nodesByKey, parse(version.getDefinitionJson())));
+        return nodesByKey.values().stream()
+                .sorted(Comparator.comparing(WorkflowNodeDefinition::name).thenComparing(WorkflowNodeDefinition::key))
+                .map(node -> new WorkflowProjectNodeOptionDTO(node.key(), node.name()))
+                .toList();
+    }
+
+    private void requireProjectCreationType(ProjectTypeDO type) {
+        if (Boolean.FALSE.equals(type.getProjectCreationEnabled())) {
+            throw BusinessException.error("该流程类型不可用于新建项目");
+        }
     }
 
     public WorkflowTemplateDefinition getDefinition(Long versionId) {
@@ -310,6 +530,7 @@ public class WorkflowTemplateService {
         dto.setName(type.getName());
         dto.setDescription(type.getDescription());
         dto.setStatus(type.getStatus());
+        dto.setProjectCreationEnabled(type.getProjectCreationEnabled());
         dto.setSort(type.getSort());
         dto.setDefaultTemplateVersionId(type.getDefaultTemplateVersionId());
         if (type.getDefaultTemplateVersionId() != null) {

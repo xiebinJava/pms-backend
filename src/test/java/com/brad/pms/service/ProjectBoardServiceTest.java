@@ -48,6 +48,7 @@ class ProjectBoardServiceTest {
     @Mock WorkflowTemplateVersionMapper versionMapper;
     @Mock ProjectNodeRiskMapper riskMapper;
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
+    @Mock ProjectNodeDevelopmentTopicMapper topicMapper;
     @Mock ProjectNodeAcceptanceDefectMapper defectMapper;
     @InjectMocks ProjectService projectService;
 
@@ -62,9 +63,10 @@ class ProjectBoardServiceTest {
         for (Class<?> entity : List.of(ProjectDO.class, ProjectMemberDO.class, ProjectNodeDO.class, OrgUnitDO.class,
                 WorkflowTemplateVersionDO.class, ProjectNodeRiskDO.class, ProjectNodeDevelopmentStoryDO.class,
                 ProjectNodeAcceptanceDefectDO.class)) TableInfoHelper.initTableInfo(assistant, entity);
-        workflowService = new WorkflowTemplateService(mock(ProjectTypeMapper.class), mock(WorkflowTemplateMapper.class),
-                versionMapper, operationLogService, new ObjectMapper());
+        workflowService = new WorkflowTemplateService(mock(ProjectTypeMapper.class), mock(ProjectMapper.class),
+                mock(WorkflowTemplateMapper.class), versionMapper, operationLogService, new ObjectMapper());
         board = new ProjectBoardService(projectService, workflowService, riskMapper, storyMapper, defectMapper,
+                new WorkflowComponentBindingService(workflowService, topicMapper),
                 Clock.fixed(Instant.parse("2026-09-12T16:30:00Z"), ZoneId.of("Asia/Shanghai")));
         UserContext.set(new LoginUser(1L, "admin", "Admin", 1));
     }
@@ -80,7 +82,7 @@ class ProjectBoardServiceTest {
         assertThat(OffsetDateTime.parse(result.generatedAt()).toLocalDate().toString()).isEqualTo(result.asOfDate());
         assertThat(result.allCompanyScope()).isTrue();
         verifyNoInteractions(nodeMapper, versionMapper, riskMapper, storyMapper, defectMapper, taskMapper,
-                memberMapper, permissionService, milestoneMapper);
+                memberMapper, permissionService, milestoneMapper, topicMapper);
     }
 
     @Test
@@ -149,7 +151,7 @@ class ProjectBoardServiceTest {
         verify(projectMapper).selectList(query.capture());
         assertThat(query.getValue().getSqlSegment()).contains("id =");
         assertThat(query.getValue().getParamNameValuePairs().values()).contains(-1L);
-        verifyNoInteractions(nodeMapper, versionMapper, riskMapper, storyMapper, defectMapper);
+        verifyNoInteractions(nodeMapper, versionMapper, riskMapper, storyMapper, defectMapper, topicMapper);
     }
 
     @Test
@@ -262,6 +264,33 @@ class ProjectBoardServiceTest {
         when(nodeMapper.selectList(any())).thenReturn(List.of(node(1, TODAY)));
         assertThatThrownBy(() -> board.getBoard(null)).hasMessageContaining("流程模板版本不存在");
         verifyNoInteractions(riskMapper, storyMapper, defectMapper);
+    }
+
+    @Test
+    void boardAggregatesStoriesFromTheConfiguredHostEvenWhenItsPinnedTemplateOmitsTheComponent() throws Exception {
+        when(projectMapper.selectList(any())).thenReturn(List.of(storedProject(1L, 100L)));
+        var host = node(1, TODAY);
+        host.setNodeKey("develop");
+        when(nodeMapper.selectList(any())).thenReturn(List.of(host));
+        var definition = new WorkflowTemplateDefinition(2,
+                List.of(definitionNode("develop", List.of("component:solution-design"))));
+        var version = new WorkflowTemplateVersionDO();
+        version.setId(100L);
+        version.setDefinitionJson(new ObjectMapper().writeValueAsString(definition));
+        when(versionMapper.selectList(any())).thenReturn(List.of(version));
+        var topic = new ProjectNodeDevelopmentTopicDO();
+        topic.setProjectId(1L);
+        topic.setNodeId(host.getId());
+        when(topicMapper.selectList(any())).thenReturn(List.of(topic));
+        var story = story("IN_PROGRESS", 3, TODAY.plusDays(2));
+        story.setNodeId(host.getId());
+        when(storyMapper.selectList(any())).thenReturn(List.of(story));
+
+        var row = board.getBoard(null).projects().get(0);
+
+        assertThat(row.storySummary()).isNotNull();
+        assertThat(row.storySummary().total()).isEqualTo(1);
+        verify(topicMapper, times(1)).selectList(any());
     }
 
     static ProjectDO storedProject(Long id, Long versionId) {

@@ -1,6 +1,7 @@
 package com.brad.pms.workflow;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -138,6 +139,24 @@ class WorkflowTemplateDefinitionValidatorTest {
     }
 
     @Test
+    void roundTripsTopicSourceProjectNodeKeyWithoutBreakingUnknownLegacyMetadata() throws Exception {
+        String json = """
+                {"schemaVersion":1,"sourceProjectNodeKey":"develop","sourceTopicNodeKey":"requirements","nodes":[{"key":"intake",
+                "name":"立项","description":"","deliverable":"","roles":"","components":[],
+                "fields":[],"projectBasicInfo":false,"projectBasicInfoFields":[]}]}
+                """;
+        ObjectMapper mapper = new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        WorkflowTemplateDefinition definition = mapper.readValue(json, WorkflowTemplateDefinition.class);
+        String serialized = mapper.writeValueAsString(definition);
+        WorkflowTemplateDefinition roundTripped = mapper.readValue(serialized, WorkflowTemplateDefinition.class);
+
+        assertThat(mapper.readTree(serialized).path("sourceProjectNodeKey").asText()).isEqualTo("develop");
+        assertThat(mapper.readTree(serialized).path("sourceTopicNodeKey").asText()).isEqualTo("requirements");
+        assertThat(WorkflowTemplateDefinitionValidator.validate(roundTripped)).isEqualTo(roundTripped);
+    }
+
+    @Test
     void templateJsonRoundTripsExplicitFieldWidth() throws Exception {
         String json = """
                 {"schemaVersion":2,"nodes":[{"key":"intake","name":"立项","description":"",
@@ -202,6 +221,14 @@ class WorkflowTemplateDefinitionValidatorTest {
                         v2Field("labels", "标签", WorkflowFieldType.MULTI_SELECT, false, List.of("A", "B"), true, null),
                         v2Field("files", "附件", WorkflowFieldType.ATTACHMENT, false, List.of(), true, null)),
                         List.of("fields", "component:solution-design"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator.validate(definition)).isEqualTo(definition);
+    }
+
+    @Test
+    void acceptsStoryListWorkbenchInTopicWorkflowContentOrder() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("topic-stage", List.of(), List.of("component:story-list"))));
 
         assertThat(WorkflowTemplateDefinitionValidator.validate(definition)).isEqualTo(definition);
     }

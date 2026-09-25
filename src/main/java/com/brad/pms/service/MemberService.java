@@ -12,6 +12,7 @@ import com.brad.pms.dto.response.ProjectMemberDTO;
 import com.brad.pms.entity.ProjectMemberDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectMemberMapper;
+import com.brad.pms.mapper.ProjectMemberAutoManagedMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,7 @@ public class MemberService {
     private final UserService userService;
     private final ProjectPermissionService permissionService;
     private final OperationLogService operationLogService;
+    private final ProjectMemberAutoManagedMapper autoManagedMapper;
 
     public List<ProjectMemberDTO> list(Long projectId) {
         permissionService.requireProject(projectId);
@@ -61,10 +63,23 @@ public class MemberService {
      * Callers must already have authorized the assignment itself.
      */
     public ProjectMemberDO ensureMember(Long projectId, Long userId) {
-        if (userId == null) return null;
-        ProjectMemberDO existing = findMember(projectId, userId);
-        if (existing != null) return existing;
-        return insertMember(projectId, userId, MemberRole.MEMBER.getCode());
+        return ensureMemberForAssignment(projectId, userId).member();
+    }
+
+    public EnsureMemberResult ensureMemberForAssignment(Long projectId, Long userId) {
+        if (userId == null) return new EnsureMemberResult(null, false);
+        userService.requireActiveUser(userId);
+        ProjectMemberDO existing = memberMapper.selectIncludingDeleted(projectId, userId);
+        if (existing != null) {
+            boolean reactivated = Boolean.TRUE.equals(existing.getDeleted());
+            if (reactivated) {
+                existing.setDeleted(false);
+                memberMapper.updateById(existing);
+            }
+            return new EnsureMemberResult(existing,
+                    reactivated && Objects.equals(existing.getRole(), MemberRole.MEMBER.getCode()));
+        }
+        return new EnsureMemberResult(insertMember(projectId, userId, MemberRole.MEMBER.getCode()), true);
     }
 
     public void ensureMembers(Long projectId, Collection<Long> userIds) {
@@ -80,7 +95,7 @@ public class MemberService {
     }
 
     private ProjectMemberDO insertMember(Long projectId, Long userId, int role) {
-        requireActiveUser(userId);
+        userService.requireActiveUser(userId);
         ProjectMemberDO member = new ProjectMemberDO();
         member.setProjectId(projectId);
         member.setUserId(userId);
@@ -92,12 +107,16 @@ public class MemberService {
         return member;
     }
 
-    private void requireActiveUser(Long userId) {
-        UserDO user = userService.listByIds(List.of(userId)).stream().findFirst().orElse(null);
-        if (user == null) throw BusinessException.notFound("账号不存在");
-        if (!UserStatus.ACTIVE.name().equals(user.getStatus())) {
-            throw BusinessException.error("只能选择已激活的账号");
+    public void removeAutoManagedMember(Long projectId, Long userId) {
+        ProjectMemberDO member = memberMapper.selectForUpdateIncludingDeleted(projectId, userId);
+        if (member == null || Boolean.TRUE.equals(member.getDeleted())
+                || !Objects.equals(member.getRole(), MemberRole.MEMBER.getCode())) {
+            return;
         }
+        memberMapper.deleteById(member.getId());
+        operationLogService.record(AuditEvent.success(
+                AuditAction.PROJECT_MEMBER_REMOVED.name(), AuditResourceType.PROJECT_MEMBER.name(), member.getId(), projectId,
+                null, java.util.Map.of("userId", member.getUserId(), "role", member.getRole()), null));
     }
 
     public void remove(Long projectId, Long memberId) {
@@ -109,6 +128,7 @@ public class MemberService {
         if (member.getRole() == 0) {
             throw BusinessException.error("项目负责人不可移除");
         }
+        autoManagedMapper.delete(projectId, member.getUserId());
         memberMapper.deleteById(memberId);
         operationLogService.record(AuditEvent.success(
                 AuditAction.PROJECT_MEMBER_REMOVED.name(), AuditResourceType.PROJECT_MEMBER.name(), memberId, projectId,
@@ -163,6 +183,9 @@ public class MemberService {
                         null, java.util.Map.of("userId", userId, "role", previousRole),
                         java.util.Map.of("userId", userId, "role", member.getRole())));
             }
+            autoManagedMapper.delete(projectId, userId);
         }
     }
+
+    public record EnsureMemberResult(ProjectMemberDO member, boolean inserted) { }
 }

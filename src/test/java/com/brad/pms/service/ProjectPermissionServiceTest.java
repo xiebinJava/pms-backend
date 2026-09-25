@@ -8,6 +8,7 @@ import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectMemberMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
+import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.security.AuthorizationService;
 import com.brad.pms.security.DataScopeResolver;
 import com.brad.pms.security.PermissionCode;
@@ -29,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +42,7 @@ class ProjectPermissionServiceTest {
     @Mock DataScopeResolver dataScopeResolver;
     @Mock AuthorizationService authorizationService;
     @Mock WorkflowTemplateService workflowTemplateService;
+    @Mock ProjectNodeDevelopmentTopicMapper topicMapper;
 
     @BeforeEach
     void initNodeLambdaMetadata() {
@@ -151,6 +154,25 @@ class ProjectPermissionServiceTest {
     }
 
     @Test
+    void configuredTopicHostCanUseDevelopmentControlWithoutAnExplicitProjectComponent() {
+        ProjectDO project = project(ProjectStatus.ACTIVE.getCode(), 42L, 7L, 8L);
+        project.setWorkflowTemplateVersionId(15L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(11L);
+        node.setProjectId(10L);
+        node.setNodeKey("develop");
+        when(projectMapper.selectById(10L)).thenReturn(project);
+        when(workflowTemplateService.getNodeDefinition(15L, "develop")).thenReturn(
+                new WorkflowNodeDefinition("develop", "开发与迭代控制", "", "", "", List.of(),
+                        List.of(), false, List.of()));
+        when(workflowTemplateService.resolveTopicSourceProjectNodeKey()).thenReturn("develop");
+        when(topicMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+
+        assertThatCode(() -> service().requireNodeComponent(node, WorkflowComponentKey.DEVELOPMENT_CONTROL,
+                "missing component")).doesNotThrowAnyException();
+    }
+
+    @Test
     void componentGuardRejectsNodeWithoutTheConfiguredWorkbench() {
         ProjectDO project = project(ProjectStatus.ACTIVE.getCode(), 42L, 7L, 8L);
         project.setWorkflowTemplateVersionId(15L);
@@ -169,6 +191,25 @@ class ProjectPermissionServiceTest {
     }
 
     @Test
+    void componentDiscoveryFindsTheConfiguredTopicHostWithoutAnExplicitComponent() {
+        ProjectDO project = project(ProjectStatus.ACTIVE.getCode(), 42L, 7L, 8L);
+        project.setWorkflowTemplateVersionId(15L);
+        ProjectNodeDO node = new ProjectNodeDO();
+        node.setId(13L);
+        node.setProjectId(10L);
+        node.setNodeKey("develop");
+        when(projectMapper.selectById(10L)).thenReturn(project);
+        when(workflowTemplateService.getDefinition(15L)).thenReturn(new WorkflowTemplateDefinition(1, List.of(
+                new WorkflowNodeDefinition("develop", "开发与迭代控制", "", "", "", List.of(),
+                        List.of(), false, List.of()))));
+        when(workflowTemplateService.resolveTopicSourceProjectNodeKey()).thenReturn("develop");
+        when(nodeMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(node));
+        when(topicMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+
+        assertThat(service().findNodeWithComponent(10L, WorkflowComponentKey.DEVELOPMENT_CONTROL)).isSameAs(node);
+    }
+
+    @Test
     void crossWorkbenchLookupFindsTheConfiguredCustomNodeKey() {
         ProjectDO project = project(ProjectStatus.ACTIVE.getCode(), 42L, 7L, 8L);
         project.setWorkflowTemplateVersionId(15L);
@@ -180,7 +221,7 @@ class ProjectPermissionServiceTest {
         when(workflowTemplateService.getDefinition(15L)).thenReturn(new WorkflowTemplateDefinition(1, List.of(
                 new WorkflowNodeDefinition("quality-gate", "质量评审", "", "", "",
                         List.of(WorkflowComponentKey.SOLUTION_DESIGN), List.of(), false, List.of()))));
-        when(nodeMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(node);
+        when(nodeMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(node));
 
         assertThat(service().findNodeWithComponent(10L, WorkflowComponentKey.SOLUTION_DESIGN)).isSameAs(node);
     }
@@ -197,14 +238,15 @@ class ProjectPermissionServiceTest {
         when(workflowTemplateService.getDefinition(15L)).thenReturn(new WorkflowTemplateDefinition(2, List.of(
                 new WorkflowNodeDefinition("quality-gate", "质量评审", "", "", "", null, List.of(), false, null,
                         List.of("component:solution-design", "fields")))));
-        when(nodeMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(node);
+        when(nodeMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(node));
 
         assertThat(service().findNodeWithComponent(10L, WorkflowComponentKey.SOLUTION_DESIGN)).isSameAs(node);
     }
 
     private ProjectPermissionService service() {
         return new ProjectPermissionService(projectMapper, memberMapper, nodeMapper, dataScopeResolver,
-                authorizationService, workflowTemplateService);
+                authorizationService, workflowTemplateService,
+                new WorkflowComponentBindingService(workflowTemplateService, topicMapper));
     }
 
     private ProjectDO project(int status, Long orgUnitId, Long creatorId, Long managerId) {

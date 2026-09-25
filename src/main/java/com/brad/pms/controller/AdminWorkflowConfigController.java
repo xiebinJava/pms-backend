@@ -5,6 +5,7 @@ import com.brad.pms.dto.request.ProjectTypeSaveCmd;
 import com.brad.pms.dto.request.WorkflowTemplateDefaultCmd;
 import com.brad.pms.dto.request.WorkflowTemplateSaveCmd;
 import com.brad.pms.dto.response.ProjectTypeDTO;
+import com.brad.pms.dto.response.WorkflowProjectNodeOptionDTO;
 import com.brad.pms.dto.response.WorkflowTemplateDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
 import com.brad.pms.security.PermissionCode;
@@ -34,6 +35,18 @@ public class AdminWorkflowConfigController {
     @RequirePermission(PermissionCode.WORKFLOW_READ)
     public ResponseResult<List<ProjectTypeDTO>> listProjectTypes() {
         return ResponseResult.success(workflowTemplateService.listProjectTypes());
+    }
+
+    @GetMapping("/project-node-options")
+    @RequirePermission(PermissionCode.WORKFLOW_READ)
+    public ResponseResult<List<WorkflowProjectNodeOptionDTO>> projectNodeOptions() {
+        return ResponseResult.success(workflowTemplateService.listTopicSourceNodeOptions());
+    }
+
+    @GetMapping("/topic-node-options")
+    @RequirePermission(PermissionCode.WORKFLOW_READ)
+    public ResponseResult<List<WorkflowProjectNodeOptionDTO>> topicNodeOptions() {
+        return ResponseResult.success(workflowTemplateService.listStorySourceTopicNodeOptions());
     }
 
     @PostMapping("/project-types")

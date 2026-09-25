@@ -13,7 +13,7 @@ public final class WorkflowTemplateDefinitionValidator {
             WorkflowComponentKey.SOLUTION_DESIGN, WorkflowComponentKey.PLAN_RESOURCE_RISK,
             WorkflowComponentKey.DEVELOPMENT_CONTROL, WorkflowComponentKey.BUSINESS_ACCEPTANCE,
             WorkflowComponentKey.RELEASE_HANDOVER, WorkflowComponentKey.VALUE_REVIEW,
-            WorkflowComponentKey.KNOWLEDGE_STANDARD);
+            WorkflowComponentKey.KNOWLEDGE_STANDARD, WorkflowComponentKey.STORY_LIST);
     private static final Set<String> PROJECT_BASIC_INFO_FIELDS = Set.of("description", "priority", "projectLevel",
             "schedule", "businessLine", "projectManager", "projectMembers", "followers");
     private static final Set<WorkflowFieldType> V1_FIELD_TYPES = Set.of(

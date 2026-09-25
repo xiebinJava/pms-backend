@@ -2,6 +2,7 @@ package com.brad.pms.controller;
 
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.response.WorkflowTemplateOptionsDTO;
+import com.brad.pms.dto.response.DevelopmentWorkflowTemplateOptionsDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import com.brad.pms.service.WorkflowTemplateService;
@@ -20,5 +21,11 @@ public class WorkflowTemplateOptionsController {
     @RequirePermission(PermissionCode.PROJECT_CREATE)
     public ResponseResult<WorkflowTemplateOptionsDTO> options() {
         return ResponseResult.success(workflowTemplateService.options());
+    }
+
+    @GetMapping("/development-options")
+    @RequirePermission(PermissionCode.PROJECT_READ)
+    public ResponseResult<DevelopmentWorkflowTemplateOptionsDTO> developmentOptions() {
+        return ResponseResult.success(workflowTemplateService.developmentOptions());
     }
 }

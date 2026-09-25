@@ -23,7 +23,7 @@ class ProjectAttentionServiceTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 9, 17);
 
     @Test
-    void reportsCurrentNodeConfigurationAsCriticalAndFutureNodeConfigurationAsWarning() {
+    void reportsCurrentNodeConfigurationAndIgnoresFutureNodeConfiguration() {
         ProjectDTO project = project();
         project.setProjectManagerId(null);
 
@@ -36,13 +36,33 @@ class ProjectAttentionServiceTest {
                 TODAY);
 
         assertEquals(3, readiness.getCriticalCount());
-        assertEquals(2, readiness.getWarningCount());
+        assertEquals(0, readiness.getWarningCount());
         assertTrue(types(readiness).contains("PROJECT_MANAGER_MISSING"));
         assertTrue(types(readiness).contains("CURRENT_NODE_OWNER_MISSING"));
         assertTrue(types(readiness).contains("CURRENT_NODE_SCHEDULE_MISSING"));
-        assertTrue(types(readiness).contains("FUTURE_NODE_OWNER_MISSING"));
-        assertTrue(types(readiness).contains("FUTURE_NODE_SCHEDULE_MISSING"));
+        assertTrue(types(readiness).stream().noneMatch(type -> type.startsWith("FUTURE_NODE_")));
         assertTrue(types(readiness).stream().noneMatch(type -> type.endsWith("_TASK_MISSING")));
+    }
+
+    @Test
+    void ignoresFutureNodeTasksAndRisks() {
+        ProjectDTO project = project();
+        ProjectNodeDO current = node(11L, NodeStatus.IN_PROGRESS.getCode(), 8L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), 0);
+        ProjectNodeDO future = node(12L, NodeStatus.NOT_STARTED.getCode(), null, null, null, 1);
+        ProjectTaskDO futureTask = task(401L, "后续节点任务", TaskStatus.TODO.getCode(), LocalDate.of(2026, 9, 14));
+        futureTask.setNodeId(future.getId());
+
+        ProjectReadinessDTO readiness = ProjectAttentionService.buildForProject(
+                project,
+                List.of(current, future),
+                List.of(futureTask),
+                List.of(risk(402L, future.getId(), "后续节点风险", "HIGH", "OPEN")),
+                TODAY);
+
+        assertTrue(types(readiness).stream().noneMatch(type -> type.startsWith("FUTURE_NODE_")));
+        assertTrue(types(readiness).stream().noneMatch(type -> type.startsWith("TASK_")));
+        assertTrue(types(readiness).stream().noneMatch(type -> type.equals("HIGH_RISK_OPEN")));
     }
 
     @Test
@@ -71,7 +91,7 @@ class ProjectAttentionServiceTest {
     }
 
     @Test
-    void ordersOverdueBeforeCurrentNodeIssuesAndFutureWarnings() {
+    void ordersOverdueBeforeCurrentNodeIssues() {
         ProjectDTO project = project();
         List<ProjectTaskDO> tasks = List.of(
                 task(201L, "逾期 1 天", TaskStatus.TODO.getCode(), LocalDate.of(2026, 9, 16)),
@@ -89,7 +109,8 @@ class ProjectAttentionServiceTest {
         assertEquals("逾期 3 天", readiness.getItems().get(0).getTaskName());
         assertEquals("TASK_OVERDUE", readiness.getItems().get(1).getType());
         assertEquals("CURRENT_NODE_OWNER_MISSING", readiness.getItems().get(2).getType());
-        assertTrue(readiness.getItems().get(readiness.getItems().size() - 1).getType().startsWith("FUTURE_NODE_"));
+        assertEquals("CURRENT_NODE_SCHEDULE_MISSING", readiness.getItems().get(3).getType());
+        assertEquals(4, readiness.getItems().size());
     }
 
     @Test

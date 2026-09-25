@@ -18,6 +18,7 @@ public class ProjectTypeDO {
     private String name;
     private String description;
     private Integer status;
+    private Boolean projectCreationEnabled;
     private Integer sort;
     private Long defaultTemplateVersionId;
     @TableLogic(value = "false", delval = "true")

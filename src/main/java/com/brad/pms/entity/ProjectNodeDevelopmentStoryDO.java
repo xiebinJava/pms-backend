@@ -19,6 +19,7 @@ public class ProjectNodeDevelopmentStoryDO {
     private Long projectId;
     private Long nodeId;
     private Long topicId;
+    private Long topicWorkflowNodeId;
     private Long iterationPlanId;
     private String title;
     private Long ownerId;

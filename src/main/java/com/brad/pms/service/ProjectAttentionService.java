@@ -140,14 +140,11 @@ public class ProjectAttentionService {
         if (currentNode != null) {
             addNodeConfigurationItems(items, project, currentNode, true);
         }
-        safeNodes.stream()
-                .filter(node -> Objects.equals(node.getStatus(), NodeStatus.NOT_STARTED.getCode()))
-                .sorted(nodeOrder())
-                .forEach(node -> addNodeConfigurationItems(items, project, node, false));
 
         LocalDate safeToday = today == null ? TaskScheduleCalculator.today() : today;
         LocalDate dueSoonLimit = safeToday.plusDays(DUE_SOON_DAYS);
         for (ProjectTaskDO task : safeTasks) {
+            if (currentNode == null || !Objects.equals(currentNode.getId(), task.getNodeId())) continue;
             if (Objects.equals(task.getStatus(), TaskStatus.DONE.getCode()) || task.getDueDate() == null) continue;
             TaskScheduleCalculator.TaskScheduleSnapshot snapshot =
                     TaskScheduleCalculator.calculate(task.getStatus(), task.getDueDate(), safeToday);
@@ -167,6 +164,7 @@ public class ProjectAttentionService {
         }
 
         safeRisks.stream()
+                .filter(risk -> currentNode != null && Objects.equals(currentNode.getId(), risk.getNodeId()))
                 .filter(risk -> "HIGH".equalsIgnoreCase(risk.getLevel()))
                 .filter(risk -> "OPEN".equalsIgnoreCase(risk.getStatus()))
                 .forEach(risk -> {

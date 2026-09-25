@@ -24,6 +24,12 @@ public interface ProjectMapper extends BaseMapper<ProjectDO> {
     })
     List<ProjectDO> selectIncludingDeletedByIds(@Param("ids") Collection<Long> ids);
 
+    /** Returns workflow versions still referenced by projects that are active, including legacy 0/null statuses. */
+    @Select("SELECT DISTINCT workflow_template_version_id FROM project "
+            + "WHERE deleted = FALSE AND (status IS NULL OR status = 0 OR status = 1) "
+            + "AND workflow_template_version_id IS NOT NULL")
+    List<Long> selectActiveWorkflowTemplateVersionIds();
+
     @Update("UPDATE project SET status = #{status}, deleted = TRUE, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = #{id} AND deleted = FALSE")
     int softDeleteProject(@Param("id") Long id, @Param("status") Integer status);
 

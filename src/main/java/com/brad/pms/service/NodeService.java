@@ -61,6 +61,7 @@ public class NodeService {
     private final MemberService memberService;
     private NotificationService notificationService;
     private WorkflowTemplateService workflowTemplateService;
+    private WorkflowComponentBindingService workflowComponentBindingService;
     private NodeCustomFieldService nodeCustomFieldService;
     private ProjectFollowerMapper followerMapper;
 
@@ -72,6 +73,11 @@ public class NodeService {
     @Autowired
     public void setWorkflowTemplateService(WorkflowTemplateService workflowTemplateService) {
         this.workflowTemplateService = workflowTemplateService;
+    }
+
+    @Autowired
+    public void setWorkflowComponentBindingService(WorkflowComponentBindingService workflowComponentBindingService) {
+        this.workflowComponentBindingService = workflowComponentBindingService;
     }
 
     @Autowired
@@ -165,13 +171,21 @@ public class NodeService {
         List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
                         .eq(ProjectNodeDO::getProjectId, projectId)
                         .orderByAsc(ProjectNodeDO::getSort));
+        WorkflowTemplateDefinition definition = resolveProjectDefinition(project);
+        if (workflowComponentBindingService != null && definition != null) {
+            definition = workflowComponentBindingService.applyTopicBinding(project, definition, nodes);
+        }
+        java.util.Map<String, WorkflowNodeDefinition> definitionsByNodeKey = definition == null ? java.util.Map.of()
+                : definition.nodes().stream().collect(Collectors.toMap(WorkflowNodeDefinition::key, item -> item,
+                        (left, right) -> left));
         java.util.Map<Long, UserDO> owners = userService.listByIds(nodes.stream()
                         .map(ProjectNodeDO::getOwnerId)
                         .filter(java.util.Objects::nonNull)
                         .distinct()
                         .collect(Collectors.toList()))
                 .stream().collect(Collectors.toMap(UserDO::getId, user -> user));
-        return nodes.stream().map(node -> toDTO(node, owners.get(node.getOwnerId()), project)).collect(Collectors.toList());
+        return nodes.stream().map(node -> toDTO(node, owners.get(node.getOwnerId()), project,
+                definitionsByNodeKey.get(node.getNodeKey()))).collect(Collectors.toList());
     }
 
     @Transactional
@@ -440,6 +454,11 @@ public class NodeService {
     }
 
     private ProjectNodeDTO toDTO(ProjectNodeDO node, UserDO owner, ProjectDO project) {
+        return toDTO(node, owner, project, resolveNodeDefinition(project, node));
+    }
+
+    private ProjectNodeDTO toDTO(ProjectNodeDO node, UserDO owner, ProjectDO project,
+                                 WorkflowNodeDefinition definition) {
         ProjectNodeDTO dto = new ProjectNodeDTO();
         dto.setId(node.getId());
         dto.setVersion(node.getVersion());
@@ -458,7 +477,6 @@ public class NodeService {
         dto.setEndDate(node.getEndDate());
         dto.setCreatedAt(node.getCreatedAt());
         dto.setPermissions(permissionService.nodePermissions(project, node));
-        WorkflowNodeDefinition definition = resolveNodeDefinition(project, node);
         if (definition != null) {
             dto.setComponents(runtimeComponents(definition));
             dto.setContentOrder(definition.contentOrder());
@@ -477,12 +495,26 @@ public class NodeService {
     }
 
     private WorkflowNodeDefinition resolveNodeDefinition(ProjectDO project, ProjectNodeDO node) {
+        WorkflowNodeDefinition definition;
         if (project != null && project.getWorkflowTemplateVersionId() != null) {
-            return workflowTemplateService == null ? null : workflowTemplateService.getNodeDefinition(
+            definition = workflowTemplateService == null ? null : workflowTemplateService.getNodeDefinition(
                     project.getWorkflowTemplateVersionId(), node.getNodeKey());
+        } else {
+            definition = BuiltInWorkflowTemplate.compatibilityDefinition().nodes().stream()
+                    .filter(item -> item.key().equals(node.getNodeKey())).findFirst().orElse(null);
         }
-        return BuiltInWorkflowTemplate.compatibilityDefinition().nodes().stream()
-                .filter(definition -> definition.key().equals(node.getNodeKey())).findFirst().orElse(null);
+        if (definition == null || workflowComponentBindingService == null) return definition;
+        WorkflowTemplateDefinition singleNodeDefinition = new WorkflowTemplateDefinition(1, List.of(definition));
+        return workflowComponentBindingService.applyTopicBinding(project, singleNodeDefinition, List.of(node))
+                .nodes().stream().filter(item -> item.key().equals(node.getNodeKey())).findFirst().orElse(definition);
+    }
+
+    private WorkflowTemplateDefinition resolveProjectDefinition(ProjectDO project) {
+        if (project != null && project.getWorkflowTemplateVersionId() != null) {
+            return workflowTemplateService == null ? null
+                    : workflowTemplateService.getDefinition(project.getWorkflowTemplateVersionId());
+        }
+        return BuiltInWorkflowTemplate.compatibilityDefinition();
     }
 
     private void validateAttachedComponents(Long projectId, Long nodeId, WorkflowNodeDefinition definition) {

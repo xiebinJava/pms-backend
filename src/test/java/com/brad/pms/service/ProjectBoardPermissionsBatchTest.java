@@ -26,7 +26,8 @@ class ProjectBoardPermissionsBatchTest {
         when(scope.resolveOrgUnitIds(user, PermissionCode.PROJECT_WRITE)).thenReturn(List.of(11L));
         when(scope.resolveOrgUnitIds(user, PermissionCode.PROJECT_MANAGE)).thenReturn(List.of(12L));
         var service = new ProjectPermissionService(mock(ProjectMapper.class), mock(ProjectMemberMapper.class),
-                mock(ProjectNodeMapper.class), scope, authorization, mock(WorkflowTemplateService.class));
+                mock(ProjectNodeMapper.class), scope, authorization, mock(WorkflowTemplateService.class),
+                mock(WorkflowComponentBindingService.class));
         var writable = project(1L, 11L, 1);
         var manageable = project(2L, 12L, 1);
         var outsider = project(3L, 13L, 1);
