@@ -226,6 +226,14 @@ class WorkflowTemplateDefinitionValidatorTest {
     }
 
     @Test
+    void acceptsStoryListWorkbenchInTopicWorkflowContentOrder() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("topic-stage", List.of(), List.of("component:story-list"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator.validate(definition)).isEqualTo(definition);
+    }
+
+    @Test
     void acceptsEmptyV2NodesAndRequiresOrderSlotsOnlyForDefinedFields() {
         WorkflowTemplateDefinition emptyNode = new WorkflowTemplateDefinition(2, List.of(
                 v2Node("empty", List.of(), List.of()),

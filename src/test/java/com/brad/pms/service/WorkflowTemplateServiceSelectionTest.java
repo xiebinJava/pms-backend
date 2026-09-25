@@ -64,6 +64,24 @@ class WorkflowTemplateServiceSelectionTest {
     }
 
     @Test
+    void resolvesAnExplicitPublishedProcessTemplateInsteadOfTheDefault() {
+        ProjectTypeDO type = type(4L, 21L);
+        type.setCode("topic-management");
+        type.setProjectCreationEnabled(false);
+        WorkflowTemplateVersionDO selected = version(31L, 9L, "PUBLISHED");
+        WorkflowTemplateDO template = template(9L, 4L);
+        when(projectTypeMapper.selectOne(any())).thenReturn(type);
+        when(versionMapper.selectById(31L)).thenReturn(selected);
+        when(templateMapper.selectById(9L)).thenReturn(template);
+
+        var binding = service.resolveForProcessType("topic-management", 31L);
+
+        assertThat(binding.projectType().getCode()).isEqualTo("topic-management");
+        assertThat(binding.version().getId()).isEqualTo(31L);
+        assertThat(binding.template().getId()).isEqualTo(9L);
+    }
+
+    @Test
     void rejectsDraftAndCrossTypeVersionsWhenTheCreatorSwitchesTemplates() {
         when(projectTypeMapper.selectById(3L)).thenReturn(type(3L, 21L));
         when(versionMapper.selectById(22L)).thenReturn(version(22L, 9L, "DRAFT"));

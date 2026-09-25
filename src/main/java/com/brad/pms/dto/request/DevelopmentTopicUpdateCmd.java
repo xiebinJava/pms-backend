@@ -11,4 +11,5 @@ public class DevelopmentTopicUpdateCmd {
     private String title;
     private Long ownerId;
     private Long projectId;
+    private Long templateVersionId;
 }

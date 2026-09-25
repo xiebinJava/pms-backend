@@ -81,6 +81,22 @@ public class DevelopmentItemWorkflowService {
     @Transactional
     public DevelopmentItemWorkflowDO createIfDefaultExists(
             DevelopmentItemType itemType, Long itemId, Long projectId, Long sourceNodeId) {
+        return createWithResolvedBinding(itemType, itemId, projectId, sourceNodeId,
+                workflowTemplateService.resolveDefaultForProcessType(itemType.processTypeCode()));
+    }
+
+    /** Creates a pinned snapshot using an explicitly selected published template version. */
+    @Transactional
+    public DevelopmentItemWorkflowDO createWithTemplate(
+            DevelopmentItemType itemType, Long itemId, Long projectId, Long sourceNodeId,
+            Long templateVersionId) {
+        return createWithResolvedBinding(itemType, itemId, projectId, sourceNodeId,
+                workflowTemplateService.resolveForProcessType(itemType.processTypeCode(), templateVersionId));
+    }
+
+    private DevelopmentItemWorkflowDO createWithResolvedBinding(
+            DevelopmentItemType itemType, Long itemId, Long projectId, Long sourceNodeId,
+            WorkflowTemplateService.WorkflowTemplateBinding binding) {
         if (itemId == null || (projectId == null) != (sourceNodeId == null)) {
             throw BusinessException.error("研发事项信息不完整，无法绑定流程");
         }
@@ -95,8 +111,6 @@ public class DevelopmentItemWorkflowService {
             return existing;
         }
 
-        WorkflowTemplateService.WorkflowTemplateBinding binding =
-                workflowTemplateService.resolveDefaultForProcessType(itemType.processTypeCode());
         if (binding == null) return null;
 
         DevelopmentItemWorkflowDO workflow = new DevelopmentItemWorkflowDO();

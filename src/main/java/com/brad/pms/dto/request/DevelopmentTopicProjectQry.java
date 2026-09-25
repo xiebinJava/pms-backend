@@ -8,4 +8,5 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class DevelopmentTopicProjectQry extends BasePage {
     private String keyword;
+    private Long templateVersionId;
 }

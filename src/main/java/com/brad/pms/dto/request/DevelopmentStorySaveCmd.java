@@ -13,6 +13,8 @@ public class DevelopmentStorySaveCmd {
 
     private Long topicId;
 
+    private Long templateVersionId;
+
     @NotBlank
     @Size(max = 300)
     private String title;

@@ -13,6 +13,7 @@ import com.brad.pms.dto.response.WorkflowTemplateDTO;
 import com.brad.pms.dto.response.WorkflowTemplateOptionsDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
 import com.brad.pms.dto.response.WorkflowTemplateVersionSummaryDTO;
+import com.brad.pms.dto.response.DevelopmentWorkflowTemplateOptionsDTO;
 import com.brad.pms.entity.ProjectTypeDO;
 import com.brad.pms.entity.WorkflowTemplateDO;
 import com.brad.pms.entity.WorkflowTemplateVersionDO;
@@ -124,6 +125,20 @@ public class WorkflowTemplateService {
                 .filter(template -> projectTypeIds.contains(template.getProjectTypeId()))
                 .toList());
         return options;
+    }
+
+    public DevelopmentWorkflowTemplateOptionsDTO developmentOptions() {
+        DevelopmentWorkflowTemplateOptionsDTO options = new DevelopmentWorkflowTemplateOptionsDTO();
+        options.setTopicTemplates(listTemplatesForProcessType("topic-management"));
+        options.setStoryTemplates(listTemplatesForProcessType("story-management"));
+        return options;
+    }
+
+    private List<WorkflowTemplateSummaryDTO> listTemplatesForProcessType(String processTypeCode) {
+        ProjectTypeDO type = projectTypeMapper.selectOne(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getCode, processTypeCode)
+                .eq(ProjectTypeDO::getStatus, 1));
+        return type == null ? List.of() : listTemplates(type.getId(), true);
     }
 
     /**
@@ -405,14 +420,21 @@ public class WorkflowTemplateService {
      * configured yet; callers may still create the development item without a flow.
      */
     public WorkflowTemplateBinding resolveDefaultForProcessType(String processTypeCode) {
+        return resolveForProcessType(processTypeCode, null);
+    }
+
+    public WorkflowTemplateBinding resolveForProcessType(String processTypeCode, Long requestedVersionId) {
         ProjectTypeDO type = projectTypeMapper.selectOne(new LambdaQueryWrapper<ProjectTypeDO>()
                 .eq(ProjectTypeDO::getCode, processTypeCode)
                 .eq(ProjectTypeDO::getStatus, 1));
-        if (type == null || type.getDefaultTemplateVersionId() == null) return null;
-        WorkflowTemplateVersionDO version = requirePublishedVersion(type.getDefaultTemplateVersionId());
+        if (type == null) return null;
+        Long selectedVersionId = requestedVersionId == null
+                ? type.getDefaultTemplateVersionId() : requestedVersionId;
+        if (selectedVersionId == null) return null;
+        WorkflowTemplateVersionDO version = requirePublishedVersion(selectedVersionId);
         WorkflowTemplateDO template = requireTemplate(version.getTemplateId());
         if (!type.getId().equals(template.getProjectTypeId())) {
-            throw BusinessException.error("默认流程模板与流程类型不匹配");
+            throw BusinessException.error("所选流程模板与流程类型不匹配");
         }
         return new WorkflowTemplateBinding(type, version, template);
     }

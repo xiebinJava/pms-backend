@@ -74,8 +74,11 @@ public class DevelopmentTopicManagementService {
         String title = trimToNull(cmd.getTitle());
         if (title == null) throw BusinessException.error("专题名称不能为空");
         if (cmd.getOwnerId() != null) userService.requireActiveUser(cmd.getOwnerId());
+        String topicNodeKey = cmd.getTemplateVersionId() == null
+                ? workflowTemplateService.resolveTopicSourceProjectNodeKey()
+                : resolveSelectedTopicNodeKey(cmd.getTemplateVersionId());
         ProjectDO project = cmd.getProjectId() == null ? null : requireActiveManageableTarget(cmd.getProjectId());
-        ProjectNodeDO hostNode = project == null ? null : requireTopicSourceNode(project.getId());
+        ProjectNodeDO hostNode = project == null ? null : requireTopicSourceNode(project.getId(), topicNodeKey);
 
         LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO> previousQuery = new LambdaQueryWrapper<>();
         if (project != null) {
@@ -104,8 +107,12 @@ public class DevelopmentTopicManagementService {
             throw BusinessException.conflict("专题创建失败，请重试");
         }
 
-        DevelopmentItemWorkflowDO topicWorkflow = developmentItemWorkflowService.createIfDefaultExists(
-                DevelopmentItemType.TOPIC, topic.getId(), topic.getProjectId(), topic.getNodeId());
+        DevelopmentItemWorkflowDO topicWorkflow = cmd.getTemplateVersionId() == null
+                ? developmentItemWorkflowService.createIfDefaultExists(
+                DevelopmentItemType.TOPIC, topic.getId(), topic.getProjectId(), topic.getNodeId())
+                : developmentItemWorkflowService.createWithTemplate(
+                DevelopmentItemType.TOPIC, topic.getId(), topic.getProjectId(), topic.getNodeId(),
+                cmd.getTemplateVersionId());
         if (topicWorkflow == null) {
             throw BusinessException.error("请先发布并设置专题流程模板为默认流程");
         }
@@ -238,14 +245,19 @@ public class DevelopmentTopicManagementService {
 
     public PageResult<DevelopmentTopicProjectOptionDTO> projectOptions(DevelopmentTopicProjectQry qry) {
         DevelopmentTopicProjectQry query = qry == null ? new DevelopmentTopicProjectQry() : qry;
-        if (workflowTemplateService.resolveDefaultForProcessType(DevelopmentItemType.TOPIC.processTypeCode()) == null) {
-            return PageResult.of(0, query.getCurrPage(), query.getPageSize(), List.of());
+        String topicNodeKey;
+        if (query.getTemplateVersionId() == null) {
+            if (workflowTemplateService.resolveDefaultForProcessType(DevelopmentItemType.TOPIC.processTypeCode()) == null) {
+                return PageResult.of(0, query.getCurrPage(), query.getPageSize(), List.of());
+            }
+            topicNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey();
+        } else {
+            topicNodeKey = resolveSelectedTopicNodeKey(query.getTemplateVersionId());
         }
         List<Long> readableIds = safeList(projectService.listReadableIds()).stream()
                 .filter(Objects::nonNull).distinct().toList();
         if (readableIds.isEmpty()) return PageResult.of(0, query.getCurrPage(), query.getPageSize(), List.of());
 
-        String topicNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey();
         if (!StringUtils.hasText(topicNodeKey)) return PageResult.of(0, query.getCurrPage(), query.getPageSize(), List.of());
         Map<Long, ProjectDO> projectsById = projectMapper.selectBatchIds(readableIds).stream()
                 .filter(project -> ProjectStatus.isOpen(project.getStatus()))
@@ -319,6 +331,13 @@ public class DevelopmentTopicManagementService {
 
     private ProjectNodeDO requireTopicSourceNode(Long projectId) {
         return requireTopicSourceNode(projectId, workflowTemplateService.resolveTopicSourceProjectNodeKey());
+    }
+
+    private String resolveSelectedTopicNodeKey(Long templateVersionId) {
+        WorkflowTemplateService.WorkflowTemplateBinding binding = workflowTemplateService.resolveForProcessType(
+                DevelopmentItemType.TOPIC.processTypeCode(), templateVersionId);
+        if (binding == null) throw BusinessException.error("请先发布并选择专题流程模板");
+        return workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(binding.version().getId());
     }
 
     private ProjectNodeDO requireTopicSourceNode(Long projectId, String nodeKey) {

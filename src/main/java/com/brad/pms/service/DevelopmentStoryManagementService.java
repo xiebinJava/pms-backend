@@ -51,8 +51,12 @@ public class DevelopmentStoryManagementService {
         if (storyMapper.insert(story) != 1 || story.getId() == null) {
             throw BusinessException.conflict("故事创建失败，请重试");
         }
-        DevelopmentItemWorkflowDO workflow = developmentItemWorkflowService.createIfDefaultExists(
-                DevelopmentItemType.STORY, story.getId(), story.getProjectId(), story.getNodeId());
+        DevelopmentItemWorkflowDO workflow = cmd.getTemplateVersionId() == null
+                ? developmentItemWorkflowService.createIfDefaultExists(
+                DevelopmentItemType.STORY, story.getId(), story.getProjectId(), story.getNodeId())
+                : developmentItemWorkflowService.createWithTemplate(
+                DevelopmentItemType.STORY, story.getId(), story.getProjectId(), story.getNodeId(),
+                cmd.getTemplateVersionId());
         if (workflow == null) throw BusinessException.error("请先发布并设置故事流程模板为默认流程");
         replaceOwner(story, null, story.getOwnerId());
         return story.getId();
