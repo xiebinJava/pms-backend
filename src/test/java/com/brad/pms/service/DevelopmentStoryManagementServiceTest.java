@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -92,6 +93,36 @@ class DevelopmentStoryManagementServiceTest {
         order.verify(workflowMapper).updateById(workflow);
         order.verify(developmentItemWorkflowService).createIfDefaultExists(
                 DevelopmentItemType.STORY, 30L, null, null);
+    }
+
+    @Test
+    void rebindsStoryToTheTargetTopicsPinnedWorkflowNode() {
+        ProjectNodeDevelopmentStoryDO story = story(30L, 10L, 1L, 11L, 88L);
+        story.setTopicWorkflowNodeId(41L);
+        ProjectNodeDevelopmentTopicDO oldTopic = topic(10L, 1L, 11L);
+        ProjectNodeDevelopmentTopicDO targetTopic = topic(20L, 2L, 22L);
+        DevelopmentItemWorkflowDO workflow = workflow(300L, 1L, 11L);
+        when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
+        when(topicManagementService.requireWritableTopic(10L)).thenReturn(oldTopic);
+        when(topicManagementService.requireWritableTopic(20L)).thenReturn(targetTopic);
+        when(developmentItemWorkflowService.resolveTopicStoryMountNodeId(20L)).thenReturn(84L);
+        when(workflowMapper.selectForUpdate("STORY", 30L)).thenReturn(workflow);
+        when(taskMapper.selectByWorkflowIdsForUpdate(List.of(300L))).thenReturn(List.of());
+        when(storyMapper.updateById(story)).thenReturn(1);
+        when(workflowMapper.updateById(workflow)).thenReturn(1);
+        when(developmentItemWorkflowService.createIfDefaultExists(
+                DevelopmentItemType.STORY, 30L, 2L, 22L)).thenReturn(workflow(300L, 2L, 22L));
+
+        service.update(30L, command("故事改绑", 20L, 88L));
+
+        assertThat(story.getTopicId()).isEqualTo(20L);
+        assertThat(story.getTopicWorkflowNodeId()).isEqualTo(84L);
+        assertThat(story.getProjectId()).isEqualTo(2L);
+        assertThat(story.getNodeId()).isEqualTo(22L);
+        assertThat(workflow.getProjectId()).isEqualTo(2L);
+        assertThat(workflow.getSourceNodeId()).isEqualTo(22L);
+        verify(developmentItemWorkflowService).resolveTopicStoryMountNodeId(20L);
+        verify(assignmentService).synchronizeItemAssignments(1L, 2L, DevelopmentItemType.STORY, 30L);
     }
 
     @Test

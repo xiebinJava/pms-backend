@@ -284,6 +284,34 @@ class DevelopmentTopicManagementServiceTest {
     }
 
     @Test
+    void rebindsHistoricalTopicUsingItsPersistedMountKeyInsteadOfTheCurrentDefault() {
+        ProjectDO source = project(1L, 1);
+        ProjectDO target = project(2L, 1);
+        ProjectNodeDO targetNode = node(22L, 2L, "historical-host");
+        ProjectNodeDevelopmentTopicDO topic = topic(10L, 1L, 11L, 88L);
+        DevelopmentItemWorkflowDO topicWorkflow = workflow(1000L, "TOPIC", 10L, 1L, 11L, 501L);
+        topicWorkflow.setProjectMountNodeKey("historical-host");
+        when(topicMapper.selectByIdForUpdate(10L)).thenReturn(topic);
+        when(projectMapper.selectIncludingDeleted(1L)).thenReturn(source);
+        when(projectMapper.selectById(2L)).thenReturn(target);
+        when(permissionService.canManageProject(source)).thenReturn(true);
+        when(permissionService.canManageProject(target)).thenReturn(true);
+        when(workflowMapper.selectByItem("TOPIC", 10L)).thenReturn(topicWorkflow);
+        when(nodeMapper.selectOne(any())).thenReturn(targetNode);
+        when(storyMapper.selectList(any())).thenReturn(List.of());
+        when(workflowMapper.selectForUpdate("TOPIC", 10L)).thenReturn(topicWorkflow);
+        when(topicMapper.updateById(any(ProjectNodeDevelopmentTopicDO.class))).thenReturn(1);
+        when(workflowMapper.updateById(any(DevelopmentItemWorkflowDO.class))).thenReturn(1);
+        when(taskMapper.selectByWorkflowIdsForUpdate(any())).thenReturn(List.of());
+
+        service.update(10L, update("历史专题", 88L, 2L));
+
+        assertThat(topic.getNodeId()).isEqualTo(22L);
+        verify(nodeMapper).selectOne(any());
+        verify(workflowTemplateService, never()).resolveTopicSourceProjectNodeKey();
+    }
+
+    @Test
     void rejectsCompletedOrTerminatedTargetBeforeMovingTopic() {
         ProjectDO source = project(1L, 1);
         ProjectDO target = project(2L, 2);
