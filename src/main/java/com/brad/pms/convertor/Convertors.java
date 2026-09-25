@@ -65,11 +65,15 @@ public final class Convertors {
                                        int memberCount, int taskCount, int doneTaskCount, int progress) {
         ProjectDTO dto = new ProjectDTO();
         dto.setId(do_.getId());
+        dto.setVersion(do_.getVersion());
         dto.setCode(do_.getCode());
         dto.setName(do_.getName());
         dto.setDescription(do_.getDescription());
         dto.setStatus(do_.getStatus());
         dto.setPriority(do_.getPriority());
+        dto.setProjectLevel(do_.getProjectLevel());
+        dto.setProjectTypeId(do_.getProjectTypeId());
+        dto.setWorkflowTemplateVersionId(do_.getWorkflowTemplateVersionId());
         dto.setOwnerId(do_.getOwnerId());
         dto.setOwnerName(userDisplayName(owner));
         dto.setCreatedBy(do_.getCreatedBy());
@@ -108,6 +112,7 @@ public final class Convertors {
     public static ProjectTaskDTO toTask(ProjectTaskDO do_, UserDO assignee) {
         ProjectTaskDTO dto = new ProjectTaskDTO();
         dto.setId(do_.getId());
+        dto.setVersion(do_.getVersion());
         dto.setProjectId(do_.getProjectId());
         dto.setNodeId(do_.getNodeId());
         dto.setParentId(do_.getParentId());
@@ -118,7 +123,6 @@ public final class Convertors {
         dto.setPriority(do_.getPriority());
         dto.setAssigneeId(do_.getAssigneeId());
         dto.setAssigneeName(userDisplayName(assignee));
-        dto.setMilestoneId(do_.getMilestoneId());
         dto.setSort(do_.getSort());
         dto.setDueDate(do_.getDueDate());
         dto.setCreatedAt(do_.getCreatedAt());
@@ -134,8 +138,6 @@ public final class Convertors {
         dto.setDescription(do_.getDescription());
         dto.setDueDate(do_.getDueDate());
         dto.setStatus(do_.getStatus());
-        dto.setTaskCount(0);
-        dto.setDoneTaskCount(0);
         dto.setCreatedAt(do_.getCreatedAt());
         return dto;
     }

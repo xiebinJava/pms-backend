@@ -1,6 +1,9 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.brad.pms.audit.AuditAction;
+import com.brad.pms.audit.AuditEvent;
+import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.response.TaskAttachmentDTO;
@@ -31,14 +34,15 @@ public class TaskAttachmentService {
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final FileStorageService fileStorageService;
+    private final OperationLogService operationLogService;
 
     public List<TaskAttachmentDTO> listByTask(Long taskId) {
-        requireReadableTask(taskId);
+        ProjectTaskDO task = requireReadableTask(taskId);
         List<ProjectTaskAttachmentDO> rows = attachmentMapper.selectList(
                 new LambdaQueryWrapper<ProjectTaskAttachmentDO>()
                         .eq(ProjectTaskAttachmentDO::getTaskId, taskId)
                         .orderByDesc(ProjectTaskAttachmentDO::getCreatedAt));
-        return toDTOs(rows);
+        return toDTOs(rows, task);
     }
 
     public TaskAttachmentDTO upload(Long taskId, MultipartFile file) {
@@ -52,7 +56,13 @@ public class TaskAttachmentService {
         row.setContentType(stored.contentType());
         row.setSizeBytes(stored.size());
         attachmentMapper.insert(row);
-        return toDTO(row, userService.listByIds(List.of(UserContext.userId())).stream().findFirst().orElse(null));
+        operationLogService.record(AuditEvent.success(
+                AuditAction.TASK_ATTACHMENT_UPLOADED.name(), AuditResourceType.TASK_ATTACHMENT.name(), row.getId(), task.getProjectId(),
+                null, null, java.util.Map.of("taskId", taskId, "originalName", row.getOriginalName(),
+                        "contentType", String.valueOf(row.getContentType()), "sizeBytes", row.getSizeBytes())));
+        TaskAttachmentDTO dto = toDTO(row, userService.listByIds(List.of(UserContext.userId())).stream().findFirst().orElse(null));
+        dto.setCanDelete(true);
+        return dto;
     }
 
     public Resource loadFile(Long taskId, Long attachmentId) {
@@ -69,19 +79,19 @@ public class TaskAttachmentService {
     }
 
     public void delete(Long taskId, Long attachmentId) {
-        ProjectTaskDO task = requireWritableTask(taskId);
+        ProjectTaskDO task = requireReadableTask(taskId);
         ProjectTaskAttachmentDO row = requireOwnedAttachment(taskId, attachmentId);
         Long userId = UserContext.userId();
         boolean owner = Objects.equals(row.getCreatedBy(), userId);
-        boolean manager = ProjectPermissionPolicy.canManageTask(
-                permissionService.requireProject(task.getProjectId()),
-                permissionService.requireNode(task.getProjectId(), task.getNodeId()),
-                task, userId, UserContext.isAdministrator());
+        boolean manager = canManageTask(task);
         if (!owner && !manager) {
             throw BusinessException.forbidden("只能删除自己上传的附件，或由项目创建人/项目经理/节点负责人删除");
         }
         attachmentMapper.deleteById(row.getId());
         fileStorageService.delete(row.getFileKey());
+        operationLogService.record(AuditEvent.success(
+                AuditAction.TASK_ATTACHMENT_DELETED.name(), AuditResourceType.TASK_ATTACHMENT.name(), row.getId(), row.getProjectId(),
+                null, java.util.Map.of("taskId", row.getTaskId(), "originalName", String.valueOf(row.getOriginalName())), null));
     }
 
     public void deleteAllForTask(Long taskId) {
@@ -91,6 +101,9 @@ public class TaskAttachmentService {
         for (ProjectTaskAttachmentDO row : rows) {
             attachmentMapper.deleteById(row.getId());
             fileStorageService.delete(row.getFileKey());
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.TASK_ATTACHMENT_DELETED.name(), AuditResourceType.TASK_ATTACHMENT.name(), row.getId(), row.getProjectId(),
+                    null, java.util.Map.of("taskId", row.getTaskId(), "originalName", String.valueOf(row.getOriginalName())), null));
         }
     }
 
@@ -106,8 +119,10 @@ public class TaskAttachmentService {
         var project = permissionService.requireProject(task.getProjectId());
         var node = permissionService.requireNode(task.getProjectId(), task.getNodeId());
         Long userId = UserContext.userId();
-        if (!ProjectPermissionPolicy.canManageTask(project, node, task, userId, UserContext.isAdministrator())
-                && !ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId, UserContext.isAdministrator())) {
+        if (!ProjectPermissionPolicy.canManageTask(project, node, task, userId, UserContext.isAdministrator(),
+                permissionService.canWriteProject(project))
+                && !ProjectPermissionPolicy.canEditTaskContent(project, node, task, userId, UserContext.isAdministrator(),
+                permissionService.canWriteProject(project))) {
             throw BusinessException.forbidden("当前用户没有上传该任务附件的权限");
         }
         return task;
@@ -122,12 +137,26 @@ public class TaskAttachmentService {
         return row;
     }
 
-    private List<TaskAttachmentDTO> toDTOs(List<ProjectTaskAttachmentDO> rows) {
+    private List<TaskAttachmentDTO> toDTOs(List<ProjectTaskAttachmentDO> rows, ProjectTaskDO task) {
         if (rows.isEmpty()) return List.of();
         Map<Long, UserDO> users = userService.listByIds(
                         rows.stream().map(ProjectTaskAttachmentDO::getCreatedBy).filter(Objects::nonNull).collect(Collectors.toList()))
                 .stream().collect(Collectors.toMap(UserDO::getId, u -> u, (left, right) -> left));
-        return rows.stream().map(row -> toDTO(row, users.get(row.getCreatedBy()))).collect(Collectors.toList());
+        Long userId = UserContext.userId();
+        boolean manager = canManageTask(task);
+        return rows.stream().map(row -> {
+            TaskAttachmentDTO dto = toDTO(row, users.get(row.getCreatedBy()));
+            dto.setCanDelete(manager || Objects.equals(row.getCreatedBy(), userId));
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
+    private boolean canManageTask(ProjectTaskDO task) {
+        if (task.getNodeId() == null) return false;
+        var project = permissionService.requireProject(task.getProjectId());
+        var node = permissionService.requireNode(task.getProjectId(), task.getNodeId());
+        return ProjectPermissionPolicy.canManageTask(
+                project, node, task, UserContext.userId(), UserContext.isAdministrator(), permissionService.canWriteProject(project));
     }
 
     private static TaskAttachmentDTO toDTO(ProjectTaskAttachmentDO row, UserDO creator) {

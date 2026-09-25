@@ -1,5 +1,6 @@
 package com.brad.pms.dto.response;
 
+import com.brad.pms.common.enums.TaskScheduleState;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
 public class ProjectTaskDTO {
 
     private Long id;
+    private Integer version;
     private Long projectId;
     private Long nodeId;
     private Long parentId;
@@ -19,9 +21,13 @@ public class ProjectTaskDTO {
     private Integer priority;
     private Long assigneeId;
     private String assigneeName;
-    private Long milestoneId;
+    private Long requirementId;
+    private String requirementCode;
     private Integer sort;
     private LocalDate dueDate;
+    private TaskScheduleState scheduleState;
+    private int overdueDays;
+    private boolean rescheduled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Integer subtaskCount;

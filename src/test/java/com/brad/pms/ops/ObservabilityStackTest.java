@@ -19,6 +19,7 @@ class ObservabilityStackTest {
         assertThat(application).contains("port: ${PMS_MANAGEMENT_PORT:8081}");
         assertThat(application).contains("address: ${PMS_MANAGEMENT_ADDRESS:127.0.0.1}");
         assertThat(application).contains("include: health,metrics,prometheus");
+        assertThat(application).contains("enabled: ${PMS_MAIL_HEALTH_ENABLED:false}");
         assertThat(pom).contains("micrometer-registry-prometheus");
     }
 
@@ -57,11 +58,11 @@ class ObservabilityStackTest {
                 "docker", "compose",
                 "-f", "docker-compose.example.yml",
                 "-f", "docker-compose.observability.yml",
-                "--env-file", ".env.oceanbase.example",
+                "--env-file", ".env.mysql.example",
                 "config", "--quiet")
                 .directory(Path.of(".").toFile())
                 .redirectErrorStream(true);
-        for (String line : Files.readAllLines(Path.of(".env.oceanbase.example"))) {
+        for (String line : Files.readAllLines(Path.of(".env.mysql.example"))) {
             String trimmed = line.trim();
             if (trimmed.isEmpty() || trimmed.startsWith("#") || !trimmed.contains("=")) {
                 continue;

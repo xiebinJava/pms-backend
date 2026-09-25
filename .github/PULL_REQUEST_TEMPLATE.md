@@ -1,8 +1,8 @@
-## Summary
+## 摘要
 
 -
 
-## Checks
+## 检查
 
 - [ ] `./scripts/check-privacy.sh`
 - [ ] `./scripts/validate-openapi.sh`

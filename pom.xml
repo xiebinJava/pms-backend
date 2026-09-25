@@ -12,7 +12,7 @@
 
     <groupId>com.brad</groupId>
     <artifactId>pms-backend</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.7</version>
     <name>pms-backend</name>
     <description>Project Management System - Backend</description>
     <licenses>
@@ -29,10 +29,12 @@
         <!-- Keep the web/security stack on the latest Spring Boot 3.5 line. -->
         <spring-framework.version>6.2.19</spring-framework.version>
         <spring-security.version>6.5.7</spring-security.version>
-        <tomcat.version>11.0.22</tomcat.version>
+        <tomcat.version>11.0.25</tomcat.version>
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <micrometer.version>1.15.12</micrometer.version>
         <logback.version>1.5.18</logback.version>
+        <!-- Keep AWS SDK's Netty transport on the latest patched 4.1 line. -->
+        <netty.version>4.1.137.Final</netty.version>
         <mysql-connector-j.version>9.4.0</mysql-connector-j.version>
         <aws.sdk.version>2.31.78</aws.sdk.version>
     </properties>
@@ -53,6 +55,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -78,18 +84,11 @@
             <version>${mybatis-plus.version}</version>
         </dependency>
 
-        <!-- OceanBase MySQL-compatible runtime driver -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <version>${mysql-connector-j.version}</version>
             <scope>runtime</scope>
-        </dependency>
-        <!-- Embedded database is test-only; production runs use OceanBase. -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
         </dependency>
 
         <!-- JWT -->
@@ -159,6 +158,16 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

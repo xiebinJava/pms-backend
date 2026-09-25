@@ -72,8 +72,9 @@ public class RequestRateLimitInterceptor implements HandlerInterceptor {
                 || "/auth/password-reset/request".equals(path)
                 || "/auth/password-reset/confirm".equals(path)
                 || "/admin/users/invite".equals(path)
+                || path.matches("/admin/users/[0-9]+/reinvite")
                 || path.startsWith("/admin/import/")
-                || "/projects/images".equals(path);
+                || path.matches("/projects/[0-9]+/images");
     }
 
     private String normalizedPath(HttpServletRequest request) {

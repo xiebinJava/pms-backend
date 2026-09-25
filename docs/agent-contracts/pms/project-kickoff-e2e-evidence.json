@@ -1,0 +1,295 @@
+[
+  {
+    "step": "auth.login",
+    "at": "2026-09-21T07:15:43.085Z",
+    "detail": {
+      "email": "e2e.kickoff@pms.com",
+      "userId": 19,
+      "requestId": "c8322802-bc0d-4eba-a417-fe16821ecd82"
+    }
+  },
+  {
+    "step": "auth.authorization-code",
+    "at": "2026-09-21T07:15:43.116Z",
+    "detail": {
+      "dshSessionId": "pms-kickoff-e2e-live",
+      "expiresInSeconds": 90,
+      "scopes": [
+        "pms:project:read",
+        "pms:task:read",
+        "pms:query:read",
+        "pms:task:write",
+        "pms:command:preview",
+        "pms:command:execute",
+        "pms:workflow:write",
+        "pms:project:write",
+        "pms:workspace:embed"
+      ],
+      "authorizationCodeLength": 43
+    }
+  },
+  {
+    "step": "read.project-list",
+    "at": "2026-09-21T07:15:43.313Z",
+    "detail": {
+      "total": 22,
+      "kickoffCount": 12,
+      "targetProjectId": 44,
+      "targetProjectName": "立项联调-2026-09-21T06:36:18.400Z"
+    }
+  },
+  {
+    "step": "read.project-detail",
+    "at": "2026-09-21T07:15:43.421Z",
+    "detail": {
+      "pageType": "project-detail",
+      "projectId": 44,
+      "resolvedNodeId": null,
+      "currentNodeKey": "kickoff",
+      "currentNodeId": 388,
+      "nodeCount": 9,
+      "memberCount": 1
+    }
+  },
+  {
+    "step": "read.task-list",
+    "at": "2026-09-21T07:15:43.445Z",
+    "detail": {
+      "projectId": 44,
+      "total": 0,
+      "returned": 0
+    }
+  },
+  {
+    "step": "contract.injected",
+    "at": "2026-09-21T07:15:43.527Z",
+    "detail": {
+      "sectionName": "pms:agent-contract",
+      "sectionLength": 1619,
+      "contractId": "pms-project-assistant/project-kickoff",
+      "contractVersion": "1.0.0",
+      "contentSha256": "d05ae4761eda2a9fef22710fac733e8dd675b1e8e6916b17ea2115d047b2d090",
+      "loadedAt": "2026-09-21T07:15:43.526Z",
+      "currentNodeKey": "kickoff",
+      "writeCommands": [
+        "project.create",
+        "project.update",
+        "member.add",
+        "node.owner.update",
+        "node.schedule.update",
+        "task.create",
+        "task.assign",
+        "task.update",
+        "node.complete"
+      ],
+      "contractSectionPreview": [
+        "【PMS 节点契约：必读】",
+        "契约标识：pms-project-assistant/project-kickoff",
+        "契约版本：1.0.0",
+        "内容摘要：d05ae4761eda2a9fef22710fac733e8dd675b1e8e6916b17ea2115d047b2d090",
+        "获取时间：2026-09-21T07:15:43.526Z",
+        "当前节点：kickoff"
+      ]
+    }
+  },
+  {
+    "step": "contract.fail-closed-preview",
+    "at": "2026-09-21T07:15:43.528Z",
+    "detail": {
+      "blocked": true,
+      "message": "Error: PMS 当前节点契约未加载，禁止执行写入"
+    }
+  },
+  {
+    "step": "write.preview",
+    "at": "2026-09-21T07:15:43.550Z",
+    "detail": {
+      "operationId": "5b8bc9cd-7443-41d3-a5cf-f2f7774b9688",
+      "command": "project.create",
+      "warnings": [
+        "创建后 PMS 会初始化项目节点，并将当前用户加入项目成员；项目经理需后续单独设置"
+      ],
+      "changes": [
+        {
+          "entity": "project",
+          "action": "create",
+          "name": "立项联调-2026-09-21T07:15:43.528Z",
+          "description": null,
+          "priority": 1,
+          "projectLevel": 0,
+          "projectTypeId": null,
+          "workflowTemplateVersionId": null,
+          "startDate": null,
+          "endDate": null,
+          "orgUnitId": null
+        }
+      ],
+      "expiresAt": "2026-09-21T07:25:43.539884Z"
+    }
+  },
+  {
+    "step": "write.execute-gate-without-approval",
+    "at": "2026-09-21T07:15:43.550Z",
+    "detail": {
+      "blocked": true,
+      "message": "Error: PMS 写操作即将落库。请确认预览中的具体变更后再执行。"
+    }
+  },
+  {
+    "step": "write.executed",
+    "at": "2026-09-21T07:15:43.632Z",
+    "detail": {
+      "operationId": "5b8bc9cd-7443-41d3-a5cf-f2f7774b9688",
+      "status": "SUCCEEDED",
+      "message": "项目已创建",
+      "createdProjectId": 45,
+      "createdProjectName": "立项联调-2026-09-21T07:15:43.528Z",
+      "refreshScopes": [
+        "project-list",
+        "project-dashboard",
+        "project-detail"
+      ]
+    }
+  },
+  {
+    "step": "write.idempotent-retry",
+    "at": "2026-09-21T07:15:43.644Z",
+    "detail": {
+      "operationId": "5b8bc9cd-7443-41d3-a5cf-f2f7774b9688",
+      "status": "SUCCEEDED",
+      "message": "项目已创建"
+    }
+  },
+  {
+    "step": "write.verified",
+    "at": "2026-09-21T07:15:43.711Z",
+    "detail": {
+      "createdProjectId": 45,
+      "projectName": "立项联调-2026-09-21T07:15:43.528Z",
+      "projectCode": "PRJ-000045"
+    }
+  },
+  {
+    "step": "refresh.batch",
+    "at": "2026-09-21T07:15:43.711Z",
+    "detail": {
+      "revision": 1,
+      "scopes": [
+        "project-list",
+        "project-dashboard",
+        "project-detail"
+      ],
+      "requestId": "pms-refresh-batch-1789974943711",
+      "pendingBatchesFlushed": 1
+    }
+  },
+  {
+    "step": "failure.invalid-preview",
+    "at": "2026-09-21T07:15:43.725Z",
+    "detail": {
+      "blocked": true,
+      "message": "Error: 不支持的 project.create 参数: unexpectedField"
+    }
+  },
+  {
+    "step": "failure.unknown-operation",
+    "at": "2026-09-21T07:15:43.735Z",
+    "detail": {
+      "blocked": true,
+      "message": "操作预览不存在",
+      "code": 404,
+      "status": 404,
+      "requestId": "464f2720-7762-48d5-a719-41f3c30c20b2"
+    }
+  },
+  {
+    "step": "failure.unauthenticated-contract",
+    "at": "2026-09-21T07:15:43.739Z",
+    "detail": {
+      "status": 401,
+      "code": 401,
+      "msg": "未登录或登录已过期",
+      "requestId": "955b92da-8bfc-413e-87a0-b56d0c3741c4"
+    }
+  },
+  {
+    "step": "completion.preview",
+    "at": "2026-09-21T07:15:43.824Z",
+    "detail": {
+      "blocked": false,
+      "message": "{\n  \"operationId\": \"262b7415-1015-4971-a9f4-8e31f5e8351b\",\n  \"command\": \"node.complete\",\n  \"expiresAt\": \"2026-09-21T07:25:43.814301Z\",\n  \"contextVersion\": \"v1\",\n  \"warnings\": [\n    \"完成节点前仍会执行 PMS 的任务、必填字段和工作台组件校验\"\n  ],\n  \"changes\": [\n    {\n      \"entity\": \"node\",\n      \"action\": \"complete\",\n      \"projectId\": 45,\n      \"nodeId\": 397,\n      \"nodeName\": \"项目立项与启动\",\n      \"fromStatus\": 1,\n      \"toStatus\": 2,\n      \"projectVersion\": 0,\n      \"nodeVersion\": 0\n    }\n  ],\n  \"refreshScopes\": [\n    \"project-detail\",\n    \"project-dashboard\",\n    \"task-board\"\n  ]\n}",
+      "changes": [
+        {
+          "entity": "node",
+          "action": "complete",
+          "projectId": 45,
+          "nodeId": 397,
+          "nodeName": "项目立项与启动",
+          "fromStatus": 1,
+          "toStatus": 2,
+          "projectVersion": 0,
+          "nodeVersion": 0
+        }
+      ]
+    }
+  },
+  {
+    "step": "completion.rejected-other-node",
+    "at": "2026-09-21T07:15:43.902Z",
+    "detail": {
+      "blocked": true,
+      "nodeId": 398,
+      "nodeKey": "requirement",
+      "message": "Error: 仅当前节点负责人或项目负责人可以完成进行中的节点"
+    }
+  },
+  {
+    "step": "project-update.preview",
+    "at": "2026-09-21T07:15:43.985Z",
+    "detail": {
+      "operationId": "6ca76814-8339-4b13-806f-8fdd9bf50bce",
+      "command": "project.update",
+      "warnings": [
+        "未提供的字段保留原值；显式传 null 可清空描述或日期",
+        "项目更新不会改动项目成员、关注人和项目经理"
+      ],
+      "changes": [
+        {
+          "entity": "project",
+          "action": "update",
+          "projectId": 45,
+          "projectName": "立项联调-2026-09-21T07:15:43.528Z",
+          "fromName": "立项联调-2026-09-21T07:15:43.528Z",
+          "toName": "立项联调-2026-09-21T07:15:43.528Z",
+          "fromDescription": null,
+          "toDescription": "基于当前达模型进行调整",
+          "fromStartDate": null,
+          "toStartDate": null,
+          "fromEndDate": null,
+          "toEndDate": "2026-10-30",
+          "projectVersion": 0
+        }
+      ],
+      "expiresAt": "2026-09-21T07:25:43.975557Z"
+    }
+  },
+  {
+    "step": "project-update.verified",
+    "at": "2026-09-21T07:15:44.086Z",
+    "detail": {
+      "operationId": "6ca76814-8339-4b13-806f-8fdd9bf50bce",
+      "status": "SUCCEEDED",
+      "message": "项目已更新",
+      "description": "基于当前达模型进行调整",
+      "endDate": "2026-10-30",
+      "startDate": null,
+      "memberCountBefore": 1,
+      "memberCountAfter": 1,
+      "refreshScopes": [
+        "project-detail",
+        "project-list",
+        "project-dashboard"
+      ]
+    }
+  }
+]

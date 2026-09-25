@@ -6,6 +6,8 @@ import com.brad.pms.entity.OrgUnitDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.OrgUnitMapper;
 import com.brad.pms.mapper.UserMapper;
+import com.brad.pms.mapper.OrgUnitHistoryMapper;
+import com.brad.pms.mapper.UserPositionMapper;
 import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.UserContext;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +22,8 @@ class OrgUnitServiceTest {
     @Autowired OrgUnitService orgUnitService;
     @Autowired OrgUnitMapper orgUnitMapper;
     @Autowired UserMapper userMapper;
+    @Autowired OrgUnitHistoryMapper orgUnitHistoryMapper;
+    @Autowired UserPositionMapper userPositionMapper;
 
     @AfterEach
     void clearContext() { UserContext.clear(); }
@@ -47,6 +51,10 @@ class OrgUnitServiceTest {
         assertThat(dto.getName()).isEqualTo("更新后的组织");
         assertThat(dto.getLeaderDisplayName()).isEqualTo("管理员（admin）");
         assertThat(orgUnitMapper.selectById(created.getId()).getLeaderUserId()).isEqualTo(admin.getId());
+        assertThat(orgUnitHistoryMapper.findByOrgUnitId(created.getId())).extracting("action")
+                .containsExactly("UPDATED", "CREATED");
+        assertThat(userPositionMapper.findActivePrimary(admin.getId()).getOrgUnitId())
+                .isEqualTo(orgUnitMapper.findByCode("HQ").getId());
     }
 
     @Test

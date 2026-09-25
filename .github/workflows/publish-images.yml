@@ -1,0 +1,110 @@
+name: publish-backend-images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Image version to publish without a leading v
+        required: true
+        type: string
+        default: 1.0.0
+      verify_anonymous:
+        description: Verify anonymous GHCR access after a manual publish
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-backend
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve image version
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="$REQUESTED_VERSION"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version must match MAJOR.MINOR.PATCH: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "owner=$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refuse existing version tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in pms-backend; do
+            for tag in "${{ steps.version.outputs.version }}" "sha-${{ github.sha }}"; do
+              ref="ghcr.io/${{ steps.version.outputs.owner }}/${image}:${tag}"
+              if docker buildx imagetools inspect "$ref" >/dev/null 2>&1; then
+                echo "refusing to overwrite existing immutable tag: $ref" >&2
+                exit 1
+              fi
+            done
+          done
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.version.outputs.owner }}/pms-backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ steps.version.outputs.owner }}/pms-backend:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=pms-backend
+          cache-to: type=gha,mode=max,scope=pms-backend
+          provenance: true
+          sbom: true
+
+      - name: Verify anonymous package access
+        if: github.event_name == 'push' || inputs.verify_anonymous
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          docker manifest inspect \
+            "ghcr.io/${{ steps.version.outputs.owner }}/pms-backend:${{ steps.version.outputs.version }}" \
+            >/dev/null
+          echo "backend manifest is anonymously readable"

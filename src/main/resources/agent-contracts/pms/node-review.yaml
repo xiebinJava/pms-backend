@@ -1,0 +1,77 @@
+contractId: pms-project-assistant/review
+agentId: project_assistant
+contractKey: review
+workflowNodeKeys:
+  - review
+contractVersion: 1.0.0
+required: true
+locale: zh-CN
+principalRole: PMS 项目助手独立履行项目复盘组织者职责
+specializedAgents: []
+readCapabilities:
+  - 查询当前项目、节点、成员和任务（以当前已发布工具返回字段为准）
+  - 按姓名或邮箱查询可选人员目录，用于把负责人、成员、关注人解析成账号
+readToolBindings:
+  project-list: pms_project_list
+  project-context: pms_project_get
+  task-context: pms_task_list
+  people-directory: pms_people_list
+  bounded-query: pms_query
+writeCommands:
+  - node.field.update
+  - node.owner.update
+  - node.schedule.update
+  - task.create
+  - task.assign
+  - task.update
+  - node.complete
+  - batch.write
+confirmationPolicies:
+  node.field.update: preview-then-execute
+  node.owner.update: preview-then-execute
+  node.schedule.update: preview-then-execute
+  task.create: preview-then-execute
+  task.assign: preview-then-execute
+  task.update: preview-then-execute
+  node.complete: preview-then-execute
+  batch.write: preview-then-execute
+entryConditions:
+  - 当前节点为价值验证与项目复盘（review）
+  - 用户已登录且当前 PMS 用户具备对应项目权限
+  - 价值验证工作台和任务写入能力可用
+inputs:
+  - 价值验证工作台字段（工作台标识 value-review），包括验证结论、实际价值结果、复盘结论和改进行动
+  - 项目价值评估、项目复盘报告
+  - 页面已配置的节点自定义字段
+  - 节点负责人、节点排期和本节点任务
+missingInputRules:
+  - 只使用用户明确提供的信息和 PMS 返回的事实
+  - 不猜测用户身份、组织、权限、负责人和关键日期
+  - 缺少关键字段时先询问，不生成写入预览
+  - 不编造项目收益数据，用户未提供时保持为空并提示补充
+executionSteps:
+  - 先读取项目、当前节点、价值验证工作台字段和任务状态
+  - 识别缺失信息并向用户补充询问
+  - 汇总验证结论、实际价值结果、复盘结论、改进行动和任务变更
+  - 对批量变更统一生成一份预览并直接执行，无需等待用户逐次确认
+  - 使用原操作编号和幂等键执行，不重复执行未知结果的操作
+  - 核验 PMS 返回结果，成功后统一刷新一次当前 PMS 页面
+  - 汇报结果并生成下一节点预览，不自动推进节点
+completionCriteria:
+  - 验证结论、实际价值结果和复盘结论已填写并保存
+  - 改进行动清单符合当前权限与流程要求
+  - 节点负责人、节点排期和本节点任务已按用户要求维护
+  - 页面已配置的自定义字段和检查项已填写
+  - PMS 当前节点状态已核验
+failureStrategies:
+  - 鉴权失败立即停止写入并提示重新建立 PMS 登录态
+  - 参数校验失败时指出字段并回到补充信息
+  - 系统繁忙或超时时先按幂等键查询状态，不盲目重试
+  - 短暂网络失败最多使用同一幂等键重试三次
+  - 执行结果未知时标记待核验，禁止重新创建同一业务对象
+terminationConditions:
+  - 用户明确取消或暂不执行
+  - 关键输入缺失且用户无法补充
+  - 当前用户无权限或 PMS 能力不可用
+  - 连续三轮无法完成或发生数据冲突
+  - 写入结果无法核验

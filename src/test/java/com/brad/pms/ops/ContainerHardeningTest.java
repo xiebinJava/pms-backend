@@ -39,10 +39,11 @@ class ContainerHardeningTest {
         assertThat(compose).contains("mem_limit:");
         assertThat(compose).contains("cpus:");
         assertThat(compose).contains("healthcheck:");
-        assertThat(compose).contains("127.0.0.1:2881:2881");
+        assertThat(compose).contains("127.0.0.1:3306:3306");
         assertThat(compose).contains("127.0.0.1:8080:8080");
         assertThat(compose).contains("uploads-init:");
         assertThat(compose).contains("chown -R 10001:10001");
+        assertThat(compose).contains("cap_add: [CHOWN, FOWNER]");
         assertThat(compose).contains("PMS_NOTIFICATION_STARTUP_CHECK:-false");
         assertThat(compose).contains("PMS_DEPLOYMENT_ENV:-development");
         assertThat(compose).contains("pms-data:", "pms-edge:", "networks: [pms-data, pms-edge]");
@@ -75,5 +76,12 @@ class ContainerHardeningTest {
         String application = Files.readString(Path.of("src/main/resources/application.yml"));
         assertThat(application).contains("port: ${PMS_MANAGEMENT_PORT:8081}");
         assertThat(application).contains("address: ${PMS_MANAGEMENT_ADDRESS:127.0.0.1}");
+    }
+
+    @Test
+    void ciAllowsTheFrontendProxyOriginForBrowserLogin() throws Exception {
+        String workflow = Files.readString(Path.of(".github/workflows/integration.yml"));
+        assertThat(workflow).contains(
+                "PMS_CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173");
     }
 }

@@ -56,8 +56,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ResponseResult<Void>> handleException(Exception e) {
-        log.error("系统异常", e);
-        return response(ResponseResult.ERROR, "系统繁忙，请稍后重试");
+        String requestId = org.slf4j.MDC.get("requestId");
+        log.error("系统异常, requestId={}", requestId, e);
+        String message = requestId == null || requestId.isBlank()
+                ? "系统繁忙，请稍后重试"
+                : "系统繁忙，请稍后重试（请求编号：" + requestId + "）";
+        return response(ResponseResult.ERROR, message);
     }
 
     private ResponseEntity<ResponseResult<Void>> response(int code, String message) {
@@ -70,6 +74,7 @@ public class GlobalExceptionHandler {
             case ResponseResult.PARAM_ERROR -> HttpStatus.BAD_REQUEST;
             case ResponseResult.UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
             case ResponseResult.FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case ResponseResult.NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ResponseResult.CONFLICT -> HttpStatus.CONFLICT;
             case ResponseResult.UNPROCESSABLE_ENTITY -> HttpStatus.UNPROCESSABLE_ENTITY;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;

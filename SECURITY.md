@@ -1,17 +1,17 @@
-# Security Policy
+# 安全策略
 
-## Supported versions
+## 支持范围
 
-The `main` branch and the latest `v1.x` release receive security fixes.
+`main` 分支和最新的 `v1.x` 发行版会接收安全修复。
 
-## Reporting a vulnerability
+## 报告漏洞
 
-Please do **not** open a public issue for security reports.
+请**不要**用公开 Issue 报告安全问题。
 
-Use GitHub's private vulnerability reporting on this repository, or email the maintainers listed in the latest release notes. Include:
+请使用本仓库的 GitHub 私下漏洞报告，并写明：
 
-- affected version or commit
-- reproduction steps
-- impact (auth bypass, data leak, injection, etc.)
+- 受影响版本或提交
+- 复现步骤
+- 影响（鉴权绕过、数据泄露、注入等）
 
-We will acknowledge the report and work on a fix before any public disclosure.
+我们会确认报告，并在公开披露前完成修复。

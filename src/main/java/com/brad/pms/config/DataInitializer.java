@@ -4,8 +4,8 @@ import com.brad.pms.entity.*;
 import com.brad.pms.common.enums.SystemRole;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.mapper.*;
-import com.brad.pms.service.AuthService;
 import com.brad.pms.service.NodeService;
+import com.brad.pms.service.WorkflowTemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -19,8 +19,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Local demo seed data. Persistent deployments use explicit bootstrap
- * credentials and never receive a shared default password.
+ * Local demo seed data. Persistent (mysql/prod) empty databases create one
+ * administrator from PMS_BOOTSTRAP_* env vars, falling back to the documented
+ * OSS defaults (admin@example.com / PmsAdmin123!). Production must override.
  */
 @Slf4j
 @Component
@@ -35,6 +36,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ProjectMilestoneMapper milestoneMapper;
     private final ProjectCommentMapper commentMapper;
     private final NodeService nodeService;
+    private final WorkflowTemplateService workflowTemplateService;
     private final EnterpriseDataMigration enterpriseDataMigration;
     private final Environment environment;
 
@@ -50,18 +52,23 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         if (isPersistentProfile()) {
-            String email = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_EMAIL");
+            // Documented OSS first-login defaults (must match distribution README / .env.example).
+            String email = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_EMAIL", "admin@example.com");
             String normalizedEmail = EnterpriseDataMigration.normalizeEmail(email);
             if (normalizedEmail == null || !normalizedEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
                 throw new IllegalStateException("PMS_BOOTSTRAP_ADMIN_EMAIL 必须是有效邮箱");
             }
-            String username = optionalBootstrap("PMS_BOOTSTRAP_ADMIN_USERNAME");
-            String nameZh = optionalBootstrap("PMS_BOOTSTRAP_ADMIN_NAME_ZH");
-            String password = requiredBootstrap("PMS_BOOTSTRAP_ADMIN_PASSWORD");
+            String username = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_USERNAME", "admin");
+            String nameZh = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_NAME_ZH", "系统管理员");
+            String password = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_PASSWORD", "PmsAdmin123!");
             if (password.length() < 12) {
                 throw new IllegalStateException("PMS_BOOTSTRAP_ADMIN_PASSWORD 至少需要 12 位");
             }
-            if (username == null) username = "user-" + AuthService.sha256(normalizedEmail).substring(0, 16);
+            if ("production".equalsIgnoreCase(System.getenv("PMS_DEPLOYMENT_ENV"))
+                    && "PmsAdmin123!".equals(password)) {
+                throw new IllegalStateException(
+                        "生产环境禁止使用公开默认管理员密码 PmsAdmin123!，请设置 PMS_BOOTSTRAP_ADMIN_PASSWORD");
+            }
             UserDO bootstrap = user(username, password, nameZh, email);
             bootstrap.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
             userMapper.updateById(bootstrap);
@@ -80,6 +87,7 @@ public class DataInitializer implements CommandLineRunner {
         UserDO terry = demoUsers.get(1);
         UserDO kevin = demoUsers.get(2);
         UserDO claire = demoUsers.get(3);
+        var defaultWorkflow = workflowTemplateService.resolveForProjectCreation(null, null);
 
         ProjectDO p1 = new ProjectDO();
         p1.setName("开源项目管理平台");
@@ -91,9 +99,12 @@ public class DataInitializer implements CommandLineRunner {
         p1.setStartDate(LocalDate.now().minusDays(20));
         p1.setEndDate(LocalDate.now().plusDays(80));
         p1.setProgress(35);
+        p1.setProjectTypeId(defaultWorkflow.projectType().getId());
+        p1.setWorkflowTemplateVersionId(defaultWorkflow.version().getId());
         p1.setCode("PRJ-000001");
         projectMapper.insert(p1);
-        nodeService.initDefault(p1.getId());
+        nodeService.initFromDefinition(p1.getId(), admin.getId(),
+                workflowTemplateService.getDefinition(defaultWorkflow.version().getId()));
         List<ProjectNodeDTO> p1Nodes = nodeService.list(p1.getId());
 
         ProjectDO p2 = new ProjectDO();
@@ -106,9 +117,12 @@ public class DataInitializer implements CommandLineRunner {
         p2.setStartDate(LocalDate.now().plusDays(10));
         p2.setEndDate(LocalDate.now().plusDays(120));
         p2.setProgress(0);
+        p2.setProjectTypeId(defaultWorkflow.projectType().getId());
+        p2.setWorkflowTemplateVersionId(defaultWorkflow.version().getId());
         p2.setCode("PRJ-000002");
         projectMapper.insert(p2);
-        nodeService.initDefault(p2.getId());
+        nodeService.initFromDefinition(p2.getId(), terry.getId(),
+                workflowTemplateService.getDefinition(defaultWorkflow.version().getId()));
 
         member(p1.getId(), admin.getId(), 0);
         member(p1.getId(), brad.getId(), 1);
@@ -133,12 +147,12 @@ public class DataInitializer implements CommandLineRunner {
         m2.setStatus(0);
         milestoneMapper.insert(m2);
 
-        task(p1.getId(), nodeId(p1Nodes, "kickoff"), "立项材料评审", "确认目标、范围与资源授权", 2, 2, admin.getId(), null, 1);
-        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, terry.getId(), null, 2);
-        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, kevin.getId(), null, 3);
-        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, terry.getId(), m1.getId(), 4);
-        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, claire.getId(), m1.getId(), 5);
-        task(p1.getId(), nodeId(p1Nodes, "knowledge"), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), m2.getId(), 6);
+        task(p1.getId(), nodeId(p1Nodes, "kickoff"), "立项材料评审", "确认目标、范围与资源授权", 2, 2, admin.getId(), 1);
+        task(p1.getId(), nodeId(p1Nodes, "requirement"), "梳理需求与验收标准", "汇总需求并形成范围基线", 2, 1, terry.getId(), 2);
+        task(p1.getId(), nodeId(p1Nodes, "design"), "完成技术方案评审", "记录关键方案决策", 2, 1, kevin.getId(), 3);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "搭建后端工程骨架", "Spring Boot + MyBatis-Plus + JWT", 1, 2, terry.getId(), 4);
+        task(p1.getId(), nodeId(p1Nodes, "develop"), "实现任务看板", "支持拖拽切换状态", 0, 2, claire.getId(), 5);
+        task(p1.getId(), nodeId(p1Nodes, "knowledge"), "撰写 README 与部署文档", "含 Docker 与生产部署说明", 0, 0, admin.getId(), 6);
 
         ProjectCommentDO c1 = new ProjectCommentDO();
         c1.setProjectId(p1.getId());
@@ -182,22 +196,18 @@ public class DataInitializer implements CommandLineRunner {
     private boolean isPersistentProfile() {
         return java.util.Arrays.stream(environment.getActiveProfiles())
                 .anyMatch(profile -> "mysql".equalsIgnoreCase(profile)
-                        || "oceanbase".equalsIgnoreCase(profile)
                         || "prod".equalsIgnoreCase(profile)
                         || "production".equalsIgnoreCase(profile));
-    }
-
-    private String requiredBootstrap(String key) {
-        String value = System.getenv(key);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("首次启动企业环境时必须设置 " + key);
-        }
-        return value.trim();
     }
 
     private String optionalBootstrap(String key) {
         String value = System.getenv(key);
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String bootstrapOrDefault(String key, String defaultValue) {
+        String value = optionalBootstrap(key);
+        return value != null ? value : defaultValue;
     }
 
     private void member(Long projectId, Long userId, int role) {
@@ -217,7 +227,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void task(Long projectId, Long nodeId, String title, String desc, int status, int priority,
-                      Long assigneeId, Long milestoneId, int sort) {
+                      Long assigneeId, int sort) {
         ProjectTaskDO t = new ProjectTaskDO();
         t.setProjectId(projectId);
         t.setNodeId(nodeId);
@@ -226,7 +236,6 @@ public class DataInitializer implements CommandLineRunner {
         t.setStatus(status);
         t.setPriority(priority);
         t.setAssigneeId(assigneeId);
-        t.setMilestoneId(milestoneId);
         t.setSort(sort);
         taskMapper.insert(t);
     }

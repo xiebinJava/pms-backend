@@ -1,0 +1,62 @@
+{
+  "realm": "pms",
+  "enabled": true,
+  "displayName": "PMS Enterprise SSO",
+  "sslRequired": "NONE",
+  "registrationAllowed": false,
+  "clients": [
+    {
+      "clientId": "pms-web",
+      "name": "PMS Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:5173/login/oidc/callback",
+        "http://localhost:5173/login/oidc/callback"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "dsh-web",
+      "name": "DSH Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:5173/auth/oidc/callback",
+        "http://localhost:5173/auth/oidc/callback",
+        "http://127.0.0.1:3080/auth/oidc/callback",
+        "http://localhost:3080/auth/oidc/callback"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:3080",
+        "http://localhost:3080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "pms-api",
+      "name": "PMS API",
+      "enabled": true,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    }
+  ]
+}

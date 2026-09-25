@@ -14,4 +14,5 @@ public class ProjectCommentDTO {
     private Long userId;
     private String userNickname;
     private LocalDateTime createdAt;
+    private boolean canDelete;
 }

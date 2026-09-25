@@ -39,6 +39,12 @@ public class AdminImportController {
         return ResponseResult.success();
     }
 
+    @GetMapping("/{jobId}/errors.csv")
+    @RequirePermission(PermissionCode.IMPORT_WRITE)
+    public ResponseEntity<byte[]> errors(@PathVariable String jobId) {
+        return csv(importService.errorCsv(jobId), "import-errors-" + jobId + ".csv");
+    }
+
     @GetMapping("/template/organizations.csv")
     @RequirePermission(PermissionCode.IMPORT_WRITE)
     public ResponseEntity<byte[]> organizationTemplate() { return csv(templateService.organizationCsvTemplate(), "organizations-template.csv"); }

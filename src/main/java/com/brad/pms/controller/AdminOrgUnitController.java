@@ -5,6 +5,7 @@ import com.brad.pms.dto.request.OrgUnitCreateCmd;
 import com.brad.pms.dto.request.OrgUnitMoveCmd;
 import com.brad.pms.dto.request.OrgUnitUpdateCmd;
 import com.brad.pms.dto.response.OrgUnitTreeDTO;
+import com.brad.pms.entity.OrgUnitHistoryDO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import com.brad.pms.service.OrgUnitService;
@@ -24,6 +25,12 @@ public class AdminOrgUnitController {
     @RequirePermission(PermissionCode.ORG_READ)
     public ResponseResult<List<OrgUnitTreeDTO>> tree() {
         return ResponseResult.success(orgUnitService.tree());
+    }
+
+    @GetMapping("/{id}/history")
+    @RequirePermission(PermissionCode.ORG_READ)
+    public ResponseResult<List<OrgUnitHistoryDO>> history(@PathVariable Long id) {
+        return ResponseResult.success(orgUnitService.history(id));
     }
 
     @PostMapping

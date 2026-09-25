@@ -6,4 +6,8 @@ fs\.com
 fsclaw
 谢斌
 brad\.xie
-xiebinJava
+# The published GitHub owner used in clone URLs and GHCR names is allowed.
+fs-insight
+fsinsight
+/Users/fs/
+fs-blue

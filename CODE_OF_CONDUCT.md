@@ -1,9 +1,9 @@
-# Code of Conduct
+# 行为准则
 
-Be respectful and professional in issues, pull requests, and discussions.
+在 Issue、Pull Request 和讨论中请保持尊重、专业。
 
-- No harassment, personal attacks, or discriminatory language.
-- Assume good intent; disagree about the code, not the person.
-- Do not publish other people's private data, credentials, or internal company identifiers.
+- 禁止骚扰、人身攻击或歧视性用语。
+- 默认善意；可以反对代码，不要针对个人。
+- 不要公开他人的隐私数据、凭据或公司内部标识。
 
-Maintainers may hide or reject contributions that violate this policy.
+维护者可以隐藏或拒绝违反本准则的贡献。

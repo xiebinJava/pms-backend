@@ -19,6 +19,12 @@ public class ProjectCreateCmd {
 
     private Integer priority = 1;
 
+    private Integer projectLevel = 0;
+
+    private Long projectTypeId;
+
+    private Long workflowTemplateVersionId;
+
     private Long ownerId;
 
     private LocalDate startDate;

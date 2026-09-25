@@ -32,6 +32,12 @@ public class AdminUserController {
         return ResponseResult.success(invitationService.invite(cmd));
     }
 
+    @PostMapping("/{id}/reinvite")
+    @RequirePermission(PermissionCode.USER_WRITE)
+    public ResponseResult<InvitationResponse> reinvite(@PathVariable Long id) {
+        return ResponseResult.success(invitationService.reinvite(id));
+    }
+
     @GetMapping
     @RequirePermission(PermissionCode.USER_READ)
     public ResponseResult<List<PersonnelDTO>> list(@RequestParam(required = false) String keyword) {

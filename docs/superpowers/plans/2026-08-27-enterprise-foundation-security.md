@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task with review checkpoints.
 
-**Goal:** 为单企业 OceanBase 部署补齐登录审计、认证安全、显式 CORS 和上线前数据库预检能力。
+**Goal:** 为单企业 MySQL 部署补齐登录审计、认证安全、显式 CORS 和上线前数据库预检能力。
 
-**Architecture:** 认证服务在同一事务中更新用户安全状态并写入登录日志，使用 `noRollbackFor` 确保认证失败也能留下安全记录。生产配置通过启动时校验拒绝弱 JWT 密钥，通过显式来源列表配置 CORS；OceanBase 的 schema 和数据完整性由只读预检脚本在部署前验证。
+**Architecture:** 认证服务在同一事务中更新用户安全状态并写入登录日志，使用 `noRollbackFor` 确保认证失败也能留下安全记录。生产配置通过启动时校验拒绝弱 JWT 密钥，通过显式来源列表配置 CORS；MySQL 的 schema 和数据完整性由只读预检脚本在部署前验证。
 
-**Tech Stack:** Spring Boot 2.7、Java 17、MyBatis-Plus、Flyway、OceanBase MySQL 兼容模式、JUnit 5、Bash。
+**Tech Stack:** Spring Boot 2.7、Java 17、MyBatis-Plus、Flyway、MySQL 8、JUnit 5、Bash。
 
 **Spec:** `docs/superpowers/specs/2026-08-27-enterprise-foundation-security-design.md`
 
 ## Global Constraints
 
-- 生产数据库固定使用 OceanBase MySQL 兼容模式；不把 H2 配置用于生产运行。
+- 生产数据库固定使用 MySQL 8；不把内存数据库配置用于生产运行。
 - 单企业本地部署，不增加 `tenant_id`。
 - 不记录密码、JWT、刷新令牌或密码重置令牌。
 - 预检脚本只读，不执行 DROP、TRUNCATE、覆盖或自动回滚。
@@ -99,7 +99,7 @@ git add src/main/java/com/brad/pms/security/JwtTokenProvider.java src/main/java/
 git commit -m "fix: harden production authentication defaults"
 ```
 
-### Task 3: OceanBase 生产预检和文档验收
+### Task 3: MySQL 生产预检和文档验收
 
 **Files:**
 - Modify: `scripts/enterprise-preflight.sh`
@@ -109,7 +109,7 @@ git commit -m "fix: harden production authentication defaults"
 - Create: `src/test/java/com/brad/pms/config/EnterprisePreflightScriptTest.java`
 
 **Interfaces:**
-- Scripts continue to read `PMS_DB_*` first, then `OCEANBASE_*`, and never echo the password.
+- Scripts continue to read `PMS_DB_*` first, then `MYSQL_*`, and never echo the password.
 - Preflight checks required enterprise tables/indexes, valid user login names, exactly one active root, and projects with organization assignment.
 
 - [ ] **Step 1: Write failing script contract tests**
@@ -136,7 +136,7 @@ Expected: all tests pass and both scripts parse successfully without connecting 
 
 ```bash
 git add scripts/enterprise-preflight.sh scripts/verify-enterprise-migration.sh docs/operations/enterprise-upgrade-runbook.md src/test/java/com/brad/pms/config/EnterprisePreflightScriptTest.java
-git commit -m "chore: strengthen OceanBase deployment preflight"
+git commit -m "chore: strengthen MySQL deployment preflight"
 ```
 
 ### Task 4: Final review and delivery

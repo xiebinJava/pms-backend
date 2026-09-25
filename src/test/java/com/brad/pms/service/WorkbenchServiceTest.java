@@ -1,7 +1,10 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.brad.pms.common.enums.TaskScheduleState;
 import com.brad.pms.dto.response.ProjectDTO;
+import com.brad.pms.dto.response.ProjectActionItemDTO;
+import com.brad.pms.dto.response.WorkbenchActionCenterDTO;
 import com.brad.pms.dto.response.WorkbenchDTO;
 import com.brad.pms.dto.response.WorkbenchSummaryDTO;
 import com.brad.pms.entity.ProjectCommentDO;
@@ -47,6 +50,7 @@ class WorkbenchServiceTest {
     @Mock ProjectTaskMapper taskMapper;
     @Mock ProjectCommentMapper commentMapper;
     @Mock UserService userService;
+    @Mock ProjectAttentionService attentionService;
 
     @InjectMocks WorkbenchService workbenchService;
 
@@ -83,6 +87,18 @@ class WorkbenchServiceTest {
     }
 
     @Test
+    void summarizeCountsOnlyUnfinishedOverdueTasks() {
+        List<ProjectTaskDO> tasks = List.of(
+                task(1L, 10L, 0, 2, LocalDate.of(2026, 9, 15)),
+                task(2L, 10L, 2, 2, LocalDate.of(2026, 9, 1)),
+                task(3L, 10L, 1, 2, LocalDate.of(2026, 9, 16))
+        );
+
+        assertThat(WorkbenchService.summarize(tasks, 1, LocalDate.of(2026, 9, 16))
+                .getOverdueTaskCount()).isEqualTo(1);
+    }
+
+    @Test
     void taskItemsSortByStatusDueDatePriorityAndTitle() {
         ProjectDTO project = project(10L, "研发门户", "PRJ-000001");
         List<ProjectTaskDO> tasks = List.of(
@@ -90,11 +106,23 @@ class WorkbenchServiceTest {
                 task(1L, 10L, 0, 2, LocalDate.of(2026, 8, 29), "补齐接口文档")
         );
 
-        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project)))
+        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project), LocalDate.of(2026, 9, 1)))
                 .extracting(item -> item.getId())
                 .containsExactly(1L, 2L);
-        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project)).get(0).getProjectName())
+        assertThat(WorkbenchService.toTaskItems(tasks, Map.of(10L, project), LocalDate.of(2026, 9, 1)).get(0).getProjectName())
                 .isEqualTo("研发门户");
+    }
+
+    @Test
+    void taskItemsIncludeDerivedOverdueState() {
+        ProjectTaskDO overdueTask = task(1L, 10L, 1, 2, LocalDate.of(2026, 9, 14));
+
+        assertThat(WorkbenchService.toTaskItems(List.of(overdueTask), Map.of(), LocalDate.of(2026, 9, 16)))
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.getScheduleState()).isEqualTo(TaskScheduleState.OVERDUE);
+                    assertThat(item.getOverdueDays()).isEqualTo(2);
+                });
     }
 
     @Test
@@ -173,6 +201,33 @@ class WorkbenchServiceTest {
         assertThat(dto.getSummary().getParticipatingProjectCount()).isEqualTo(10);
         assertThat(dto.getTasks()).hasSize(8);
         assertThat(dto.getProjects()).hasSize(6);
+    }
+
+    @Test
+    void loadIncludesServerDerivedActionCenterForAllReadableProjects() {
+        UserContext.set(new LoginUser(7L, "Alex.Zhang", "张伟"));
+        ProjectDTO project = project(10L, "成员项目", "PRJ-10");
+        WorkbenchActionCenterDTO actionCenter = new WorkbenchActionCenterDTO();
+        ProjectActionItemDTO issue = new ProjectActionItemDTO();
+        issue.setProjectId(10L);
+        issue.setType("CURRENT_NODE_OWNER_MISSING");
+        actionCenter.setTotalCount(1);
+        actionCenter.setCriticalCount(1);
+        actionCenter.setItems(List.of(issue));
+
+        when(memberMapper.selectList(any())).thenReturn(List.of(member(10L, 7L)));
+        when(taskMapper.selectList(any())).thenReturn(List.of());
+        when(projectMapper.selectList(any())).thenReturn(List.of());
+        when(projectService.listReadableByIds(any())).thenReturn(List.of(project));
+        when(attentionService.loadForProjects(List.of(project))).thenReturn(actionCenter);
+        when(commentMapper.selectList(any())).thenReturn(List.of());
+
+        WorkbenchDTO dto = workbenchService.load();
+
+        assertThat(dto.getActionCenter()).isSameAs(actionCenter);
+        assertThat(dto.getActionCenter().getItems()).singleElement()
+                .extracting(item -> item.getType())
+                .isEqualTo("CURRENT_NODE_OWNER_MISSING");
     }
 
     private static ProjectMemberDO member(Long projectId, Long userId) {

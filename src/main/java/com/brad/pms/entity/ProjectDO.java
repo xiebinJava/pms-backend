@@ -23,11 +23,18 @@ public class ProjectDO {
 
     private Integer priority;
 
+    private Integer projectLevel;
+
+    private Long projectTypeId;
+
+    private Long workflowTemplateVersionId;
+
     private Long ownerId;
 
     private Long projectManagerId;
 
     /** Primary organization responsible for the project. */
+    @TableField("org_unit_id")
     private Long orgUnitId;
 
     private LocalDate startDate;

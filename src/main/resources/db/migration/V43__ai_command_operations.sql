@@ -1,0 +1,20 @@
+CREATE TABLE pms_ai_operation (
+    id VARCHAR(64) NOT NULL,
+    command_name VARCHAR(80) NOT NULL,
+    user_id BIGINT NOT NULL,
+    context_id VARCHAR(160) NOT NULL,
+    context_version VARCHAR(160) NOT NULL,
+    arguments_json LONGTEXT NOT NULL,
+    preview_json LONGTEXT NOT NULL,
+    expected_versions_json LONGTEXT NULL,
+    status VARCHAR(24) NOT NULL,
+    idempotency_key VARCHAR(160) NULL,
+    result_json LONGTEXT NULL,
+    expires_at DATETIME NOT NULL,
+    executed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_pms_ai_operation_user_status (user_id, status, created_at),
+    UNIQUE KEY uk_pms_ai_operation_user_idempotency (user_id, idempotency_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

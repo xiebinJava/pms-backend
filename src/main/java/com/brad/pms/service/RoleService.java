@@ -1,6 +1,9 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.brad.pms.audit.AuditAction;
+import com.brad.pms.audit.AuditEvent;
+import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.common.enums.DataScopeType;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.RoleSaveCmd;
@@ -48,13 +51,16 @@ public class RoleService {
         role.setEnabled(!Boolean.FALSE.equals(cmd.getEnabled()));
         roleMapper.insert(role);
         saveBindings(role, cmd);
-        operationLogService.record("ROLE_CREATED", "ROLE", role.getId(), null, Map.of("code", role.getCode(), "name", role.getName()));
+        operationLogService.record(AuditEvent.success(
+                AuditAction.ROLE_CREATED.name(), AuditResourceType.ROLE.name(), role.getId(), null, null,
+                null, roleAuditSnapshot(role)));
         return toDto(role);
     }
 
     @Transactional
     public RoleDTO update(Long id, RoleSaveCmd cmd) {
         RoleDO role = require(id);
+        Map<String, Object> before = roleAuditSnapshot(role);
         if (cmd.getName() == null || cmd.getName().isBlank()) throw BusinessException.error("角色名称不能为空");
         if (Boolean.TRUE.equals(role.getBuiltin())) {
             if (Boolean.FALSE.equals(cmd.getEnabled())) throw BusinessException.forbidden("内置角色不能停用");
@@ -63,7 +69,9 @@ public class RoleService {
             // only access path for a protected role.
             role.setName(cmd.getName());
             roleMapper.updateById(role);
-            operationLogService.record("ROLE_UPDATED", "ROLE", id, null, Map.of("name", role.getName(), "builtin", true));
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.ROLE_UPDATED.name(), AuditResourceType.ROLE.name(), id, null, null,
+                    before, roleAuditSnapshot(role)));
             return toDto(role);
         }
         role.setName(cmd.getName());
@@ -71,17 +79,37 @@ public class RoleService {
         role.setEnabled(!Boolean.FALSE.equals(cmd.getEnabled()));
         roleMapper.updateById(role);
         saveBindings(role, cmd);
-        operationLogService.record("ROLE_UPDATED", "ROLE", id, null, Map.of("name", role.getName(), "dataScopeType", role.getDataScopeType()));
+        Map<String, Object> after = roleAuditSnapshot(role);
+        if (!Objects.equals(before.get("permissionCodes"), after.get("permissionCodes"))) {
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.ROLE_PERMISSION_CHANGED.name(), AuditResourceType.ROLE.name(), id, null, null,
+                    Map.of("permissionCodes", before.get("permissionCodes")),
+                    Map.of("permissionCodes", after.get("permissionCodes"))));
+        }
+        if (!Objects.equals(before.get("dataScopeType"), after.get("dataScopeType"))
+                || !Objects.equals(before.get("customOrgUnitIds"), after.get("customOrgUnitIds"))) {
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.ROLE_SCOPE_CHANGED.name(), AuditResourceType.ROLE.name(), id, null, null,
+                    Map.of("dataScopeType", before.get("dataScopeType"), "customOrgUnitIds", before.get("customOrgUnitIds")),
+                    Map.of("dataScopeType", after.get("dataScopeType"), "customOrgUnitIds", after.get("customOrgUnitIds"))));
+        }
+        if (!Objects.equals(before.get("name"), after.get("name"))
+                || !Objects.equals(before.get("enabled"), after.get("enabled"))) {
+            operationLogService.record(AuditEvent.success(
+                    AuditAction.ROLE_UPDATED.name(), AuditResourceType.ROLE.name(), id, null, null, before, after));
+        }
         return toDto(role);
     }
 
     @Transactional
     public void delete(Long id) {
         RoleDO role = require(id);
+        Map<String, Object> before = roleAuditSnapshot(role);
         if (Boolean.TRUE.equals(role.getBuiltin())) throw BusinessException.forbidden("内置角色不能删除");
         if (userRoleMapper.selectCount(new LambdaQueryWrapper<UserRoleDO>().eq(UserRoleDO::getRoleId, id).eq(UserRoleDO::getStatus, "ACTIVE")) > 0) throw BusinessException.error("角色仍被人员使用，不能删除");
         roleMapper.deleteById(id);
-        operationLogService.record("ROLE_DELETED", "ROLE", id, Map.of("code", role.getCode()), null);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.ROLE_DELETED.name(), AuditResourceType.ROLE.name(), id, null, null, before, null));
     }
 
     @Transactional
@@ -97,7 +125,9 @@ public class RoleService {
         grant.setStartAt(LocalDateTime.now());
         grant.setStatus("ACTIVE");
         userRoleMapper.insert(grant);
-        operationLogService.record("USER_ROLE_ASSIGNED", "USER", userId, null, Map.of("roleCode", role.getCode()));
+        operationLogService.record(AuditEvent.success(
+                AuditAction.USER_ROLE_ASSIGNED.name(), AuditResourceType.USER.name(), userId, null, null,
+                null, Map.of("roleId", roleId, "roleCode", role.getCode())));
     }
 
     @Transactional
@@ -113,7 +143,9 @@ public class RoleService {
             grant.setEndAt(LocalDateTime.now());
             userRoleMapper.updateById(grant);
         }
-        operationLogService.record("USER_ROLE_UNASSIGNED", "USER", userId, Map.of("roleCode", role.getCode()), null);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.USER_ROLE_UNASSIGNED.name(), AuditResourceType.USER.name(), userId, null, null,
+                Map.of("roleId", roleId, "roleCode", role.getCode()), null));
     }
 
     private void saveBindings(RoleDO role, RoleSaveCmd cmd) {
@@ -148,6 +180,19 @@ public class RoleService {
         RoleDO role = roleMapper.selectById(id);
         if (role == null) throw BusinessException.error("角色不存在");
         return role;
+    }
+
+    private Map<String, Object> roleAuditSnapshot(RoleDO role) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("code", role.getCode());
+        snapshot.put("name", role.getName());
+        snapshot.put("builtin", role.getBuiltin());
+        snapshot.put("enabled", role.getEnabled());
+        snapshot.put("dataScopeType", role.getDataScopeType());
+        snapshot.put("permissionCodes", permissionMapper.findByRoleId(role.getId()).stream()
+                .map(PermissionDO::getCode).sorted().collect(Collectors.toList()));
+        snapshot.put("customOrgUnitIds", new ArrayList<>(roleOrgScopeMapper.findOrgUnitIds(role.getId())));
+        return snapshot;
     }
 
     private String validateScope(String scope) {

@@ -12,4 +12,7 @@ public interface InvitationMapper extends BaseMapper<InvitationDO> {
 
     @Update("UPDATE sys_invitation SET status = 'USED', used_at = CURRENT_TIMESTAMP WHERE id = #{id} AND status = 'PENDING'")
     int markUsed(@Param("id") Long id);
+
+    @Update("UPDATE sys_invitation SET status = 'EXPIRED' WHERE user_id = #{userId} AND status = 'PENDING'")
+    int expirePendingByUserId(@Param("userId") Long userId);
 }

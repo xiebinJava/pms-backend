@@ -1,0 +1,24 @@
+<h2>8.2 PMS 项目助手完成当前节点的执行闭环</h2>
+<p>“完成当前节点”不是直接把节点状态改成已完成，而是由 PMS 项目助手围绕当前节点建立目标、任务、执行、验收和回写的闭环。只有节点完成标准满足、必要证据齐全，并经过用户确认后，才允许更新 PMS 节点状态。</p>
+<ol>
+  <li><b>读取节点上下文：</b>查询当前项目、节点名称、节点负责人、节点描述、排期、已有任务、项目成员、前置/后置节点以及当前用户的 PMS 权限。</li>
+  <li><b>形成节点完成契约：</b>明确本节点的目标、交付物、验收标准、必须更新的 PMS 字段和禁止越权的操作。如果节点描述、负责人或验收标准缺失，先创建人工决策点，不根据常识补猜。</li>
+  <li><b>拆解 PMS 任务：</b>由 PMS 项目助手选择合适的产品、开发、测试等 Agent，生成任务名称、描述、负责人、开始日期、截止日期、优先级、前置依赖、验收标准和预期输出。</li>
+  <li><b>计划审查：</b>向用户展示任务清单、角色、排期、依赖、预计工具调用、数据变更和风险。审查阶段只生成预览，不创建任务、不修改节点、不产生业务副作用。</li>
+  <li><b>确认后执行：</b>用户确认后，PMS 项目助手通过 PMS 能力目录创建任务、设置周期、分配负责人、建立依赖，并按依赖图串行或并行调度专业 Agent。每次运行保存 runId、taskId、attemptId、Agent 版本和工具调用证据。</li>
+  <li><b>汇报与质量门禁：</b>专业 Agent 必须返回结果、证据、风险、阻塞和建议下一步。项目助手检查所有必需任务和验收条件；没有验收证据不能关闭任务，也不能将节点标记为已完成。</li>
+  <li><b>处理失败和阻塞：</b>工具失败、权限不足、数据缺失或 Agent 产物不可靠时，按有限重试、重新规划、人工补充和人工接管处理。超过重试上限就暂停派发并升级给人，不编造成功结果。</li>
+  <li><b>关闭节点并推动下一节点：</b>项目助手先汇总完成情况并提出“是否完成当前节点”的确认；用户确认后，才回写 PMS 节点状态、进度和验收记录，并根据工作流进入下一个节点。</li>
+</ol>
+<table>
+  <colgroup><col width="180"/><col width="330"/><col width="330"/></colgroup>
+  <thead><tr><th background-color="rgb(240,244,255)" vertical-align="top">阶段</th><th background-color="rgb(240,244,255)" vertical-align="top">PMS 项目助手负责</th><th background-color="rgb(240,244,255)" vertical-align="top">是否产生业务变更</th></tr></thead>
+  <tbody>
+    <tr><td vertical-align="top">理解与规划</td><td vertical-align="top">读取节点、定义完成标准、拆解任务、选择 Agent</td><td vertical-align="top">否，只生成计划和预览</td></tr>
+    <tr><td vertical-align="top">确认与执行</td><td vertical-align="top">创建任务、设置周期、分配负责人、建立依赖、调度 Agent</td><td vertical-align="top">是，必须经过用户确认和 PMS 权限校验</td></tr>
+    <tr><td vertical-align="top">验收与关闭</td><td vertical-align="top">检查证据、汇总结果、处理阻塞、提出节点关闭建议</td><td vertical-align="top">更新节点状态前再次确认</td></tr>
+  </tbody>
+</table>
+<callout emoji="✅" background-color="rgb(240,251,239)" border-color="rgb(142,224,133)">
+  <p><b>闭环状态：</b><code>node_ready → planning → waiting_confirmation → executing → waiting_gate → completed</code>。异常状态统一进入 <code>blocked</code>、<code>retrying</code>、<code>failed</code> 或 <code>cancelled</code>，任何异常都不能绕过验收门禁直接完成节点。</p>
+</callout>

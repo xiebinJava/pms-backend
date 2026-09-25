@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: verify-backup.sh /path/to/brad_pms-<timestamp>.sql.gz
+Usage: verify-backup.sh /path/to/pms-<timestamp>.sql.gz
 
 Verify the compression stream and the adjacent SHA-256 checksum file.
 USAGE

@@ -58,6 +58,7 @@ public class InvitationService {
             throw BusinessException.error("英文名已存在");
         }
         OrgUnitDO primaryOrg = requireOrg(cmd.getOrgUnitId());
+        RoleDO grantedRole = resolveInviteRole(cmd.getRoleCode());
         UserDO user = new UserDO();
         user.setUsername(username == null || username.isBlank() ? generatedLegacyUsername(emailNormalized) : username);
         user.setUsernameNormalized(usernameNormalized == null || usernameNormalized.isBlank()
@@ -82,37 +83,36 @@ public class InvitationService {
         position.setStartDate(java.time.LocalDate.now());
         position.setStatus("ACTIVE");
         userPositionMapper.insert(position);
-        if (cmd.getRoleCode() != null && !cmd.getRoleCode().isBlank()) {
-            RoleDO role = roleMapper.findByCode(cmd.getRoleCode());
-            if (role == null) throw BusinessException.error("角色不存在");
+        if (grantedRole != null) {
             UserRoleDO grant = new UserRoleDO();
             grant.setUserId(user.getId());
-            grant.setRoleId(role.getId());
+            grant.setRoleId(grantedRole.getId());
             grant.setStartAt(LocalDateTime.now());
             grant.setStatus("ACTIVE");
             userRoleMapper.insert(grant);
         }
-        String raw = randomToken();
-        InvitationDO invitation = new InvitationDO();
-        invitation.setUserId(user.getId());
-        invitation.setTokenHash(AuthService.sha256(raw));
-        invitation.setExpiresAt(LocalDateTime.now().plusDays(3));
-        invitation.setStatus("PENDING");
-        invitation.setCreatedBy(UserContext.userId());
-        invitationMapper.insert(invitation);
-        String activationUrl = "/auth/activate?token=" + raw;
-        InvitationNotifier notifier = notifierProvider.getIfAvailable();
-        if (notifier != null) {
-            notifier.send(user, activationUrl, invitation.getExpiresAt());
-        } else if (!exposeToken) {
-            throw BusinessException.error("未配置账号邀请通知器，暂不能发出激活链接");
-        }
+        InvitationResponse response = issueActivation(user);
         java.util.Map<String, Object> after = new java.util.LinkedHashMap<>();
         after.put("email", user.getEmail());
         if (user.getNameZh() != null) after.put("nameZh", user.getNameZh());
         if (cmd.getUsername() != null && !cmd.getUsername().isBlank()) after.put("username", user.getUsername());
         operationLogService.record("USER_INVITED", "USER", user.getId(), null, after);
-        return new InvitationResponse(user.getId(), exposeToken ? activationUrl : "", invitation.getExpiresAt().toString());
+        return response;
+    }
+
+    @Transactional
+    public InvitationResponse reinvite(Long userId) {
+        UserDO user = userMapper.selectById(userId);
+        if (user == null) throw BusinessException.notFound("账号不存在");
+        if (!UserStatus.PENDING_ACTIVATION.name().equals(user.getStatus())) {
+            throw BusinessException.error("只有待激活账号可以重新发送激活链接");
+        }
+        invitationMapper.expirePendingByUserId(user.getId());
+        InvitationResponse response = issueActivation(user);
+        operationLogService.record("USER_REINVITED", "USER", user.getId(),
+                java.util.Map.of("status", UserStatus.PENDING_ACTIVATION.name()),
+                java.util.Map.of("email", user.getEmail()));
+        return response;
     }
 
     @Transactional
@@ -128,6 +128,33 @@ public class InvitationService {
         invitationMapper.markUsed(invitation.getId());
         authService.revokeAllSessions(user.getId(), "USER_ACTIVATED");
         operationLogService.record("USER_ACTIVATED", "USER", user.getId(), java.util.Map.of("status", "PENDING_ACTIVATION"), java.util.Map.of("status", "ACTIVE"));
+    }
+
+    private InvitationResponse issueActivation(UserDO user) {
+        String raw = randomToken();
+        InvitationDO invitation = new InvitationDO();
+        invitation.setUserId(user.getId());
+        invitation.setTokenHash(AuthService.sha256(raw));
+        invitation.setExpiresAt(LocalDateTime.now().plusDays(3));
+        invitation.setStatus("PENDING");
+        invitation.setCreatedBy(UserContext.userId() == null ? user.getId() : UserContext.userId());
+        invitationMapper.insert(invitation);
+        String activationUrl = "/auth/activate?token=" + raw;
+        InvitationNotifier notifier = notifierProvider.getIfAvailable();
+        if (notifier != null) {
+            notifier.send(user, activationUrl, invitation.getExpiresAt());
+        } else if (!exposeToken) {
+            throw BusinessException.error("未配置账号邀请通知器，暂不能发出激活链接");
+        }
+        return new InvitationResponse(user.getId(), exposeToken ? activationUrl : "", invitation.getExpiresAt().toString());
+    }
+
+    private RoleDO resolveInviteRole(String roleCode) {
+        if (roleCode == null || roleCode.isBlank()) return null;
+        RoleDO role = roleMapper.findByCode(roleCode);
+        if (role == null) throw BusinessException.error("角色不存在");
+        if (!Boolean.TRUE.equals(role.getEnabled())) throw BusinessException.error("角色已停用");
+        return role;
     }
 
     private OrgUnitDO requireOrg(Long id) {

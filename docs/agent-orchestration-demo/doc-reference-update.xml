@@ -1,0 +1,1 @@
+<p><b>dsh-agent-teams：</b>重点借鉴 Captain/Members、计划审查、依赖 DAG、共享调度器、attemptId、质量门禁、停止/续跑/归档和恢复机制。其通用研发工具与本地文件状态不直接复用，PMS 业务能力和多用户运行状态仍由本方案定义。</p>

@@ -4,6 +4,8 @@ import com.brad.pms.common.enums.SystemRole;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * 登录用户信息（存于 ThreadLocal，供业务代码随时获取）
  */
@@ -18,6 +20,8 @@ public class LoginUser {
     private String nameZh;
     private String displayName;
     private Long sessionId;
+    /** Non-null only when this request was authenticated with a DSH delegation token. */
+    private List<String> delegationScopes;
 
     public LoginUser(Long id, String username, String nickname) {
         this(id, username, nickname, SystemRole.USER.getCode());

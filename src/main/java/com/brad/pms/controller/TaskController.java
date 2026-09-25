@@ -40,7 +40,7 @@ public class TaskController {
     }
 
     @PostMapping("/projects/{projectId}/tasks")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectTaskDTO> create(@PathVariable Long projectId, @Validated @RequestBody TaskCreateCmd cmd) {
         cmd.setProjectId(projectId);
         return ResponseResult.success(taskService.create(cmd));
@@ -53,7 +53,7 @@ public class TaskController {
     }
 
     @PostMapping("/tasks/{id}/attachments")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<TaskAttachmentDTO> uploadAttachment(@PathVariable Long id,
                                                               @RequestParam("file") MultipartFile file) {
         return ResponseResult.success(attachmentService.upload(id, file));
@@ -74,14 +74,14 @@ public class TaskController {
     }
 
     @DeleteMapping("/tasks/{id}/attachments/{attachmentId}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<Void> deleteAttachment(@PathVariable Long id, @PathVariable Long attachmentId) {
         attachmentService.delete(id, attachmentId);
         return ResponseResult.success();
     }
 
     @PutMapping("/tasks/{id}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectTaskDTO> update(@PathVariable Long id, @Validated @RequestBody TaskUpdateCmd cmd) {
         return ResponseResult.success(taskService.update(id, cmd));
     }

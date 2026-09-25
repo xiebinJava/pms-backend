@@ -1,42 +1,40 @@
 # PMS Helm Chart
 
-Deploys the backend and frontend into an existing cluster. **It does not install OceanBase.** Point `backend.env.oceanbaseHost` at a MySQL-compatible instance you already run, then apply schema with `./scripts/oceanbase-upgrade.sh` before the first start.
+把后端和前端部署到已有集群。**不会安装 MySQL。** 请把 `backend.env.mysqlHost` 指向你已经运行的 MySQL 8。后端首次启动时由 Flyway 执行迁移。
 
-Single-node hosts should keep using `docker-compose.example.yml`. This chart is optional.
+单机环境请继续使用 `docker-compose.example.yml`。本 chart 是可选的。
 
-## Images
+## 镜像
 
-Build them yourself and load them into the cluster:
+自行构建并加载到集群：
 
 ```bash
 docker build -t pms-backend:1.0.0 .
 docker build -t pms-front:1.0.0 ../pms-front
 ```
 
-## Install
+## 安装
 
-Create a Secret with `jwtSecret`, `oceanbasePassword`, `bootstrapAdminEmail`, `bootstrapAdminPassword`, and `bootstrapAdminNameZh`. Then:
+先创建包含 `jwtSecret`、`mysqlPassword`、`bootstrapAdminEmail`、`bootstrapAdminPassword`、`bootstrapAdminNameZh`、`bootstrapAdminUsername` 的 Secret，然后：
 
 ```bash
 helm upgrade --install pms deploy/helm/pms \
   --set existingSecret=pms-secrets \
-  --set backend.env.oceanbaseHost=oceanbase.example.com \
+  --set backend.env.mysqlHost=mysql.example.com \
   --set backend.env.corsAllowedOrigins=https://pms.example.com \
   --set backend.env.publicBaseUrl=https://pms.example.com
 ```
 
-The frontend image proxies `/api` to a Service named `backend`. Install only one release per namespace unless you rebuild nginx.
+前端镜像会把 `/api` 代理到名为 `backend` 的 Service。同一个命名空间里只安装一份，除非你重新构建 Nginx。
 
-## Metrics
+## 指标
 
-Actuator stays on a ClusterIP management port (`8081`). Do not put that Service on Ingress.
+Actuator 留在 ClusterIP 管理端口（`8081`）。不要把该 Service 挂到 Ingress。
 
-If the cluster already has prometheus-operator:
+如果集群里已经有 prometheus-operator：
 
 ```bash
 helm upgrade --install pms deploy/helm/pms \
   --set existingSecret=pms-secrets \
   --set serviceMonitor.enabled=true
 ```
-
-Local Compose can overlay Prometheus and Grafana without Kubernetes. See the repository README.

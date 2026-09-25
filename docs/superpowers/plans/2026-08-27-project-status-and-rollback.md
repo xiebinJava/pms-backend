@@ -21,8 +21,8 @@
 ### Task 1: Lock the shared status contract with failing tests
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/security/ProjectPermissionPolicyTest.java`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/workflow.test.mjs`
+- Modify: `src/test/java/com/brad/pms/security/ProjectPermissionPolicyTest.java`
+- Modify: `../pms-front/src/views/project/detail/workflow.test.mjs`
 
 **Interfaces:**
 - Backend `ProjectStatus` must expose the four project lifecycle values and normalize legacy `0` to `进行中`.
@@ -40,8 +40,8 @@
 ### Task 2: Fix rollback-to-task permission refresh
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/workflow.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/TaskKanban.vue`
+- Modify: `../pms-front/src/views/project/detail/workflow.ts`
+- Modify: `../pms-front/src/views/project/detail/components/TaskKanban.vue`
 
 **Interfaces:**
 - Add `shouldReloadNodeTasks(previous?: NodeTaskScope, next?: NodeTaskScope): boolean` to the workflow helpers; the scope includes node ID, node status, and effective read-only state.
@@ -58,11 +58,11 @@
 ### Task 3: Unify backend project lifecycle states and deletion semantics
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/common/enums/ProjectStatus.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/security/ProjectPermissionPolicy.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/ProjectService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/resources/schema.sql`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/security/ProjectPermissionPolicyTest.java`
+- Modify: `src/main/java/com/brad/pms/common/enums/ProjectStatus.java`
+- Modify: `src/main/java/com/brad/pms/security/ProjectPermissionPolicy.java`
+- Modify: `src/main/java/com/brad/pms/service/ProjectService.java`
+- Modify: `src/main/resources/schema.sql`
+- Modify: `src/test/java/com/brad/pms/security/ProjectPermissionPolicyTest.java`
 
 **Interfaces:**
 - `ProjectStatus.normalize(0)` returns `1`; null values normalize to the active status for legacy compatibility.
@@ -85,11 +85,11 @@
 ### Task 4: Unify frontend project status display, filter, and statistics
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/enums/index.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/project.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/list/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/workflow.ts`
+- Modify: `../pms-front/src/enums/index.ts`
+- Modify: `../pms-front/src/api/project.ts`
+- Modify: `../pms-front/src/views/project/list/index.vue`
+- Modify: `../pms-front/src/views/project/detail/index.vue`
+- Modify: `../pms-front/src/views/project/detail/workflow.ts`
 
 **Interfaces:**
 - `ProjectStatus.options()` exposes all four project states.

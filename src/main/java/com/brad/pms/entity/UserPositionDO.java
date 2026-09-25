@@ -2,6 +2,7 @@ package com.brad.pms.entity;
 
 import com.baomidou.mybatisplus.annotation.Version;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -15,6 +16,7 @@ public class UserPositionDO {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
+    @TableField("org_unit_id")
     private Long orgUnitId;
     private Long positionId;
     private Long managerUserId;

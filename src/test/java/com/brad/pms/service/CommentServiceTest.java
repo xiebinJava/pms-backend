@@ -37,6 +37,7 @@ class CommentServiceTest {
     @Mock UserService userService;
     @Mock ProjectPermissionService permissionService;
     @Mock NotificationService notificationService;
+    @Mock OperationLogService operationLogService;
 
     @InjectMocks CommentService commentService;
 
@@ -55,7 +56,7 @@ class CommentServiceTest {
 
     @Test
     void addRejectsTaskFromAnotherProject() {
-        when(permissionService.requireProject(9L)).thenReturn(new ProjectDO());
+        when(permissionService.requireProjectCommentWritable(9L)).thenReturn(new ProjectDO());
         ProjectTaskDO foreign = new ProjectTaskDO();
         foreign.setId(4L);
         foreign.setProjectId(88L);
@@ -72,7 +73,7 @@ class CommentServiceTest {
 
     @Test
     void addFillsAuthorDisplayName() {
-        when(permissionService.requireProject(9L)).thenReturn(new ProjectDO());
+        when(permissionService.requireProjectCommentWritable(9L)).thenReturn(new ProjectDO());
         ProjectTaskDO task = new ProjectTaskDO();
         task.setId(4L);
         task.setProjectId(9L);

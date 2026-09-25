@@ -7,6 +7,7 @@ import com.brad.pms.dto.request.OrgUnitMoveCmd;
 import com.brad.pms.dto.request.OrgUnitUpdateCmd;
 import com.brad.pms.dto.response.OrgUnitTreeDTO;
 import com.brad.pms.entity.OrgUnitDO;
+import com.brad.pms.entity.OrgUnitHistoryDO;
 import com.brad.pms.entity.OrgUnitTypeDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.OrgUnitMapper;
@@ -30,6 +31,7 @@ public class OrgUnitService {
     private final UserPositionMapper userPositionMapper;
     private final ProjectMapper projectMapper;
     private final OperationLogService operationLogService;
+    private final OrgUnitHistoryService orgUnitHistoryService;
 
     public List<OrgUnitTreeDTO> tree() {
         List<OrgUnitDO> units = orgUnitMapper.findActiveTree();
@@ -41,6 +43,11 @@ public class OrgUnitService {
         }
         return units.stream().filter(unit -> unit.getParentId() == null || !mapped.containsKey(unit.getParentId()))
                 .map(unit -> mapped.get(unit.getId())).collect(Collectors.toList());
+    }
+
+    public List<OrgUnitHistoryDO> history(Long id) {
+        requireActiveOrHistorical(id);
+        return orgUnitHistoryService.list(id);
     }
 
     @Transactional
@@ -65,6 +72,7 @@ public class OrgUnitService {
         unit.setPath(parent == null ? "/" + unit.getId() + "/" : parent.getPath() + unit.getId() + "/");
         validateLeader(unit, unit.getLeaderUserId());
         orgUnitMapper.updateById(unit);
+        orgUnitHistoryService.record("CREATED", null, unit);
         operationLogService.record("ORG_CREATED", "ORG_UNIT", unit.getId(), null, Map.of("code", unit.getCode(), "name", unit.getName()));
         return toDto(unit);
     }
@@ -77,6 +85,7 @@ public class OrgUnitService {
             throw BusinessException.error("不能移动到自身或下级组织");
         }
         String oldPrefix = unit.getPath();
+        OrgUnitDO before = copy(unit);
         String newPrefix = parent == null ? "/" + unit.getId() + "/" : parent.getPath() + unit.getId() + "/";
         unit.setParentId(parent == null ? null : parent.getId());
         unit.setPath(newPrefix);
@@ -88,6 +97,7 @@ public class OrgUnitService {
             }
         }
         operationLogService.record("ORG_MOVED", "ORG_UNIT", id, Map.of("path", oldPrefix), Map.of("path", newPrefix));
+        orgUnitHistoryService.record("MOVED", before, unit);
         return toDto(unit);
     }
 
@@ -96,6 +106,7 @@ public class OrgUnitService {
         OrgUnitDO unit = requireActive(id);
         String beforeName = unit.getName();
         String beforeType = unit.getTypeId() == null ? null : String.valueOf(unit.getTypeId());
+        OrgUnitDO before = copy(unit);
         if (cmd.getTypeCode() != null && !cmd.getTypeCode().isBlank()) {
             OrgUnitTypeDO type = orgUnitTypeMapper.selectOne(new LambdaQueryWrapper<OrgUnitTypeDO>()
                     .eq(OrgUnitTypeDO::getCode, cmd.getTypeCode().trim()));
@@ -116,6 +127,7 @@ public class OrgUnitService {
                 Map.of("name", beforeName, "typeId", beforeType == null ? "" : beforeType),
                 Map.of("name", unit.getName(), "typeId", String.valueOf(unit.getTypeId()),
                         "leaderUserId", unit.getLeaderUserId() == null ? "" : unit.getLeaderUserId()));
+        orgUnitHistoryService.record("UPDATED", before, unit);
         return toDto(unit);
     }
 
@@ -126,16 +138,16 @@ public class OrgUnitService {
         long children = orgUnitMapper.selectCount(new LambdaQueryWrapper<OrgUnitDO>()
                 .eq(OrgUnitDO::getParentId, id).eq(OrgUnitDO::getStatus, "ACTIVE"));
         if (children > 0) throw BusinessException.error("请先处理下级组织");
-        long positions = userPositionMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.UserPositionDO>()
-                .eq(com.brad.pms.entity.UserPositionDO::getOrgUnitId, id)
-                .eq(com.brad.pms.entity.UserPositionDO::getStatus, "ACTIVE"));
+        long positions = userPositionMapper.countActiveByOrgUnitId(id);
         if (positions > 0) throw BusinessException.error("请先转移该组织下的在职人员");
         long projects = projectMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.ProjectDO>()
                 .eq(com.brad.pms.entity.ProjectDO::getOrgUnitId, id)
                 .ne(com.brad.pms.entity.ProjectDO::getStatus, com.brad.pms.common.enums.ProjectStatus.DELETED.getCode()));
         if (projects > 0) throw BusinessException.error("请先处理该组织下的项目");
+        OrgUnitDO before = copy(unit);
         unit.setStatus("INACTIVE");
         orgUnitMapper.updateById(unit);
+        orgUnitHistoryService.record("DEACTIVATED", before, unit);
         operationLogService.record("ORG_DEACTIVATED", "ORG_UNIT", id, Map.of("status", "ACTIVE"), Map.of("status", "INACTIVE"));
     }
 
@@ -143,6 +155,10 @@ public class OrgUnitService {
         OrgUnitDO unit = orgUnitMapper.selectById(id);
         if (unit == null || !"ACTIVE".equals(unit.getStatus())) throw BusinessException.error("组织不存在或已停用");
         return unit;
+    }
+
+    private void requireActiveOrHistorical(Long id) {
+        if (id == null || orgUnitMapper.selectById(id) == null) throw BusinessException.error("组织不存在");
     }
 
     private void validateLeader(OrgUnitDO unit, Long leaderUserId) {
@@ -168,9 +184,7 @@ public class OrgUnitService {
         dto.setStatus(unit.getStatus());
         dto.setLeaderUserId(unit.getLeaderUserId());
         dto.setSort(unit.getSort());
-        Long memberCount = userPositionMapper.selectCount(new LambdaQueryWrapper<com.brad.pms.entity.UserPositionDO>()
-                .eq(com.brad.pms.entity.UserPositionDO::getOrgUnitId, unit.getId())
-                .eq(com.brad.pms.entity.UserPositionDO::getStatus, "ACTIVE"));
+        Long memberCount = (long) userPositionMapper.countActiveByOrgUnitId(unit.getId());
         dto.setMemberCount(memberCount == null ? 0 : Math.toIntExact(memberCount));
         if (unit.getLeaderUserId() != null) {
             UserDO leader = userMapper.selectById(unit.getLeaderUserId());
@@ -179,5 +193,21 @@ public class OrgUnitService {
         OrgUnitTypeDO type = orgUnitTypeMapper.selectById(unit.getTypeId());
         dto.setTypeCode(type == null ? null : type.getCode());
         return dto;
+    }
+
+    private OrgUnitDO copy(OrgUnitDO source) {
+        OrgUnitDO copy = new OrgUnitDO();
+        copy.setId(source.getId());
+        copy.setParentId(source.getParentId());
+        copy.setTypeId(source.getTypeId());
+        copy.setCode(source.getCode());
+        copy.setName(source.getName());
+        copy.setLeaderUserId(source.getLeaderUserId());
+        copy.setSort(source.getSort());
+        copy.setStatus(source.getStatus());
+        copy.setPath(source.getPath());
+        copy.setDeleted(source.getDeleted());
+        copy.setVersion(source.getVersion());
+        return copy;
     }
 }

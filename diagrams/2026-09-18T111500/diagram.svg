@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1050" viewBox="0 0 1200 1050">
+  <rect width="1200" height="1050" rx="28" fill="#f5f8fc"/>
+  <rect x="0" y="0" width="1200" height="124" rx="28" fill="#10223e"/>
+  <circle cx="62" cy="62" r="27" fill="#2f76e6"/>
+  <text x="62" y="71" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#ffffff">D</text>
+  <text x="108" y="54" font-family="sans-serif" font-size="28" font-weight="700" fill="#ffffff">DSH 工作台 · 多业务团队协同</text>
+  <text x="108" y="86" font-family="sans-serif" font-size="16" fill="#b9cbe4">AI 主工作区统一对话，右侧业务工作区按 teamKey 切换系统上下文</text>
+
+  <g font-family="sans-serif">
+    <text x="54" y="169" font-size="14" font-weight="700" fill="#71839d">01  用户入口</text>
+    <rect x="250" y="145" width="700" height="94" rx="18" fill="#e9f1ff" stroke="#83acec" stroke-width="2"/>
+    <circle cx="292" cy="192" r="19" fill="#2f76e6"/>
+    <text x="292" y="199" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">AI</text>
+    <text x="330" y="183" font-size="23" font-weight="700" fill="#174a8f">AI 对话工作区</text>
+    <text x="330" y="214" font-size="16" fill="#4e6c93">自然语言提出目标 · 查看进度 · 接收汇报 · 处理人工决策</text>
+    <line x1="600" y1="240" x2="600" y2="275" stroke="#6d94ca" stroke-width="2"/>
+    <polygon points="594,268 606,268 600,280" fill="#6d94ca"/>
+
+    <text x="54" y="316" font-size="14" font-weight="700" fill="#71839d">02  DSH 主工作区</text>
+    <rect x="180" y="287" width="840" height="118" rx="20" fill="#245fba"/>
+    <text x="600" y="333" text-anchor="middle" font-size="27" font-weight="700" fill="#ffffff">统一编排与决策中枢</text>
+    <text x="600" y="367" text-anchor="middle" font-size="16" fill="#e5efff">识别业务团队 → 选择 Agent → 拆解计划 → 调度执行 → 汇总结果 → 升级阻塞</text>
+    <text x="600" y="391" text-anchor="middle" font-size="14" fill="#c9dcfa">所有跨系统调用都经过能力目录、用户权限与审计链路</text>
+
+    <polyline points="600,407 600,438 195,438 195,478" fill="none" stroke="#8ca5c7" stroke-width="2"/>
+    <polyline points="600,438 600,478" fill="none" stroke="#8ca5c7" stroke-width="2"/>
+    <polyline points="600,438 1005,438 1005,478" fill="none" stroke="#8ca5c7" stroke-width="2"/>
+    <text x="54" y="465" font-size="14" font-weight="700" fill="#71839d">03  业务团队上下文</text>
+
+    <rect x="70" y="480" width="250" height="132" rx="17" fill="#edf5ff" stroke="#80aef0" stroke-width="2"/>
+    <rect x="89" y="501" width="46" height="46" rx="12" fill="#2f76e6"/>
+    <text x="112" y="533" text-anchor="middle" font-size="21" font-weight="700" fill="#fff">P</text>
+    <text x="151" y="520" font-size="21" font-weight="700" fill="#1c4c91">PMS 团队</text>
+    <text x="151" y="546" font-size="15" fill="#54719a">项目管理 · 任务 · 节点</text>
+    <text x="90" y="582" font-size="14" fill="#356aa7">/teams/pms/*</text>
+
+    <rect x="475" y="480" width="250" height="132" rx="17" fill="#eff8f3" stroke="#87c8aa" stroke-width="2"/>
+    <rect x="494" y="501" width="46" height="46" rx="12" fill="#2dae7c"/>
+    <text x="517" y="533" text-anchor="middle" font-size="21" font-weight="700" fill="#fff">O</text>
+    <text x="556" y="520" font-size="21" font-weight="700" fill="#237c5d">OA 团队</text>
+    <text x="556" y="546" font-size="15" fill="#547d6b">流程 · 审批 · 协作</text>
+    <text x="495" y="582" font-size="14" fill="#2c8864">/teams/oa/*</text>
+
+    <rect x="880" y="480" width="250" height="132" rx="17" fill="#fff5e9" stroke="#e9b976" stroke-width="2"/>
+    <rect x="899" y="501" width="46" height="46" rx="12" fill="#e8912f"/>
+    <text x="922" y="533" text-anchor="middle" font-size="21" font-weight="700" fill="#fff">C</text>
+    <text x="961" y="520" font-size="21" font-weight="700" fill="#a7661e">CRM 团队</text>
+    <text x="961" y="546" font-size="15" fill="#866946">客户 · 商机 · 跟进</text>
+    <text x="900" y="582" font-size="14" fill="#a66c24">/teams/crm/*</text>
+
+    <text x="600" y="655" text-anchor="middle" font-size="15" fill="#5f7897">每个团队独立拥有：Agent 角色、团队 Skill、插件能力、业务权限与运行历史</text>
+    <rect x="110" y="680" width="980" height="76" rx="15" fill="#ffffff" stroke="#cfdbea" stroke-width="2"/>
+    <circle cx="150" cy="718" r="18" fill="#eef4fd"/>
+    <text x="150" y="725" text-anchor="middle" font-size="18" fill="#2f76e6">↔</text>
+    <text x="185" y="712" font-size="18" font-weight="700" fill="#2c4b70">业务团队工作区</text>
+    <text x="185" y="738" font-size="15" fill="#607993">概览 · 计划审查 · 协同运行 · 运行历史 · 右侧嵌入真实业务系统页面</text>
+    <text x="1050" y="724" text-anchor="end" font-size="14" fill="#2f76e6">teamKey 隔离</text>
+
+    <line x1="600" y1="757" x2="600" y2="797" stroke="#8ca5c7" stroke-width="2"/>
+    <polygon points="594,790 606,790 600,802" fill="#8ca5c7"/>
+    <text x="54" y="828" font-size="14" font-weight="700" fill="#71839d">04  能力与事实边界</text>
+    <rect x="70" y="846" width="330" height="112" rx="16" fill="#f0edfb" stroke="#b6a5e4" stroke-width="2"/>
+    <text x="235" y="885" text-anchor="middle" font-size="20" font-weight="700" fill="#7254a9">智能体广场</text>
+    <text x="235" y="914" text-anchor="middle" font-size="15" fill="#675a81">挑选产品 / 开发 / 测试等角色</text>
+    <text x="235" y="938" text-anchor="middle" font-size="14" fill="#8068a9">SOUL · AGENTS · Skill · 插件</text>
+
+    <rect x="435" y="846" width="330" height="112" rx="16" fill="#edf2f8" stroke="#adc0d5" stroke-width="2"/>
+    <text x="600" y="885" text-anchor="middle" font-size="20" font-weight="700" fill="#35516f">能力目录与权限</text>
+    <text x="600" y="914" text-anchor="middle" font-size="15" fill="#5d7590">查询 · 预览 · 确认 · 执行 · 回读</text>
+    <text x="600" y="938" text-anchor="middle" font-size="14" fill="#6c829b">用户权限不因 Agent 扩大</text>
+
+    <rect x="800" y="846" width="330" height="112" rx="16" fill="#e9f6f1" stroke="#9ccfbd" stroke-width="2"/>
+    <text x="965" y="885" text-anchor="middle" font-size="20" font-weight="700" fill="#2a765d">各业务系统事实源</text>
+    <text x="965" y="914" text-anchor="middle" font-size="15" fill="#597b70">PMS / OA / CRM API 与领域服务</text>
+    <text x="965" y="938" text-anchor="middle" font-size="14" fill="#5b8a79">规则、数据与最终落库归属业务系统</text>
+
+    <line x1="42" y1="987" x2="1158" y2="987" stroke="#d5e0ed"/>
+    <text x="42" y="1018" font-size="14" fill="#657c98">运行链路：用户 → DSH → 业务团队 Agent → 能力目录 → 业务系统 → 结果回报 / 人工决策</text>
+    <text x="1158" y="1018" text-anchor="end" font-size="14" fill="#657c98">PMS、OA、CRM 可独立演进</text>
+  </g>
+</svg>

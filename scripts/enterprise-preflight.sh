@@ -5,37 +5,37 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat <<'USAGE'
 Usage: enterprise-preflight.sh
 
-Read-only checks for an existing MySQL/OceanBase PMS database. Connection
-settings are read from PMS_DB_* first, then MYSQL_*/OCEANBASE_* variables.
+Read-only checks for an existing MySQL PMS database. Connection
+settings are read from PMS_DB_* first, then MYSQL_* variables.
 USAGE
   exit 0
 fi
 
-DB_HOST="${PMS_DB_HOST:-${MYSQL_HOST:-${OCEANBASE_HOST:-127.0.0.1}}}"
-DB_PORT="${PMS_DB_PORT:-${MYSQL_PORT:-${OCEANBASE_PORT:-3306}}}"
-DB_NAME="${PMS_DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-${OCEANBASE_DATABASE:-brad_pms}}}}"
-DB_USER="${PMS_DB_USER:-${MYSQL_USER:-${OCEANBASE_USER:-}}}"
-DB_PASSWORD="${PMS_DB_PASSWORD:-${MYSQL_PASSWORD:-${OCEANBASE_PASSWORD:-}}}"
+DB_HOST="${PMS_DB_HOST:-${MYSQL_HOST:-127.0.0.1}}"
+DB_PORT="${PMS_DB_PORT:-${MYSQL_PORT:-3306}}"
+DB_NAME="${PMS_DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-pms}}}"
+DB_USER="${PMS_DB_USER:-${MYSQL_USER:-}}"
+DB_PASSWORD="${PMS_DB_PASSWORD:-${MYSQL_PASSWORD:-}}"
 TOOL_IMAGE="${PMS_MYSQL_TOOL_IMAGE:-mysql:8.4}"
+TOOL_CLIENT="${PMS_MYSQL_TOOL_CLIENT:-mysql}"
 
 if command -v mysql >/dev/null 2>&1; then
   SQL_CLIENT=mysql
-elif command -v obclient >/dev/null 2>&1; then
-  SQL_CLIENT=obclient
 elif command -v docker >/dev/null 2>&1; then
   SQL_CLIENT=container
 else
-  echo "mysql/obclient client or Docker (mysql:8.4) is required (MySQL 8 or OceanBase MySQL mode)" >&2
+  echo "mysql client or Docker (mysql:8.4) is required" >&2
   exit 2
 fi
 if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
-  echo "PMS_DB_USER/PMS_DB_PASSWORD (or MYSQL_/OCEANBASE_ equivalents) are required" >&2
+  echo "PMS_DB_USER/PMS_DB_PASSWORD (or MYSQL_ equivalents) are required" >&2
   exit 2
 fi
 
 mysql_args=(--protocol=tcp --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" --batch --skip-column-names --raw)
 container_mysql() {
-  MYSQL_PWD="$DB_PASSWORD" docker run --rm --network host -e MYSQL_PWD "$TOOL_IMAGE" mysql "${mysql_args[@]}" "$@"
+  MYSQL_PWD="$DB_PASSWORD" docker run --rm --network host -e MYSQL_PWD \
+    --entrypoint "$TOOL_CLIENT" "$TOOL_IMAGE" "${mysql_args[@]}" "$@"
 }
 run_sql() {
   if [[ "$SQL_CLIENT" == "container" ]]; then
@@ -98,14 +98,14 @@ assert_index() {
 }
 
 echo "Checking PMS database $DB_HOST:$DB_PORT/$DB_NAME (read-only)"
-for table_name in sys_login_log sys_auth_session sys_password_reset_token sys_operation_log; do
+for table_name in sys_login_log sys_auth_session sys_password_reset_token sys_operation_log sys_import_job sys_org_unit_history; do
   assert_table "$table_name"
 done
-for index_name in uk_user_username_normalized uk_user_email_normalized idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted; do
+for index_name in uk_user_username_normalized uk_user_email_normalized idx_auth_session_user_status idx_login_log_user_created idx_login_log_retention uk_project_code uk_project_node_key idx_project_deleted idx_org_unit_history_org_created idx_org_unit_history_operator_created uk_user_notification_dedupe; do
   assert_index "$index_name"
 done
 for column_check in \
-  "sys_user|deleted" "sys_user|version" "sys_user|email_normalized" \
+  "sys_user|deleted" "sys_user|version" "sys_user|email_normalized" "user_notification|dedupe_key" \
   "project|deleted" "project|version" \
   "project_node|deleted" "project_node|version"; do
   table_name="${column_check%%|*}"; column_name="${column_check##*|}"
@@ -114,7 +114,7 @@ for column_check in \
 done
 echo "PASS: integrity columns"
 for foreign_key_check in \
-  "project|project_org_unit_fk" "project_task|task_project_fk" "sys_user_position|user_position_user_fk"; do
+  "project|project_org_unit_fk" "project_task|task_project_fk" "sys_user_position|user_position_user_fk" "sys_org_unit_history|org_unit_history_org_fk"; do
   table_name="${foreign_key_check%%|*}"; constraint_name="${foreign_key_check##*|}"
   count="$(run_sql "SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='$table_name' AND constraint_name='$constraint_name' AND constraint_type='FOREIGN KEY';" | tr -d '[:space:]')"
   if [[ "$count" != "1" ]]; then echo "FAIL: required foreign key $table_name.$constraint_name is missing" >&2; exit 1; fi

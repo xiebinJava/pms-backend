@@ -23,14 +23,15 @@ class HelmChartTest {
 
         assertThat(chart).contains("name: pms");
         assertThat(chart).contains("version: 1.0.0");
-        assertThat(values).contains("oceanbaseHost: oceanbase.example.com");
+        assertThat(values).contains("mysqlHost: mysql.example.com");
         assertThat(values).contains("corsAllowedOrigins: https://pms.example.com");
-        assertThat(values).contains("bootstrapAdminEmail: alex.zhang@example.com");
-        assertThat(values).contains("bootstrapAdminNameZh: 张伟");
+        assertThat(values).contains("bootstrapAdminEmail: admin@example.com");
+        assertThat(values).contains("bootstrapAdminNameZh: 系统管理员");
+        assertThat(values).contains("bootstrapAdminPassword: PmsAdmin123!");
         assertThat(values).contains("jwtSecret: replace_with_a_random_secret_at_least_32_bytes");
         assertThat(values).contains("serviceMonitor:\n  enabled: false");
         assertThat(values).contains("ingress:\n  enabled: false");
-        assertThat(readme).contains("does not install OceanBase");
+        assertThat(readme).contains("不会安装 MySQL");
         assertThat(readme).doesNotContain("tenant_id");
     }
 
@@ -53,7 +54,7 @@ class HelmChartTest {
         assertThat(ingress).doesNotContain("management");
         assertThat(monitor).contains("if .Values.serviceMonitor.enabled");
         assertThat(monitor).contains("path: /actuator/prometheus");
-        assertThat(notes).contains("Do not put that Service on an Ingress");
+        assertThat(notes).contains("不要把该 Service 挂到 Ingress");
     }
 
     @Test

@@ -23,12 +23,39 @@ class EnterpriseSchemaMigrationTest {
             assertThat(tableExists(connection, "sys_user_position")).isTrue();
             assertThat(tableExists(connection, "sys_role")).isTrue();
             assertThat(tableExists(connection, "sys_auth_session")).isTrue();
+            assertThat(tableExists(connection, "sys_org_unit_history")).isTrue();
+            assertThat(tableExists(connection, "feedback_ticket")).isTrue();
+            assertThat(tableExists(connection, "feedback_history")).isTrue();
             assertThat(columnExists(connection, "sys_user", "username_normalized")).isTrue();
             assertThat(columnExists(connection, "sys_user", "email_normalized")).isTrue();
             assertThat(columnExists(connection, "sys_user", "name_zh")).isTrue();
             assertThat(columnExists(connection, "project", "org_unit_id")).isTrue();
             assertThat(columnExists(connection, "project_node", "start_date")).isTrue();
             assertThat(columnExists(connection, "project_node", "end_date")).isTrue();
+            assertThat(columnExists(connection, "sys_org_unit_history", "before_json")).isTrue();
+            assertThat(columnExists(connection, "sys_org_unit_history", "after_json")).isTrue();
+            assertThat(columnExists(connection, "feedback_ticket", "client_request_id")).isTrue();
+            assertThat(columnExists(connection, "feedback_ticket", "resolution_note")).isTrue();
+            assertThat(columnExists(connection, "feedback_history", "from_status")).isTrue();
+            assertThat(columnExists(connection, "feedback_history", "to_status")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "project_id")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "reason")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "result")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "ip")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "user_agent")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "dsh_session_id")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "dsh_agent_id")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "dsh_agent_version")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "dsh_workspace")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "dsh_tool")).isTrue();
+            assertThat(columnExists(connection, "sys_operation_log", "dsh_operation_id")).isTrue();
+            assertThat(indexExists(connection, "feedback_ticket", "feedback_ticket_reporter_created_idx")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_project_created")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_operator_created")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_action_created")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_result_created")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_dsh_session")).isTrue();
+            assertThat(indexExists(connection, "sys_operation_log", "idx_operation_log_dsh_agent")).isTrue();
         }
     }
 
@@ -48,6 +75,19 @@ class EnterpriseSchemaMigrationTest {
                 try (var result = connection.getMetaData().getColumns(
                         connection.getCatalog(), connection.getSchema(), tableCandidate, columnCandidate)) {
                     if (result.next()) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean indexExists(Connection connection, String table, String index) throws Exception {
+        for (String tableCandidate : new String[]{table, table.toUpperCase()}) {
+            try (var result = connection.getMetaData().getIndexInfo(
+                    connection.getCatalog(), connection.getSchema(), tableCandidate, false, false)) {
+                while (result.next()) {
+                    String candidate = result.getString("INDEX_NAME");
+                    if (candidate != null && candidate.equalsIgnoreCase(index)) return true;
                 }
             }
         }

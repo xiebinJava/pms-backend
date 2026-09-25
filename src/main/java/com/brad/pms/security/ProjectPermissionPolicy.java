@@ -29,6 +29,22 @@ public final class ProjectPermissionPolicy {
         return project != null && ProjectStatus.isOpen(project.getStatus());
     }
 
+    public static boolean isProjectReadable(ProjectDO project) {
+        return project != null
+                && !Boolean.TRUE.equals(project.getDeleted())
+                && ProjectStatus.normalize(project.getStatus()) != ProjectStatus.DELETED.getCode();
+    }
+
+    public static boolean isProjectOperational(ProjectDO project) {
+        return isProjectOpen(project);
+    }
+
+    public static boolean isProjectRestorable(ProjectDO project) {
+        if (project == null) return false;
+        int status = ProjectStatus.normalize(project.getStatus());
+        return status == ProjectStatus.TERMINATED.getCode() || status == ProjectStatus.DELETED.getCode();
+    }
+
     public static boolean isNodeOpen(ProjectNodeDO node) {
         return node != null && !NodeStatus.isReadOnly(node.getStatus());
     }
@@ -47,8 +63,14 @@ public final class ProjectPermissionPolicy {
 
     public static boolean canManageNode(ProjectDO project, ProjectNodeDO node, Long userId,
                                         boolean administrator) {
+        return canManageNode(project, node, userId, administrator,
+                hasProjectControl(project, userId, administrator));
+    }
+
+    public static boolean canManageNode(ProjectDO project, ProjectNodeDO node, Long userId,
+                                        boolean administrator, boolean projectControl) {
         return isProjectOpen(project) && isNodeOpen(node) && userId != null
-                && (hasProjectControl(project, userId, administrator) || Objects.equals(node.getOwnerId(), userId));
+                && (projectControl || Objects.equals(node.getOwnerId(), userId));
     }
 
     public static boolean canCompleteNode(ProjectDO project, ProjectNodeDO node, Long userId) {
@@ -57,7 +79,13 @@ public final class ProjectPermissionPolicy {
 
     public static boolean canCompleteNode(ProjectDO project, ProjectNodeDO node, Long userId,
                                           boolean administrator) {
-        return canManageNode(project, node, userId, administrator)
+        return canCompleteNode(project, node, userId, administrator,
+                hasProjectControl(project, userId, administrator));
+    }
+
+    public static boolean canCompleteNode(ProjectDO project, ProjectNodeDO node, Long userId,
+                                          boolean administrator, boolean projectControl) {
+        return canManageNode(project, node, userId, administrator, projectControl)
                 && Objects.equals(node.getStatus(), NodeStatus.IN_PROGRESS.getCode());
     }
 
@@ -67,9 +95,15 @@ public final class ProjectPermissionPolicy {
 
     public static boolean canRollbackNode(ProjectDO project, ProjectNodeDO node, Long userId,
                                           boolean administrator) {
+        return canRollbackNode(project, node, userId, administrator,
+                hasProjectControl(project, userId, administrator));
+    }
+
+    public static boolean canRollbackNode(ProjectDO project, ProjectNodeDO node, Long userId,
+                                          boolean administrator, boolean projectControl) {
         return project != null && ProjectStatus.normalize(project.getStatus()) != ProjectStatus.TERMINATED.getCode()
                 && Objects.equals(node.getStatus(), NodeStatus.COMPLETED.getCode())
-                && hasProjectControl(project, userId, administrator);
+                && projectControl;
     }
 
     public static boolean canTerminateProject(ProjectDO project, Long userId) {
@@ -77,9 +111,15 @@ public final class ProjectPermissionPolicy {
     }
 
     public static boolean canTerminateProject(ProjectDO project, Long userId, boolean administrator) {
+        return canTerminateProject(project, userId, administrator,
+                hasProjectControl(project, userId, administrator));
+    }
+
+    public static boolean canTerminateProject(ProjectDO project, Long userId, boolean administrator,
+                                              boolean projectControl) {
         return project != null
                 && ProjectStatus.normalize(project.getStatus()) == ProjectStatus.ACTIVE.getCode()
-                && hasProjectControl(project, userId, administrator);
+                && projectControl;
     }
 
     public static boolean canEditTaskContent(ProjectDO project, ProjectNodeDO node,
@@ -89,8 +129,15 @@ public final class ProjectPermissionPolicy {
 
     public static boolean canEditTaskContent(ProjectDO project, ProjectNodeDO node,
                                               ProjectTaskDO task, Long userId, boolean administrator) {
+        return canEditTaskContent(project, node, task, userId, administrator,
+                hasProjectControl(project, userId, administrator));
+    }
+
+    public static boolean canEditTaskContent(ProjectDO project, ProjectNodeDO node,
+                                              ProjectTaskDO task, Long userId, boolean administrator,
+                                              boolean projectControl) {
         return isProjectOpen(project) && isNodeOpen(node) && userId != null
-                && (administrator || Objects.equals(task.getAssigneeId(), userId));
+                && (projectControl || Objects.equals(task.getAssigneeId(), userId));
     }
 
     public static boolean canManageTask(ProjectDO project, ProjectNodeDO node,
@@ -100,12 +147,19 @@ public final class ProjectPermissionPolicy {
 
     public static boolean canManageTask(ProjectDO project, ProjectNodeDO node,
                                         ProjectTaskDO task, Long userId, boolean administrator) {
-        return canManageTaskScope(project, node, userId, administrator);
+        return canManageTask(project, node, task, userId, administrator,
+                hasProjectControl(project, userId, administrator));
+    }
+
+    public static boolean canManageTask(ProjectDO project, ProjectNodeDO node,
+                                        ProjectTaskDO task, Long userId, boolean administrator,
+                                        boolean projectControl) {
+        return canManageTaskScope(project, node, userId, projectControl);
     }
 
     private static boolean canManageTaskScope(ProjectDO project, ProjectNodeDO node, Long userId,
-                                              boolean administrator) {
+                                              boolean projectControl) {
         return isProjectOpen(project) && isNodeOpen(node) && userId != null
-                && (hasProjectControl(project, userId, administrator) || Objects.equals(node.getOwnerId(), userId));
+                && (projectControl || Objects.equals(node.getOwnerId(), userId));
     }
 }

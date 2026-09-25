@@ -26,14 +26,14 @@ public class MemberController {
     }
 
     @PostMapping
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<Void> add(@PathVariable Long projectId, @Validated @RequestBody MemberAddCmd cmd) {
         memberService.add(projectId, cmd.getUserId(), cmd.getRole());
         return ResponseResult.success();
     }
 
     @DeleteMapping("/{memberId}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<Void> remove(@PathVariable Long projectId, @PathVariable Long memberId) {
         memberService.remove(projectId, memberId);
         return ResponseResult.success();

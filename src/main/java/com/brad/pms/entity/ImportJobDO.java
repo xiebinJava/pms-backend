@@ -22,4 +22,6 @@ public class ImportJobDO {
     private LocalDateTime expiresAt;
     private LocalDateTime createdAt;
     private LocalDateTime committedAt;
+    private String failureReason;
+    private LocalDateTime failedAt;
 }

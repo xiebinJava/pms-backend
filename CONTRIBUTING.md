@@ -1,36 +1,43 @@
-# Contributing
+# 贡献指南
 
-PMS is a single-tenant, self-hosted project management system. Backend and frontend live in sibling repositories.
+PMS 是单企业、自部署的项目管理系统。后端和前端分别在兄弟仓库中维护。
 
-## Prerequisites
+## 环境要求
 
-- Java 17 and Maven for `pms-backend`
-- Node.js 22 and pnpm 9.15.9 for `pms-front`
-- Contributor local runtime: MySQL 8 via `docker-compose.mysql.yml` and `./scripts/start-local-mysql.sh`
-- Enterprise / drill runtime: OceanBase (MySQL compatible), database `brad_pms`
-- H2 is test-only
+- `pms-backend`：Java 17 和 Maven
+- `pms-front`：Node.js 22 和 pnpm 9.15.9
+- 本地与生产运行时：通过 `docker-compose.example.yml` 或 `./scripts/start-local-mysql.sh` 使用 MySQL 8
+- 自动化测试使用 Testcontainers MySQL 8，不支持 H2
 
-## Checks before you open a pull request
+Colima 用户在执行 `mvn test` 前请先导出：
 
 ```bash
-# backend
+export DOCKER_HOST=unix://$HOME/.colima/<profile>/docker.sock
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+export TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1
+```
+
+## 提交 Pull Request 之前
+
+```bash
+# 后端
 ./scripts/check-privacy.sh
 ./scripts/validate-openapi.sh
 mvn -q test
 
-# frontend
+# 前端
 ./scripts/check-privacy.sh
 pnpm test
 pnpm typecheck
 pnpm build
 ```
 
-## Rules
+## 约定
 
-- Do not add company brand names, internal hostnames, or real employee identities. Demo users use `张伟` / `Alex.Zhang` / `alex.zhang@example.com`.
-- Keep secrets, JWT keys, and database passwords out of Git.
-- Backend permission checks stay on the server; frontend only hides controls.
-- Match existing CQRS naming: Cmd / Qry / DTO / Service.
-- Keep OIDC/LDAP behind `PMS_OIDC_ENABLED` / `PMS_LDAP_ENABLED`. Do not auto-create users from a directory.
-- Keep object storage and webhooks behind `PMS_STORAGE_TYPE=s3` / `PMS_WEBHOOK_ENABLED`. Default local disk and no outbound events.
-- Helm and the Prometheus/Grafana overlay are optional. Do not change the default Actuator bind (`PMS_MANAGEMENT_ADDRESS=127.0.0.1`). Chart values stay on `example.com` hosts and placeholder secrets.
+- 不要加入公司品牌名、内部主机名或真实员工身份。演示账号使用 `张伟` / `Alex.Zhang` / `alex.zhang@example.com`。
+- 密钥、JWT 和数据库密码不要进入 Git。
+- 权限校验留在服务端；前端只负责隐藏控件。
+- 沿用现有 CQRS 命名：Cmd / Qry / DTO / Service。
+- OIDC / LDAP 必须放在 `PMS_OIDC_ENABLED` / `PMS_LDAP_ENABLED` 后面。不要根据目录自动创建用户。
+- 对象存储和 Webhook 必须放在 `PMS_STORAGE_TYPE=s3` / `PMS_WEBHOOK_ENABLED` 后面。默认使用本地磁盘，且不向外发送事件。
+- Helm 以及 Prometheus / Grafana 叠加层是可选的。不要改默认 Actuator 绑定（`PMS_MANAGEMENT_ADDRESS=127.0.0.1`）。Chart 取值继续使用 `example.com` 主机和占位密钥。

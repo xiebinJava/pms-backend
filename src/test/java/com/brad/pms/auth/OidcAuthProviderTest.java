@@ -5,8 +5,6 @@ import com.brad.pms.dto.response.OidcStartDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,6 +47,7 @@ class OidcAuthProviderTest {
                 .contains("response_type=code")
                 .contains("client_id=pms")
                 .contains("code_challenge_method=S256")
+                .contains("nonce=")
                 .contains("state=" + start.getState());
         assertThat(stateStore.consume(start.getState(), java.time.Instant.now())).isPresent();
     }
@@ -63,7 +62,10 @@ class OidcAuthProviderTest {
     void exchangeLinksEmailFromUserInfo() {
         OidcStartDTO start = provider.start();
         when(tokenClient.exchange(any(), any(), eq("code-1"), any()))
-                .thenReturn(new OidcTokenResponse("access", idToken("ignored@example.com")));
+                .thenReturn(new OidcTokenResponse("access", "signed.id.token"));
+        when(tokenClient.validateIdToken(any(), any(), eq("signed.id.token"), any()))
+                .thenReturn(new OidcValidatedClaims("https://idp.example.com", "subject-1",
+                        "alex.zhang@example.com", true));
         when(tokenClient.userInfo(eq("https://idp.example.com/userinfo"), eq("access")))
                 .thenReturn(Map.of("email", "Alex.Zhang@Example.com", "email_verified", "true"));
 
@@ -71,7 +73,10 @@ class OidcAuthProviderTest {
 
         assertThat(identity.emailNormalized()).isEqualTo("alex.zhang@example.com");
         assertThat(identity.providerType()).isEqualTo("oidc");
+        assertThat(identity.externalIssuer()).isEqualTo("https://idp.example.com");
+        assertThat(identity.externalSubject()).isEqualTo("subject-1");
         verify(tokenClient).exchange(any(), any(), eq("code-1"), any());
+        verify(tokenClient).validateIdToken(any(), any(), eq("signed.id.token"), any());
     }
 
     @Test
@@ -84,17 +89,4 @@ class OidcAuthProviderTest {
                 .hasMessage("SSO 状态已失效，请重新登录");
     }
 
-    @Test
-    void emailFromIdTokenReadsPayload() {
-        assertThat(provider.emailFromIdToken(idToken("alex.zhang@example.com")))
-                .isEqualTo("alex.zhang@example.com");
-    }
-
-    private static String idToken(String email) {
-        String header = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8));
-        String payload = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(("{\"email\":\"" + email + "\"}").getBytes(StandardCharsets.UTF_8));
-        return header + "." + payload + ".sig";
-    }
 }

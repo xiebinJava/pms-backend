@@ -1,6 +1,7 @@
 package com.brad.pms.controller;
 
 import com.brad.pms.common.response.ResponseResult;
+import com.brad.pms.common.page.PageResult;
 import com.brad.pms.dto.response.UserNotificationDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
@@ -29,6 +30,16 @@ public class NotificationController {
             @RequestParam(defaultValue = "true") boolean unreadFirst,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseResult.success(notificationService.list(unreadFirst, limit));
+    }
+
+    @GetMapping("/page")
+    @RequirePermission(PermissionCode.PROJECT_READ)
+    public ResponseResult<PageResult<UserNotificationDTO>> page(
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(defaultValue = "1") long currPage,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        return ResponseResult.success(notificationService.page(type, unreadOnly, currPage, pageSize));
     }
 
     @GetMapping("/unread-count")

@@ -1,181 +1,278 @@
-# PMS Backend — 项目管理系统后端
+# PMS 后端
 
-单企业、本地部署的开源项目管理后端。一个实例只服务一家企业，没有 `tenant_id`，也不拆微服务。许可证 Apache-2.0，贡献前请读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+[![CI](https://github.com/xiebinJava/pms-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/xiebinJava/pms-backend/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-兄弟仓库是 [`pms-front`](../pms-front)。演示身份只用 `张伟` / `Alex.Zhang` / `alex.zhang@example.com`。
+PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时和测试都只使用 MySQL 8。
 
-## 现在能做什么
+如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](https://github.com/xiebinJava/pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
 
-- 邮箱登录、组织树、RBAC、数据范围、审计日志
-- 项目、任务看板、里程碑、成员、动态
-- 工作台、任务详情（子任务 / 评论 / 附件）、站内通知、范围内搜索
-- 可选 OIDC / LDAP（默认关；只给已经邀请且已激活的邮箱建会话）
-- 可选 S3/MinIO 附件与签名 Webhook（默认本地盘、不出站）
-- 企业运行时：OceanBase MySQL 兼容模式，库名 `brad_pms`
-- 贡献者本机：MySQL 8 轻量路径，库名 `pms`（不要拿它替换企业库）
-
-完整业务约定见 [`docs/business-specification.md`](docs/business-specification.md)。OpenAPI 合同在 `src/main/resources/openapi/pms-api.yaml`。
-
-## 技术栈
-
-- Java 17 + Maven
-- Spring Boot 3.5.14、MyBatis-Plus 3.5.17、JWT（jjwt）
-- OceanBase（企业默认）或 MySQL 8（仅贡献者）
-- Actuator 管理口默认 `127.0.0.1:8081`（`health` / `metrics` / `prometheus`）
-
-## 模块
-
-```
-com.brad.pms
-├── auth        OIDC / LDAP / 本地登录提供者（默认只开本地）
-├── common      统一返回 / 分页 / 异常 / 枚举
-├── config      MyBatis-Plus、CORS、种子数据、观测
-├── security    JWT、登录拦截、用户上下文、数据范围
-├── storage     本地盘或 S3 兼容对象存储
-├── webhook     可选签名出站事件
-├── controller  REST
-├── service     业务编排
-├── mapper      MyBatis-Plus Mapper
-├── entity      DataObject
-├── dto         request（Cmd/Qry）/ response（DTO）
-└── convertor   实体 <-> DTO
-```
-
-## 本机启动
-
-先准备一份本地 env（不要提交）：
+## 最终用户安装（推荐）
 
 ```bash
-cp .env.oceanbase.example .env.oceanbase.local   # 企业 / 本机 OceanBase
-# 或
-cp .env.mysql.example .env.mysql.local           # 仅贡献者
+git clone https://github.com/xiebinJava/pms-distribution.git
+cd pms-distribution
+./scripts/bootstrap.sh
 ```
 
-至少填入数据库密码、至少 32 字节的 `PMS_JWT_SECRET`，以及至少 12 位的 `PMS_BOOTSTRAP_ADMIN_PASSWORD`。空库首次启动会创建演示管理员 `alex.zhang@example.com` / 张伟。之后用邀请或 Excel/CSV 加人，不要在文档里写测试用的共享口令。
+打开 <http://localhost:5173>。首次空库初始管理员：`admin@example.com` / `PmsAdmin123!`（登录后请立刻改密）。MySQL 与 JWT 密钥仍写入本地、未跟踪的 `.pms-bootstrap-secrets`。生产配置、升级和备份见发行仓库文档。
 
-### 贡献者：MySQL 8
+## 从源码启动（开发者）
 
-只起一个本机 MySQL 8.4 容器。`mysql` profile 会用 Flyway 把空库升到当前迁移（含附件 V8、通知 V9）。库名是 `pms`，不是 `brad_pms`。
+### 1. 准备环境
+
+- Docker 20+ 和 Docker Compose v2
+- Git
+- 至少 2 GB 可用内存（本地 MySQL 8 与后端）
+
+前后端需要放在同一个父目录，Compose 才能找到前端构建上下文：
 
 ```bash
-./scripts/start-local-mysql.sh
+mkdir pms && cd pms
+git clone https://github.com/xiebinJava/pms-backend.git
+git clone https://github.com/xiebinJava/pms-front.git
+cd pms-backend
 ```
 
-前端在 `pms-front` 执行 `pnpm dev`，代理到 `http://localhost:8080`。停止：`./scripts/stop-local-mysql.sh`；连容器一起关（保留数据卷）：`./scripts/stop-local-mysql.sh --down`。
-
-默认绑定 `127.0.0.1:3306`。端口冲突时改 `.env.mysql.local` 里的 `MYSQL_PORT`。
-
-### 企业默认：OceanBase
-
-本机已有 `brad_pms` 时：
+### 2. 创建本地配置
 
 ```bash
-PMS_ENV_FILE=.env.oceanbase.local ./scripts/start-local-oceanbase.sh
+cp .env.mysql.example .env
+openssl rand -hex 32
 ```
 
-OceanBase profile **不会**在运行时开 Flyway（OceanBase 4.x 对外报告 MySQL 5.7）。升表用 `./scripts/oceanbase-upgrade.sh`，账号必须是 **`pms_migrator`**。应用运行用 `pms_app`。步骤见 [`docs/operations/enterprise-upgrade-runbook.md`](docs/operations/enterprise-upgrade-runbook.md)。
+编辑 `.env`，至少替换下面这些占位值。`.env` 只在本机使用，永远不要提交：
 
-没有启动脚本、只想直接跑 jar 时，自行导出 `OCEANBASE_*` 后：
+| 配置 | 用途 |
+| --- | --- |
+| `MYSQL_ROOT_PASSWORD` | Compose 初始化 MySQL root |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | 后端运行账号 |
+| `PMS_JWT_SECRET` | JWT 签名密钥，至少 32 字节随机值 |
+| `PMS_BOOTSTRAP_ADMIN_PASSWORD` | 首次创建管理员的密码，至少 12 位 |
+
+本地示例的管理员由 `PMS_BOOTSTRAP_*` 指定，默认是 `admin@example.com` / `PmsAdmin123!`（与发行包一致）。登录时使用邮箱，不区分大小写；中文名和英文名只是展示信息。
+
+### 3. 启动完整系统
 
 ```bash
-mvn package -DskipTests && java -jar target/pms-backend-1.0.0.jar
+docker compose -f docker-compose.example.yml up -d --build
+docker compose -f docker-compose.example.yml ps
 ```
 
-启动后 API 前缀是 `http://localhost:8080/api`。
+首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V49）和前端：
 
-## Docker Compose
-
-单机试用（会拉起 OceanBase、迁移、后端、前端）：
-
-```bash
-cp .env.oceanbase.example .env
-# 编辑 .env：OceanBase 密码、32 字节以上 JWT、引导管理员密码
-docker compose -f docker-compose.example.yml up --build
+```text
+MySQL → uploads-init → backend（Flyway V1–V49）→ frontend
 ```
 
-前端 `http://localhost:5173`，后端只绑 `127.0.0.1:8080`。Compose 按顺序跑 `accounts-init` → `schema-init`（V1–V10）→ `uploads-init`，再启动应用。健康检查：`/api/health/live`、`/api/health/ready`。
+打开 <http://localhost:5173>。后端健康检查地址：
 
-示例默认是 `development`：SMTP 校验关闭，响应里可能带回本地重置/邀请 token。生产必须改成 HTTPS 公网地址、打开 SMTP 校验，并关掉 token 回显。已有业务库不要直接套这份 Compose，走升级手册。
-
-可选观察栈（本机 loopback，不强迫上 Kubernetes）：
-
-```bash
-# .env 里还要有 GRAFANA_ADMIN_PASSWORD
-docker compose -f docker-compose.example.yml -f docker-compose.observability.yml up --build
+```text
+http://127.0.0.1:8080/api/health/live
+http://127.0.0.1:8080/api/health/ready
 ```
 
-Prometheus `http://127.0.0.1:9090`，Grafana `http://127.0.0.1:3000`。叠层会把容器内管理口改成 `0.0.0.0:8081` 供刮取，对外仍只发布 `127.0.0.1:8081`。默认 jar / 未叠层的 Compose **不会**把 8081 暴露到公网。
-
-自动化测试用嵌入式库，不动 OceanBase：
+查看日志：
 
 ```bash
-mvn test
+docker compose -f docker-compose.example.yml logs -f backend
+```
+
+停止服务但保留数据卷：
+
+```bash
+docker compose -f docker-compose.example.yml down
+```
+
+只有确认要删除本地数据库和附件时，才使用 `down -v`。
+
+## 系统结构
+
+```text
+浏览器
+  ↓ http://localhost:5173
+pms-front（Vue 3 + Nginx/Vite）
+  ↓ /api 代理
+pms-backend（Spring Boot，8080）
+  ↓
+MySQL 8 `pms`（3306）
+```
+
+后端主要职责：
+
+- 登录、JWT 会话、邮箱身份和账号生命周期
+- RBAC 权限、数据范围和统一错误响应
+- 组织架构、组织负责人、员工主归属/兼职归属
+- 项目、任务、里程碑、成员、评论、附件和通知
+- Excel/CSV 预览、校验、幂等提交、错误报告和事务回滚
+- 审计日志、请求追踪、健康检查和 Prometheus 指标
+- 为 Work Helper 提供短时委托、按需 AI 上下文和只读任务查询桥接
+
+前端页面和操作说明见兄弟仓库 [`pms-front`](https://github.com/xiebinJava/pms-front) 以及 [使用手册](https://github.com/xiebinJava/pms-front/blob/main/docs/user-manual.md)。
+
+## 数据库与账号
+
+运行时只使用 MySQL 8 数据库 `pms`。Compose 会创建 `MYSQL_USER` 应用账号；Flyway 在后端启动时执行迁移，不再使用独立的 migrator 镜像。
+
+| 账号 | 用途 |
+| --- | --- |
+| `MYSQL_USER`（默认 `pms`） | 后端业务读写和 Flyway 迁移 |
+| MySQL `root` | 仅初始化、备份和隔离恢复 |
+
+组织负责人和员工主归属是两套关系：
+
+- `sys_org_unit.leader_user_id`：某个组织由谁负责；
+- `sys_user_position.is_primary`：员工的主归属组织；
+- 同一员工还可以有多个兼职或项目归属。
+
+不要通过修改组织负责人来替代员工归属调整。
+
+### 已有 MySQL 的升级
+
+已有企业数据库时，不要重新套用示例 Compose，也不要删除或重建业务库。先备份，再启动带新镜像/JAR 的后端，让 Flyway 补齐缺失版本：
+
+```bash
+set -a
+source .env.mysql.local
+set +a
+./scripts/backup-mysql.sh
+./scripts/enterprise-preflight.sh
+# 启动新版本后端后：
+./scripts/verify-enterprise-migration.sh
+```
+
+当前基线为 V1–V49。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+
+## 本地直接启动后端（已有 MySQL 时）
+
+不使用完整 Compose、只启动本地 JAR 时：
+
+```bash
+mvn -q -DskipTests package
+PMS_ENV_FILE=.env.mysql.local ./scripts/start-local-mysql.sh
+```
+
+后端 API：`http://127.0.0.1:8080/api`；管理和就绪端口默认只监听 `127.0.0.1:8081`。
+
+停止本地后端：
+
+```bash
+./scripts/stop-local-mysql.sh
+```
+
+本地文件 `.env.mysql.local` 不会被 Git 跟踪。启动前必须提供非空的 `PMS_JWT_SECRET`；生产环境还必须关闭 token 回显并启用 HTTPS、受限 CORS 和 SMTP 校验。
+
+## 开发与验证
+
+自动化测试使用 Testcontainers MySQL 8，本机需要可用的 Docker。Colima 用户请先导出：
+
+```bash
+export DOCKER_HOST=unix://$HOME/.colima/<profile>/docker.sock
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+export TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1
+```
+
+```bash
+mvn -q test
 ./scripts/validate-openapi.sh
+bash -n scripts/*.sh docker/*.sh
 ./scripts/check-privacy.sh
 ```
 
-## Kubernetes（可选）
+真实数据库验收使用：
 
-单机继续用 Compose。已经有集群时，用 [`deploy/helm/pms`](deploy/helm/pms/README.md)：
+```bash
+set -a
+source .env.mysql.local
+set +a
+./scripts/verify-enterprise-migration.sh
 
-- 只部署后端 + 前端，**不内置 OceanBase**
-- 镜像自己 build（`pms-backend:1.0.0` / `pms-front:1.0.0`）
-- 密钥用 `existingSecret`，values 里只有占位符
-- Ingress 默认关；管理口只有 ClusterIP，不要挂到 Ingress
-- 集群里已有 prometheus-operator 时再 `--set serviceMonitor.enabled=true`
+PMS_SMOKE_USERNAME=alex.zhang@example.com PMS_SMOKE_PASSWORD='<本地测试密码>' \
+  ./scripts/smoke-test.sh
+```
 
-## 身份与账号
+### AI 按需查询边界
 
-邮箱是唯一核心身份，登录不区分大小写。展示优先 `中文名（English.Name）`，缺姓名时回退邮箱。每名员工一个主归属，可以有多个兼职/项目归属。
+PMS 页面只向 Work Helper 提供页面类型、路由、项目/节点 ID 和筛选条件等轻量定位信息，
+不把列表行、成员、节点或任务集合自动塞进每轮对话。Work Helper 通过已注册的
+`pms.task.query` 和 `pms.context.inspect` 工具按需读取；PMS 通过短时委托令牌恢复当前用户，
+再次执行项目数据范围校验后返回带 `authoritative`、`dataScope`、`asOfDate` 和分页元数据的结果。
+Work Helper 不接触 PMS 数据库，也不能执行任意 Shell。写操作仍只生成预览并等待用户确认。
 
-OIDC / LDAP 默认关闭。打开后**不会**从目录自动开账号。常用开关：`PMS_OIDC_ENABLED`、`PMS_OIDC_ISSUER`、`PMS_OIDC_CLIENT_ID`、`PMS_OIDC_CLIENT_SECRET`、`PMS_OIDC_REDIRECT_URI`；以及 `PMS_LDAP_ENABLED`、`PMS_LDAP_URL`、`PMS_LDAP_BASE_DN`。文档主机用 `idp.example.com`、`dc=example,dc=com`。
+不要把密码、JWT、SMTP、对象存储密钥或导入文件放进仓库。提交前可执行隐私扫描：
 
-## 存储与 Webhook
+```bash
+./scripts/check-privacy.sh
+```
 
-附件默认写 `PMS_UPLOAD_DIR`。对象存储：`PMS_STORAGE_TYPE=s3`，再配 `PMS_S3_ENDPOINT`（例如 `http://minio.example.com:9000`）、`PMS_S3_BUCKET`、`PMS_S3_ACCESS_KEY`、`PMS_S3_SECRET_KEY`。
+## 目录速览
 
-出站 Webhook 默认关。`PMS_WEBHOOK_ENABLED=true` 后，任务指派和评论会向 `PMS_WEBHOOK_URL` POST，带头 `X-PMS-Signature`。生产必须 HTTPS，`PMS_WEBHOOK_SECRET` 至少 16 位。投递失败只记日志，不回滚站内通知。
+```text
+src/main/java/com/brad/pms/
+├── controller/  REST API 与权限注解
+├── service/     业务规则、事务和数据范围
+├── mapper/      MyBatis-Plus 数据访问
+├── entity/      数据库对象
+├── dto/         请求命令与响应对象
+├── security/    JWT、会话、RBAC、数据范围
+├── config/      数据源、初始化、CORS、观测
+├── storage/     本地盘或 S3 兼容对象存储
+└── webhook/     可选签名出站事件
 
-## 核心接口
+src/main/resources/
+├── db/migration/  V1–V49 MySQL / Flyway 迁移脚本
+└── openapi/       pms-api.yaml 接口合同
 
-除登录与健康检查外，请求头带 `Authorization: Bearer <token>`。完整合同以 OpenAPI 为准。
+docs/
+├── business-specification.md       业务规则和数据关系
+└── operations/                     升级、备份、发布和故障演练
+```
 
-| 方法 | 路径 | 说明 |
+## 常用接口
+
+除登录和健康检查外，请求头都需要 `Authorization: Bearer <JWT>`。完整接口以 [OpenAPI 合同](src/main/resources/openapi/pms-api.yaml) 为准。
+
+| 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| POST | `/auth/login` | 邮箱登录，返回 JWT |
-| GET | `/auth/providers` | 当前启用的登录方式 |
-| GET | `/auth/oidc/start` | 开始 OIDC 授权码登录 |
-| POST | `/auth/oidc/callback` | 用授权码换本系统会话 |
-| POST | `/auth/ldap/login` | 目录账号登录 |
-| GET | `/auth/me` | 当前用户 |
-| GET | `/users/search?keyword=` | 用户搜索 |
-| GET | `/workbench` | 工作台（我的任务、参与项目、最近动态） |
-| GET | `/notifications` | 站内通知；另有 unread-count / read / read-all |
-| GET | `/search?q=` | 可读范围内搜索项目、任务、评论 |
-| POST | `/projects/page` | 项目分页 |
-| POST | `/projects` | 新建项目 |
-| GET/PUT/DELETE | `/projects/{id}` | 项目详情 / 更新 / 删除 |
-| GET/POST | `/projects/{id}/tasks` | 任务列表 / 新建 |
-| GET | `/tasks/{id}` | 任务详情（子任务、评论、附件） |
-| PUT/DELETE | `/tasks/{id}` | 任务更新 / 删除 |
-| POST/GET/DELETE | `/tasks/{id}/attachments` | 附件上传 / 下载 / 删除 |
-| PUT | `/tasks/{id}/move` | 拖拽改状态 |
-| GET/POST | `/projects/{id}/milestones` | 里程碑 |
-| GET/POST | `/projects/{id}/members` | 成员 |
-| GET/POST | `/projects/{id}/comments` | 动态 |
-| GET/POST/PUT/DELETE | `/admin/org`… | 组织树 |
-| GET/POST | `/admin/users`… | 人员、邀请、禁用 |
-| GET/POST/PUT/DELETE | `/admin/roles`… | 角色与数据范围 |
-| POST | `/admin/import/…` | Excel/CSV 导入 |
-| GET | `/admin/audit` | 审计日志 |
-| GET | `/health`、`/healthz`、`/health/live`、`/health/ready` | 存活 / 就绪（无需登录） |
-| GET | `/actuator/health`、`/actuator/metrics`、`/actuator/prometheus` | 管理口，默认 `127.0.0.1:8081` |
+| `POST` | `/api/auth/login` | 邮箱登录 |
+| `GET` | `/api/auth/me` | 当前登录用户 |
+| `GET` | `/api/workbench` | 我的任务、项目和动态 |
+| `POST` | `/api/ai/query/tasks` | 在当前用户数据范围内按需查询任务（AI 委托 scope） |
+| `POST` | `/api/projects/page` | 项目分页 |
+| `GET` | `/api/projects/{id}` | 项目详情 |
+| `GET` | `/api/org/tree` | 项目页可用的组织树 |
+| `GET` | `/api/admin/org/tree` | 管理组织树 |
+| `GET` | `/api/admin/org/{id}/history` | 组织变更历史 |
+| `POST` | `/api/admin/import/preview/organizations` | 组织 Excel/CSV 预览和校验 |
+| `POST` | `/api/admin/import/preview/users` | 员工 Excel/CSV 预览和校验 |
+| `POST` | `/api/admin/import/{jobId}/commit` | 幂等提交导入任务 |
+| `GET` | `/api/admin/import/{jobId}/errors.csv` | 下载服务端错误报告 |
+| `GET` | `/api/feedback/tickets` | 查询反馈工单 |
+| `POST` | `/api/feedback/tickets` | 提交反馈工单 |
+| `GET` | `/api/health/live` | 存活检查 |
+| `GET` | `/api/health/ready` | 数据库就绪检查 |
 
-## 运维文档
+## 生产部署前必须完成
 
-- 升级与预检：[`docs/operations/enterprise-upgrade-runbook.md`](docs/operations/enterprise-upgrade-runbook.md)
-- 发布清单：[`docs/operations/release-checklist.md`](docs/operations/release-checklist.md)
-- 扩展边界（限流、多副本、对象存储）：[`docs/operations/scaling-readiness.md`](docs/operations/scaling-readiness.md)
-- 基础设施状态：[`docs/operations/infrastructure-status.md`](docs/operations/infrastructure-status.md)
+本 README 只解决本地快速启动；生产上线前请逐项完成 [发布验收清单](docs/operations/release-checklist.md)：
 
-生产覆盖：`PMS_JWT_SECRET`、`PMS_ACCESS_EXPIRE_MINUTES`、`PMS_REFRESH_EXPIRE_DAYS`、`PMS_PASSWORD_RESET_EXPOSE_TOKEN=false`、`PMS_INVITATION_EXPOSE_TOKEN=false`。
+- 使用企业自己的 MySQL 8 和 `MYSQL_USER` 凭据，不要用 root 跑应用；
+- `PMS_JWT_SECRET` 使用密钥管理器注入，至少 32 字节且不出现在日志；
+- `PMS_DEPLOYMENT_ENV=production`，关闭密码重置/邀请 token 回显；
+- 使用 HTTPS 反向代理，`PMS_CORS_ALLOWED_ORIGINS` 只允许正式前端来源；
+- 配置 SMTP、备份恢复、RPO/RTO、对象存储和监控告警；
+- 首次登录后更换演示管理员密码，并执行完整桌面端/移动端验收。
+
+| 文档 | 说明 |
+| --- | --- |
+| [业务规范](docs/business-specification.md) | 业务规则和数据关系 |
+| [升级与预检](docs/operations/enterprise-upgrade-runbook.md) | 已有库升级步骤 |
+| [备份与恢复](docs/operations/mysql-backup-restore.md) | 逻辑备份与隔离恢复 |
+| [扩展与观测](docs/operations/scaling-readiness.md) | 单机边界和后续升级触发条件 |
+| [基础设施状态](docs/operations/infrastructure-status.md) | 近期演练与发布快照 |
+| [贡献指南](CONTRIBUTING.md) | 如何提交改动 |
+| [安全策略](SECURITY.md) | 漏洞私下报告 |
+
+## 许可证
+
+Apache-2.0。贡献前请阅读 [贡献指南](CONTRIBUTING.md)。

@@ -1,6 +1,9 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.brad.pms.audit.AuditAction;
+import com.brad.pms.audit.AuditEvent;
+import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.CommentCreateCmd;
@@ -12,9 +15,9 @@ import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.security.UserContext;
-import com.brad.pms.security.ProjectPermissionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -29,9 +32,10 @@ public class CommentService {
     private final UserService userService;
     private final ProjectPermissionService permissionService;
     private final NotificationService notificationService;
+    private final OperationLogService operationLogService;
 
     public List<ProjectCommentDTO> listByProject(Long projectId, Long taskId) {
-        permissionService.requireProject(projectId);
+        ProjectDO project = permissionService.requireProject(projectId);
         if (taskId != null) requireTaskInProject(projectId, taskId);
         LambdaQueryWrapper<ProjectCommentDO> query = new LambdaQueryWrapper<ProjectCommentDO>()
                 .eq(ProjectCommentDO::getProjectId, projectId);
@@ -43,12 +47,17 @@ public class CommentService {
                         comments.stream().map(ProjectCommentDO::getUserId).collect(Collectors.toList()))
                 .stream().collect(Collectors.toMap(UserDO::getId, u -> u));
         return comments.stream()
-                .map(c -> Convertors.toComment(c, userMap.get(c.getUserId())))
+                .map(c -> {
+                    ProjectCommentDTO dto = Convertors.toComment(c, userMap.get(c.getUserId()));
+                    dto.setCanDelete(permissionService.canDeleteComment(project, c.getUserId()));
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public ProjectCommentDTO add(Long projectId, CommentCreateCmd cmd) {
-        ProjectDO project = permissionService.requireProject(projectId);
+        ProjectDO project = permissionService.requireProjectCommentWritable(projectId);
         ProjectTaskDO task = cmd.getTaskId() == null ? null : requireTaskInProject(projectId, cmd.getTaskId());
         ProjectCommentDO comment = new ProjectCommentDO();
         comment.setProjectId(projectId);
@@ -56,11 +65,17 @@ public class CommentService {
         comment.setContent(cmd.getContent());
         comment.setUserId(UserContext.userId());
         commentMapper.insert(comment);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.COMMENT_CREATED.name(), AuditResourceType.PROJECT_COMMENT.name(), comment.getId(), projectId,
+                null, null, java.util.Map.of("taskId", cmd.getTaskId() == null ? "PROJECT" : cmd.getTaskId(),
+                        "authorId", comment.getUserId())));
         notificationService.notifyComment(projectId, cmd.getTaskId(), cmd.getContent(),
                 task == null ? null : task.getAssigneeId(),
                 project.getProjectManagerId());
         UserDO author = userService.listByIds(List.of(comment.getUserId())).stream().findFirst().orElse(null);
-        return Convertors.toComment(comment, author);
+        ProjectCommentDTO dto = Convertors.toComment(comment, author);
+        dto.setCanDelete(true);
+        return dto;
     }
 
     private ProjectTaskDO requireTaskInProject(Long projectId, Long taskId) {
@@ -71,17 +86,20 @@ public class CommentService {
         return task;
     }
 
+    @Transactional
     public void delete(Long id) {
         ProjectCommentDO comment = commentMapper.selectById(id);
         if (comment == null) {
             throw BusinessException.error("评论不存在");
         }
         var project = permissionService.requireProject(comment.getProjectId());
-        Long userId = UserContext.userId();
-        if (!java.util.Objects.equals(comment.getUserId(), userId)
-                && !ProjectPermissionPolicy.hasProjectControl(project, userId, UserContext.isAdministrator())) {
+        if (!permissionService.canDeleteComment(project, comment.getUserId())) {
             throw BusinessException.forbidden("只能删除自己的评论，或由项目创建人/项目经理删除");
         }
         commentMapper.deleteById(id);
+        operationLogService.record(AuditEvent.success(
+                AuditAction.COMMENT_DELETED.name(), AuditResourceType.PROJECT_COMMENT.name(), id, comment.getProjectId(),
+                null, java.util.Map.of("taskId", comment.getTaskId() == null ? "PROJECT" : comment.getTaskId(),
+                        "authorId", comment.getUserId()), null));
     }
 }

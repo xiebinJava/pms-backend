@@ -11,4 +11,21 @@ public class ProjectPageQry extends BasePage {
     private String keyword;
 
     private Integer status;
+
+    /** MINE：我负责的；PORTFOLIO / ALL：当前可见范围内的全部项目。 */
+    private String view;
+
+    private Long orgUnitId;
+
+    private Long projectManagerId;
+
+    private Integer projectLevel;
+
+    /** 0：低，1：中，2：高，3：紧急。 */
+    private Integer priority;
+
+    /** OVERDUE / NO_MANAGER / ACTIVE / STALE_NODE */
+    private String attention;
+
+    private String currentNodeKey;
 }

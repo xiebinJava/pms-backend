@@ -9,11 +9,15 @@ import java.time.LocalDateTime;
 public class ProjectDTO {
 
     private Long id;
+    private Integer version;
     private String code;
     private String name;
     private String description;
     private Integer status;
     private Integer priority;
+    private Integer projectLevel;
+    private Long projectTypeId;
+    private Long workflowTemplateVersionId;
     private Long ownerId;
     private String ownerName;
     private Long createdBy;
@@ -34,7 +38,11 @@ public class ProjectDTO {
     private Integer taskCount;
     private Integer doneTaskCount;
     private Integer memberCount;
+    private String currentNodeKey;
+    private String currentNodeName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private ProjectPermissionsDTO permissions;
+    private ProjectReadinessDTO readiness;
+    private ProjectAttentionSummaryDTO attentionSummary;
 }

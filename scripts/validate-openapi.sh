@@ -35,22 +35,24 @@ expected = {
   "/projects/{projectId}/nodes/{nodeId}/rollback" => ["post"],
   "/projects/{projectId}/nodes/{nodeId}/owner" => ["put"],
   "/projects/{projectId}/nodes/{nodeId}/schedule" => ["put"],
-  "/projects/{projectId}/milestones" => ["get", "post"], "/projects/{projectId}/milestones/{id}" => ["put", "delete"],
   "/projects/{projectId}/members" => ["get", "post"], "/projects/{projectId}/members/{memberId}" => ["delete"],
   "/projects/{projectId}/followers" => ["get"],
   "/projects/{projectId}/comments" => ["get", "post"], "/comments/{id}" => ["delete"],
-  "/projects/images" => ["post"], "/projects/images/{filename}" => ["get"],
+  "/feedback/tickets" => ["get", "post"], "/feedback/tickets/assignees" => ["get"],
+  "/feedback/tickets/{id}" => ["get", "patch"], "/feedback/tickets/{id}/reopen" => ["post"],
+  "/projects/{projectId}/images" => ["post"], "/projects/{projectId}/images/{filename}" => ["get", "delete"],
   "/admin/org/tree" => ["get"], "/org/tree" => ["get"], "/admin/org" => ["post"],
-  "/admin/org/{id}" => ["put", "delete"], "/admin/org/{id}/move" => ["put"],
+  "/admin/org/{id}" => ["put", "delete"], "/admin/org/{id}/move" => ["put"], "/admin/org/{id}/history" => ["get"],
   "/admin/users" => ["get"], "/admin/users/invite" => ["post"], "/admin/users/page" => ["get"],
   "/admin/users/{id}/primary-position" => ["put"], "/admin/users/{id}/part-time-positions" => ["post"],
   "/admin/users/{id}/part-time-positions/{positionId}" => ["delete"],
   "/admin/users/{id}/roles/{roleId}" => ["post", "delete"], "/admin/users/{id}/disable" => ["post"],
   "/admin/roles" => ["get", "post"], "/admin/roles/{id}" => ["put", "delete"],
   "/admin/import/preview/organizations" => ["post"], "/admin/import/preview/users" => ["post"],
-  "/admin/import/{jobId}/commit" => ["post"],
+  "/admin/import/{jobId}/commit" => ["post"], "/admin/import/{jobId}/errors.csv" => ["get"],
   "/admin/import/template/organizations.csv" => ["get"], "/admin/import/template/users.csv" => ["get"],
   "/admin/audit" => ["get"],
+  "/admin/audit/{id}" => ["get"],
   "/health" => ["get"], "/healthz" => ["get"], "/health/ready" => ["get"], "/health/live" => ["get"]
 }
 expected.each do |route, methods|
@@ -58,6 +60,7 @@ expected.each do |route, methods|
   methods.each { |method| abort "method missing: #{method.upcase} #{route}" unless paths[route].key?(method) }
 end
 abort "legacy import template route must not be documented" if paths.key?("/admin/import/preview/{type}")
+abort "legacy milestone routes must not be documented" if paths.key?("/projects/{projectId}/milestones") || paths.key?("/projects/{projectId}/milestones/{id}")
 puts "OpenAPI contract and route map are valid: #{ARGV.fetch(0)}"
 RUBY
 elif command -v python3 >/dev/null 2>&1; then
@@ -91,22 +94,24 @@ expected = {
     "/projects/{projectId}/nodes/{nodeId}/rollback": {"post"},
     "/projects/{projectId}/nodes/{nodeId}/owner": {"put"},
     "/projects/{projectId}/nodes/{nodeId}/schedule": {"put"},
-    "/projects/{projectId}/milestones": {"get", "post"}, "/projects/{projectId}/milestones/{id}": {"put", "delete"},
     "/projects/{projectId}/members": {"get", "post"}, "/projects/{projectId}/members/{memberId}": {"delete"},
     "/projects/{projectId}/followers": {"get"},
     "/projects/{projectId}/comments": {"get", "post"}, "/comments/{id}": {"delete"},
-    "/projects/images": {"post"}, "/projects/images/{filename}": {"get"},
+    "/feedback/tickets": {"get", "post"}, "/feedback/tickets/assignees": {"get"},
+    "/feedback/tickets/{id}": {"get", "patch"}, "/feedback/tickets/{id}/reopen": {"post"},
+    "/projects/{projectId}/images": {"post"}, "/projects/{projectId}/images/{filename}": {"get", "delete"},
     "/admin/org/tree": {"get"}, "/org/tree": {"get"}, "/admin/org": {"post"},
-    "/admin/org/{id}": {"put", "delete"}, "/admin/org/{id}/move": {"put"},
+    "/admin/org/{id}": {"put", "delete"}, "/admin/org/{id}/move": {"put"}, "/admin/org/{id}/history": {"get"},
     "/admin/users": {"get"}, "/admin/users/invite": {"post"}, "/admin/users/page": {"get"},
     "/admin/users/{id}/primary-position": {"put"}, "/admin/users/{id}/part-time-positions": {"post"},
     "/admin/users/{id}/part-time-positions/{positionId}": {"delete"},
     "/admin/users/{id}/roles/{roleId}": {"post", "delete"}, "/admin/users/{id}/disable": {"post"},
     "/admin/roles": {"get", "post"}, "/admin/roles/{id}": {"put", "delete"},
     "/admin/import/preview/organizations": {"post"}, "/admin/import/preview/users": {"post"},
-    "/admin/import/{jobId}/commit": {"post"},
+    "/admin/import/{jobId}/commit": {"post"}, "/admin/import/{jobId}/errors.csv": {"get"},
     "/admin/import/template/organizations.csv": {"get"}, "/admin/import/template/users.csv": {"get"},
     "/admin/audit": {"get"},
+    "/admin/audit/{id}": {"get"},
     "/health": {"get"}, "/healthz": {"get"}, "/health/ready": {"get"}, "/health/live": {"get"},
 }
 for route, methods in expected.items():
@@ -117,6 +122,8 @@ for route, methods in expected.items():
         raise SystemExit(f"method missing: {','.join(sorted(missing))} {route}")
 if "/admin/import/preview/{type}" in value["paths"]:
     raise SystemExit("legacy import template route must not be documented")
+if "/projects/{projectId}/milestones" in value["paths"] or "/projects/{projectId}/milestones/{id}" in value["paths"]:
+    raise SystemExit("legacy milestone routes must not be documented")
 print(f"OpenAPI contract is valid: {sys.argv[1]}")
 PY
 else

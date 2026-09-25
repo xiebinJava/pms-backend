@@ -11,10 +11,19 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.RSAPublicKeySpec;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.math.BigInteger;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 
 @Component
 public class DefaultOidcTokenClient implements OidcTokenClient {
@@ -33,7 +42,8 @@ public class DefaultOidcTokenClient implements OidcTokenClient {
         if (authorize.isBlank() || token.isBlank()) {
             throw BusinessException.error("SSO 发现文档缺少授权或令牌地址");
         }
-        return new OidcEndpoints(authorize, token, text(node, "userinfo_endpoint"));
+        return new OidcEndpoints(authorize, token, text(node, "userinfo_endpoint"),
+                text(node, "jwks_uri"), text(node, "issuer"));
     }
 
     @Override
@@ -42,8 +52,10 @@ public class DefaultOidcTokenClient implements OidcTokenClient {
                 + "&code=" + enc(code)
                 + "&redirect_uri=" + enc(oidc.getRedirectUri())
                 + "&client_id=" + enc(oidc.getClientId())
-                + "&client_secret=" + enc(oidc.getClientSecret())
                 + "&code_verifier=" + enc(codeVerifier);
+        if (oidc.getClientSecret() != null && !oidc.getClientSecret().isBlank()) {
+            body += "&client_secret=" + enc(oidc.getClientSecret());
+        }
         JsonNode node = postForm(endpoints.tokenUri(), body);
         String accessToken = text(node, "access_token");
         String idToken = text(node, "id_token");
@@ -51,6 +63,103 @@ public class DefaultOidcTokenClient implements OidcTokenClient {
             throw BusinessException.unauthorized("SSO 未返回可用令牌");
         }
         return new OidcTokenResponse(accessToken, idToken);
+    }
+
+    @Override
+    public OidcValidatedClaims validateIdToken(AuthProviderProperties.Oidc oidc,
+                                               OidcEndpoints endpoints,
+                                               String idToken,
+                                               String nonce) {
+        Claims claims = verifiedClaims(oidc, endpoints, idToken, Set.of(oidc.getClientId()), nonce);
+        return toValidatedClaims(claims);
+    }
+
+    @Override
+    public OidcValidatedClaims validateRelayedIdToken(AuthProviderProperties.Oidc oidc,
+                                                      OidcEndpoints endpoints,
+                                                      String idToken,
+                                                      Set<String> allowedAudiences) {
+        if (allowedAudiences == null || allowedAudiences.isEmpty()) {
+            throw BusinessException.forbidden("未配置允许的 SSO 客户端");
+        }
+        Claims claims = verifiedClaims(oidc, endpoints, idToken, allowedAudiences, null);
+        return toValidatedClaims(claims);
+    }
+
+    /**
+     * Shared signature/issuer/audience verification. `nonce` is only required for
+     * the browser login flow; a relayed token is verified against the audiences
+     * the deployment allow-lists instead.
+     */
+    private Claims verifiedClaims(AuthProviderProperties.Oidc oidc,
+                                  OidcEndpoints endpoints,
+                                  String idToken,
+                                  Set<String> allowedAudiences,
+                                  String nonce) {
+        if (idToken == null || idToken.isBlank()) {
+            throw BusinessException.unauthorized("SSO 未返回 ID Token");
+        }
+        if (endpoints.jwksUri() == null || endpoints.jwksUri().isBlank()) {
+            throw BusinessException.error("SSO 未配置 JWKS 地址，无法校验 ID Token");
+        }
+        try {
+            String[] parts = idToken.split("\\.");
+            if (parts.length != 3) throw new IllegalArgumentException("ID Token 格式无效");
+            JsonNode header = objectMapper.readTree(Base64.getUrlDecoder().decode(parts[0]));
+            if (!"RS256".equals(header.path("alg").asText())) {
+                throw new IllegalArgumentException("ID Token 仅支持 RS256");
+            }
+            String kid = header.path("kid").asText("");
+            JsonNode jwks = getJson(endpoints.jwksUri(), null);
+            JsonNode jwk = null;
+            for (JsonNode key : jwks.path("keys")) {
+                if (kid.equals(key.path("kid").asText()) && "RSA".equals(key.path("kty").asText())) {
+                    jwk = key;
+                    break;
+                }
+            }
+            if (jwk == null) throw new IllegalArgumentException("找不到 ID Token 签名密钥");
+            PublicKey publicKey = rsaPublicKey(jwk.path("n").asText(), jwk.path("e").asText());
+            String issuer = firstNonBlank(endpoints.issuer(), oidc.getIssuer());
+            if (issuer.isBlank()) throw new IllegalArgumentException("SSO 发行方为空");
+            io.jsonwebtoken.JwtParserBuilder builder = Jwts.parserBuilder()
+                    .setSigningKey(publicKey)
+                    .requireIssuer(issuer);
+            if (nonce != null) builder = builder.require("nonce", nonce);
+            Claims claims = builder.build().parseClaimsJws(idToken).getBody();
+            if (claims.getSubject() == null || claims.getSubject().isBlank()) {
+                throw new IllegalArgumentException("ID Token 缺少 subject");
+            }
+            requireAllowedAudience(audiencesOf(claims), allowedAudiences);
+            return claims;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw BusinessException.unauthorized("SSO ID Token 校验失败");
+        }
+    }
+
+    /** `aud` is a string or a list depending on the token, so normalise both. */
+    static Set<String> audiencesOf(Claims claims) {
+        Object raw = claims.get("aud");
+        if (raw instanceof java.util.Collection<?> values) {
+            return values.stream().map(String::valueOf).collect(java.util.stream.Collectors.toSet());
+        }
+        return raw == null ? Set.of() : Set.of(String.valueOf(raw));
+    }
+
+    /** Rejects a token minted for a client this deployment did not allow-list. */
+    static void requireAllowedAudience(Set<String> tokenAudiences, Set<String> allowedAudiences) {
+        if (tokenAudiences == null || tokenAudiences.stream().noneMatch(allowedAudiences::contains)) {
+            throw BusinessException.forbidden("SSO 令牌的客户端不在允许列表内");
+        }
+    }
+
+    private static OidcValidatedClaims toValidatedClaims(Claims claims) {
+        String email = claims.get("email", String.class);
+        Boolean verified = claims.get("email_verified", Boolean.class);
+        return new OidcValidatedClaims(claims.getIssuer(), claims.getSubject(), email,
+                verified == null || verified);
     }
 
     @Override
@@ -122,5 +231,19 @@ public class DefaultOidcTokenClient implements OidcTokenClient {
     private static String trimSlash(String value) {
         if (value == null) return "";
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return first != null && !first.isBlank() ? first : second == null ? "" : second;
+    }
+
+    private static PublicKey rsaPublicKey(String encodedModulus, String encodedExponent) throws Exception {
+        if (encodedModulus.isBlank() || encodedExponent.isBlank()) {
+            throw new IllegalArgumentException("RSA JWK 缺少参数");
+        }
+        byte[] modulus = Base64.getUrlDecoder().decode(encodedModulus);
+        byte[] exponent = Base64.getUrlDecoder().decode(encodedExponent);
+        return KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(
+                new BigInteger(1, modulus), new BigInteger(1, exponent)));
     }
 }

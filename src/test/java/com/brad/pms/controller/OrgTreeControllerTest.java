@@ -14,4 +14,10 @@ class OrgTreeControllerTest {
         Method method = OrgTreeController.class.getDeclaredMethod("tree");
         assertThat(method.getAnnotation(RequirePermission.class).value()).isEqualTo("project:read");
     }
+
+    @Test
+    void organizationHistoryIsReadableWithOrganizationPermission() throws Exception {
+        Method method = AdminOrgUnitController.class.getDeclaredMethod("history", Long.class);
+        assertThat(method.getAnnotation(RequirePermission.class).value()).isEqualTo("admin:org:read");
+    }
 }

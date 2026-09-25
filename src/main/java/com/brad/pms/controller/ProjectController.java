@@ -7,7 +7,10 @@ import com.brad.pms.dto.request.ProjectPageQry;
 import com.brad.pms.dto.request.ProjectUpdateCmd;
 import com.brad.pms.dto.request.ProjectLifecycleCmd;
 import com.brad.pms.dto.response.ProjectDTO;
+import com.brad.pms.dto.response.ProjectListSummaryDTO;
+import com.brad.pms.dto.response.ProjectBoardDTO;
 import com.brad.pms.service.ProjectService;
+import com.brad.pms.service.ProjectBoardService;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import lombok.RequiredArgsConstructor;
@@ -20,35 +23,42 @@ import org.springframework.web.bind.annotation.*;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectBoardService projectBoardService;
+
+    @GetMapping("/board")
+    @RequirePermission(PermissionCode.PROJECT_READ)
+    public ResponseResult<ProjectBoardDTO> board(@RequestParam(required = false) Long orgUnitId) {
+        return ResponseResult.success(projectBoardService.getBoard(orgUnitId));
+    }
 
     @PostMapping
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_CREATE)
     public ResponseResult<ProjectDTO> create(@Validated @RequestBody ProjectCreateCmd cmd) {
         return ResponseResult.success(projectService.create(cmd));
     }
 
     @PutMapping("/{id}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectDTO> update(@PathVariable Long id, @Validated @RequestBody ProjectUpdateCmd cmd) {
         return ResponseResult.success(projectService.update(id, cmd));
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<Void> delete(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseResult.success();
     }
 
     @PostMapping("/{id}/terminate")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectDTO> terminate(@PathVariable Long id,
                                                 @Validated @RequestBody ProjectLifecycleCmd cmd) {
         return ResponseResult.success(projectService.terminate(id, cmd.getReason()));
     }
 
     @PostMapping("/{id}/restore")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
+    @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<ProjectDTO> restore(@PathVariable Long id,
                                               @Validated @RequestBody ProjectLifecycleCmd cmd) {
         return ResponseResult.success(projectService.restore(id, cmd.getReason()));
@@ -64,6 +74,12 @@ public class ProjectController {
     @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<PageResult<ProjectDTO>> page(@RequestBody ProjectPageQry qry) {
         return ResponseResult.success(projectService.page(qry));
+    }
+
+    @PostMapping("/summary")
+    @RequirePermission(PermissionCode.PROJECT_READ)
+    public ResponseResult<ProjectListSummaryDTO> listSummary(@RequestBody(required = false) ProjectPageQry qry) {
+        return ResponseResult.success(projectService.listSummary(qry == null ? new ProjectPageQry() : qry));
     }
 
     @GetMapping("/{id}")
