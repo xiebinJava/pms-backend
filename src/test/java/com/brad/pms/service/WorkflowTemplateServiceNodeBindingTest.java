@@ -105,7 +105,7 @@ class WorkflowTemplateServiceNodeBindingTest {
     }
 
     @Test
-    void usesDevelopForAnUnconfiguredTopicWorkflowAndKeepsAConfiguredStableKey() throws Exception {
+    void leavesAnUnconfiguredTopicWorkflowWithoutAMountKeyAndKeepsAConfiguredStableKey() throws Exception {
         ProjectTypeDO topic = type(7L, "topic-management", false);
         topic.setDefaultTemplateVersionId(701L);
         when(projectTypeMapper.selectOne(any())).thenReturn(topic);
@@ -115,13 +115,27 @@ class WorkflowTemplateServiceNodeBindingTest {
                         """));
         when(templateMapper.selectById(70L)).thenReturn(template(70L, 7L));
 
-        assertThat(invokeString("resolveTopicSourceProjectNodeKey")).isEqualTo("develop");
+        assertThat(invokeString("resolveTopicSourceProjectNodeKey")).isNull();
 
         when(versionMapper.selectById(701L)).thenReturn(version(701L, 70L, "PUBLISHED",
                 """
                         {"schemaVersion":1,"sourceProjectNodeKey":"design","nodes":[{"key":"intake","name":"调研","description":"","deliverable":"","roles":"","components":[],"fields":[],"projectBasicInfo":false,"projectBasicInfoFields":[]}]}
                         """));
         assertThat(invokeString("resolveTopicSourceProjectNodeKey")).isEqualTo("design");
+    }
+
+    @Test
+    void exposesVersionAwareTopicAndStoryMountResolversAndStoryNodeOptions() {
+        assertThat(Arrays.stream(WorkflowTemplateService.class.getMethods())
+                .anyMatch(method -> method.getName().equals("resolveTopicSourceProjectNodeKey")
+                        && method.getParameterCount() == 1
+                        && method.getParameterTypes()[0].equals(Long.class))).isTrue();
+        assertThat(Arrays.stream(WorkflowTemplateService.class.getMethods())
+                .anyMatch(method -> method.getName().equals("resolveStorySourceTopicNodeKey")
+                        && method.getParameterCount() == 1
+                        && method.getParameterTypes()[0].equals(Long.class))).isTrue();
+        assertThat(Arrays.stream(WorkflowTemplateService.class.getMethods())
+                .anyMatch(method -> method.getName().equals("listStorySourceTopicNodeOptions"))).isTrue();
     }
 
     @Test

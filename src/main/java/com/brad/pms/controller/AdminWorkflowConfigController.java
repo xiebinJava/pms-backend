@@ -43,6 +43,12 @@ public class AdminWorkflowConfigController {
         return ResponseResult.success(workflowTemplateService.listTopicSourceNodeOptions());
     }
 
+    @GetMapping("/topic-node-options")
+    @RequirePermission(PermissionCode.WORKFLOW_READ)
+    public ResponseResult<List<WorkflowProjectNodeOptionDTO>> topicNodeOptions() {
+        return ResponseResult.success(workflowTemplateService.listStorySourceTopicNodeOptions());
+    }
+
     @PostMapping("/project-types")
     @RequirePermission(PermissionCode.WORKFLOW_WRITE)
     public ResponseResult<ProjectTypeDTO> createProjectType(@Valid @RequestBody ProjectTypeSaveCmd cmd) {

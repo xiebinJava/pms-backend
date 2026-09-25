@@ -263,12 +263,32 @@ public class WorkflowTemplateService {
     }
 
     private void validateTopicSourceProjectNodeKey(ProjectTypeDO type, WorkflowTemplateDefinition definition) {
-        if (type == null || !"topic-management".equals(type.getCode())) return;
-        String sourceNodeKey = trimToNull(definition.sourceProjectNodeKey());
-        if (sourceNodeKey == null) return;
-        boolean selectable = listTopicSourceNodeOptions().stream()
-                .anyMatch(option -> sourceNodeKey.equals(option.key()));
-        if (!selectable) throw BusinessException.error("专题流程绑定的项目节点不存在或不可用");
+        validateSourceNodeKeys(type, definition);
+    }
+
+    private void validateSourceNodeKeys(ProjectTypeDO type, WorkflowTemplateDefinition definition) {
+        if (type == null || definition == null) return;
+        String projectNodeKey = trimToNull(definition.sourceProjectNodeKey());
+        String topicNodeKey = trimToNull(definition.sourceTopicNodeKey());
+        if ("topic-management".equals(type.getCode())) {
+            if (topicNodeKey != null) throw BusinessException.error("专题流程不能配置专题节点挂载点");
+            if (projectNodeKey == null) throw BusinessException.error("专题流程必须配置项目节点挂载点");
+            boolean selectable = listTopicSourceNodeOptions().stream()
+                    .anyMatch(option -> projectNodeKey.equals(option.key()));
+            if (!selectable) throw BusinessException.error("专题流程绑定的项目节点不存在或不可用");
+            return;
+        }
+        if ("story-management".equals(type.getCode())) {
+            if (projectNodeKey != null) throw BusinessException.error("故事流程不能配置项目节点挂载点");
+            if (topicNodeKey == null) throw BusinessException.error("故事流程必须配置专题节点挂载点");
+            boolean selectable = listStorySourceTopicNodeOptions().stream()
+                    .anyMatch(option -> topicNodeKey.equals(option.key()));
+            if (!selectable) throw BusinessException.error("故事流程绑定的专题节点不存在或不可用");
+            return;
+        }
+        if (projectNodeKey != null || topicNodeKey != null) {
+            throw BusinessException.error("当前流程类型不支持事项挂载点");
+        }
     }
 
     @Transactional
@@ -276,6 +296,13 @@ public class WorkflowTemplateService {
         WorkflowTemplateDO template = requireTemplateForUpdate(templateId);
         WorkflowTemplateVersionDO draft = findLatestVersion(templateId, "DRAFT");
         if (draft == null) throw BusinessException.error("没有可发布的流程草稿");
+        WorkflowTemplateDefinition definition;
+        try {
+            definition = WorkflowTemplateDefinitionValidator.validate(parse(draft.getDefinitionJson()));
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.error(e.getMessage());
+        }
+        validateSourceNodeKeys(projectTypeMapper.selectById(template.getProjectTypeId()), definition);
         draft.setStatus("PUBLISHED");
         draft.setPublishedAt(LocalDateTime.now());
         if (versionMapper.updateById(draft) != 1) throw BusinessException.conflict("流程版本已被其他人修改");
@@ -391,9 +418,41 @@ public class WorkflowTemplateService {
     /** Resolves the configured topic host node, retaining the compatibility node for legacy templates. */
     public String resolveTopicSourceProjectNodeKey() {
         WorkflowTemplateBinding binding = resolveDefaultForProcessType("topic-management");
-        if (binding == null) return "develop";
-        String configuredKey = trimToNull(parse(binding.version().getDefinitionJson()).sourceProjectNodeKey());
-        return configuredKey == null ? "develop" : configuredKey;
+        return binding == null ? null : resolveTopicSourceProjectNodeKey(binding.version().getId());
+    }
+
+    public String resolveTopicSourceProjectNodeKey(Long templateVersionId) {
+        if (templateVersionId == null) return null;
+        return trimToNull(getDefinition(templateVersionId).sourceProjectNodeKey());
+    }
+
+    public String resolveStorySourceTopicNodeKey(Long templateVersionId) {
+        if (templateVersionId == null) return null;
+        return trimToNull(getDefinition(templateVersionId).sourceTopicNodeKey());
+    }
+
+    /** Lists stable node keys from all published Topic Management templates for Story Management binding. */
+    public List<WorkflowProjectNodeOptionDTO> listStorySourceTopicNodeOptions() {
+        List<ProjectTypeDO> topicTypes = projectTypeMapper.selectList(new LambdaQueryWrapper<ProjectTypeDO>()
+                .eq(ProjectTypeDO::getCode, "topic-management")
+                .eq(ProjectTypeDO::getStatus, 1)
+                .eq(ProjectTypeDO::getDeleted, false));
+        Set<Long> typeIds = topicTypes.stream().map(ProjectTypeDO::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (typeIds.isEmpty()) return List.of();
+        List<WorkflowTemplateDO> templates = templateMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateDO>()
+                .in(WorkflowTemplateDO::getProjectTypeId, typeIds)
+                .eq(WorkflowTemplateDO::getDeleted, false));
+        Set<Long> templateIds = templates.stream().map(WorkflowTemplateDO::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (templateIds.isEmpty()) return List.of();
+        List<WorkflowTemplateVersionDO> versions = versionMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
+                .in(WorkflowTemplateVersionDO::getTemplateId, templateIds)
+                .eq(WorkflowTemplateVersionDO::getStatus, "PUBLISHED"));
+        Map<String, WorkflowNodeDefinition> nodesByKey = new LinkedHashMap<>();
+        versions.forEach(version -> addNodes(nodesByKey, parse(version.getDefinitionJson())));
+        return nodesByKey.values().stream()
+                .sorted(Comparator.comparing(WorkflowNodeDefinition::name).thenComparing(WorkflowNodeDefinition::key))
+                .map(node -> new WorkflowProjectNodeOptionDTO(node.key(), node.name()))
+                .toList();
     }
 
     private void requireProjectCreationType(ProjectTypeDO type) {

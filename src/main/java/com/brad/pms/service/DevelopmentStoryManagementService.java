@@ -46,7 +46,7 @@ public class DevelopmentStoryManagementService {
                 : topicManagementService.requireWritableTopic(cmd.getTopicId());
         if (cmd.getOwnerId() != null) userService.requireActiveUser(cmd.getOwnerId());
         ProjectNodeDevelopmentStoryDO story = new ProjectNodeDevelopmentStoryDO();
-        apply(story, cmd, topic, 0);
+        apply(story, cmd, topic, 0, resolveTopicWorkflowNodeId(topic));
         story.setCreatedBy(com.brad.pms.security.UserContext.userIdOrNull());
         if (storyMapper.insert(story) != 1 || story.getId() == null) {
             throw BusinessException.conflict("故事创建失败，请重试");
@@ -73,13 +73,15 @@ public class DevelopmentStoryManagementService {
         Long sourceProjectId = story.getProjectId();
         Long oldOwnerId = story.getOwnerId();
         Long targetProjectId = targetTopic == null ? null : targetTopic.getProjectId();
+        Long targetTopicWorkflowNodeId = resolveTopicWorkflowNodeId(targetTopic);
         boolean contextChanged = !Objects.equals(story.getTopicId(), cmd.getTopicId())
                 || !Objects.equals(story.getProjectId(), targetProjectId)
-                || !Objects.equals(story.getNodeId(), targetTopic == null ? null : targetTopic.getNodeId());
+                || !Objects.equals(story.getNodeId(), targetTopic == null ? null : targetTopic.getNodeId())
+                || !Objects.equals(story.getTopicWorkflowNodeId(), targetTopicWorkflowNodeId);
         DevelopmentItemWorkflowDO workflow = workflowMapper.selectForUpdate("STORY", story.getId());
         if (workflow != null) taskMapper.selectByWorkflowIdsForUpdate(List.of(workflow.getId()));
 
-        apply(story, cmd, targetTopic, story.getSort() == null ? 0 : story.getSort());
+        apply(story, cmd, targetTopic, story.getSort() == null ? 0 : story.getSort(), targetTopicWorkflowNodeId);
         if (contextChanged) story.setIterationPlanId(null);
         if (storyMapper.updateById(story) != 1) throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
 
@@ -133,9 +135,17 @@ public class DevelopmentStoryManagementService {
         cmd.setBlocker(trimToNull(cmd.getBlocker()));
     }
 
+    private Long resolveTopicWorkflowNodeId(ProjectNodeDevelopmentTopicDO topic) {
+        if (topic == null) return null;
+        Long nodeId = developmentItemWorkflowService.resolveTopicStoryMountNodeId(topic.getId());
+        if (nodeId == null) throw BusinessException.error("专题流程未配置故事挂载节点");
+        return nodeId;
+    }
+
     private void apply(ProjectNodeDevelopmentStoryDO story, DevelopmentStorySaveCmd cmd,
-                       ProjectNodeDevelopmentTopicDO topic, int defaultSort) {
+                       ProjectNodeDevelopmentTopicDO topic, int defaultSort, Long topicWorkflowNodeId) {
         story.setTopicId(topic == null ? null : topic.getId());
+        story.setTopicWorkflowNodeId(topicWorkflowNodeId);
         story.setProjectId(topic == null ? null : topic.getProjectId());
         story.setNodeId(topic == null ? null : topic.getNodeId());
         story.setTitle(cmd.getTitle());

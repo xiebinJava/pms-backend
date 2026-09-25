@@ -278,8 +278,12 @@ class ProjectBoardServiceTest {
         version.setId(100L);
         version.setDefinitionJson(new ObjectMapper().writeValueAsString(definition));
         when(versionMapper.selectList(any())).thenReturn(List.of(version));
-        when(topicMapper.selectList(any())).thenReturn(List.of());
+        var topic = new ProjectNodeDevelopmentTopicDO();
+        topic.setProjectId(1L);
+        topic.setNodeId(host.getId());
+        when(topicMapper.selectList(any())).thenReturn(List.of(topic));
         var story = story("IN_PROGRESS", 3, TODAY.plusDays(2));
+        story.setNodeId(host.getId());
         when(storyMapper.selectList(any())).thenReturn(List.of(story));
 
         var row = board.getBoard(null).projects().get(0);

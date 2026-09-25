@@ -127,7 +127,7 @@ public class WorkflowComponentBindingService {
             }
         }
         return changed ? new WorkflowTemplateDefinition(definition.schemaVersion(), effectiveNodes,
-                definition.sourceProjectNodeKey()) : definition;
+                definition.sourceProjectNodeKey(), definition.sourceTopicNodeKey()) : definition;
     }
 
     private WorkflowNodeDefinition withDevelopmentControl(WorkflowNodeDefinition node) {

@@ -104,6 +104,20 @@ public class DevelopmentItemWorkflowService {
         workflow.setProjectId(projectId);
         workflow.setSourceNodeId(sourceNodeId);
         workflow.setTemplateVersionId(binding.version().getId());
+        if (itemType == DevelopmentItemType.TOPIC) {
+            String projectMountNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey(binding.version().getId());
+            if (projectId != null && projectMountNodeKey == null) {
+                throw BusinessException.error("专题流程未配置项目节点挂载点");
+            }
+            workflow.setProjectMountNodeKey(projectMountNodeKey);
+            WorkflowTemplateService.WorkflowTemplateBinding storyBinding =
+                    workflowTemplateService.resolveDefaultForProcessType(DevelopmentItemType.STORY.processTypeCode());
+            if (storyBinding != null) {
+                workflow.setStoryMountTemplateVersionId(storyBinding.version().getId());
+                workflow.setStoryMountNodeKey(
+                        workflowTemplateService.resolveStorySourceTopicNodeKey(storyBinding.version().getId()));
+            }
+        }
         workflow.setVersion(0);
         try {
             if (workflowMapper.insert(workflow) != 1) {
@@ -133,6 +147,20 @@ public class DevelopmentItemWorkflowService {
             }
         }
         return workflow;
+    }
+
+    /** Resolves a story's parent topic workflow node from the topic's immutable mount snapshot. */
+    public Long resolveTopicStoryMountNodeId(Long topicId) {
+        if (topicId == null) return null;
+        DevelopmentItemWorkflowDO topicWorkflow = workflowMapper.selectByItem(
+                DevelopmentItemType.TOPIC.name(), topicId);
+        if (topicWorkflow == null || !StringUtils.hasText(topicWorkflow.getStoryMountNodeKey())) return null;
+        List<DevelopmentItemWorkflowNodeDO> nodes = nodeMapper.selectByWorkflowAndNodeKey(
+                topicWorkflow.getId(), topicWorkflow.getStoryMountNodeKey());
+        if (nodes == null || nodes.size() != 1) {
+            throw BusinessException.conflict("专题流程没有唯一的故事挂载节点");
+        }
+        return nodes.get(0).getId();
     }
 
     @Transactional
@@ -330,6 +358,8 @@ public class DevelopmentItemWorkflowService {
         dto.setSourceNodeName(context.sourceNode() == null ? null : context.sourceNode().getName());
         dto.setTopicId(context.topicId());
         dto.setTopicTitle(context.topicTitle());
+        dto.setTopicWorkflowNodeId(context.topicWorkflowNodeId());
+        dto.setTopicWorkflowNodeName(context.topicWorkflowNodeName());
         dto.setOwnerId(context.ownerId());
         dto.setOwnerName(displayName(context.ownerId()));
         dto.setDevelopmentStatus(context.developmentStatus());
@@ -486,6 +516,8 @@ public class DevelopmentItemWorkflowService {
         String iterationPlanName = null;
         Long topicId = null;
         String topicTitle = null;
+        Long topicWorkflowNodeId = null;
+        String topicWorkflowNodeName = null;
 
         if (itemType == DevelopmentItemType.TOPIC) {
             ProjectNodeDevelopmentTopicDO topic = topicMapper.selectById(itemId);
@@ -526,6 +558,17 @@ public class DevelopmentItemWorkflowService {
                     throw BusinessException.notFound("故事所属专题不存在");
                 }
                 topicTitle = topic.getTitle();
+                topicWorkflowNodeId = story.getTopicWorkflowNodeId();
+                if (topicWorkflowNodeId != null) {
+                    DevelopmentItemWorkflowNodeDO topicNode = nodeMapper.selectById(topicWorkflowNodeId);
+                    if (topicNode == null) throw BusinessException.notFound("故事所属专题流程节点不存在");
+                    DevelopmentItemWorkflowDO topicWorkflow = workflowMapper.selectByItem(
+                            DevelopmentItemType.TOPIC.name(), topic.getId());
+                    if (topicWorkflow == null || !Objects.equals(topicWorkflow.getId(), topicNode.getWorkflowId())) {
+                        throw BusinessException.notFound("故事所属专题流程节点不存在");
+                    }
+                    topicWorkflowNodeName = topicNode.getName();
+                }
             }
             ProjectNodeIterationPlanDO plan = story.getIterationPlanId() == null
                     ? null : iterationPlanMapper.selectById(story.getIterationPlanId());
@@ -538,7 +581,8 @@ public class DevelopmentItemWorkflowService {
             throw BusinessException.notFound("研发事项来源节点不存在");
         }
         if (sourceNodeId != null && sourceNode == null) throw BusinessException.notFound("研发事项来源节点不存在");
-        return new ItemContext(itemType, itemId, title, project, sourceNode, topicId, topicTitle, ownerId,
+        return new ItemContext(itemType, itemId, title, project, sourceNode, topicId, topicTitle,
+                topicWorkflowNodeId, topicWorkflowNodeName, ownerId,
                 developmentStatus, developmentProgress, storyPoints, startDate, dueDate, blocker,
                 latestBuildVersion, testStatus, iterationPlanName);
     }
@@ -724,6 +768,8 @@ public class DevelopmentItemWorkflowService {
             ProjectNodeDO sourceNode,
             Long topicId,
             String topicTitle,
+            Long topicWorkflowNodeId,
+            String topicWorkflowNodeName,
             Long ownerId,
             String developmentStatus,
             Integer developmentProgress,

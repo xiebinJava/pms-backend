@@ -141,7 +141,7 @@ class WorkflowTemplateDefinitionValidatorTest {
     @Test
     void roundTripsTopicSourceProjectNodeKeyWithoutBreakingUnknownLegacyMetadata() throws Exception {
         String json = """
-                {"schemaVersion":1,"sourceProjectNodeKey":"develop","nodes":[{"key":"intake",
+                {"schemaVersion":1,"sourceProjectNodeKey":"develop","sourceTopicNodeKey":"requirements","nodes":[{"key":"intake",
                 "name":"立项","description":"","deliverable":"","roles":"","components":[],
                 "fields":[],"projectBasicInfo":false,"projectBasicInfoFields":[]}]}
                 """;
@@ -152,6 +152,7 @@ class WorkflowTemplateDefinitionValidatorTest {
         WorkflowTemplateDefinition roundTripped = mapper.readValue(serialized, WorkflowTemplateDefinition.class);
 
         assertThat(mapper.readTree(serialized).path("sourceProjectNodeKey").asText()).isEqualTo("develop");
+        assertThat(mapper.readTree(serialized).path("sourceTopicNodeKey").asText()).isEqualTo("requirements");
         assertThat(WorkflowTemplateDefinitionValidator.validate(roundTripped)).isEqualTo(roundTripped);
     }
 

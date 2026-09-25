@@ -129,10 +129,19 @@ public class DevelopmentTopicManagementService {
         if (cmd.getOwnerId() != null) userService.requireActiveUser(cmd.getOwnerId());
         ProjectDO sourceProject = requireManageableProjectIncludingDeleted(topic.getProjectId());
         boolean rebound = !Objects.equals(topic.getProjectId(), cmd.getProjectId());
+        DevelopmentItemWorkflowDO topicWorkflowSnapshot = workflowMapper.selectByItem(
+                DevelopmentItemType.TOPIC.name(), topic.getId());
+        // Existing topics created before workflow snapshots were introduced do not have a
+        // workflow row. Keep their rebind behavior compatible with the current default;
+        // once a snapshot exists, always use its persisted mount key so later template
+        // changes cannot move the topic to a different project node unexpectedly.
+        String topicMountNodeKey = topicWorkflowSnapshot == null
+                ? workflowTemplateService.resolveTopicSourceProjectNodeKey()
+                : topicWorkflowSnapshot.getProjectMountNodeKey();
         ProjectDO targetProject = cmd.getProjectId() == null ? null
                 : (rebound ? requireActiveManageableTarget(cmd.getProjectId()) : sourceProject);
         ProjectNodeDO targetNode = targetProject == null ? null
-                : (rebound || sourceProject == null ? requireTopicSourceNode(targetProject.getId())
+                : (rebound ? requireTopicSourceNode(targetProject.getId(), topicMountNodeKey)
                 : nodeMapper.selectById(topic.getNodeId()));
         if (targetProject != null && (targetNode == null || !Objects.equals(targetNode.getProjectId(), targetProject.getId()))) {
             throw BusinessException.notFound("专题关联节点不存在");
@@ -237,6 +246,7 @@ public class DevelopmentTopicManagementService {
         if (readableIds.isEmpty()) return PageResult.of(0, query.getCurrPage(), query.getPageSize(), List.of());
 
         String topicNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey();
+        if (!StringUtils.hasText(topicNodeKey)) return PageResult.of(0, query.getCurrPage(), query.getPageSize(), List.of());
         Map<Long, ProjectDO> projectsById = projectMapper.selectBatchIds(readableIds).stream()
                 .filter(project -> ProjectStatus.isOpen(project.getStatus()))
                 .filter(permissionService::canManageProject)
@@ -308,7 +318,11 @@ public class DevelopmentTopicManagementService {
     }
 
     private ProjectNodeDO requireTopicSourceNode(Long projectId) {
-        String nodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey();
+        return requireTopicSourceNode(projectId, workflowTemplateService.resolveTopicSourceProjectNodeKey());
+    }
+
+    private ProjectNodeDO requireTopicSourceNode(Long projectId, String nodeKey) {
+        if (!StringUtils.hasText(nodeKey)) throw BusinessException.error("专题流程未配置项目节点挂载点");
         ProjectNodeDO node = nodeMapper.selectOne(new LambdaQueryWrapper<ProjectNodeDO>()
                 .eq(ProjectNodeDO::getProjectId, projectId)
                 .eq(ProjectNodeDO::getNodeKey, nodeKey)
