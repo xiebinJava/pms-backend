@@ -14,6 +14,7 @@ import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
+import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -33,7 +34,7 @@ class DevelopmentItemWorkflowServiceFieldTest {
             mock(ProjectNodeDevelopmentStoryMapper.class), mock(ProjectNodeMapper.class),
             mock(ProjectNodeIterationPlanMapper.class), mock(WorkflowTemplateVersionMapper.class),
             mock(ProjectPermissionService.class), mock(UserService.class), workflowTemplateService,
-            mock(ProjectMemberAssignmentService.class), new ObjectMapper());
+            mock(WorkflowComponentBindingService.class), mock(ProjectMemberAssignmentService.class), new ObjectMapper());
 
     @Test
     void nodeDtoIncludesTemplateFieldDefinitionsAndSavedValues() {
@@ -53,7 +54,8 @@ class DevelopmentItemWorkflowServiceFieldTest {
         when(workflowTemplateService.getNodeDefinition(88L, "research")).thenReturn(definition);
 
         DevelopmentItemWorkflowNodeDTO result = ReflectionTestUtils.invokeMethod(
-                service, "toNodeDTO", node, List.of(), Map.of(9L, new UserDO()), 88L);
+                service, "toNodeDTO", node, List.of(), Map.of(9L, new UserDO()),
+                new WorkflowTemplateDefinition(1, List.of(definition)));
 
         assertThat(result.getFields()).containsExactly(field);
         assertThat(result.getFieldValues()).containsEntry("researchSummary",

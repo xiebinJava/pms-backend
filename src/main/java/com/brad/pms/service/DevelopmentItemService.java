@@ -156,12 +156,20 @@ public class DevelopmentItemService {
         topics.stream().map(ProjectNodeDevelopmentTopicDO::getOwnerId).filter(Objects::nonNull).forEach(ownerIds::add);
         stories.stream().map(ProjectNodeDevelopmentStoryDO::getOwnerId).filter(Objects::nonNull).forEach(ownerIds::add);
         Map<Long, UserDO> users = userMap(ownerIds);
+        List<Long> topicWorkflowNodeIds = stories.stream().map(ProjectNodeDevelopmentStoryDO::getTopicWorkflowNodeId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, String> topicWorkflowNodeNames = topicWorkflowNodeIds.isEmpty() ? Map.of()
+                : safeList(workflowNodeMapper.selectList(new LambdaQueryWrapper<DevelopmentItemWorkflowNodeDO>()
+                                .in(DevelopmentItemWorkflowNodeDO::getId, topicWorkflowNodeIds))).stream()
+                        .collect(Collectors.toMap(DevelopmentItemWorkflowNodeDO::getId,
+                                DevelopmentItemWorkflowNodeDO::getName, (left, right) -> left, LinkedHashMap::new));
         return new QueryContext(
                 topics,
                 stories,
                 projectsById,
                 nodes.stream().filter(node -> node.getId() != null).collect(Collectors.toMap(ProjectNodeDO::getId, Function.identity(), (left, right) -> left, LinkedHashMap::new)),
                 users,
+                topicWorkflowNodeNames,
                 plans.stream().filter(plan -> plan.getId() != null).collect(Collectors.toMap(ProjectNodeIterationPlanDO::getId, ProjectNodeIterationPlanDO::getName, (left, right) -> left, LinkedHashMap::new))
         );
     }
@@ -223,6 +231,9 @@ public class DevelopmentItemService {
         dto.setNodeName(node == null ? null : node.getName());
         dto.setTopicId(story.getTopicId());
         dto.setTopicTitle(topic == null ? null : topic.getTitle());
+        dto.setTopicWorkflowNodeId(story.getTopicWorkflowNodeId());
+        dto.setTopicWorkflowNodeName(story.getTopicWorkflowNodeId() == null ? null
+                : context.topicWorkflowNodeNames().get(story.getTopicWorkflowNodeId()));
         dto.setOwnerId(story.getOwnerId());
         dto.setOwnerName(displayName(context.users().get(story.getOwnerId())));
         dto.setIterationPlanName(context.iterationPlans().get(story.getIterationPlanId()));
@@ -369,10 +380,11 @@ public class DevelopmentItemService {
             Map<Long, ProjectDTO> projects,
             Map<Long, ProjectNodeDO> nodes,
             Map<Long, UserDO> users,
+            Map<Long, String> topicWorkflowNodeNames,
             Map<Long, String> iterationPlans
     ) {
         private static QueryContext empty() {
-            return new QueryContext(List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of());
+            return new QueryContext(List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
         }
     }
 

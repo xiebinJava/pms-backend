@@ -25,5 +25,7 @@ public class DevelopmentItemWorkflowNodeDTO {
     private Integer version;
     private List<WorkflowFieldDefinition> fields;
     private Map<String, JsonNode> fieldValues;
+    /** Runtime components after applying the item's pinned workflow bindings. */
+    private List<String> runtimeComponents;
     private List<DevelopmentItemTaskDTO> tasks;
 }

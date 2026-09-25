@@ -10,6 +10,7 @@ import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -82,6 +83,28 @@ public class WorkflowComponentBindingService {
                 && Objects.equals(node.getNodeKey(), workflowTemplateService.resolveTopicSourceProjectNodeKey());
     }
 
+    /**
+     * Adds the story-splitting runtime component to the node selected by the pinned topic snapshot.
+     * The component is derived at read time and the immutable template definition is never mutated.
+     */
+    public WorkflowTemplateDefinition applyStoryBinding(WorkflowTemplateDefinition definition,
+                                                         String pinnedTopicNodeKey) {
+        if (definition == null || !StringUtils.hasText(pinnedTopicNodeKey)) return definition;
+        List<WorkflowNodeDefinition> effectiveNodes = new ArrayList<>(definition.nodes().size());
+        boolean changed = false;
+        for (WorkflowNodeDefinition node : definition.nodes()) {
+            if (Objects.equals(node.key(), pinnedTopicNodeKey)
+                    && !node.runtimeComponents().contains(WorkflowComponentKey.STORY_SPLIT)) {
+                effectiveNodes.add(withComponent(node, WorkflowComponentKey.STORY_SPLIT));
+                changed = true;
+            } else {
+                effectiveNodes.add(node);
+            }
+        }
+        return changed ? new WorkflowTemplateDefinition(definition.schemaVersion(), effectiveNodes,
+                definition.sourceProjectNodeKey(), definition.sourceTopicNodeKey()) : definition;
+    }
+
     private List<ProjectNodeDevelopmentTopicDO> loadTopicRoots(Collection<Long> projectIds) {
         List<ProjectNodeDevelopmentTopicDO> topics = topicMapper.selectList(new QueryWrapper<ProjectNodeDevelopmentTopicDO>()
                 .select("project_id", "node_id")
@@ -120,7 +143,7 @@ public class WorkflowComponentBindingService {
         boolean changed = false;
         for (WorkflowNodeDefinition node : definition.nodes()) {
             if (hostKeys.contains(node.key()) && !node.runtimeComponents().contains(WorkflowComponentKey.DEVELOPMENT_CONTROL)) {
-                effectiveNodes.add(withDevelopmentControl(node));
+                effectiveNodes.add(withComponent(node, WorkflowComponentKey.DEVELOPMENT_CONTROL));
                 changed = true;
             } else {
                 effectiveNodes.add(node);
@@ -130,14 +153,14 @@ public class WorkflowComponentBindingService {
                 definition.sourceProjectNodeKey(), definition.sourceTopicNodeKey()) : definition;
     }
 
-    private WorkflowNodeDefinition withDevelopmentControl(WorkflowNodeDefinition node) {
+    private WorkflowNodeDefinition withComponent(WorkflowNodeDefinition node, String componentKey) {
         List<String> components = node.components() == null ? null : new ArrayList<>(node.components());
         List<String> contentOrder = node.contentOrder() == null ? null : new ArrayList<>(node.contentOrder());
         if (contentOrder == null) {
             components = components == null ? new ArrayList<>() : components;
-            components.add(WorkflowComponentKey.DEVELOPMENT_CONTROL);
+            components.add(componentKey);
         } else {
-            contentOrder.add("component:" + WorkflowComponentKey.DEVELOPMENT_CONTROL);
+            contentOrder.add("component:" + componentKey);
         }
         return new WorkflowNodeDefinition(node.key(), node.name(), node.description(), node.deliverable(), node.roles(),
                 components, node.fields(), node.projectBasicInfo(), node.projectBasicInfoFields(), contentOrder);

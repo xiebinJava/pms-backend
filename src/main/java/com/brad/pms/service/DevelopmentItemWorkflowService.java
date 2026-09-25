@@ -73,6 +73,7 @@ public class DevelopmentItemWorkflowService {
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final WorkflowTemplateService workflowTemplateService;
+    private final WorkflowComponentBindingService workflowComponentBindingService;
     private final ProjectMemberAssignmentService assignmentService;
     private final ObjectMapper objectMapper;
 
@@ -399,9 +400,15 @@ public class DevelopmentItemWorkflowService {
                 tasks.stream().map(DevelopmentItemTaskDO::getAssigneeId).toList());
         Map<Long, List<DevelopmentItemTaskDO>> tasksByNode = tasks.stream()
                 .collect(Collectors.groupingBy(DevelopmentItemTaskDO::getNodeId));
+        WorkflowTemplateDefinition effectiveDefinition = workflowTemplateService.getDefinition(workflow.getTemplateVersionId());
+        if (context.itemType() == DevelopmentItemType.TOPIC) {
+            effectiveDefinition = workflowComponentBindingService.applyStoryBinding(
+                    effectiveDefinition, workflow.getStoryMountNodeKey());
+        }
+        WorkflowTemplateDefinition nodeDefinitionSnapshot = effectiveDefinition;
         List<DevelopmentItemWorkflowNodeDTO> nodeDTOs = nodes.stream()
                 .map(node -> toNodeDTO(node, tasksByNode.getOrDefault(node.getId(), List.of()), users,
-                        workflow.getTemplateVersionId()))
+                        nodeDefinitionSnapshot))
                 .toList();
         int completed = (int) nodes.stream().filter(node -> Objects.equals(node.getStatus(), NODE_COMPLETED)).count();
         int total = nodes.size();
@@ -416,7 +423,7 @@ public class DevelopmentItemWorkflowService {
 
     private DevelopmentItemWorkflowNodeDTO toNodeDTO(
             DevelopmentItemWorkflowNodeDO node, List<DevelopmentItemTaskDO> tasks, Map<Long, UserDO> users,
-            Long templateVersionId) {
+            WorkflowTemplateDefinition templateDefinition) {
         DevelopmentItemWorkflowNodeDTO dto = new DevelopmentItemWorkflowNodeDTO();
         dto.setId(node.getId());
         dto.setNodeKey(node.getNodeKey());
@@ -430,8 +437,11 @@ public class DevelopmentItemWorkflowService {
         dto.setStartDate(node.getStartDate());
         dto.setEndDate(node.getEndDate());
         dto.setVersion(node.getVersion());
-        WorkflowNodeDefinition definition = workflowTemplateService.getNodeDefinition(templateVersionId, node.getNodeKey());
+        WorkflowNodeDefinition definition = templateDefinition == null ? null : templateDefinition.nodes().stream()
+                .filter(candidate -> Objects.equals(candidate.key(), node.getNodeKey()))
+                .findFirst().orElse(null);
         dto.setFields(definition == null ? List.of() : definition.fields());
+        dto.setRuntimeComponents(definition == null ? List.of() : definition.runtimeComponents());
         dto.setFieldValues(readFieldValues(node.getFieldValuesJson()));
         Map<Long, DevelopmentItemTaskDTO> taskDTOs = new HashMap<>();
         for (DevelopmentItemTaskDO task : tasks) taskDTOs.put(task.getId(), toTaskDTO(task, users));

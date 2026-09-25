@@ -215,6 +215,7 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
         private final ProjectPermissionService permissionService = mock(ProjectPermissionService.class);
         private final UserService userService = mock(UserService.class);
         private final WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
+        private final WorkflowComponentBindingService workflowComponentBindingService = mock(WorkflowComponentBindingService.class);
         private final ProjectMemberAssignmentService assignmentService = mock(ProjectMemberAssignmentService.class);
         private final DevelopmentItemWorkflowService service;
         private final ProjectDO project = new ProjectDO();
@@ -227,7 +228,8 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
         private Fixture(int status) {
             service = new DevelopmentItemWorkflowService(workflowMapper, nodeMapper, taskMapper, topicMapper,
                     storyMapper, projectNodeMapper, iterationPlanMapper, templateVersionMapper,
-                    permissionService, userService, workflowTemplateService, assignmentService, new ObjectMapper());
+                    permissionService, userService, workflowTemplateService, workflowComponentBindingService,
+                    assignmentService, new ObjectMapper());
 
             project.setId(5L);
             project.setName("项目");

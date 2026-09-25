@@ -10,6 +10,8 @@ public final class WorkflowComponentKey {
     public static final String RELEASE_HANDOVER = "release-handover";
     public static final String VALUE_REVIEW = "value-review";
     public static final String KNOWLEDGE_STANDARD = "knowledge-standard";
+    /** Runtime-only component generated on the configured topic workflow mount node. */
+    public static final String STORY_SPLIT = "story-split";
 
     private WorkflowComponentKey() { }
 }

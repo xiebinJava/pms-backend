@@ -167,6 +167,7 @@ public class DevelopmentStoryManagementService {
         dto.setOwnerName(story.getOwnerId() == null ? null
                 : userService.listByIdsIncludingDeleted(List.of(story.getOwnerId())).stream().findFirst()
                 .map(com.brad.pms.convertor.Convertors::userDisplayName).orElse(null));
+        dto.setTopicWorkflowNodeId(story.getTopicWorkflowNodeId());
         dto.setStatus(story.getStatus());
         dto.setProgress(effectiveProgress(story.getStatus(), story.getProgress()));
         dto.setStoryPoints(story.getStoryPoints());

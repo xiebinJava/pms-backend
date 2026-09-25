@@ -11,6 +11,7 @@ public class DevelopmentTopicStoryDTO {
     private String title;
     private Long ownerId;
     private String ownerName;
+    private Long topicWorkflowNodeId;
     private String status;
     private Integer progress;
     private Integer storyPoints;

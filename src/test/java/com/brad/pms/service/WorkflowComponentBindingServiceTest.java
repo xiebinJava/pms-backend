@@ -98,6 +98,35 @@ class WorkflowComponentBindingServiceTest {
                 .containsExactly(WorkflowComponentKey.DEVELOPMENT_CONTROL);
     }
 
+    @Test
+    void derivesStorySplitOnlyOnThePinnedTopicMountNodeWithoutMutatingTheSnapshot() {
+        WorkflowTemplateDefinition stored = new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("research", "需求调研", "", "", "", null,
+                        List.of(), false, List.of(), List.of("fields")),
+                new WorkflowNodeDefinition("story-host", "故事承接", "", "", "", null,
+                        List.of(), false, List.of(), List.of("fields"))));
+
+        WorkflowTemplateDefinition effective = new WorkflowComponentBindingService(
+                workflowTemplateService, topicMapper).applyStoryBinding(stored, "story-host");
+
+        assertThat(effective.nodes().get(0).runtimeComponents()).isEmpty();
+        assertThat(effective.nodes().get(1).runtimeComponents())
+                .containsExactly(WorkflowComponentKey.STORY_SPLIT);
+        assertThat(stored.nodes().get(1).runtimeComponents()).isEmpty();
+    }
+
+    @Test
+    void doesNotDuplicateStorySplitWhenThePinnedSnapshotAlreadyContainsIt() {
+        WorkflowTemplateDefinition stored = new WorkflowTemplateDefinition(1, List.of(
+                nodeDefinition("story-host", List.of(WorkflowComponentKey.STORY_SPLIT))));
+
+        WorkflowTemplateDefinition effective = new WorkflowComponentBindingService(
+                workflowTemplateService, topicMapper).applyStoryBinding(stored, "story-host");
+
+        assertThat(effective.nodes().get(0).runtimeComponents())
+                .containsExactly(WorkflowComponentKey.STORY_SPLIT);
+    }
+
     private WorkflowTemplateDefinition apply(ProjectDO project, WorkflowTemplateDefinition definition,
                                              Collection<ProjectNodeDO> nodes) {
         try {
