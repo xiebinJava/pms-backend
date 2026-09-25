@@ -17,7 +17,10 @@ public class DevelopmentItemWorkflowDO {
     private Long itemId;
     private Long projectId;
     private Long sourceNodeId;
+    private String projectMountNodeKey;
     private Long templateVersionId;
+    private Long storyMountTemplateVersionId;
+    private String storyMountNodeKey;
     @Version
     private Integer version;
     private LocalDateTime createdAt;

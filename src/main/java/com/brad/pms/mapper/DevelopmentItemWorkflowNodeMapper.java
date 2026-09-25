@@ -19,4 +19,9 @@ public interface DevelopmentItemWorkflowNodeMapper extends BaseMapper<Developmen
     })
     List<DevelopmentItemWorkflowNodeDO> selectByWorkflowIdsForUpdate(
             @Param("workflowIds") Collection<Long> workflowIds);
+
+    @Select("SELECT * FROM pms_development_item_workflow_node WHERE workflow_id = #{workflowId} AND node_key = #{nodeKey} LIMIT 2")
+    List<DevelopmentItemWorkflowNodeDO> selectByWorkflowAndNodeKey(
+            @Param("workflowId") Long workflowId,
+            @Param("nodeKey") String nodeKey);
 }

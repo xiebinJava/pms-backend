@@ -17,6 +17,8 @@ public class DevelopmentStoryListDTO {
     private String nodeName;
     private Long topicId;
     private String topicTitle;
+    private Long topicWorkflowNodeId;
+    private String topicWorkflowNodeName;
     private Long ownerId;
     private String ownerName;
     private String iterationPlanName;
