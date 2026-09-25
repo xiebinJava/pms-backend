@@ -49,6 +49,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WorkflowTemplateService {
+    private static final String LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY = "develop";
+
     private final ProjectTypeMapper projectTypeMapper;
     private final ProjectMapper projectMapper;
     private final WorkflowTemplateMapper templateMapper;
@@ -418,12 +420,23 @@ public class WorkflowTemplateService {
     /** Resolves the configured topic host node, retaining the compatibility node for legacy templates. */
     public String resolveTopicSourceProjectNodeKey() {
         WorkflowTemplateBinding binding = resolveDefaultForProcessType("topic-management");
-        return binding == null ? null : resolveTopicSourceProjectNodeKey(binding.version().getId());
+        return binding == null
+                ? LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY
+                : resolveTopicSourceProjectNodeKeyForRuntime(binding.version().getId());
     }
 
     public String resolveTopicSourceProjectNodeKey(Long templateVersionId) {
         if (templateVersionId == null) return null;
         return trimToNull(getDefinition(templateVersionId).sourceProjectNodeKey());
+    }
+
+    /**
+     * Resolves a topic host node for runtime creation. Published templates created
+     * before the mount-key field existed retain the original compatibility node.
+     */
+    public String resolveTopicSourceProjectNodeKeyForRuntime(Long templateVersionId) {
+        String configuredKey = resolveTopicSourceProjectNodeKey(templateVersionId);
+        return configuredKey == null ? LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY : configuredKey;
     }
 
     public String resolveStorySourceTopicNodeKey(Long templateVersionId) {

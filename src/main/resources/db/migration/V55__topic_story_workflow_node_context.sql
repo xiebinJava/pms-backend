@@ -39,23 +39,10 @@ WHERE w.item_type = 'TOPIC'
   AND JSON_VALID(v.definition_json)
   AND JSON_UNQUOTE(JSON_EXTRACT(v.definition_json, '$.sourceProjectNodeKey')) IS NOT NULL;
 
--- If a published default story template exists and has one explicit mount
--- key, preserve it for existing topic workflow instances. If it does not,
--- leave the snapshot empty and record an issue instead of guessing.
-UPDATE pms_development_item_workflow w
-JOIN pms_project_type t
-  ON t.code = 'story-management'
- AND t.deleted = FALSE
-JOIN pms_workflow_template_version sv
-  ON sv.id = t.default_template_version_id
- AND sv.status = 'PUBLISHED'
-SET w.story_mount_template_version_id = sv.id,
-    w.story_mount_node_key = NULLIF(
-        JSON_UNQUOTE(JSON_EXTRACT(sv.definition_json, '$.sourceTopicNodeKey')), '')
-WHERE w.item_type = 'TOPIC'
-  AND w.story_mount_template_version_id IS NULL
-  AND JSON_VALID(sv.definition_json)
-  AND JSON_UNQUOTE(JSON_EXTRACT(sv.definition_json, '$.sourceTopicNodeKey')) IS NOT NULL;
+-- Existing topic workflows do not contain a deterministic story mount
+-- snapshot. Never derive one from the current default story template: that
+-- template may have changed after the topic was created. Leave the snapshot
+-- empty and let the migration issue below make the historical gap visible.
 
 -- Existing bound stories inherit the concrete node from their parent topic
 -- workflow only when the snapshot resolves to exactly one node.

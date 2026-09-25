@@ -105,7 +105,7 @@ class WorkflowTemplateServiceNodeBindingTest {
     }
 
     @Test
-    void leavesAnUnconfiguredTopicWorkflowWithoutAMountKeyAndKeepsAConfiguredStableKey() throws Exception {
+    void keepsLegacyTopicCreationOnTheCompatibilityNodeAndUsesConfiguredStableKeyWhenPresent() throws Exception {
         ProjectTypeDO topic = type(7L, "topic-management", false);
         topic.setDefaultTemplateVersionId(701L);
         when(projectTypeMapper.selectOne(any())).thenReturn(topic);
@@ -115,7 +115,7 @@ class WorkflowTemplateServiceNodeBindingTest {
                         """));
         when(templateMapper.selectById(70L)).thenReturn(template(70L, 7L));
 
-        assertThat(invokeString("resolveTopicSourceProjectNodeKey")).isNull();
+        assertThat(invokeString("resolveTopicSourceProjectNodeKey")).isEqualTo("develop");
 
         when(versionMapper.selectById(701L)).thenReturn(version(701L, 70L, "PUBLISHED",
                 """

@@ -28,6 +28,11 @@ class TopicStoryWorkflowNodeMigrationTest {
                 "idx_development_story_topic_workflow_node",
                 "pms_development_workflow_migration_issue");
         assertThat(sql).doesNotContain("= 'develop'");
+        assertThat(sql).doesNotContain(
+                "JOIN pms_project_type t",
+                "story_mount_template_version_id = sv.id",
+                "JSON_EXTRACT(sv.definition_json, '$.sourceTopicNodeKey')");
+        assertThat(sql).contains("'TOPIC_STORY_MOUNT_UNRESOLVED'");
     }
 
     @Test

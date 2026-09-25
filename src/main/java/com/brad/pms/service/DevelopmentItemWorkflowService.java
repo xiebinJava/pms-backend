@@ -106,7 +106,8 @@ public class DevelopmentItemWorkflowService {
         workflow.setSourceNodeId(sourceNodeId);
         workflow.setTemplateVersionId(binding.version().getId());
         if (itemType == DevelopmentItemType.TOPIC) {
-            String projectMountNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey(binding.version().getId());
+            String projectMountNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(
+                    binding.version().getId());
             if (projectId != null && projectMountNodeKey == null) {
                 throw BusinessException.error("专题流程未配置项目节点挂载点");
             }

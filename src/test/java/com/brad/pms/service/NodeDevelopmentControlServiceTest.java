@@ -404,6 +404,7 @@ class NodeDevelopmentControlServiceTest {
     void normalizesCompletedStoryProgressToFullCompletionBeforePersisting() {
         ProjectNodeDO node = node("develop");
         when(permissionService.requireManageableNode(1L, 10L, "保存开发测试与项目控制")).thenReturn(node);
+        when(developmentItemWorkflowService.resolveTopicStoryMountNodeId(20L)).thenReturn(40L);
         when(baselineMapper.selectOne(any())).thenReturn(baseline());
         when(baselineMapper.updateById(any(ProjectNodeDevelopmentBaselineDO.class))).thenReturn(1);
         when(topicMapper.selectList(any())).thenReturn(List.of());
@@ -432,7 +433,8 @@ class NodeDevelopmentControlServiceTest {
 
         service.save(1L, 10L, cmd);
 
-        verify(storyMapper).insert(argThat((ProjectNodeDevelopmentStoryDO row) -> row.getProgress().equals(100)));
+        verify(storyMapper).insert(argThat((ProjectNodeDevelopmentStoryDO row) -> row.getProgress().equals(100)
+                && row.getTopicWorkflowNodeId().equals(40L)));
         verify(developmentItemWorkflowService).createIfDefaultExists(DevelopmentItemType.TOPIC, 20L, 1L, 10L);
         verify(developmentItemWorkflowService).createIfDefaultExists(DevelopmentItemType.STORY, 30L, 1L, 10L);
     }

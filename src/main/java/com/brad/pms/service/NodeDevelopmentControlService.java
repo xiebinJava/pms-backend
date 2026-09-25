@@ -397,6 +397,7 @@ public class NodeDevelopmentControlService {
         story.setProjectId(topic.getProjectId());
         story.setNodeId(topic.getNodeId());
         story.setTopicId(topic.getId());
+        story.setTopicWorkflowNodeId(developmentItemWorkflowService.resolveTopicStoryMountNodeId(topic.getId()));
         story.setIterationPlanId(cmd.getIterationPlanId());
         story.setTitle(cmd.getTitle());
         story.setOwnerId(cmd.getOwnerId());
