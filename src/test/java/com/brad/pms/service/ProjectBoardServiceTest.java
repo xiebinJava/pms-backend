@@ -50,6 +50,7 @@ class ProjectBoardServiceTest {
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
     @Mock ProjectNodeDevelopmentTopicMapper topicMapper;
     @Mock ProjectNodeAcceptanceDefectMapper defectMapper;
+    @Mock RequirementExecutionTargetReadService requirementTargetReadService;
     @InjectMocks ProjectService projectService;
 
     ProjectBoardService board;

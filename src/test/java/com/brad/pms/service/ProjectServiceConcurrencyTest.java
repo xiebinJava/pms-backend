@@ -37,6 +37,7 @@ class ProjectServiceConcurrencyTest {
     @Mock com.brad.pms.security.DataScopeResolver dataScopeResolver;
     @Mock com.brad.pms.mapper.OrgUnitMapper orgUnitMapper;
     @Mock OperationLogService operationLogService;
+    @Mock RequirementExecutionTargetReadService requirementTargetReadService;
 
     @InjectMocks ProjectService projectService;
 
