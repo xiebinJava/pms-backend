@@ -27,3 +27,7 @@ services:
 
 volumes:
   pms-mysql-data:
+    # Reuse the original local PMS database volume so existing users,
+    # projects, and organization data remain available after restarts.
+    external: true
+    name: pms-backend_mysql-data

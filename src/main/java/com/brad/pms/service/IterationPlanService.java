@@ -27,7 +27,8 @@ import com.brad.pms.mapper.ProjectNodeSolutionDecisionMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.workflow.WorkflowComponentKey;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -42,7 +43,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class IterationPlanService {
 
     private final ProjectNodeIterationPlanMapper iterationPlanMapper;
@@ -55,6 +55,30 @@ public class IterationPlanService {
     private final ProjectNodeDevelopmentTopicMapper topicMapper;
     private final ProjectNodeDevelopmentStoryMapper storyMapper;
     private final ProjectTaskMapper taskMapper;
+
+    @Autowired
+    public IterationPlanService(
+            ProjectNodeIterationPlanMapper iterationPlanMapper,
+            ProjectNodePlanBaselineMapper baselineMapper,
+            ProjectNodeSolutionDecisionMapper decisionMapper,
+            ProjectPermissionService permissionService,
+            UserService userService,
+            @Lazy ProjectService projectService,
+            ProjectNodeMapper nodeMapper,
+            ProjectNodeDevelopmentTopicMapper topicMapper,
+            ProjectNodeDevelopmentStoryMapper storyMapper,
+            ProjectTaskMapper taskMapper) {
+        this.iterationPlanMapper = iterationPlanMapper;
+        this.baselineMapper = baselineMapper;
+        this.decisionMapper = decisionMapper;
+        this.permissionService = permissionService;
+        this.userService = userService;
+        this.projectService = projectService;
+        this.nodeMapper = nodeMapper;
+        this.topicMapper = topicMapper;
+        this.storyMapper = storyMapper;
+        this.taskMapper = taskMapper;
+    }
 
     public List<NodeIterationPlanDTO> listByProject(Long projectId) {
         permissionService.requireProjectReadable(projectId);
