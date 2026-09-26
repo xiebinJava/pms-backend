@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-23-development-topic-management-design.md`
 
-**Repository roots:** Backend commands run from `/Users/fs/Desktop/Project/pms-backend`; frontend commands run from `/Users/fs/Desktop/Project/pms-front`. Backend file paths below are relative to the backend root; frontend file paths are absolute.
+**Repository roots:** Backend commands run from the backend repository root; frontend commands run from the sibling `../pms-front` checkout. Backend and frontend file paths below are relative to their respective repository roots.
 
 ## Global Constraints
 
@@ -138,10 +138,10 @@ ALTER TABLE project_node_development_topic
 - Modify: `src/main/java/com/brad/pms/dto/response/NodeDevelopmentControlDTO.java`
 - Modify: `src/main/java/com/brad/pms/service/NodeDevelopmentControlService.java`
 - Test: `src/test/java/com/brad/pms/service/NodeDevelopmentControlServiceTest.java`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/node-development-control.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/types/domain.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/DevelopmentControlWorkbench.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/development-control.test.mjs`
+- Modify: `../pms-front/src/api/node-development-control.ts`
+- Modify: `../pms-front/src/types/domain.ts`
+- Modify: `../pms-front/src/views/project/detail/components/DevelopmentControlWorkbench.vue`
+- Modify: `../pms-front/src/views/project/detail/development-control.test.mjs`
 
 **Interfaces:**
 - Produces: a single effective-definition resolver that overlays `development-control` for (a) the configured stable node key and (b) historical project nodes that still contain topic records; it supports v1 `components` and v2 `contentOrder` without mutating stored project workflow JSON.
@@ -170,15 +170,15 @@ dto.setTopicCreationAllowed(Objects.equals(node.getNodeKey(), sourceProjectNodeK
 ### Task 4: 流程模板管理页配置项目节点
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/types/workflow.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/admin-workflow.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/index.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-model.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-model.d.mts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-model.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-admin-visual.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/locales/zh-CN.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/locales/en-US.ts`
+- Modify: `../pms-front/src/types/workflow.ts`
+- Modify: `../pms-front/src/api/admin-workflow.ts`
+- Modify: `../pms-front/src/views/admin/workflows/index.vue`
+- Modify: `../pms-front/src/views/admin/workflows/workflow-template-model.mjs`
+- Modify: `../pms-front/src/views/admin/workflows/workflow-template-model.d.mts`
+- Modify: `../pms-front/src/views/admin/workflows/workflow-template-model.test.mjs`
+- Modify: `../pms-front/src/views/admin/workflows/workflow-admin-visual.test.mjs`
+- Modify: `../pms-front/src/locales/zh-CN.ts`
+- Modify: `../pms-front/src/locales/en-US.ts`
 
 **Interfaces:**
 - Consumes: `GET /admin/workflow-config/project-node-options` from Task 1.
@@ -201,12 +201,12 @@ interface WorkflowTemplateDefinitionV2 {
 ### Task 5: 专题/故事列表精简及专题编辑、删除、恢复
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/development-item.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/DevelopmentListPage.vue`
-- Create: `/Users/fs/Desktop/Project/pms-front/src/views/development/DevelopmentTopicEditModal.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/development-list.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/locales/zh-CN.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/locales/en-US.ts`
+- Modify: `../pms-front/src/api/development-item.ts`
+- Modify: `../pms-front/src/views/development/DevelopmentListPage.vue`
+- Create: `../pms-front/src/views/development/DevelopmentTopicEditModal.vue`
+- Modify: `../pms-front/src/views/development/development-list.test.mjs`
+- Modify: `../pms-front/src/locales/zh-CN.ts`
+- Modify: `../pms-front/src/locales/en-US.ts`
 
 **Interfaces:**
 - Consumes: Task 2’s page `deleted` scope, topic update/delete/restore routes and paged compatible-project options.

@@ -338,21 +338,21 @@ void createsStoryWithoutTopicAndPinsDefaultStoryWorkflow() {
 ### Task 6: 前端专题编辑、列表、详情和全员人员选择
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/DevelopmentTopicEditModal.vue`
-- Create: `/Users/fs/Desktop/Project/pms-front/src/views/development/DevelopmentStoryEditModal.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/DevelopmentListPage.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
-- Create: `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/TopicStorySection.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/components/DevelopmentItemTaskBoard.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/project/detail/components/DevelopmentControlWorkbench.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/development-item.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/locales/zh-CN.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/locales/en-US.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/development-list.test.mjs`
-- Create: `/Users/fs/Desktop/Project/pms-front/src/views/development/development-story-edit.test.mjs`
-- Create: `/Users/fs/Desktop/Project/pms-front/src/views/development/topic-story-section.test.mjs`
-- Modify: `/Users/fs/Desktop/Project/pms-front/docs/user-manual.md`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/manual/manual.test.mjs`
+- Modify: `../pms-front/src/views/development/DevelopmentTopicEditModal.vue`
+- Create: `../pms-front/src/views/development/DevelopmentStoryEditModal.vue`
+- Modify: `../pms-front/src/views/development/DevelopmentListPage.vue`
+- Modify: `../pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
+- Create: `../pms-front/src/views/development/detail/TopicStorySection.vue`
+- Modify: `../pms-front/src/views/development/detail/components/DevelopmentItemTaskBoard.vue`
+- Modify: `../pms-front/src/views/project/detail/components/DevelopmentControlWorkbench.vue`
+- Modify: `../pms-front/src/api/development-item.ts`
+- Modify: `../pms-front/src/locales/zh-CN.ts`
+- Modify: `../pms-front/src/locales/en-US.ts`
+- Modify: `../pms-front/src/views/development/development-list.test.mjs`
+- Create: `../pms-front/src/views/development/development-story-edit.test.mjs`
+- Create: `../pms-front/src/views/development/topic-story-section.test.mjs`
+- Modify: `../pms-front/docs/user-manual.md`
+- Modify: `../pms-front/src/views/manual/manual.test.mjs`
 
 **Interfaces:**
 - Topic create/update uses `projectId: number | null`; story create/update uses `topicId: number | null`; both associations can be explicitly cleared.
@@ -393,7 +393,7 @@ test('topic owner is independent from optional project association', () => {
 
 - [ ] **Step 1: Run backend focused suites:** `mvn -Dtest=FlywayMigrationVersionTest,OptionalDevelopmentContextMigrationTest,ProjectMemberAssignmentMigrationTest,UserServiceTest,MemberServiceTest,ProjectMemberAssignmentServiceTest,DevelopmentTopicManagementServiceTest,DevelopmentTopicRebindRollbackIntegrationTest,DevelopmentItemWorkflowServiceNodeEditTest,DevelopmentItemServiceTest,DevelopmentStoryManagementServiceTest,DevelopmentStoryManagementControllerTest,DevelopmentItemWorkflowControllerTest,NodeDevelopmentControlServiceTest,WorkflowComponentBindingServiceTest test`.
 - [ ] **Step 2: Run backend full suite:** `mvn test`.
-- [ ] **Step 3: Run frontend full tests and production build:** `pnpm test && pnpm build` from `/Users/fs/Desktop/Project/pms-front`.
+- [ ] **Step 3: Run frontend full tests and production build:** `pnpm test && pnpm build` from the sibling `../pms-front` checkout.
 - [ ] **Step 4: If local runtime is available, apply migration through normal startup and exercise create-unbound → edit owner → create story → assign node/parent-task/subtask → bind project → reassign/clear people → rebind/clear project; verify page refresh persistence, every current assignment has the right project member/reference, and only eligible auto-added members are reclaimed.**
 - [ ] **Step 5: Review both repository diffs against their pre-existing dirty state; confirm only this feature's hunks are claimed, `git diff --check` is clean, and no secrets/local data were staged.**
 - [ ] **Step 6: Report test outputs, any environment-blocked UI/database checks, and remaining limitations before deciding whether to commit the implementation.**

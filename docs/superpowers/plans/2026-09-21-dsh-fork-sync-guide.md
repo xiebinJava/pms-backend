@@ -26,7 +26,7 @@
 ### 2.1 取上游最新到 master（镜像，安全无冲突）
 
 ```bash
-cd /Users/fs/Desktop/Project/deepseek-harness
+cd /path/to/deepseek-harness
 git fetch --no-tags upstream master
 git branch -f master upstream/master   # 只允许对 master 这样做
 git log --oneline -1 master            # 看一眼取到哪个版本
@@ -61,7 +61,7 @@ git checkout release && git merge feat/xxx   # 做完并回 release（或先推�
 如果你不想直接在主线上解冲突，也可以保留一条独立工作分支，用 rebase 跟随上游，然后把结果并回 `master`。这条路径等价于 2026-09-21 那次操作：
 
 ```bash
-cd /Users/fs/Desktop/Project/deepseek-harness
+cd /path/to/deepseek-harness
 git config rerere.enabled true          # 只做一次：记住重复冲突的解法
 
 # 1) 你的分支 rebase 到上游基线
