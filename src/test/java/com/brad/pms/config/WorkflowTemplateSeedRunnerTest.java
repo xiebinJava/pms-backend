@@ -34,7 +34,7 @@ class WorkflowTemplateSeedRunnerTest {
     @InjectMocks WorkflowTemplateSeedRunner runner;
 
     @Test
-    void createsTopicAndStoryProcessTypesAsTemplateOnlyTypes() throws Exception {
+    void createsDevelopmentProcessTypesAsTemplateOnlyTypes() throws Exception {
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
         runner.run();
 
@@ -43,7 +43,7 @@ class WorkflowTemplateSeedRunnerTest {
         List<ProjectTypeDO> insertedTypes = captor.getAllValues();
 
         assertThat(insertedTypes).extracting(ProjectTypeDO::getCode)
-                .contains("general", "topic-management", "story-management");
+                .contains("general", "topic-management", "story-management", "requirement-management");
         assertThat(insertedTypes.stream()
                 .filter(type -> !"general".equals(type.getCode()))
                 .map(this::creationEnabledUnchecked))
@@ -55,14 +55,15 @@ class WorkflowTemplateSeedRunnerTest {
         ProjectTypeDO general = type(1L, "general", true);
         ProjectTypeDO topic = type(2L, "topic-management", false);
         ProjectTypeDO story = type(3L, "story-management", false);
-        when(projectTypeMapper.selectOne(any())).thenReturn(general, topic, story);
+        ProjectTypeDO requirement = type(4L, "requirement-management", false);
+        when(projectTypeMapper.selectOne(any())).thenReturn(general, topic, story, requirement);
         when(templateMapper.selectOne(any())).thenReturn(null);
         when(versionMapper.selectOne(any())).thenReturn(null);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
         runner.run();
 
-        verify(projectTypeMapper, times(3)).selectOne(any());
+        verify(projectTypeMapper, times(4)).selectOne(any());
         verify(projectTypeMapper, never()).insert(any(ProjectTypeDO.class));
     }
 

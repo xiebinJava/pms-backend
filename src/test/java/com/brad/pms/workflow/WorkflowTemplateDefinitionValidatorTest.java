@@ -234,6 +234,28 @@ class WorkflowTemplateDefinitionValidatorTest {
     }
 
     @Test
+    void acceptsRequirementExecutionOnlyForRequirementTemplates() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("decision", List.of(), List.of("component:requirement-execution"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator
+                .validateForProcessType("requirement-management", definition)).isEqualTo(definition);
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("topic-management", definition))
+                .hasMessageContaining("需求执行对象组件只能配置在需求流程");
+    }
+
+    @Test
+    void rejectsMountKeysFromRequirementTemplates() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(1,
+                List.of(node("decision", List.of())), "develop");
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("requirement-management", definition))
+                .hasMessageContaining("需求流程不能配置事项挂载点");
+    }
+
+    @Test
     void acceptsEmptyV2NodesAndRequiresOrderSlotsOnlyForDefinedFields() {
         WorkflowTemplateDefinition emptyNode = new WorkflowTemplateDefinition(2, List.of(
                 v2Node("empty", List.of(), List.of()),

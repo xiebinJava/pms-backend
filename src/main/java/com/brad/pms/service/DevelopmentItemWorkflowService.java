@@ -20,6 +20,7 @@ import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
 import com.brad.pms.entity.ProjectNodeIterationPlanDO;
+import com.brad.pms.entity.RequirementDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.entity.WorkflowTemplateVersionDO;
 import com.brad.pms.mapper.DevelopmentItemTaskMapper;
@@ -29,6 +30,7 @@ import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
+import com.brad.pms.mapper.RequirementMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.workflow.DevelopmentItemType;
@@ -67,6 +69,7 @@ public class DevelopmentItemWorkflowService {
     private final DevelopmentItemTaskMapper taskMapper;
     private final ProjectNodeDevelopmentTopicMapper topicMapper;
     private final ProjectNodeDevelopmentStoryMapper storyMapper;
+    private final RequirementMapper requirementMapper;
     private final ProjectNodeMapper projectNodeMapper;
     private final ProjectNodeIterationPlanMapper iterationPlanMapper;
     private final WorkflowTemplateVersionMapper templateVersionMapper;
@@ -99,6 +102,9 @@ public class DevelopmentItemWorkflowService {
             WorkflowTemplateService.WorkflowTemplateBinding binding) {
         if (itemId == null || (projectId == null) != (sourceNodeId == null)) {
             throw BusinessException.error("研发事项信息不完整，无法绑定流程");
+        }
+        if (itemType == DevelopmentItemType.REQUIREMENT && (projectId != null || sourceNodeId != null)) {
+            throw BusinessException.notFound("研发事项不属于独立事项范围");
         }
         if (projectId != null) permissionService.requireProjectReadable(projectId);
         requireItemScope(itemType, itemId, projectId, sourceNodeId);
@@ -544,7 +550,18 @@ public class DevelopmentItemWorkflowService {
         Long topicWorkflowNodeId = null;
         String topicWorkflowNodeName = null;
 
-        if (itemType == DevelopmentItemType.TOPIC) {
+        if (itemType == DevelopmentItemType.REQUIREMENT) {
+            RequirementDO requirement = requirementMapper.selectById(itemId);
+            if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) {
+                throw BusinessException.notFound("需求不存在");
+            }
+            title = requirement.getTitle();
+            projectId = null;
+            sourceNodeId = null;
+            ownerId = requirement.getOwnerId();
+            developmentStatus = requirement.getStatus();
+            developmentProgress = 0;
+        } else if (itemType == DevelopmentItemType.TOPIC) {
             ProjectNodeDevelopmentTopicDO topic = topicMapper.selectById(itemId);
             if (topic == null || Boolean.TRUE.equals(topic.getDeleted())) throw BusinessException.notFound("专题不存在");
             title = topic.getTitle();
@@ -691,10 +708,20 @@ public class DevelopmentItemWorkflowService {
     }
 
     private void requireItemScope(DevelopmentItemType itemType, Long itemId, Long projectId, Long sourceNodeId) {
+        if (itemType == DevelopmentItemType.REQUIREMENT && (projectId != null || sourceNodeId != null)) {
+            throw BusinessException.notFound("研发事项不属于独立事项范围");
+        }
         if ((projectId == null) != (sourceNodeId == null)) {
             throw BusinessException.notFound("研发事项来源节点不存在");
         }
         if (projectId == null) {
+            if (itemType == DevelopmentItemType.REQUIREMENT) {
+                RequirementDO requirement = requirementMapper.selectByIdForUpdate(itemId);
+                if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) {
+                    throw BusinessException.notFound("需求不存在");
+                }
+                return;
+            }
             if (itemType == DevelopmentItemType.TOPIC) {
                 ProjectNodeDevelopmentTopicDO topic = topicMapper.selectByIdForUpdate(itemId);
                 if (topic == null || Boolean.TRUE.equals(topic.getDeleted())

@@ -39,6 +39,8 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
                 "topic-management", "专题管理", "用于配置专题管理流程模板", 10, false);
         ensureProjectType(
                 "story-management", "故事管理", "用于配置故事管理流程模板", 20, false);
+        ensureProjectType(
+                "requirement-management", "需求管理", "用于配置需求管理流程模板", 30, false);
 
         WorkflowTemplateDO template = templateMapper.selectOne(new LambdaQueryWrapper<WorkflowTemplateDO>()
                 .eq(WorkflowTemplateDO::getCode, "current-process"));

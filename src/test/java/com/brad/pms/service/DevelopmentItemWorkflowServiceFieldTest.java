@@ -10,6 +10,7 @@ import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
+import com.brad.pms.mapper.RequirementMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
@@ -31,7 +32,7 @@ class DevelopmentItemWorkflowServiceFieldTest {
     private final DevelopmentItemWorkflowService service = new DevelopmentItemWorkflowService(
             mock(DevelopmentItemWorkflowMapper.class), mock(DevelopmentItemWorkflowNodeMapper.class),
             mock(DevelopmentItemTaskMapper.class), mock(ProjectNodeDevelopmentTopicMapper.class),
-            mock(ProjectNodeDevelopmentStoryMapper.class), mock(ProjectNodeMapper.class),
+            mock(ProjectNodeDevelopmentStoryMapper.class), mock(RequirementMapper.class), mock(ProjectNodeMapper.class),
             mock(ProjectNodeIterationPlanMapper.class), mock(WorkflowTemplateVersionMapper.class),
             mock(ProjectPermissionService.class), mock(UserService.class), workflowTemplateService,
             mock(WorkflowComponentBindingService.class), mock(ProjectMemberAssignmentService.class), new ObjectMapper());

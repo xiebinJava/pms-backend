@@ -13,7 +13,8 @@ public final class WorkflowTemplateDefinitionValidator {
             WorkflowComponentKey.SOLUTION_DESIGN, WorkflowComponentKey.PLAN_RESOURCE_RISK,
             WorkflowComponentKey.DEVELOPMENT_CONTROL, WorkflowComponentKey.BUSINESS_ACCEPTANCE,
             WorkflowComponentKey.RELEASE_HANDOVER, WorkflowComponentKey.VALUE_REVIEW,
-            WorkflowComponentKey.KNOWLEDGE_STANDARD, WorkflowComponentKey.STORY_LIST);
+            WorkflowComponentKey.KNOWLEDGE_STANDARD, WorkflowComponentKey.STORY_LIST,
+            WorkflowComponentKey.REQUIREMENT_EXECUTION);
     private static final Set<String> PROJECT_BASIC_INFO_FIELDS = Set.of("description", "priority", "projectLevel",
             "schedule", "businessLine", "projectManager", "projectMembers", "followers");
     private static final Set<WorkflowFieldType> V1_FIELD_TYPES = Set.of(
@@ -56,6 +57,22 @@ public final class WorkflowTemplateDefinitionValidator {
             } else {
                 validateV2Node(node);
             }
+        }
+        return definition;
+    }
+
+    public static WorkflowTemplateDefinition validateForProcessType(
+            String processTypeCode, WorkflowTemplateDefinition definition) {
+        validate(definition);
+        boolean hasRequirementExecution = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .anyMatch(WorkflowComponentKey.REQUIREMENT_EXECUTION::equals);
+        if (hasRequirementExecution && !"requirement-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("需求执行对象组件只能配置在需求流程");
+        }
+        if ("requirement-management".equals(processTypeCode)
+                && (!blank(definition.sourceProjectNodeKey()) || !blank(definition.sourceTopicNodeKey()))) {
+            throw new IllegalArgumentException("需求流程不能配置事项挂载点");
         }
         return definition;
     }

@@ -3,6 +3,7 @@ package com.brad.pms.service;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.response.ProjectTypeDTO;
+import com.brad.pms.dto.response.DevelopmentWorkflowTemplateOptionsDTO;
 import com.brad.pms.dto.response.WorkflowTemplateOptionsDTO;
 import com.brad.pms.entity.ProjectTypeDO;
 import com.brad.pms.entity.WorkflowTemplateDO;
@@ -143,6 +144,31 @@ class WorkflowTemplateServiceSelectionTest {
                 .containsExactly("general");
         assertThat(options.getTemplates()).extracting(item -> item.getProjectTypeId())
                 .containsOnly(3L);
+    }
+
+    @Test
+    void developmentOptionsExposeRequirementTemplatesAlongsideTopicAndStoryTemplates() {
+        ProjectTypeDO topic = type(4L, 41L);
+        topic.setCode("topic-management");
+        topic.setProjectCreationEnabled(false);
+        ProjectTypeDO story = type(5L, 51L);
+        story.setCode("story-management");
+        story.setProjectCreationEnabled(false);
+        ProjectTypeDO requirement = type(6L, 61L);
+        requirement.setCode("requirement-management");
+        requirement.setProjectCreationEnabled(false);
+        WorkflowTemplateDO template = template(16L, 6L);
+        when(projectTypeMapper.selectOne(any())).thenReturn(topic, story, requirement);
+        when(projectTypeMapper.selectList(isNull())).thenReturn(java.util.List.of(topic, story, requirement));
+        when(templateMapper.selectList(any())).thenReturn(java.util.List.of(template));
+        when(versionMapper.selectList(any())).thenReturn(java.util.List.of(version(61L, 16L, "PUBLISHED")));
+
+        DevelopmentWorkflowTemplateOptionsDTO options = service.developmentOptions();
+
+        assertThat(options.getTopicTemplates()).isNotEmpty();
+        assertThat(options.getStoryTemplates()).isNotEmpty();
+        assertThat(options.getRequirementTemplates()).extracting(item -> item.getProjectTypeId())
+                .containsOnly(6L);
     }
 
     @Test

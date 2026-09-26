@@ -12,6 +12,8 @@ public final class WorkflowComponentKey {
     public static final String KNOWLEDGE_STANDARD = "knowledge-standard";
     /** Configurable workbench for creating and maintaining stories within a topic workflow. */
     public static final String STORY_LIST = "story-list";
+    /** Configurable workbench for selecting one execution target for a requirement. */
+    public static final String REQUIREMENT_EXECUTION = "requirement-execution";
     /** Runtime-only component generated on the configured topic workflow mount node. */
     public static final String STORY_SPLIT = "story-split";
 

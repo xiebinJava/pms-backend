@@ -6,7 +6,8 @@ import java.util.Locale;
 
 public enum DevelopmentItemType {
     TOPIC("topic-management"),
-    STORY("story-management");
+    STORY("story-management"),
+    REQUIREMENT("requirement-management");
 
     private final String processTypeCode;
 

@@ -131,6 +131,7 @@ public class WorkflowTemplateService {
         DevelopmentWorkflowTemplateOptionsDTO options = new DevelopmentWorkflowTemplateOptionsDTO();
         options.setTopicTemplates(listTemplatesForProcessType("topic-management"));
         options.setStoryTemplates(listTemplatesForProcessType("story-management"));
+        options.setRequirementTemplates(listTemplatesForProcessType("requirement-management"));
         return options;
     }
 
@@ -216,12 +217,14 @@ public class WorkflowTemplateService {
             throw BusinessException.error(e.getMessage());
         }
         WorkflowTemplateDO template;
+        ProjectTypeDO processType;
         if (templateId == null) {
-            ProjectTypeDO type = requireActiveType(cmd.getProjectTypeId());
-            validateTopicSourceProjectNodeKey(type, definition);
+            processType = requireActiveType(cmd.getProjectTypeId());
+            definition = validateDefinitionForProcessType(processType.getCode(), definition);
+            validateTopicSourceProjectNodeKey(processType, definition);
             template = new WorkflowTemplateDO();
             template.setCode("wf-" + UUID.randomUUID().toString().replace("-", ""));
-            template.setProjectTypeId(type.getId());
+            template.setProjectTypeId(processType.getId());
             template.setName(cmd.getName().trim());
             template.setDescription(trimToNull(cmd.getDescription()));
             template.setLatestVersionNo(0);
@@ -235,7 +238,10 @@ public class WorkflowTemplateService {
             if (cmd.getProjectTypeId() != null && !cmd.getProjectTypeId().equals(template.getProjectTypeId())) {
                 throw BusinessException.error("流程模板所属项目类型不可更改");
             }
-            validateTopicSourceProjectNodeKey(projectTypeMapper.selectById(template.getProjectTypeId()), definition);
+            processType = projectTypeMapper.selectById(template.getProjectTypeId());
+            definition = validateDefinitionForProcessType(
+                    processType == null ? null : processType.getCode(), definition);
+            validateTopicSourceProjectNodeKey(processType, definition);
         }
 
         WorkflowTemplateVersionDO draft = findLatestVersion(template.getId(), "DRAFT");
@@ -283,6 +289,15 @@ public class WorkflowTemplateService {
         validateSourceNodeKeys(type, definition);
     }
 
+    private WorkflowTemplateDefinition validateDefinitionForProcessType(
+            String processTypeCode, WorkflowTemplateDefinition definition) {
+        try {
+            return WorkflowTemplateDefinitionValidator.validateForProcessType(processTypeCode, definition);
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.error(e.getMessage());
+        }
+    }
+
     private void validateSourceNodeKeys(ProjectTypeDO type, WorkflowTemplateDefinition definition) {
         if (type == null || definition == null) return;
         String projectNodeKey = trimToNull(definition.sourceProjectNodeKey());
@@ -319,7 +334,10 @@ public class WorkflowTemplateService {
         } catch (IllegalArgumentException e) {
             throw BusinessException.error(e.getMessage());
         }
-        validateSourceNodeKeys(projectTypeMapper.selectById(template.getProjectTypeId()), definition);
+        ProjectTypeDO processType = projectTypeMapper.selectById(template.getProjectTypeId());
+        definition = validateDefinitionForProcessType(
+                processType == null ? null : processType.getCode(), definition);
+        validateSourceNodeKeys(processType, definition);
         draft.setStatus("PUBLISHED");
         draft.setPublishedAt(LocalDateTime.now());
         if (versionMapper.updateById(draft) != 1) throw BusinessException.conflict("流程版本已被其他人修改");

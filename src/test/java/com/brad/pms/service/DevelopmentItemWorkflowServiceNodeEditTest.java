@@ -18,6 +18,7 @@ import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
+import com.brad.pms.mapper.RequirementMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
@@ -209,6 +210,7 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
         private final DevelopmentItemTaskMapper taskMapper = mock(DevelopmentItemTaskMapper.class);
         private final ProjectNodeDevelopmentTopicMapper topicMapper = mock(ProjectNodeDevelopmentTopicMapper.class);
         private final ProjectNodeDevelopmentStoryMapper storyMapper = mock(ProjectNodeDevelopmentStoryMapper.class);
+        private final RequirementMapper requirementMapper = mock(RequirementMapper.class);
         private final ProjectNodeMapper projectNodeMapper = mock(ProjectNodeMapper.class);
         private final ProjectNodeIterationPlanMapper iterationPlanMapper = mock(ProjectNodeIterationPlanMapper.class);
         private final WorkflowTemplateVersionMapper templateVersionMapper = mock(WorkflowTemplateVersionMapper.class);
@@ -227,7 +229,7 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
 
         private Fixture(int status) {
             service = new DevelopmentItemWorkflowService(workflowMapper, nodeMapper, taskMapper, topicMapper,
-                    storyMapper, projectNodeMapper, iterationPlanMapper, templateVersionMapper,
+                    storyMapper, requirementMapper, projectNodeMapper, iterationPlanMapper, templateVersionMapper,
                     permissionService, userService, workflowTemplateService, workflowComponentBindingService,
                     assignmentService, new ObjectMapper());
 
