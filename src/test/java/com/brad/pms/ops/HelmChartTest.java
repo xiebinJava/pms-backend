@@ -22,7 +22,7 @@ class HelmChartTest {
         String readme = Files.readString(CHART.resolve("README.md"));
 
         assertThat(chart).contains("name: pms");
-        assertThat(chart).contains("version: 1.0.0");
+        assertThat(chart).contains("version: 1.0.8");
         assertThat(values).contains("mysqlHost: mysql.example.com");
         assertThat(values).contains("corsAllowedOrigins: https://pms.example.com");
         assertThat(values).contains("bootstrapAdminEmail: admin@example.com");
