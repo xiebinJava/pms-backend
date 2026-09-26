@@ -172,6 +172,7 @@ jobs:
       - name: Run desktop and mobile browser smoke tests
         working-directory: pms-front
         env:
+          E2E_BASE_URL: http://127.0.0.1:5173
           PMS_E2E_BASE_URL: http://127.0.0.1:5173
           E2E_USERNAME: alex.zhang@example.com
         run: pnpm exec playwright test

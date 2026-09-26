@@ -31,11 +31,10 @@ grep -F -- "default: release" "$integration_workflow" >/dev/null \
   || fail "integration workflow must default to the frontend release branch"
 grep -F -- 'ref: ${{ inputs.frontend_ref || '\''release'\'' }}' "$integration_workflow" >/dev/null \
   || fail "integration workflow must check out the frontend release branch by default"
+grep -E -- '^[[:space:]]+E2E_BASE_URL: http://127\.0\.0\.1:5173$' "$integration_workflow" >/dev/null \
+  || fail "integration workflow must pass the live E2E base URL variable expected by browser smoke tests"
 grep -F -- 'PMS_E2E_BASE_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \
   || fail "integration workflow must pass the frontend base URL variable expected by Playwright"
-if grep -E -- '^[[:space:]]+E2E_BASE_URL:' "$integration_workflow" >/dev/null; then
-  fail "integration workflow uses the obsolete E2E_BASE_URL variable"
-fi
 
 health_controller="$BACKEND_DIR/src/main/java/com/brad/pms/controller/HealthController.java"
 health_baseline="$(sed -nE 's/.*LATEST_MIGRATION_VERSION = ([0-9]+);.*/\1/p' "$health_controller" | head -n 1)"
