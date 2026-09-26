@@ -45,4 +45,5 @@ public class ProjectDTO {
     private ProjectPermissionsDTO permissions;
     private ProjectReadinessDTO readiness;
     private ProjectAttentionSummaryDTO attentionSummary;
+    private SourceRequirementSummaryDTO sourceRequirement;
 }

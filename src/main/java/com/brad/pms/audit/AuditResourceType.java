@@ -5,6 +5,7 @@ public enum AuditResourceType {
     PROJECT,
     PROJECT_NODE,
     DEVELOPMENT_TOPIC,
+    REQUIREMENT,
     PROJECT_NODE_FIELD_ATTACHMENT,
     TASK,
     PROJECT_MEMBER,

@@ -12,6 +12,7 @@ import com.brad.pms.dto.request.DevelopmentItemTaskSaveCmd;
 import com.brad.pms.dto.response.DevelopmentItemTaskDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
+import com.brad.pms.dto.response.RequirementExecutionTargetDTO;
 import com.brad.pms.entity.DevelopmentItemTaskDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
@@ -23,6 +24,7 @@ import com.brad.pms.entity.ProjectNodeIterationPlanDO;
 import com.brad.pms.entity.RequirementDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.entity.WorkflowTemplateVersionDO;
+import com.brad.pms.common.enums.RequirementExecutionTargetType;
 import com.brad.pms.mapper.DevelopmentItemTaskMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
@@ -40,6 +42,7 @@ import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
 import com.brad.pms.workflow.WorkflowFieldValueValidator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,6 +82,18 @@ public class DevelopmentItemWorkflowService {
     private final WorkflowComponentBindingService workflowComponentBindingService;
     private final ProjectMemberAssignmentService assignmentService;
     private final ObjectMapper objectMapper;
+    private RequirementExecutionTargetReadService requirementTargetReadService;
+    private RequirementExecutionTargetService requirementExecutionTargetService;
+
+    @Autowired(required = false)
+    public void setRequirementTargetReadService(RequirementExecutionTargetReadService requirementTargetReadService) {
+        this.requirementTargetReadService = requirementTargetReadService;
+    }
+
+    @Autowired(required = false)
+    public void setRequirementExecutionTargetService(RequirementExecutionTargetService requirementExecutionTargetService) {
+        this.requirementExecutionTargetService = requirementExecutionTargetService;
+    }
 
     /** Creates a pinned snapshot of the current default, when one is configured. */
     @Transactional
@@ -393,6 +408,24 @@ public class DevelopmentItemWorkflowService {
         dto.setLatestBuildVersion(context.latestBuildVersion());
         dto.setTestStatus(context.testStatus());
         dto.setIterationPlanName(context.iterationPlanName());
+        if (context.itemType() == DevelopmentItemType.REQUIREMENT) {
+            if (requirementTargetReadService != null) {
+                dto.setExecutionTarget(requirementTargetReadService.findCurrentTarget(
+                        requirementMapper.selectById(context.itemId())));
+            } else if (context.executionTargetType() != null && context.executionTargetId() != null) {
+                RequirementExecutionTargetDTO target = new RequirementExecutionTargetDTO();
+                target.setTargetType(context.executionTargetType());
+                target.setTargetId(context.executionTargetId());
+                dto.setExecutionTarget(target);
+            }
+            dto.setExecutionTargetHistory(requirementExecutionTargetService == null
+                    ? List.of() : requirementExecutionTargetService.history(context.itemId()));
+        } else if (requirementTargetReadService != null) {
+            RequirementExecutionTargetType targetType = context.itemType() == DevelopmentItemType.TOPIC
+                    ? RequirementExecutionTargetType.TOPIC : RequirementExecutionTargetType.STORY;
+            dto.setSourceRequirement(requirementTargetReadService.findDirectSourceForTarget(
+                    targetType, context.itemId()));
+        }
 
         if (workflow == null) {
             dto.setWorkflowConfigured(false);
@@ -549,6 +582,8 @@ public class DevelopmentItemWorkflowService {
         String topicTitle = null;
         Long topicWorkflowNodeId = null;
         String topicWorkflowNodeName = null;
+        RequirementExecutionTargetType executionTargetType = null;
+        Long executionTargetId = null;
 
         if (itemType == DevelopmentItemType.REQUIREMENT) {
             RequirementDO requirement = requirementMapper.selectById(itemId);
@@ -561,6 +596,8 @@ public class DevelopmentItemWorkflowService {
             ownerId = requirement.getOwnerId();
             developmentStatus = requirement.getStatus();
             developmentProgress = 0;
+            executionTargetType = requirement.getExecutionTargetType();
+            executionTargetId = requirement.getExecutionTargetId();
         } else if (itemType == DevelopmentItemType.TOPIC) {
             ProjectNodeDevelopmentTopicDO topic = topicMapper.selectById(itemId);
             if (topic == null || Boolean.TRUE.equals(topic.getDeleted())) throw BusinessException.notFound("专题不存在");
@@ -626,7 +663,7 @@ public class DevelopmentItemWorkflowService {
         return new ItemContext(itemType, itemId, title, project, sourceNode, topicId, topicTitle,
                 topicWorkflowNodeId, topicWorkflowNodeName, ownerId,
                 developmentStatus, developmentProgress, storyPoints, startDate, dueDate, blocker,
-                latestBuildVersion, testStatus, iterationPlanName);
+                latestBuildVersion, testStatus, iterationPlanName, executionTargetType, executionTargetId);
     }
 
     private ItemContext requireWritableItem(DevelopmentItemType itemType, Long itemId, String action) {
@@ -831,5 +868,7 @@ public class DevelopmentItemWorkflowService {
             String blocker,
             String latestBuildVersion,
             String testStatus,
-            String iterationPlanName) { }
+            String iterationPlanName,
+            RequirementExecutionTargetType executionTargetType,
+            Long executionTargetId) { }
 }

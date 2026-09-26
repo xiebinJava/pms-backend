@@ -30,6 +30,9 @@ public class DevelopmentItemWorkflowDetailDTO {
     private String latestBuildVersion;
     private String testStatus;
     private String iterationPlanName;
+    private SourceRequirementSummaryDTO sourceRequirement;
+    private RequirementExecutionTargetDTO executionTarget;
+    private List<RequirementExecutionTargetHistoryDTO> executionTargetHistory;
 
     private Boolean workflowConfigured;
     private String workflowStatus;

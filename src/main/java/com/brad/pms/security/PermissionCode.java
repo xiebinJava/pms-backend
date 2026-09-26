@@ -16,6 +16,9 @@ public final class PermissionCode {
     public static final String PROJECT_WRITE = "project:write";
     public static final String PROJECT_MANAGE = "project:manage";
     public static final String PROJECT_COMMENT_WRITE = "project:comment:write";
+    public static final String REQUIREMENT_READ = "requirement:read";
+    public static final String REQUIREMENT_WRITE = "requirement:write";
+    public static final String REQUIREMENT_MANAGE = "requirement:manage";
     public static final String FEEDBACK_READ = "feedback:read";
     public static final String FEEDBACK_WRITE = "feedback:write";
     public static final String FEEDBACK_MANAGE = "feedback:manage";

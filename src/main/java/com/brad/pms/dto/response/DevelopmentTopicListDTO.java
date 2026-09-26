@@ -26,4 +26,5 @@ public class DevelopmentTopicListDTO {
     private String latestBuildVersion;
     private String testStatus;
     private String blocker;
+    private SourceRequirementSummaryDTO sourceRequirement;
 }

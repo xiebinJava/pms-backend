@@ -7,6 +7,7 @@ import com.brad.pms.common.ProjectScheduleRange;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.common.enums.ProjectLevel;
 import com.brad.pms.common.enums.ProjectStatus;
+import com.brad.pms.common.enums.RequirementExecutionTargetType;
 import com.brad.pms.audit.AuditAction;
 import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
@@ -19,6 +20,7 @@ import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.ProjectAttentionSummaryDTO;
 import com.brad.pms.dto.response.ProjectListSummaryDTO;
 import com.brad.pms.dto.response.ProjectPermissionsDTO;
+import com.brad.pms.dto.response.SourceRequirementSummaryDTO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectLifecycleLogDO;
 import com.brad.pms.entity.ProjectMemberDO;
@@ -67,6 +69,7 @@ public class ProjectService {
     private final DataScopeResolver dataScopeResolver;
     private final OrgUnitMapper orgUnitMapper;
     private final OperationLogService operationLogService;
+    private final RequirementExecutionTargetReadService requirementTargetReadService;
     private WorkflowTemplateService workflowTemplateService;
     private ProjectAttentionService attentionService;
 
@@ -598,6 +601,10 @@ public class ProjectService {
         if (projects.isEmpty()) return Collections.emptyList();
 
         List<Long> projectIds = projects.stream().map(ProjectDO::getId).collect(Collectors.toList());
+        Map<Long, SourceRequirementSummaryDTO> loadedSourceRequirements = requirementTargetReadService
+                .findDirectSourcesForTargets(RequirementExecutionTargetType.PROJECT, projectIds);
+        Map<Long, SourceRequirementSummaryDTO> sourceRequirements = loadedSourceRequirements == null
+                ? Map.of() : loadedSourceRequirements;
         Set<Long> userIds = projects.stream().map(ProjectDO::getOwnerId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         projects.stream().map(ProjectDO::getCreatedBy).filter(Objects::nonNull).forEach(userIds::add);
@@ -658,6 +665,7 @@ public class ProjectService {
                 dto.setCurrentNodeName(currentNode.getName());
             }
             dto.setPermissions(preloadedPermissions == null ? permissionService.projectPermissions(p) : preloadedPermissions.get(pid));
+            dto.setSourceRequirement(sourceRequirements.get(pid));
             return dto;
         }).collect(Collectors.toList());
         if (attentionService != null) {

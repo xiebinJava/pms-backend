@@ -31,4 +31,5 @@ public class DevelopmentStoryListDTO {
     private LocalDate startDate;
     private LocalDate dueDate;
     private String blocker;
+    private SourceRequirementSummaryDTO sourceRequirement;
 }

@@ -3,8 +3,10 @@ package com.brad.pms.controller;
 import com.brad.pms.common.page.PageResult;
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.DevelopmentItemPageQry;
+import com.brad.pms.dto.request.RequirementPageQry;
 import com.brad.pms.dto.response.DevelopmentStoryListDTO;
 import com.brad.pms.dto.response.DevelopmentTopicListDTO;
+import com.brad.pms.dto.response.RequirementListDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import com.brad.pms.service.DevelopmentItemService;
@@ -31,5 +33,11 @@ public class DevelopmentItemController {
     @RequirePermission(PermissionCode.PROJECT_READ)
     public ResponseResult<PageResult<DevelopmentStoryListDTO>> stories(@RequestBody(required = false) DevelopmentItemPageQry qry) {
         return ResponseResult.success(service.pageStories(qry));
+    }
+
+    @PostMapping("/requirements/page")
+    @RequirePermission(PermissionCode.REQUIREMENT_READ)
+    public ResponseResult<PageResult<RequirementListDTO>> requirements(@RequestBody(required = false) RequirementPageQry qry) {
+        return ResponseResult.success(service.pageRequirements(qry));
     }
 }
