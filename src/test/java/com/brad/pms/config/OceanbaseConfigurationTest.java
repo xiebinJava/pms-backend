@@ -36,12 +36,12 @@ class OceanbaseConfigurationTest {
     }
 
     @Test
-    void defaultRuntimeUsesOceanbaseAndRequiresExplicitJwtSecret() throws Exception {
+    void defaultRuntimeUsesMysqlAndRequiresExplicitJwtSecret() throws Exception {
         List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
                 "application", new FileSystemResource("src/main/resources/application.yml"));
         PropertySource<?> source = sources.get(0);
 
-        assertThat(source.getProperty("spring.profiles.default")).isEqualTo("oceanbase");
+        assertThat(source.getProperty("spring.profiles.default")).isEqualTo("mysql");
         assertThat(source.getProperty("spring.sql.init.mode")).isEqualTo("never");
         assertThat(source.getProperty("pms.jwt.secret")).isEqualTo("${PMS_JWT_SECRET:}");
         assertThat(source.getProperty("pms.security.cors.allowed-origins"))
@@ -49,14 +49,12 @@ class OceanbaseConfigurationTest {
     }
 
     @Test
-    void composeSeparatesRuntimeAndMigrationDatabaseAccounts() throws Exception {
+    void composeUsesMysqlRuntimeAccount() throws Exception {
         String compose = Files.readString(Path.of("docker-compose.example.yml"));
 
-        assertThat(compose).contains("OCEANBASE_USER: pms_app");
-        assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_APP_PASSWORD:?set PMS_APP_PASSWORD}");
-        assertThat(compose).contains("OCEANBASE_USER: pms_migrator");
-        assertThat(compose).contains("OCEANBASE_PASSWORD: ${PMS_MIGRATOR_PASSWORD:?set PMS_MIGRATOR_PASSWORD}");
-        assertThat(compose).doesNotContain("OCEANBASE_USER: ${OCEANBASE_USER:-root@sys}");
+        assertThat(compose).contains("MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER}");
+        assertThat(compose).contains("MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD}");
+        assertThat(compose).doesNotContain("OCEANBASE_");
     }
 
     @Test
