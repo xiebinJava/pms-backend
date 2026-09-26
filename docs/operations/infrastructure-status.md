@@ -4,7 +4,7 @@
 
 本文件只记录企业级基础设施状态，不代表业务功能已经完成生产验收。每完成一个基础设施任务，必须补充验证命令、结果和对应提交。
 
-> 说明：本文下方的 V21 / V15 等内容是对应日期的历史验收快照。当前运行时为 MySQL 8，发布基线为 V41；当前安装与升级请以 [README](../../README.md)、[企业升级手册](enterprise-upgrade-runbook.md) 和 `scripts/release-consistency.test.sh` 为准。
+> 说明：本文下方的 V21 / V15 等内容是对应日期的历史验收快照。当前运行时为 MySQL 8，发布基线为 V55；当前安装与升级请以 [README](../../README.md)、[企业升级手册](enterprise-upgrade-runbook.md) 和 `scripts/release-consistency.test.sh` 为准。
 
 ## 当前基线
 

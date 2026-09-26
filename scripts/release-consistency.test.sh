@@ -23,7 +23,7 @@ latest_migration="$({ find "$BACKEND_DIR/src/main/resources/db/migration" -maxde
   | sed -nE 's/^V([0-9]+)__.*\.sql$/\1/p' \
   | sort -n \
   | tail -n 1)"
-[[ "$latest_migration" == "49" ]] || fail "expected current migration baseline V1–V49, found V${latest_migration:-unknown}"
+[[ "$latest_migration" == "55" ]] || fail "expected current migration baseline V1–V55, found V${latest_migration:-unknown}"
 
 health_controller="$BACKEND_DIR/src/main/java/com/brad/pms/controller/HealthController.java"
 health_baseline="$(sed -nE 's/.*LATEST_MIGRATION_VERSION = ([0-9]+);.*/\1/p' "$health_controller" | head -n 1)"
@@ -50,4 +50,4 @@ for route in \
   grep -F -- "$route" "$openapi" >/dev/null || fail "feedback route missing from OpenAPI contract: $route"
 done
 
-echo "Release consistency checks passed: migration=V1–V49, readiness=aligned, READMEs=current, feedback routes=documented"
+echo "Release consistency checks passed: migration=V1–V55, readiness=aligned, READMEs=current, feedback routes=documented"
