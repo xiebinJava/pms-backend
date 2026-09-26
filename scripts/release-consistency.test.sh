@@ -35,6 +35,17 @@ grep -E -- '^[[:space:]]+E2E_BASE_URL: http://127\.0\.0\.1:5173$' "$integration_
   || fail "integration workflow must pass the live E2E base URL variable expected by browser smoke tests"
 grep -F -- 'PMS_E2E_BASE_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \
   || fail "integration workflow must pass the frontend base URL variable expected by Playwright"
+grep -F -- 'PMS_PROJECT_LIST_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \
+  || fail "integration workflow must pass the frontend base URL variable expected by project-list and task browser tests"
+for browser_command in \
+  'pnpm exec playwright test tests/e2e/auth-and-project.spec.ts tests/e2e/manual-record.spec.ts tests/e2e/task-overdue-reschedule.spec.ts' \
+  'pnpm exec playwright test --config tests/e2e/playwright.enterprise-board.config.mjs' \
+  'pnpm exec playwright test --config tests/e2e/playwright.project-list.config.mjs' \
+  'pnpm exec playwright test --config tests/workflows/playwright.config.mjs' \
+  'pnpm exec playwright test --config tests/workflows/solution-design-autosave.config.mjs'; do
+  grep -F -- "$browser_command" "$integration_workflow" >/dev/null \
+    || fail "integration workflow is missing the dedicated browser command: $browser_command"
+done
 
 health_controller="$BACKEND_DIR/src/main/java/com/brad/pms/controller/HealthController.java"
 health_baseline="$(sed -nE 's/.*LATEST_MIGRATION_VERSION = ([0-9]+);.*/\1/p' "$health_controller" | head -n 1)"

@@ -169,13 +169,30 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps chromium
-      - name: Run desktop and mobile browser smoke tests
+      - name: Run live browser smoke tests
         working-directory: pms-front
         env:
           E2E_BASE_URL: http://127.0.0.1:5173
+          PMS_PROJECT_LIST_URL: http://127.0.0.1:5173
+          E2E_USERNAME: alex.zhang@example.com
+        run: pnpm exec playwright test tests/e2e/auth-and-project.spec.ts tests/e2e/manual-record.spec.ts tests/e2e/task-overdue-reschedule.spec.ts
+      - name: Run enterprise board browser smoke tests
+        working-directory: pms-front
+        run: pnpm exec playwright test --config tests/e2e/playwright.enterprise-board.config.mjs
+      - name: Run project list browser smoke tests
+        working-directory: pms-front
+        env:
+          PMS_PROJECT_LIST_URL: http://127.0.0.1:5173
+        run: pnpm exec playwright test --config tests/e2e/playwright.project-list.config.mjs
+      - name: Run workflow field builder browser smoke tests
+        working-directory: pms-front
+        env:
           PMS_E2E_BASE_URL: http://127.0.0.1:5173
           E2E_USERNAME: alex.zhang@example.com
-        run: pnpm exec playwright test
+        run: pnpm exec playwright test --config tests/workflows/playwright.config.mjs
+      - name: Run solution design autosave browser smoke tests
+        working-directory: pms-front
+        run: pnpm exec playwright test --config tests/workflows/solution-design-autosave.config.mjs
       - name: Show service status on failure
         if: ${{ failure() && hashFiles('.env') != '' }}
         run: |
