@@ -165,7 +165,7 @@ class ProjectPermissionServiceTest {
         when(workflowTemplateService.getNodeDefinition(15L, "develop")).thenReturn(
                 new WorkflowNodeDefinition("develop", "开发与迭代控制", "", "", "", List.of(),
                         List.of(), false, List.of()));
-        when(workflowTemplateService.resolveTopicSourceProjectNodeKey()).thenReturn("develop");
+        when(workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(15L)).thenReturn("develop");
         when(topicMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
         assertThatCode(() -> service().requireNodeComponent(node, WorkflowComponentKey.DEVELOPMENT_CONTROL,
@@ -202,7 +202,7 @@ class ProjectPermissionServiceTest {
         when(workflowTemplateService.getDefinition(15L)).thenReturn(new WorkflowTemplateDefinition(1, List.of(
                 new WorkflowNodeDefinition("develop", "开发与迭代控制", "", "", "", List.of(),
                         List.of(), false, List.of()))));
-        when(workflowTemplateService.resolveTopicSourceProjectNodeKey()).thenReturn("develop");
+        when(workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(15L)).thenReturn("develop");
         when(nodeMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(node));
         when(topicMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 

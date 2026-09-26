@@ -479,6 +479,15 @@ public class WorkflowTemplateService {
         return configuredKey == null ? LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY : configuredKey;
     }
 
+    /**
+     * Resolves the topic host from an already loaded runtime definition.
+     * Batch readers use this overload to avoid reloading the pinned version.
+     */
+    public String resolveTopicSourceProjectNodeKeyForRuntime(WorkflowTemplateDefinition definition) {
+        String configuredKey = definition == null ? null : trimToNull(definition.sourceProjectNodeKey());
+        return configuredKey == null ? LEGACY_TOPIC_SOURCE_PROJECT_NODE_KEY : configuredKey;
+    }
+
     public String resolveStorySourceTopicNodeKey(Long templateVersionId) {
         if (templateVersionId == null) return null;
         return trimToNull(getDefinition(templateVersionId).sourceTopicNodeKey());

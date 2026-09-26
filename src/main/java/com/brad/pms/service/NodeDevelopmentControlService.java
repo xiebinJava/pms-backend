@@ -17,6 +17,7 @@ import com.brad.pms.dto.response.NodeDevelopmentSummaryDTO;
 import com.brad.pms.dto.response.NodeDevelopmentTopicDTO;
 import com.brad.pms.dto.response.NodeIterationPlanDTO;
 import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentBaselineDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
@@ -98,7 +99,7 @@ public class NodeDevelopmentControlService {
         ProjectNodeDO node = requireDevelopNode(permissionService.requireManageableNode(
                 projectId, nodeId, "保存开发测试与项目控制"));
         validatePayload(cmd);
-        if (!workflowComponentBindingService.topicCreationAllowed(node)
+        if (!topicCreationAllowed(node)
                 && cmd.getTopics().stream().anyMatch(topic -> !isPersistedId(topic.getId()))) {
             throw BusinessException.error("当前节点不是专题模板配置节点，不能新增专题");
         }
@@ -451,7 +452,7 @@ public class NodeDevelopmentControlService {
         dto.setVersion(baseline == null ? null : baseline.getVersion());
         dto.setCurrentIteration(baseline == null ? null : baseline.getCurrentIteration());
         dto.setCanEdit(!NodeStatus.isReadOnly(node.getStatus()));
-        dto.setTopicCreationAllowed(workflowComponentBindingService.topicCreationAllowed(node));
+        dto.setTopicCreationAllowed(topicCreationAllowed(node));
         dto.setUpdatedAt(baseline == null ? null : baseline.getUpdatedAt());
         List<NodeDevelopmentTopicDTO> topicDTOs = topics.stream()
                 .map(topic -> toTopicDTO(topic, storiesByTopic.getOrDefault(topic.getId(), List.of()), userMap, iterationPlanNamesById))
@@ -555,6 +556,14 @@ public class NodeDevelopmentControlService {
         permissionService.requireNodeComponent(node, WorkflowComponentKey.DEVELOPMENT_CONTROL,
                 "仅配置了开发控制组件的节点支持开发工作台");
         return node;
+    }
+
+    private boolean topicCreationAllowed(ProjectNodeDO node) {
+        ProjectDO project = permissionService.requireProjectReadable(node == null ? null : node.getProjectId());
+        if (project == null || project.getWorkflowTemplateVersionId() == null) {
+            return workflowComponentBindingService.topicCreationAllowed(node);
+        }
+        return workflowComponentBindingService.topicCreationAllowed(node, project.getWorkflowTemplateVersionId());
     }
 
     private String normalize(String value, String fallback) {

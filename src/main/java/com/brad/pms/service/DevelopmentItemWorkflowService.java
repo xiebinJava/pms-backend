@@ -13,6 +13,7 @@ import com.brad.pms.dto.response.DevelopmentItemTaskDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.dto.response.RequirementExecutionTargetDTO;
+import com.brad.pms.dto.response.SourceRequirementSummaryDTO;
 import com.brad.pms.entity.DevelopmentItemTaskDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
@@ -423,8 +424,10 @@ public class DevelopmentItemWorkflowService {
         } else if (requirementTargetReadService != null) {
             RequirementExecutionTargetType targetType = context.itemType() == DevelopmentItemType.TOPIC
                     ? RequirementExecutionTargetType.TOPIC : RequirementExecutionTargetType.STORY;
-            dto.setSourceRequirement(requirementTargetReadService.findDirectSourceForTarget(
-                    targetType, context.itemId()));
+            List<SourceRequirementSummaryDTO> sourceRequirements =
+                    requirementTargetReadService.findDirectSourcesForTarget(targetType, context.itemId());
+            dto.setSourceRequirements(sourceRequirements);
+            dto.setSourceRequirement(sourceRequirements.isEmpty() ? null : sourceRequirements.get(0));
         }
 
         if (workflow == null) {

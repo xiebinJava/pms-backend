@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,6 +33,7 @@ public class RequirementExecutionTargetReadService {
     private final RequirementMapper requirementMapper;
     private final UserService userService;
     private final ProjectMapper projectMapper;
+    private final ProjectPermissionService projectPermissionService;
     private final ProjectNodeDevelopmentTopicMapper topicMapper;
     private final ProjectNodeDevelopmentStoryMapper storyMapper;
 
@@ -61,7 +63,14 @@ public class RequirementExecutionTargetReadService {
         return toSummary(requirement, owner);
     }
 
-    public Map<Long, SourceRequirementSummaryDTO> findDirectSourcesForTargets(
+    public List<SourceRequirementSummaryDTO> findDirectSourcesForTarget(
+            RequirementExecutionTargetType targetType, Long targetId) {
+        if (targetType == null || targetId == null) return List.of();
+        return findDirectSourcesForTargets(targetType, List.of(targetId))
+                .getOrDefault(targetId, List.of());
+    }
+
+    public Map<Long, List<SourceRequirementSummaryDTO>> findDirectSourcesForTargets(
             RequirementExecutionTargetType targetType, Collection<Long> targetIds) {
         if (targetType == null || targetIds == null || targetIds.isEmpty()) return Map.of();
         List<Long> ids = targetIds.stream().filter(Objects::nonNull).distinct().toList();
@@ -76,9 +85,11 @@ public class RequirementExecutionTargetReadService {
                 .collect(Collectors.toMap(UserDO::getId, Function.identity(), (left, right) -> left));
         return requirements.stream()
                 .filter(requirement -> !Boolean.TRUE.equals(requirement.getDeleted()))
-                .collect(Collectors.toMap(RequirementDO::getExecutionTargetId,
-                        requirement -> toSummary(requirement, owners.get(requirement.getOwnerId())),
-                        (left, right) -> left));
+                .filter(requirement -> requirement.getExecutionTargetId() != null)
+                .collect(Collectors.groupingBy(RequirementDO::getExecutionTargetId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(requirement -> toSummary(requirement,
+                                owners.get(requirement.getOwnerId())), Collectors.toList())));
     }
 
     private SourceRequirementSummaryDTO toSummary(RequirementDO requirement, UserDO owner) {
@@ -100,9 +111,10 @@ public class RequirementExecutionTargetReadService {
             dto.setStatus("UNAVAILABLE");
             return dto;
         }
+        if (!projectPermissionService.canReadProject(project)) return unavailable(dto);
         dto.setTitle(project.getName());
         dto.setCode(project.getCode());
-        dto.setStatus(String.valueOf(ProjectStatus.normalize(project.getStatus())));
+        dto.setStatus(projectStatus(project));
         dto.setOwnerId(project.getOwnerId());
         dto.setOwnerName(displayName(project.getOwnerId()));
         dto.setProgress(project.getProgress());
@@ -115,6 +127,10 @@ public class RequirementExecutionTargetReadService {
         if (topic == null) {
             dto.setStatus("UNAVAILABLE");
             return dto;
+        }
+        if (topic.getProjectId() != null) {
+            ProjectDO project = projectMapper.selectIncludingDeleted(topic.getProjectId());
+            if (!projectPermissionService.canReadProject(project)) return unavailable(dto);
         }
         dto.setTitle(topic.getTitle());
         dto.setStatus(Boolean.TRUE.equals(topic.getDeleted()) ? "DELETED" : "ACTIVE");
@@ -129,6 +145,10 @@ public class RequirementExecutionTargetReadService {
         if (story == null) {
             dto.setStatus("UNAVAILABLE");
             return dto;
+        }
+        if (story.getProjectId() != null) {
+            ProjectDO project = projectMapper.selectIncludingDeleted(story.getProjectId());
+            if (!projectPermissionService.canReadProject(project)) return unavailable(dto);
         }
         dto.setTitle(story.getTitle());
         dto.setStatus(story.getStatus());
@@ -146,6 +166,27 @@ public class RequirementExecutionTargetReadService {
         dto.setNavigationType(navigationType);
         dto.setNavigationId(targetId);
         return dto;
+    }
+
+    private RequirementExecutionTargetDTO unavailable(RequirementExecutionTargetDTO dto) {
+        dto.setStatus("UNAVAILABLE");
+        dto.setTitle(null);
+        dto.setCode(null);
+        dto.setOwnerId(null);
+        dto.setOwnerName(null);
+        dto.setProgress(null);
+        dto.setNavigationId(null);
+        return dto;
+    }
+
+    private String projectStatus(ProjectDO project) {
+        if (Boolean.TRUE.equals(project.getDeleted())) return "DELETED";
+        return switch (ProjectStatus.normalize(project.getStatus())) {
+            case 1 -> "ACTIVE";
+            case 2 -> "COMPLETED";
+            case 3 -> "TERMINATED";
+            default -> "UNAVAILABLE";
+        };
     }
 
     private String displayName(Long userId) {

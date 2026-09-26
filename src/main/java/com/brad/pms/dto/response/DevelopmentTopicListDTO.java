@@ -2,6 +2,8 @@ package com.brad.pms.dto.response;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class DevelopmentTopicListDTO {
 
@@ -26,5 +28,8 @@ public class DevelopmentTopicListDTO {
     private String latestBuildVersion;
     private String testStatus;
     private String blocker;
+    /** All direct requirements that execute through this topic. */
+    private List<SourceRequirementSummaryDTO> sourceRequirements;
+    /** @deprecated Use sourceRequirements; retained for older clients. */
     private SourceRequirementSummaryDTO sourceRequirement;
 }

@@ -601,9 +601,9 @@ public class ProjectService {
         if (projects.isEmpty()) return Collections.emptyList();
 
         List<Long> projectIds = projects.stream().map(ProjectDO::getId).collect(Collectors.toList());
-        Map<Long, SourceRequirementSummaryDTO> loadedSourceRequirements = requirementTargetReadService
+        Map<Long, List<SourceRequirementSummaryDTO>> loadedSourceRequirements = requirementTargetReadService
                 .findDirectSourcesForTargets(RequirementExecutionTargetType.PROJECT, projectIds);
-        Map<Long, SourceRequirementSummaryDTO> sourceRequirements = loadedSourceRequirements == null
+        Map<Long, List<SourceRequirementSummaryDTO>> sourceRequirements = loadedSourceRequirements == null
                 ? Map.of() : loadedSourceRequirements;
         Set<Long> userIds = projects.stream().map(ProjectDO::getOwnerId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
@@ -665,7 +665,10 @@ public class ProjectService {
                 dto.setCurrentNodeName(currentNode.getName());
             }
             dto.setPermissions(preloadedPermissions == null ? permissionService.projectPermissions(p) : preloadedPermissions.get(pid));
-            dto.setSourceRequirement(sourceRequirements.get(pid));
+            List<SourceRequirementSummaryDTO> directSourceRequirements = sourceRequirements
+                    .getOrDefault(pid, List.of());
+            dto.setSourceRequirements(directSourceRequirements);
+            dto.setSourceRequirement(directSourceRequirements.isEmpty() ? null : directSourceRequirements.get(0));
             return dto;
         }).collect(Collectors.toList());
         if (attentionService != null) {

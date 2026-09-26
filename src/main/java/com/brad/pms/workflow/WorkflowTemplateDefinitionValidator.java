@@ -70,6 +70,12 @@ public final class WorkflowTemplateDefinitionValidator {
         if (hasRequirementExecution && !"requirement-management".equals(processTypeCode)) {
             throw new IllegalArgumentException("需求执行对象组件只能配置在需求流程");
         }
+        boolean hasStoryList = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .anyMatch(WorkflowComponentKey.STORY_LIST::equals);
+        if (hasStoryList && !"topic-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("故事列表工作台只能配置在专题流程");
+        }
         if ("requirement-management".equals(processTypeCode)
                 && (!blank(definition.sourceProjectNodeKey()) || !blank(definition.sourceTopicNodeKey()))) {
             throw new IllegalArgumentException("需求流程不能配置事项挂载点");

@@ -43,6 +43,24 @@ class WorkflowComponentBindingServiceTest {
     }
 
     @Test
+    void resolvesTheTopicHostFromTheProjectsPinnedWorkflowVersion() {
+        ProjectDO project = project(1L);
+        project.setWorkflowTemplateVersionId(42L);
+        ProjectNodeDO global = node(10L, 1L, "global-topic-host");
+        ProjectNodeDO pinned = node(11L, 1L, "pinned-topic-host");
+        WorkflowTemplateDefinition stored = new WorkflowTemplateDefinition(1, List.of(
+                nodeDefinition("global-topic-host", List.of()),
+                nodeDefinition("pinned-topic-host", List.of())));
+        when(workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(42L)).thenReturn("pinned-topic-host");
+        when(topicMapper.selectList(any())).thenReturn(List.of());
+
+        WorkflowTemplateDefinition effective = apply(project, stored, List.of(global, pinned));
+
+        assertThat(components(effective, "global-topic-host")).doesNotContain(WorkflowComponentKey.DEVELOPMENT_CONTROL);
+        assertThat(components(effective, "pinned-topic-host")).contains(WorkflowComponentKey.DEVELOPMENT_CONTROL);
+    }
+
+    @Test
     void keepsTheComponentOnHistoricalNodesWithActiveOrDeletedTopicsOnly() {
         ProjectDO project = project(1L);
         ProjectNodeDO current = node(10L, 1L, "new-topic-host");

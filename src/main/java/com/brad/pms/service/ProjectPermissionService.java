@@ -61,6 +61,12 @@ public class ProjectPermissionService {
         return project;
     }
 
+    /** Read check for historical target summaries where throwing would hide the parent item. */
+    public boolean canReadProject(ProjectDO project) {
+        if (!ProjectPermissionPolicy.isProjectReadable(project)) return false;
+        return UserContext.get() == null || authorizationService.has(PermissionCode.PROJECT_READ);
+    }
+
     /** Loads a terminated or soft-deleted project for an authorized restore flow. */
     public ProjectDO requireProjectForRestore(Long projectId) {
         ProjectDO project = projectMapper.selectIncludingDeleted(projectId);

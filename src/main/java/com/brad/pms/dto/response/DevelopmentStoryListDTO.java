@@ -3,6 +3,7 @@ package com.brad.pms.dto.response;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class DevelopmentStoryListDTO {
@@ -31,5 +32,8 @@ public class DevelopmentStoryListDTO {
     private LocalDate startDate;
     private LocalDate dueDate;
     private String blocker;
+    /** All direct requirements that execute through this story. */
+    private List<SourceRequirementSummaryDTO> sourceRequirements;
+    /** @deprecated Use sourceRequirements; retained for older clients. */
     private SourceRequirementSummaryDTO sourceRequirement;
 }

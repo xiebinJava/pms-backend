@@ -5,7 +5,17 @@ import com.brad.pms.dto.request.RequirementPageQry;
 import com.brad.pms.dto.request.RequirementSaveCmd;
 import com.brad.pms.entity.RequirementDO;
 import com.brad.pms.mapper.RequirementMapper;
+import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
+import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
+import com.brad.pms.entity.DevelopmentItemWorkflowDO;
+import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
+import com.brad.pms.workflow.DevelopmentItemType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -29,7 +39,22 @@ class RequirementManagementServiceTest {
     @Mock RequirementExecutionTargetReadService targetReadService;
     @Mock UserService userService;
     @Mock OperationLogService operationLogService;
+    @Mock DevelopmentItemWorkflowMapper workflowMapper;
+    @Mock DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
+    @Mock WorkflowTemplateService workflowTemplateService;
     @InjectMocks RequirementManagementService service;
+
+    @BeforeEach
+    void initTableInfo() {
+        if (TableInfoHelper.getTableInfo(DevelopmentItemWorkflowDO.class) == null) {
+            TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new Configuration(), "requirement-management-test"),
+                    DevelopmentItemWorkflowDO.class);
+        }
+        if (TableInfoHelper.getTableInfo(DevelopmentItemWorkflowNodeDO.class) == null) {
+            TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new Configuration(), "requirement-management-test"),
+                    DevelopmentItemWorkflowNodeDO.class);
+        }
+    }
 
     @Test
     void createsAnUnassociatedRequirementEvenWhenNoWorkflowDefaultExists() {
@@ -59,7 +84,9 @@ class RequirementManagementServiceTest {
     @Test
     void listsUnassociatedRequirementsAsNormalRows() {
         RequirementDO requirement = requirement(12L, 3);
-        when(requirementMapper.selectList(any())).thenReturn(List.of(requirement));
+        Page<RequirementDO> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(requirement));
+        when(requirementMapper.selectPage(any(), any())).thenReturn(page);
 
         var result = service.page(new RequirementPageQry());
 
@@ -111,6 +138,35 @@ class RequirementManagementServiceTest {
 
         verify(userService, never()).requireActiveUser(99L);
         assertThat(requirement.getTitle()).isEqualTo("更新标题");
+    }
+
+    @Test
+    void populatesRequirementWorkflowStatusAndProgressForListRows() {
+        RequirementDO requirement = requirement(16L, 0);
+        Page<RequirementDO> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(requirement));
+        when(requirementMapper.selectPage(any(), any())).thenReturn(page);
+        DevelopmentItemWorkflowDO workflow = new DevelopmentItemWorkflowDO();
+        workflow.setId(160L);
+        workflow.setItemType(DevelopmentItemType.REQUIREMENT.name());
+        workflow.setItemId(16L);
+        DevelopmentItemWorkflowNodeDO completed = workflowNode(160L, 2);
+        DevelopmentItemWorkflowNodeDO active = workflowNode(160L, 1);
+        when(workflowMapper.selectList(any())).thenReturn(List.of(workflow));
+        when(workflowNodeMapper.selectList(any())).thenReturn(List.of(completed, active));
+
+        var result = service.page(new RequirementPageQry());
+
+        assertThat(result.getList().get(0).getWorkflowConfigured()).isTrue();
+        assertThat(result.getList().get(0).getWorkflowStatus()).isEqualTo("IN_PROGRESS");
+        assertThat(result.getList().get(0).getWorkflowProgress()).isEqualTo(50);
+    }
+
+    private static DevelopmentItemWorkflowNodeDO workflowNode(Long workflowId, int status) {
+        DevelopmentItemWorkflowNodeDO node = new DevelopmentItemWorkflowNodeDO();
+        node.setWorkflowId(workflowId);
+        node.setStatus(status);
+        return node;
     }
 
     private static RequirementDO requirement(Long id, int version) {

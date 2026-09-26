@@ -4,6 +4,7 @@ import com.brad.pms.common.enums.ProjectStatus;
 import com.brad.pms.common.enums.RequirementExecutionTargetType;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.RequirementExecutionTargetCmd;
+import com.brad.pms.dto.request.RequirementExecutionTargetOptionQry;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.RequirementDO;
 import com.brad.pms.entity.RequirementExecutionTargetHistoryDO;
@@ -120,6 +121,15 @@ class RequirementExecutionTargetServiceTest {
 
         assertThat(requirement.getExecutionTargetType()).isNull();
         assertThat(requirement.getExecutionTargetId()).isNull();
+    }
+
+    @Test
+    void targetOptionsMustBelongToAnExistingActiveRequirement() {
+        when(requirementMapper.selectById(99L)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.options(99L, new RequirementExecutionTargetOptionQry()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("需求不存在");
     }
 
     private static RequirementDO requirement(Long id, int version) {

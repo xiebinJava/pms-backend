@@ -95,6 +95,10 @@ public class RequirementExecutionTargetService {
 
     public PageResult<RequirementExecutionTargetOptionDTO> options(
             Long requirementId, RequirementExecutionTargetOptionQry qry) {
+        RequirementDO requirement = requirementId == null ? null : requirementMapper.selectById(requirementId);
+        if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) {
+            throw BusinessException.notFound("需求不存在");
+        }
         RequirementExecutionTargetOptionQry query = qry == null ? new RequirementExecutionTargetOptionQry() : qry;
         List<RequirementExecutionTargetOptionDTO> options = new ArrayList<>();
         if (query.getTargetType() == null || query.getTargetType() == RequirementExecutionTargetType.PROJECT) {
@@ -174,7 +178,7 @@ public class RequirementExecutionTargetService {
         }
         permissionService.requireProjectReadable(targetId);
         return new TargetSnapshot(RequirementExecutionTargetType.PROJECT, targetId, project.getName(), project.getCode(),
-                String.valueOf(ProjectStatus.normalize(project.getStatus())), project.getOwnerId(), project.getProgress(),
+                projectStatus(project), project.getOwnerId(), project.getProgress(),
                 "project", targetId);
     }
 
@@ -214,7 +218,7 @@ public class RequirementExecutionTargetService {
                     "UNAVAILABLE", null, null, "project", targetId);
         }
         return new TargetSnapshot(RequirementExecutionTargetType.PROJECT, targetId, project.getName(), project.getCode(),
-                String.valueOf(ProjectStatus.normalize(project.getStatus())), project.getOwnerId(), project.getProgress(),
+                projectStatus(project), project.getOwnerId(), project.getProgress(),
                 "project", targetId);
     }
 
@@ -299,7 +303,7 @@ public class RequirementExecutionTargetService {
                 return false;
             }
         }).map(project -> option(new TargetSnapshot(RequirementExecutionTargetType.PROJECT, project.getId(),
-                project.getName(), project.getCode(), String.valueOf(ProjectStatus.normalize(project.getStatus())),
+                project.getName(), project.getCode(), projectStatus(project),
                 project.getOwnerId(), project.getProgress(), "project", project.getId()))).toList();
     }
 
@@ -333,6 +337,17 @@ public class RequirementExecutionTargetService {
         } catch (BusinessException ignored) {
             return false;
         }
+    }
+
+    private String projectStatus(ProjectDO project) {
+        if (project == null) return "UNAVAILABLE";
+        if (Boolean.TRUE.equals(project.getDeleted())) return "DELETED";
+        return switch (ProjectStatus.normalize(project.getStatus())) {
+            case 1 -> "ACTIVE";
+            case 2 -> "COMPLETED";
+            case 3 -> "TERMINATED";
+            default -> "UNAVAILABLE";
+        };
     }
 
     private RequirementExecutionTargetOptionDTO option(TargetSnapshot target) {

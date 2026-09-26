@@ -24,10 +24,12 @@ import com.brad.pms.entity.ProjectTaskScheduleHistoryDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeRequirementDO;
+import com.brad.pms.entity.ProjectNodeIterationPlanDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.entity.ProjectTaskRequirementDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
+import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.mapper.ProjectTaskScheduleHistoryMapper;
 import com.brad.pms.mapper.ProjectTaskRequirementMapper;
@@ -53,6 +55,7 @@ public class TaskService {
     private final ProjectTaskScheduleHistoryMapper scheduleHistoryMapper;
     private final ProjectTaskRequirementMapper taskRequirementMapper;
     private final ProjectNodeRequirementMapper requirementMapper;
+    private final ProjectNodeIterationPlanMapper iterationPlanMapper;
     private final ProjectCommentMapper commentMapper;
     private final UserService userService;
     private final ProjectPermissionService permissionService;
@@ -150,6 +153,7 @@ public class TaskService {
         ProjectDO project = permissionService.requireProject(cmd.getProjectId());
         ProjectNodeDO node = permissionService.requireManageableNode(cmd.getProjectId(), cmd.getNodeId(), "创建任务");
         ProjectNodeRequirementDO requirement = resolveRequirement(cmd.getRequirementId(), cmd.getProjectId(), cmd.getNodeId());
+        ProjectNodeIterationPlanDO iterationPlan = resolveIterationPlan(cmd.getIterationPlanId(), cmd.getProjectId());
         if (cmd.getAssigneeId() != null) {
             memberService.ensureMember(cmd.getProjectId(), cmd.getAssigneeId());
         }
@@ -168,10 +172,18 @@ public class TaskService {
             if (parent.getNodeId() != null && !Objects.equals(parent.getNodeId(), cmd.getNodeId())) {
                 throw BusinessException.error("子任务必须归属父任务所在节点");
             }
+            Long requestedPlanId = iterationPlan == null ? parent.getIterationPlanId() : iterationPlan.getId();
+            if (!Objects.equals(requestedPlanId, parent.getIterationPlanId())) {
+                throw BusinessException.error("子任务必须与父任务属于同一迭代");
+            }
+            if (iterationPlan == null && parent.getIterationPlanId() != null) {
+                iterationPlan = requireIterationPlan(parent.getIterationPlanId(), cmd.getProjectId());
+            }
         }
         ProjectTaskDO task = new ProjectTaskDO();
         task.setProjectId(cmd.getProjectId());
         task.setNodeId(cmd.getNodeId());
+        task.setIterationPlanId(iterationPlan == null ? null : iterationPlan.getId());
         task.setParentId(parentId);
         task.setTitle(cmd.getTitle());
         task.setDescription(cmd.getDescription());
@@ -220,8 +232,18 @@ public class TaskService {
         }
         if (!manager && (cmd.getPriority() != null || cmd.getAssigneeId() != null
                 || cmd.getSort() != null
-                || cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement()))) {
+                || cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement())
+                || cmd.getIterationPlanId() != null || Boolean.TRUE.equals(cmd.getClearIterationPlan()))) {
             throw BusinessException.forbidden("任务负责人只能修改任务内容、状态和截止日期");
+        }
+        Long targetIterationPlanId = task.getIterationPlanId();
+        if (manager && cmd.getIterationPlanId() != null) {
+            targetIterationPlanId = requireIterationPlan(cmd.getIterationPlanId(), task.getProjectId()).getId();
+        } else if (manager && Boolean.TRUE.equals(cmd.getClearIterationPlan())) {
+            targetIterationPlanId = null;
+        }
+        if (manager && (cmd.getIterationPlanId() != null || Boolean.TRUE.equals(cmd.getClearIterationPlan()))) {
+            validateParentIteration(task, targetIterationPlanId);
         }
         ProjectNodeRequirementDO requirement = cmd.getRequirementId() == null
                 ? null
@@ -237,6 +259,10 @@ public class TaskService {
             memberService.ensureMember(task.getProjectId(), cmd.getAssigneeId());
             task.setAssigneeId(cmd.getAssigneeId());
         }
+        Long previousIterationPlanId = task.getIterationPlanId();
+        if (manager && (cmd.getIterationPlanId() != null || Boolean.TRUE.equals(cmd.getClearIterationPlan()))) {
+            task.setIterationPlanId(targetIterationPlanId);
+        }
         if (cmd.getSort() != null) task.setSort(cmd.getSort());
         if (Boolean.TRUE.equals(cmd.getClearDueDate())) task.setDueDate(null);
         else if (cmd.getDueDate() != null) task.setDueDate(cmd.getDueDate());
@@ -246,6 +272,9 @@ public class TaskService {
         recordScheduleHistoryIfChanged(task, previousDueDate);
         if (manager && (cmd.getRequirementId() != null || Boolean.TRUE.equals(cmd.getClearRequirement()))) {
             replaceTaskRequirementLink(task, requirement);
+        }
+        if (manager && !Objects.equals(previousIterationPlanId, task.getIterationPlanId()) && task.getParentId() == null) {
+            syncDirectSubtaskIterationPlans(task);
         }
         completeSubtasksIfCompleted(previousStatus, task, today);
         if (task.getAssigneeId() != null && !Objects.equals(previousAssignee, task.getAssigneeId())) {
@@ -440,6 +469,40 @@ public class TaskService {
             throw BusinessException.error("需求必须先确认后才能创建关联任务");
         }
         return requirement;
+    }
+
+    private ProjectNodeIterationPlanDO resolveIterationPlan(Long iterationPlanId, Long projectId) {
+        if (iterationPlanId == null) return null;
+        return requireIterationPlan(iterationPlanId, projectId);
+    }
+
+    private ProjectNodeIterationPlanDO requireIterationPlan(Long iterationPlanId, Long projectId) {
+        ProjectNodeIterationPlanDO plan = iterationPlanMapper.selectById(iterationPlanId);
+        if (plan == null || !Objects.equals(plan.getProjectId(), projectId)) {
+            throw BusinessException.error("任务关联的迭代计划必须属于当前项目");
+        }
+        return plan;
+    }
+
+    private void validateParentIteration(ProjectTaskDO task, Long targetIterationPlanId) {
+        if (task.getParentId() == null) return;
+        ProjectTaskDO parent = requireTask(task.getParentId());
+        if (!Objects.equals(parent.getIterationPlanId(), targetIterationPlanId)) {
+            throw BusinessException.error("任务必须与父任务属于同一迭代");
+        }
+    }
+
+    private void syncDirectSubtaskIterationPlans(ProjectTaskDO parent) {
+        List<ProjectTaskDO> children = taskMapper.selectList(new LambdaQueryWrapper<ProjectTaskDO>()
+                .eq(ProjectTaskDO::getParentId, parent.getId()));
+        if (children == null) return;
+        for (ProjectTaskDO child : children) {
+            if (Objects.equals(child.getIterationPlanId(), parent.getIterationPlanId())) continue;
+            child.setIterationPlanId(parent.getIterationPlanId());
+            if (taskMapper.updateById(child) != 1) {
+                throw BusinessException.conflict("子任务已被其他人修改，请刷新后重试");
+            }
+        }
     }
 
     private void replaceTaskRequirementLink(ProjectTaskDO task, ProjectNodeRequirementDO requirement) {

@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS project_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     project_id  BIGINT       NOT NULL,
     node_id     BIGINT,
+    iteration_plan_id BIGINT,
     parent_id   BIGINT,
     title       VARCHAR(200) NOT NULL,
     description VARCHAR(2000),
@@ -402,6 +403,7 @@ CREATE TABLE IF NOT EXISTS project_node_knowledge_action (
 CREATE INDEX idx_task_project ON project_task (project_id);
 CREATE INDEX idx_task_node ON project_task (project_id, node_id);
 CREATE INDEX idx_task_status ON project_task (project_id, status);
+CREATE INDEX idx_task_iteration_plan ON project_task (project_id, iteration_plan_id, parent_id, sort);
 CREATE INDEX idx_member_project ON project_member (project_id);
 CREATE INDEX idx_follower_project ON project_follower (project_id);
 CREATE INDEX idx_milestone_project ON project_milestone (project_id);

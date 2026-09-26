@@ -1,6 +1,8 @@
 package com.brad.pms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.brad.pms.audit.AuditAction;
 import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
@@ -11,6 +13,10 @@ import com.brad.pms.dto.request.RequirementPageQry;
 import com.brad.pms.dto.request.RequirementSaveCmd;
 import com.brad.pms.dto.response.RequirementListDTO;
 import com.brad.pms.entity.RequirementDO;
+import com.brad.pms.entity.DevelopmentItemWorkflowDO;
+import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
+import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
+import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
 import com.brad.pms.mapper.RequirementMapper;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.workflow.DevelopmentItemType;
@@ -30,6 +36,9 @@ public class RequirementManagementService {
     private final RequirementExecutionTargetReadService targetReadService;
     private final UserService userService;
     private final OperationLogService operationLogService;
+    private final DevelopmentItemWorkflowMapper workflowMapper;
+    private final DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
+    private final WorkflowTemplateService workflowTemplateService;
 
     @Transactional
     public Long create(RequirementSaveCmd cmd) {
@@ -104,7 +113,7 @@ public class RequirementManagementService {
     public RequirementListDTO detail(Long id) {
         RequirementDO requirement = requirementMapper.selectById(id);
         if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) throw BusinessException.notFound("需求不存在");
-        return toDTO(requirement);
+        return toDTO(requirement, workflowSummary(requirement.getId()));
     }
 
     public PageResult<RequirementListDTO> page(RequirementPageQry qry) {
@@ -118,13 +127,17 @@ public class RequirementManagementService {
                 .eq(query.getTargetType() != null, RequirementDO::getExecutionTargetType, query.getTargetType())
                 .orderByDesc(RequirementDO::getUpdatedAt)
                 .orderByDesc(RequirementDO::getId);
-        List<RequirementListDTO> items = safe(requirementMapper.selectList(wrapper)).stream()
-                .map(this::toDTO).toList();
-        int page = query.getCurrPage();
-        int size = query.getPageSize();
-        int from = Math.min((page - 1) * size, items.size());
-        int to = Math.min(from + size, items.size());
-        return PageResult.of(items.size(), page, size, items.subList(from, to));
+        IPage<RequirementDO> pageResult = requirementMapper.selectPage(
+                new Page<>(query.getCurrPage(), query.getPageSize()), wrapper);
+        List<RequirementDO> requirements = safe(pageResult == null ? null : pageResult.getRecords());
+        java.util.Map<Long, FlowSummary> workflowSummaries = workflowSummaries(
+                requirements.stream().map(RequirementDO::getId).toList());
+        List<RequirementListDTO> items = requirements.stream()
+                .map(requirement -> toDTO(requirement, workflowSummaries.get(requirement.getId()))).toList();
+        long total = pageResult == null ? 0 : pageResult.getTotal();
+        long page = pageResult == null ? query.getCurrPage() : pageResult.getCurrent();
+        long size = pageResult == null ? query.getPageSize() : pageResult.getSize();
+        return PageResult.of(total, page, size, items);
     }
 
     private RequirementDO requireForMutation(Long id, boolean restore) {
@@ -150,7 +163,7 @@ public class RequirementManagementService {
         }
     }
 
-    private RequirementListDTO toDTO(RequirementDO requirement) {
+    private RequirementListDTO toDTO(RequirementDO requirement, FlowSummary workflowSummary) {
         RequirementListDTO dto = new RequirementListDTO();
         dto.setId(requirement.getId());
         dto.setTitle(requirement.getTitle());
@@ -163,10 +176,52 @@ public class RequirementManagementService {
         dto.setStatus(requirement.getStatus());
         dto.setDeleted(requirement.getDeleted());
         dto.setVersion(requirement.getVersion());
-        dto.setWorkflowConfigured(null);
+        FlowSummary summary = workflowSummary == null ? new FlowSummary(false, "NOT_CONFIGURED", 0) : workflowSummary;
+        dto.setWorkflowConfigured(summary.configured());
+        dto.setWorkflowStatus(summary.status());
+        dto.setWorkflowProgress(summary.progress());
         dto.setExecutionTarget(targetReadService.findCurrentTarget(requirement));
         return dto;
     }
+
+    private FlowSummary workflowSummary(Long requirementId) {
+        return workflowSummaries(requirementId == null ? List.of() : List.of(requirementId))
+                .getOrDefault(requirementId, new FlowSummary(false, "NOT_CONFIGURED", 0));
+    }
+
+    private java.util.Map<Long, FlowSummary> workflowSummaries(List<Long> requirementIds) {
+        List<Long> ids = requirementIds == null ? List.of() : requirementIds.stream()
+                .filter(Objects::nonNull).distinct().toList();
+        boolean defaultConfigured = workflowTemplateService.resolveDefaultForProcessType(
+                DevelopmentItemType.REQUIREMENT.processTypeCode()) != null;
+        java.util.Map<Long, FlowSummary> summaries = new java.util.HashMap<>();
+        if (!ids.isEmpty()) {
+            List<DevelopmentItemWorkflowDO> workflows = safe(workflowMapper.selectList(new LambdaQueryWrapper<DevelopmentItemWorkflowDO>()
+                    .eq(DevelopmentItemWorkflowDO::getItemType, DevelopmentItemType.REQUIREMENT.name())
+                    .in(DevelopmentItemWorkflowDO::getItemId, ids)));
+            List<Long> workflowIds = workflows.stream().map(DevelopmentItemWorkflowDO::getId)
+                    .filter(Objects::nonNull).toList();
+            java.util.Map<Long, List<DevelopmentItemWorkflowNodeDO>> nodesByWorkflow = workflowIds.isEmpty()
+                    ? java.util.Map.of()
+                    : safe(workflowNodeMapper.selectList(new LambdaQueryWrapper<DevelopmentItemWorkflowNodeDO>()
+                            .in(DevelopmentItemWorkflowNodeDO::getWorkflowId, workflowIds))).stream()
+                    .collect(java.util.stream.Collectors.groupingBy(DevelopmentItemWorkflowNodeDO::getWorkflowId));
+            for (DevelopmentItemWorkflowDO workflow : workflows) {
+                List<DevelopmentItemWorkflowNodeDO> nodes = nodesByWorkflow.getOrDefault(workflow.getId(), List.of());
+                int total = nodes.size();
+                int completed = (int) nodes.stream().filter(node -> Objects.equals(node.getStatus(), 2)).count();
+                String status = total > 0 && completed == total ? "COMPLETED"
+                        : nodes.stream().anyMatch(node -> Objects.equals(node.getStatus(), 1)) ? "IN_PROGRESS" : "NOT_STARTED";
+                int progress = total == 0 ? 0 : (int) Math.round(completed * 100.0 / total);
+                summaries.put(workflow.getItemId(), new FlowSummary(true, status, progress));
+            }
+        }
+        for (Long id : ids) summaries.putIfAbsent(id,
+                new FlowSummary(defaultConfigured, defaultConfigured ? "NOT_STARTED" : "NOT_CONFIGURED", 0));
+        return summaries;
+    }
+
+    private record FlowSummary(boolean configured, String status, Integer progress) { }
 
     private java.util.Map<String, Object> snapshot(RequirementDO requirement) {
         java.util.Map<String, Object> snapshot = new java.util.LinkedHashMap<>();

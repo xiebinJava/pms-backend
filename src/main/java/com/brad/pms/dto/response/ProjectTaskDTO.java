@@ -13,6 +13,8 @@ public class ProjectTaskDTO {
     private Integer version;
     private Long projectId;
     private Long nodeId;
+    private Long iterationPlanId;
+    private String iterationPlanName;
     private Long parentId;
     private String title;
     private String description;

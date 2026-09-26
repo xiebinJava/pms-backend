@@ -17,12 +17,14 @@ import com.brad.pms.entity.ProjectCommentDO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeRequirementDO;
+import com.brad.pms.entity.ProjectNodeIterationPlanDO;
 import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.entity.ProjectTaskRequirementDO;
 import com.brad.pms.entity.ProjectTaskScheduleHistoryDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.mapper.ProjectCommentMapper;
 import com.brad.pms.mapper.ProjectNodeRequirementMapper;
+import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
 import com.brad.pms.mapper.ProjectTaskRequirementMapper;
 import com.brad.pms.mapper.ProjectTaskScheduleHistoryMapper;
@@ -62,6 +64,7 @@ class TaskServiceTest {
     @Mock ProjectTaskRequirementMapper taskRequirementMapper;
     @Mock ProjectTaskScheduleHistoryMapper scheduleHistoryMapper;
     @Mock ProjectNodeRequirementMapper requirementMapper;
+    @Mock ProjectNodeIterationPlanMapper iterationPlanMapper;
     @Mock ProjectCommentMapper commentMapper;
     @Mock UserService userService;
     @Mock ProjectPermissionService permissionService;
@@ -171,6 +174,104 @@ class TaskServiceTest {
         assertThat(captor.getValue().getRequirementId()).isEqualTo(51L);
         assertThat(dto.getRequirementId()).isEqualTo(51L);
         assertThat(dto.getRequirementCode()).isEqualTo("REQ-001");
+    }
+
+    @Test
+    void createsTaskWithAnOptionalIterationPlanAssociation() throws Exception {
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireManageableNode(9L, 3L, "创建任务")).thenReturn(openNode());
+        ProjectNodeIterationPlanDO plan = new ProjectNodeIterationPlanDO();
+        plan.setId(21L);
+        plan.setProjectId(9L);
+        when(iterationPlanMapper.selectById(21L)).thenReturn(plan);
+        when(taskMapper.insert(any(ProjectTaskDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, ProjectTaskDO.class).setId(77L);
+            return 1;
+        });
+        when(permissionService.taskPermissions(any(), any(), any())).thenReturn(new TaskPermissionsDTO());
+
+        TaskCreateCmd cmd = new TaskCreateCmd();
+        cmd.setProjectId(9L);
+        cmd.setNodeId(3L);
+        cmd.setTitle("迭代任务");
+        var iterationPlanField = TaskCreateCmd.class.getDeclaredField("iterationPlanId");
+        iterationPlanField.setAccessible(true);
+        iterationPlanField.set(cmd, 21L);
+
+        ProjectTaskDTO dto = taskService.create(cmd);
+
+        ArgumentCaptor<ProjectTaskDO> captor = ArgumentCaptor.forClass(ProjectTaskDO.class);
+        verify(taskMapper).insert(captor.capture());
+        assertThat(readField(captor.getValue(), "iterationPlanId")).isEqualTo(21L);
+        assertThat(readField(dto, "iterationPlanId")).isEqualTo(21L);
+    }
+
+    @Test
+    void rejectsAnIterationPlanFromAnotherProject() {
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireManageableNode(9L, 3L, "创建任务")).thenReturn(openNode());
+        ProjectNodeIterationPlanDO plan = new ProjectNodeIterationPlanDO();
+        plan.setId(22L);
+        plan.setProjectId(88L);
+        when(iterationPlanMapper.selectById(22L)).thenReturn(plan);
+
+        TaskCreateCmd cmd = new TaskCreateCmd();
+        cmd.setProjectId(9L);
+        cmd.setNodeId(3L);
+        cmd.setTitle("跨项目迭代任务");
+        cmd.setIterationPlanId(22L);
+
+        assertThatThrownBy(() -> taskService.create(cmd))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("必须属于当前项目");
+        verify(taskMapper, never()).insert(any(ProjectTaskDO.class));
+    }
+
+    @Test
+    void subtaskInheritsItsParentIteration() {
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireManageableNode(9L, 3L, "创建任务")).thenReturn(openNode());
+        ProjectTaskDO parent = task(1L, null);
+        parent.setIterationPlanId(21L);
+        when(taskMapper.selectById(1L)).thenReturn(parent);
+        ProjectNodeIterationPlanDO plan = new ProjectNodeIterationPlanDO();
+        plan.setId(21L);
+        plan.setProjectId(9L);
+        when(iterationPlanMapper.selectById(21L)).thenReturn(plan);
+        when(taskMapper.insert(any(ProjectTaskDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, ProjectTaskDO.class).setId(78L);
+            return 1;
+        });
+        when(permissionService.taskPermissions(any(), any(), any())).thenReturn(new TaskPermissionsDTO());
+
+        TaskCreateCmd cmd = new TaskCreateCmd();
+        cmd.setProjectId(9L);
+        cmd.setNodeId(3L);
+        cmd.setParentId(1L);
+        cmd.setTitle("继承迭代的子任务");
+
+        taskService.create(cmd);
+
+        ArgumentCaptor<ProjectTaskDO> captor = ArgumentCaptor.forClass(ProjectTaskDO.class);
+        verify(taskMapper).insert(captor.capture());
+        assertThat(captor.getValue().getIterationPlanId()).isEqualTo(21L);
+    }
+
+    @Test
+    void managerCanClearAnIterationAssociation() {
+        ProjectTaskDO task = task(73L, null);
+        task.setIterationPlanId(21L);
+        when(taskMapper.selectById(73L)).thenReturn(task);
+        when(permissionService.requireProject(9L)).thenReturn(openProject());
+        when(permissionService.requireNode(9L, 3L)).thenReturn(openNode());
+
+        TaskUpdateCmd cmd = new TaskUpdateCmd();
+        cmd.setVersion(task.getVersion());
+        cmd.setClearIterationPlan(true);
+
+        taskService.update(73L, cmd);
+
+        assertThat(task.getIterationPlanId()).isNull();
     }
 
     @Test
@@ -628,5 +729,11 @@ class TaskServiceTest {
         task.setPriority(1);
         task.setVersion(0);
         return task;
+    }
+
+    private static Object readField(Object target, String name) throws Exception {
+        var field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(target);
     }
 }

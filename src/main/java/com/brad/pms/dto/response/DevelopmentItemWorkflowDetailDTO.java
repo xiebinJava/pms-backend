@@ -30,6 +30,9 @@ public class DevelopmentItemWorkflowDetailDTO {
     private String latestBuildVersion;
     private String testStatus;
     private String iterationPlanName;
+    /** All direct requirements that execute through this development item. */
+    private List<SourceRequirementSummaryDTO> sourceRequirements;
+    /** @deprecated Use sourceRequirements; retained for older clients. */
     private SourceRequirementSummaryDTO sourceRequirement;
     private RequirementExecutionTargetDTO executionTarget;
     private List<RequirementExecutionTargetHistoryDTO> executionTargetHistory;

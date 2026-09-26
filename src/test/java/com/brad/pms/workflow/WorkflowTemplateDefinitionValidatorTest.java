@@ -246,6 +246,18 @@ class WorkflowTemplateDefinitionValidatorTest {
     }
 
     @Test
+    void acceptsStoryListOnlyForTopicTemplates() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("story-stage", List.of(), List.of("component:story-list"))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("story-management", definition))
+                .hasMessageContaining("故事列表工作台只能配置在专题流程");
+        assertThat(WorkflowTemplateDefinitionValidator
+                .validateForProcessType("topic-management", definition)).isEqualTo(definition);
+    }
+
+    @Test
     void rejectsMountKeysFromRequirementTemplates() {
         WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(1,
                 List.of(node("decision", List.of())), "develop");

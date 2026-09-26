@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class ProjectDTO {
@@ -45,5 +46,8 @@ public class ProjectDTO {
     private ProjectPermissionsDTO permissions;
     private ProjectReadinessDTO readiness;
     private ProjectAttentionSummaryDTO attentionSummary;
+    /** All direct requirements that execute through this project. */
+    private List<SourceRequirementSummaryDTO> sourceRequirements;
+    /** @deprecated Use sourceRequirements; retained for older clients. */
     private SourceRequirementSummaryDTO sourceRequirement;
 }

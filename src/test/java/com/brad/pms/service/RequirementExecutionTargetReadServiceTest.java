@@ -24,6 +24,7 @@ class RequirementExecutionTargetReadServiceTest {
     @Mock ProjectMapper projectMapper;
     @Mock ProjectNodeDevelopmentTopicMapper topicMapper;
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
+    @Mock ProjectPermissionService projectPermissionService;
     @InjectMocks RequirementExecutionTargetReadService service;
 
     @Test
@@ -54,6 +55,22 @@ class RequirementExecutionTargetReadServiceTest {
     }
 
     @Test
+    void returnsAllDirectRequirementsWhenOneTargetHasMultipleRequirements() {
+        RequirementDO first = requirement(31L, "第一个需求", 7L);
+        RequirementDO second = requirement(32L, "第二个需求", 7L);
+        when(requirementMapper.selectByExecutionTargets(RequirementExecutionTargetType.TOPIC, java.util.List.of(7L)))
+                .thenReturn(java.util.List.of(second, first));
+
+        Object value = service.findDirectSourcesForTargets(RequirementExecutionTargetType.TOPIC,
+                java.util.List.of(7L)).get(7L);
+
+        assertThat(value).isInstanceOf(java.util.List.class);
+        assertThat((java.util.List<?>) value)
+                .extracting("id")
+                .containsExactly(32L, 31L);
+    }
+
+    @Test
     void readsCurrentProjectTargetDetailsEvenWhenItsStatusChanged() {
         RequirementDO requirement = new RequirementDO();
         requirement.setExecutionTargetType(RequirementExecutionTargetType.PROJECT);
@@ -64,12 +81,44 @@ class RequirementExecutionTargetReadServiceTest {
         project.setCode("PRJ-000078");
         project.setStatus(2);
         when(projectMapper.selectIncludingDeleted(78L)).thenReturn(project);
+        when(projectPermissionService.canReadProject(project)).thenReturn(true);
 
         var target = service.findCurrentTarget(requirement);
 
         assertThat(target.getTitle()).isEqualTo("旧项目");
         assertThat(target.getCode()).isEqualTo("PRJ-000078");
-        assertThat(target.getStatus()).isEqualTo("2");
+        assertThat(target.getStatus()).isEqualTo("COMPLETED");
         assertThat(target.getNavigationType()).isEqualTo("project");
+    }
+
+    @Test
+    void redactsAProjectTargetWhenTheCurrentUserCannotReadItsProject() {
+        RequirementDO requirement = new RequirementDO();
+        requirement.setExecutionTargetType(RequirementExecutionTargetType.PROJECT);
+        requirement.setExecutionTargetId(79L);
+        ProjectDO project = new ProjectDO();
+        project.setId(79L);
+        project.setName("受限项目");
+        project.setCode("PRJ-000079");
+        project.setStatus(1);
+        when(projectMapper.selectIncludingDeleted(79L)).thenReturn(project);
+        when(projectPermissionService.canReadProject(project)).thenReturn(false);
+
+        var target = service.findCurrentTarget(requirement);
+
+        assertThat(target.getStatus()).isEqualTo("UNAVAILABLE");
+        assertThat(target.getTitle()).isNull();
+        assertThat(target.getCode()).isNull();
+        assertThat(target.getNavigationId()).isNull();
+    }
+
+    private RequirementDO requirement(Long id, String title, Long targetId) {
+        RequirementDO requirement = new RequirementDO();
+        requirement.setId(id);
+        requirement.setTitle(title);
+        requirement.setStatus("ACTIVE");
+        requirement.setExecutionTargetType(RequirementExecutionTargetType.TOPIC);
+        requirement.setExecutionTargetId(targetId);
+        return requirement;
     }
 }
