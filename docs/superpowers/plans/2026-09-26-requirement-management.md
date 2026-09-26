@@ -137,6 +137,7 @@ The current backend already has a generic DevelopmentItemType containing TOPIC a
 - Create: src/main/java/com/brad/pms/mapper/RequirementMapper.java
 - Create: src/main/java/com/brad/pms/mapper/RequirementExecutionTargetHistoryMapper.java
 - Create: src/main/java/com/brad/pms/common/enums/RequirementExecutionTargetType.java
+- Modify: src/main/java/com/brad/pms/controller/HealthController.java
 - Test: src/test/java/com/brad/pms/migration/RequirementManagementMigrationTest.java
 
 **Interfaces:**
@@ -164,7 +165,7 @@ Expected: PASS with no Flyway version collision and no V51-V55 regression.
 - [ ] **Step 5: Self-review the stage.** Verify that target cardinality is enforced by the requirement row, history is append-only, project/topic/story tables are not mutated, the V54 nullable workflow context is preserved for independent items, and existing project/topic/story service paths still retain their required context. Only after this review passes, commit:
 
 ~~~bash
-git add src/main/resources/db/migration/V56__requirement_management.sql src/main/java/com/brad/pms/entity/RequirementDO.java src/main/java/com/brad/pms/entity/RequirementExecutionTargetHistoryDO.java src/main/java/com/brad/pms/mapper/RequirementMapper.java src/main/java/com/brad/pms/mapper/RequirementExecutionTargetHistoryMapper.java src/main/java/com/brad/pms/common/enums/RequirementExecutionTargetType.java src/test/java/com/brad/pms/migration/RequirementManagementMigrationTest.java
+git add src/main/resources/db/migration/V56__requirement_management.sql src/main/java/com/brad/pms/entity/RequirementDO.java src/main/java/com/brad/pms/entity/RequirementExecutionTargetHistoryDO.java src/main/java/com/brad/pms/mapper/RequirementMapper.java src/main/java/com/brad/pms/mapper/RequirementExecutionTargetHistoryMapper.java src/main/java/com/brad/pms/common/enums/RequirementExecutionTargetType.java src/main/java/com/brad/pms/controller/HealthController.java src/test/java/com/brad/pms/migration/RequirementManagementMigrationTest.java
 git commit -m "feat: add requirement management schema"
 ~~~
 
