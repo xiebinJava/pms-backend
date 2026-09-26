@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       frontend_ref:
-        description: 'Reviewed pms-front branch, tag, or commit SHA (defaults to main)'
+        description: 'Reviewed pms-front branch, tag, or commit SHA (defaults to release)'
         required: false
         type: string
-        default: main
+        default: release
 
 jobs:
   mysql-and-browser:
@@ -32,9 +32,10 @@ jobs:
           repository: ${{ github.repository_owner }}/pms-front
           path: pms-front
           token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
-          # Push/PR runs use the current remote main. A manual dispatch may
-          # pin a reviewed branch, tag, or immutable commit SHA for release.
-          ref: ${{ inputs.frontend_ref || 'main' }}
+          # Release validation must exercise the matching frontend release
+          # branch. A manual dispatch may pin a reviewed branch, tag, or
+          # immutable commit SHA for a deliberate cross-branch check.
+          ref: ${{ inputs.frontend_ref || 'release' }}
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
@@ -171,7 +172,7 @@ jobs:
       - name: Run desktop and mobile browser smoke tests
         working-directory: pms-front
         env:
-          E2E_BASE_URL: http://127.0.0.1:5173
+          PMS_E2E_BASE_URL: http://127.0.0.1:5173
           E2E_USERNAME: alex.zhang@example.com
         run: pnpm exec playwright test
       - name: Show service status on failure
