@@ -1,6 +1,8 @@
 package com.brad.pms.controller;
 
 import com.brad.pms.security.IgnoreAuth;
+import org.springframework.boot.availability.ApplicationAvailability;
+import org.springframework.boot.availability.ReadinessState;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,15 +29,26 @@ public class HealthController {
 
     private final DataSource dataSource;
     private final int expectedMigrationVersion;
+    private final ApplicationAvailability applicationAvailability;
 
     @Autowired
+    public HealthController(DataSource dataSource, ApplicationAvailability applicationAvailability) {
+        this(dataSource, LATEST_MIGRATION_VERSION, applicationAvailability);
+    }
+
     public HealthController(DataSource dataSource) {
-        this(dataSource, LATEST_MIGRATION_VERSION);
+        this(dataSource, LATEST_MIGRATION_VERSION, null);
     }
 
     public HealthController(DataSource dataSource, int expectedMigrationVersion) {
+        this(dataSource, expectedMigrationVersion, null);
+    }
+
+    HealthController(DataSource dataSource, int expectedMigrationVersion,
+                     ApplicationAvailability applicationAvailability) {
         this.dataSource = dataSource;
         this.expectedMigrationVersion = expectedMigrationVersion;
+        this.applicationAvailability = applicationAvailability;
     }
 
     @GetMapping("/health/live")
@@ -50,24 +63,27 @@ public class HealthController {
         Readiness readiness = checkReadiness();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", readiness.ready ? "UP" : "DOWN");
+        body.put("startup", readiness.startupReady ? "UP" : "DOWN");
         body.put("database", readiness.databaseUp ? "UP" : "DOWN");
         body.put("migration", readiness.migrationVersion == null ? "MISSING" : readiness.migrationVersion);
         return ResponseEntity.status(readiness.ready ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).body(body);
     }
 
     private Readiness checkReadiness() {
+        boolean startupReady = applicationAvailability == null
+                || applicationAvailability.getReadinessState() == ReadinessState.ACCEPTING_TRAFFIC;
         try (Connection connection = dataSource.getConnection()) {
             boolean databaseUp;
             try (PreparedStatement statement = connection.prepareStatement("SELECT 1");
                  ResultSet resultSet = statement.executeQuery()) {
                 databaseUp = resultSet.next() && resultSet.getInt(1) == 1;
             }
-            if (!databaseUp) return new Readiness(false, false, null);
+            if (!databaseUp) return new Readiness(false, false, startupReady, null);
             String migrationVersion = latestMigrationVersion(connection);
             boolean migrationReady = String.valueOf(expectedMigrationVersion).equals(migrationVersion);
-            return new Readiness(true, migrationReady, migrationVersion);
+            return new Readiness(true, startupReady && migrationReady, startupReady, migrationVersion);
         } catch (Exception ignored) {
-            return new Readiness(false, false, null);
+            return new Readiness(false, false, startupReady, null);
         }
     }
 
@@ -94,11 +110,13 @@ public class HealthController {
     private static final class Readiness {
         private final boolean databaseUp;
         private final boolean ready;
+        private final boolean startupReady;
         private final String migrationVersion;
 
-        private Readiness(boolean databaseUp, boolean ready, String migrationVersion) {
+        private Readiness(boolean databaseUp, boolean ready, boolean startupReady, String migrationVersion) {
             this.databaseUp = databaseUp;
             this.ready = ready;
+            this.startupReady = startupReady;
             this.migrationVersion = migrationVersion;
         }
     }

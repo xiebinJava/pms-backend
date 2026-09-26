@@ -1,5 +1,7 @@
 package com.brad.pms.controller;
 
+import org.springframework.boot.availability.ApplicationAvailability;
+import org.springframework.boot.availability.ReadinessState;
 import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
@@ -90,5 +92,37 @@ class HealthControllerTest {
         assertThat(controller.readiness().getStatusCodeValue()).isEqualTo(503);
         assertThat(controller.readiness().getBody()).containsEntry("database", "UP");
         assertThat(controller.readiness().getBody()).containsEntry("migration", "MISSING");
+    }
+
+    @Test
+    void readinessStaysDownUntilApplicationAcceptsTraffic() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement databaseProbe = mock(PreparedStatement.class);
+        PreparedStatement migrationProbe = mock(PreparedStatement.class);
+        ResultSet databaseResult = mock(ResultSet.class);
+        ResultSet migrationResult = mock(ResultSet.class);
+        ApplicationAvailability availability = mock(ApplicationAvailability.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT 1")).thenReturn(databaseProbe);
+        when(databaseProbe.executeQuery()).thenReturn(databaseResult);
+        when(databaseResult.next()).thenReturn(true);
+        when(databaseResult.getInt(1)).thenReturn(1);
+        when(connection.prepareStatement(
+                "SELECT version FROM flyway_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1"))
+                .thenReturn(migrationProbe);
+        when(migrationProbe.executeQuery()).thenReturn(migrationResult);
+        when(migrationResult.next()).thenReturn(true);
+        when(migrationResult.getString(1)).thenReturn("55");
+        when(availability.getReadinessState()).thenReturn(ReadinessState.REFUSING_TRAFFIC);
+
+        HealthController controller = new HealthController(dataSource, 55, availability);
+
+        assertThat(controller.readiness().getStatusCodeValue()).isEqualTo(503);
+        assertThat(controller.readiness().getBody())
+                .containsEntry("status", "DOWN")
+                .containsEntry("startup", "DOWN")
+                .containsEntry("database", "UP")
+                .containsEntry("migration", "55");
     }
 }
