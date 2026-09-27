@@ -114,6 +114,15 @@ public class DevelopmentStoryManagementService {
                 .map(this::toDTO).toList();
     }
 
+    /** Domain-owned lookup used by partial command adapters without exposing mapper rules. */
+    public ProjectNodeDevelopmentStoryDO requireWritableStory(Long id) {
+        if (id == null) throw BusinessException.notFound("故事不存在");
+        ProjectNodeDevelopmentStoryDO story = storyMapper.selectById(id);
+        if (story == null) throw BusinessException.notFound("故事不存在");
+        if (story.getTopicId() != null) topicManagementService.requireWritableTopic(story.getTopicId());
+        return story;
+    }
+
     private void replaceOwner(ProjectNodeDevelopmentStoryDO story, Long oldUserId, Long newUserId) {
         assignmentService.replaceAssignment(story.getProjectId(), DevelopmentItemType.STORY, story.getId(),
                 DevelopmentAssignmentType.STORY_OWNER, story.getId(), newUserId);

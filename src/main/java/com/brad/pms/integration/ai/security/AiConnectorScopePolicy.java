@@ -14,10 +14,15 @@ import java.util.Set;
 public final class AiConnectorScopePolicy {
 
     public static final String QUERY_READ = "pms:query:read";
+    public static final String COMMAND_PREVIEW = "pms:command:preview";
     public static final String COMMAND_EXECUTE = "pms:command:execute";
+    public static final String PROJECT_READ = "pms:project:read";
+    public static final String TASK_READ = "pms:task:read";
+    public static final String TASK_WRITE = "pms:task:write";
     public static final String WORKFLOW_WRITE = "pms:workflow:write";
     public static final String PROJECT_WRITE = "pms:project:write";
     public static final String DEVELOPMENT_WRITE = "pms:development:write";
+    public static final String REQUIREMENT_WRITE = "pms:requirement:write";
     public static final String ITERATION_WRITE = "pms:iteration:write";
 
     private static final Set<String> CLIENTS = Set.of("mcp", "opencli");

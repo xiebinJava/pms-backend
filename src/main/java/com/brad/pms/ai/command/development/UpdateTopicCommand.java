@@ -1,0 +1,67 @@
+package com.brad.pms.ai.command.development;
+
+import com.brad.pms.ai.command.CommandArgumentReader;
+import com.brad.pms.ai.command.CommandName;
+import com.brad.pms.ai.command.CommandPreview;
+import com.brad.pms.ai.command.CommandPreviewRequest;
+import com.brad.pms.ai.command.CommandResult;
+import com.brad.pms.ai.command.PmsCommand;
+import com.brad.pms.ai.command.PmsCommandSupport;
+import com.brad.pms.dto.request.DevelopmentTopicUpdateCmd;
+import com.brad.pms.entity.AiOperationDO;
+import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
+import com.brad.pms.service.DevelopmentTopicManagementService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+@Component
+@RequiredArgsConstructor
+public class UpdateTopicCommand implements PmsCommand {
+    protected static final Set<String> ALLOWED = Set.of("topicId", "title", "ownerId", "projectId");
+    protected static final List<String> REFRESH = List.of("topic-list", "topic-detail", "project-detail");
+    protected final DevelopmentTopicManagementService topicService;
+    protected final PmsCommandSupport support;
+
+    @Override public CommandName name() { return CommandName.TOPIC_UPDATE; }
+
+    @Override
+    public CommandPreview preview(CommandPreviewRequest request) {
+        Map<String, Object> arguments = request.arguments();
+        support.rejectUnknown(arguments, ALLOWED, name().code());
+        Long id = CommandArgumentReader.requiredLong(arguments, "topicId");
+        ProjectNodeDevelopmentTopicDO current = topicService.requireWritableTopic(id);
+        Map<String, Object> change = new LinkedHashMap<>();
+        change.put("entity", "topic"); change.put("action", "update"); change.put("topicId", id);
+        change.put("fromProjectId", current.getProjectId());
+        change.put("toProjectId", projectId(arguments, current));
+        change.put("title", arguments.containsKey("title")
+                ? CommandArgumentReader.requiredText(arguments, "title") : current.getTitle());
+        return support.preview(request, name(), "更新专题", change, List.of(), REFRESH);
+    }
+
+    @Override
+    public CommandResult execute(AiOperationDO operation) {
+        Map<String, Object> arguments = support.readArguments(operation, name().code());
+        support.rejectUnknown(arguments, ALLOWED, name().code());
+        Long id = CommandArgumentReader.requiredLong(arguments, "topicId");
+        ProjectNodeDevelopmentTopicDO current = topicService.requireWritableTopic(id);
+        DevelopmentTopicUpdateCmd command = new DevelopmentTopicUpdateCmd();
+        command.setTitle(arguments.containsKey("title")
+                ? CommandArgumentReader.requiredText(arguments, "title") : current.getTitle());
+        command.setOwnerId(arguments.containsKey("ownerId")
+                ? CommandArgumentReader.optionalLong(arguments, "ownerId") : current.getOwnerId());
+        command.setProjectId(projectId(arguments, current));
+        topicService.update(id, command);
+        return support.result(operation, "专题已更新", Map.of("topicId", id), REFRESH);
+    }
+
+    protected Long projectId(Map<String, Object> arguments, ProjectNodeDevelopmentTopicDO current) {
+        return arguments.containsKey("projectId")
+                ? CommandArgumentReader.optionalLong(arguments, "projectId") : current.getProjectId();
+    }
+}

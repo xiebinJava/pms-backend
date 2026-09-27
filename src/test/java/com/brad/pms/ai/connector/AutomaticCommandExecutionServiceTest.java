@@ -71,6 +71,16 @@ class AutomaticCommandExecutionServiceTest {
                 .hasMessageContaining("节点操作必须提供具体上下文");
     }
 
+    @Test
+    void requiresConcreteContextForIterationPlanOperations() {
+        UserContext.set(new LoginUser(7L, "admin", "管理员"));
+        AutomaticCommandExecutionService service = new AutomaticCommandExecutionService(operationService);
+
+        assertThatThrownBy(() -> service.execute(request(CommandName.ITERATION_PLAN_CREATE, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("节点操作必须提供具体上下文");
+    }
+
     private AutomaticOperationRequest request(CommandName command, OperationContext context) {
         return new AutomaticOperationRequest(
                 command,

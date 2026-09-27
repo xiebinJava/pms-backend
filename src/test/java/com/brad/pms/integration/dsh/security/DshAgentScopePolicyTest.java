@@ -23,6 +23,7 @@ class DshAgentScopePolicyTest {
                         "pms:task:write", "pms:command:preview", "pms:command:execute",
                         "pms:workflow:write",
                         "pms:project:write",
+                        "pms:requirement:write", "pms:development:write", "pms:iteration:write",
                         "pms:workspace:embed");
     }
 

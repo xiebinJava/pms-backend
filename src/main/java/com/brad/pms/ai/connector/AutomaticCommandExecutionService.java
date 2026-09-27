@@ -55,7 +55,14 @@ public class AutomaticCommandExecutionService {
     private boolean requiresConcreteContext(CommandName command) {
         return switch (command) {
             case NODE_COMPLETE, NODE_FIELD_UPDATE, NODE_ROLLBACK,
-                 NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE, TASK_CREATE -> true;
+                 NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE, TASK_CREATE,
+                 DEVELOPMENT_ITEM_NODE_OWNER_UPDATE,
+                 DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
+                 DEVELOPMENT_ITEM_NODE_FIELD_UPDATE,
+                 DEVELOPMENT_ITEM_NODE_COMPLETE,
+                 DEVELOPMENT_ITEM_TASK_CREATE,
+                 ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
+                 ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> true;
             default -> false;
         };
     }

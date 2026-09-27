@@ -117,12 +117,12 @@ export interface OperationResult {
 }
 ```
 
-- [ ] **Step 1: 创建 pnpm workspace 和最小包结构。** 锁定 Node.js 24.10.0、pnpm 10.18.2、TypeScript strict mode，并让 `pnpm test` 能发现空测试目录；`engines.node` 保留 `>=22`。
-- [ ] **Step 2: 写共享 Schema 的失败测试。** 使用 Zod 或选定的 Schema 库断言缺少 `operation`、`idempotencyKey`、`clientId`、`requestId` 时拒绝；断言资源类型和结果状态只能使用枚举值。
-- [ ] **Step 3: 实现 `pms-contracts` 类型和运行时 Schema。** 所有 MCP/OpenCLI 输入在进入 `pms-client` 前完成校验；不要在适配器中重新定义同名接口。
-- [ ] **Step 4: 写 README 的仓库边界说明。** 明确 PMS 是真源、连接器不访问数据库、自动写入仍执行服务端安全校验。
-- [ ] **Step 5: 运行 `pnpm test` 和 `pnpm typecheck`。** 预期全部通过。
-- [ ] **Step 6: 自审并提交。** 检查协议是否覆盖需求、项目、专题、故事、任务和迭代计划；提交 `chore: scaffold pms ai connector`。
+- [x] **Step 1: 创建 pnpm workspace 和最小包结构。** 锁定 Node.js 24.10.0、pnpm 10.18.2、TypeScript strict mode，并让 `pnpm test` 能发现空测试目录；`engines.node` 保留 `>=22`。
+- [x] **Step 2: 写共享 Schema 的失败测试。** 使用 Zod 或选定的 Schema 库断言缺少 `operation`、`idempotencyKey`、`clientId`、`requestId` 时拒绝；断言资源类型和结果状态只能使用枚举值。
+- [x] **Step 3: 实现 `pms-contracts` 类型和运行时 Schema。** 所有 MCP/OpenCLI 输入在进入 `pms-client` 前完成校验；不要在适配器中重新定义同名接口。
+- [x] **Step 4: 写 README 的仓库边界说明。** 明确 PMS 是真源、连接器不访问数据库、自动写入仍执行服务端安全校验。
+- [x] **Step 5: 运行 `pnpm test` 和 `pnpm typecheck`。** 预期全部通过。
+- [x] **Step 6: 自审并提交。** 检查协议是否覆盖需求、项目、专题、故事、任务和迭代计划；提交 `chore: scaffold pms ai connector`。
 
 ## Task 2: 增加 PMS 自动执行门面
 
@@ -163,14 +163,14 @@ public interface AutomaticCommandExecutionService {
 
 `execute` 必须在一次服务调用内完成：权限校验 → 命令预览 → 操作持久化 → 幂等检查 → 命令执行 → 结果写回 → 审计信息返回。自动执行的原子性和幂等检查由 `AiOperationService` 承载，门面只负责请求归一化和用户上下文校验；可以复用现有 `PmsCommandRegistry`、`CommandPreviewService`、`CommandExecutionService` 和 `AiOperationService`，不能复制命令的领域逻辑。
 
-- [ ] **Step 1: 写自动执行失败测试。** 覆盖无 Token、无 scope、未知命令、参数不完整、资源权限不足、版本冲突、相同幂等键重试和不同幂等键重复操作。
-- [ ] **Step 2: 写迁移测试。** 断言新增来源客户端、请求 ID、执行模式字段；旧记录可以读取，旧 DSH 操作不受影响。
-- [ ] **Step 3: 增加 `AiConnectorScopePolicy`。** 至少定义 `pms:query:read`、`pms:command:execute`、`pms:workflow:write`、`pms:project:write`、`pms:development:write`、`pms:iteration:write`，并要求后端权限与连接器 scope 取交集。
-- [ ] **Step 4: 实现自动执行服务。** 在 `AiOperationService` 增加带幂等键预占的自动执行事务：先锁定同用户同幂等键的历史记录，再生成内部预览、持久化 `AUTOMATIC_RUNNING` 状态并执行命令；不得把状态暴露为“等待用户确认”，执行失败时事务回滚，重复幂等键返回原结果。
-- [ ] **Step 5: 增加上下文规则。** 全局操作在服务端归一化为 `global:pms` 上下文；节点操作必须提供实际对象、节点和版本，不能用全局上下文绕过节点校验。
-- [ ] **Step 6: 实现 `/integration/ai/v1/operations/execute`。** Controller 从 `UserContext` 获取当前用户，不接受请求体覆盖用户身份；统一返回业务错误和 `requestId`。
-- [ ] **Step 7: 运行 `mvn -q -Dtest=AutomaticCommandExecutionServiceTest,AiConnectorControllerTest test`。** 预期通过。
-- [ ] **Step 8: 自审并提交。** 重点检查自动执行没有关闭原有 `PmsCommandScopeGuard`、对象权限、命令版本和事务；提交 `feat: add automatic ai connector execution facade`。
+- [x] **Step 1: 写自动执行失败测试。** 覆盖无 Token、无 scope、未知命令、参数不完整、资源权限不足、版本冲突、相同幂等键重试和不同幂等键重复操作。
+- [x] **Step 2: 写迁移测试。** 断言新增来源客户端、请求 ID、执行模式字段；旧记录可以读取，旧 DSH 操作不受影响。
+- [x] **Step 3: 增加 `AiConnectorScopePolicy`。** 至少定义 `pms:query:read`、`pms:command:execute`、`pms:workflow:write`、`pms:project:write`、`pms:development:write`、`pms:requirement:write`、`pms:iteration:write`，并要求后端权限与连接器 scope 取交集；委托 Agent 白名单同步新领域 scope。
+- [x] **Step 4: 实现自动执行服务。** 在 `AiOperationService` 增加带幂等键预占的自动执行事务：先锁定同用户同幂等键的历史记录，再生成内部预览、持久化 `AUTOMATIC_RUNNING` 状态并执行命令；不得把状态暴露为“等待用户确认”，执行失败时事务回滚，重复幂等键返回原结果。
+- [x] **Step 5: 增加上下文规则。** 全局操作在服务端归一化为 `global:pms` 上下文；节点和迭代计划操作必须提供实际对象、节点和版本，不能用全局上下文绕过节点校验。
+- [x] **Step 6: 实现 `/integration/ai/v1/operations/execute`。** Controller 从 `UserContext` 获取当前用户，不接受请求体覆盖用户身份；统一返回业务错误和 `requestId`。
+- [x] **Step 7: 运行 `mvn -q -Dtest=AutomaticCommandExecutionServiceTest,AiConnectorControllerTest test`。** 预期通过。
+- [x] **Step 8: 自审并提交。** 重点检查自动执行没有关闭原有 `PmsCommandScopeGuard`、对象权限、命令版本和事务；提交 `feat: add automatic ai connector execution facade`。
 
 ## Task 3: 扩展能力目录、查询和动态流程上下文
 
@@ -185,6 +185,8 @@ public interface AutomaticCommandExecutionService {
 - Create: `src/main/java/com/brad/pms/ai/command/requirement/CreateRequirementCommand.java`
 - Create: `src/main/java/com/brad/pms/ai/command/requirement/UpdateRequirementCommand.java`
 - Create: `src/main/java/com/brad/pms/ai/command/requirement/LinkRequirementTargetCommand.java`
+- Create: `src/main/java/com/brad/pms/ai/command/requirement/ChangeRequirementTargetCommand.java`
+- Create: `src/main/java/com/brad/pms/ai/command/requirement/UnlinkRequirementTargetCommand.java`
 - Create: `src/main/java/com/brad/pms/ai/command/development/CreateTopicCommand.java`
 - Create: `src/main/java/com/brad/pms/ai/command/development/UpdateTopicCommand.java`
 - Create: `src/main/java/com/brad/pms/ai/command/development/LinkTopicProjectCommand.java`
@@ -200,6 +202,7 @@ public interface AutomaticCommandExecutionService {
 - Create: `src/main/java/com/brad/pms/ai/command/iteration/CreateIterationPlanCommand.java`
 - Create: `src/main/java/com/brad/pms/ai/command/iteration/AddStoryToIterationPlanCommand.java`
 - Create: `src/main/java/com/brad/pms/ai/command/iteration/RemoveStoryFromIterationPlanCommand.java`
+- Create: `src/main/java/com/brad/pms/service/IterationPlanCommandService.java`
 - Modify: `src/main/java/com/brad/pms/ai/command/CommandName.java`
 - Modify: `src/main/java/com/brad/pms/ai/command/PmsCommandRegistry.java`
 - Modify: `src/main/java/com/brad/pms/ai/command/PmsCommandMetadata.java`
@@ -252,15 +255,15 @@ iteration-plan.story.remove
 
 `development-item.*` 命令的参数必须包含 `itemType`、`itemId` 和 `nodeId`，由后端根据项目、专题或故事类型路由到对应领域服务；不允许通过客户端传入任意表名或 URL。
 
-- [ ] **Step 1: 写能力目录测试。** 断言当前用户只能看到有权限的资源和命令；能力包含 action、inputSchema、workflowVersion、node、component、refreshScopes。
-- [ ] **Step 2: 写动态流程测试。** 使用两个不同的已发布模板版本，把专题组件绑定到不同项目节点；断言能力目录和上下文返回实际绑定节点，而不是固定节点名。
-- [ ] **Step 3: 写查询测试。** 覆盖需求、项目、专题、故事、任务、迭代计划的分页、候选项和无数据响应。
-- [ ] **Step 4: 扩展命令元数据。** 为需求、专题、故事、迭代计划和动态节点字段补齐稳定命令名、中文说明、权限 scope、Schema 和刷新范围。
-- [ ] **Step 5: 为新命令接入现有领域 Service。** `requirement/*` 调用需求管理和执行对象服务，`topic/*` 调用专题管理服务，`story/*` 调用故事管理服务，`iteration/*` 调用迭代计划服务；禁止在命令类中复制成员同步和关联校验。
-- [ ] **Step 6: 实现统一能力和查询服务。** 只调用现有领域 Service 和 Workflow Service；查询结果必须带资源版本和关联摘要。
-- [ ] **Step 7: 暴露 `GET /integration/ai/v1/capabilities`、`POST /integration/ai/v1/query` 和 `GET /integration/ai/v1/context/{resourceType}/{resourceId}`。** 普通 PMS 登录 Token 使用用户权限；委托 Token 额外取连接器 scope 与用户权限的交集。
-- [ ] **Step 8: 运行聚焦后端测试和已有 DSH 测试。** 运行 `mvn -q -Dtest=AiConnectorCapabilityServiceTest,AiConnectorQueryServiceTest,DynamicWorkflowCapabilityTest,DshCapabilityControllerTest test`。
-- [ ] **Step 9: 自审并提交。** 检查新增流程类型、字段和组件不需要重新编译连接器；提交 `feat: expose dynamic pms ai capabilities`。
+- [x] **Step 1: 写能力目录测试。** 断言当前用户只能看到有权限的资源和命令；能力包含 action、inputSchema、workflowVersion、node、component、refreshScopes。
+- [x] **Step 2: 写动态流程测试。** 使用两个不同的已发布模板版本，把专题组件绑定到不同项目节点；断言能力目录和上下文只从事项已绑定的流程实例快照生成，返回实际绑定节点、运行时组件、字段定义和当前字段值，而不是固定节点名或当前默认模板。
+- [x] **Step 3: 写查询测试。** 覆盖需求、项目、专题、故事、任务、迭代计划的分页、候选项和无数据响应。
+- [x] **Step 4: 扩展命令元数据。** 为需求、专题、故事、迭代计划和动态节点字段补齐稳定命令名、中文说明、权限 scope、Schema 和刷新范围。
+- [x] **Step 5: 为新命令接入现有领域 Service。** `requirement/*` 调用需求管理和执行对象服务，`topic/*` 调用专题管理服务，`story/*` 调用故事管理服务，`iteration/*` 调用新增的 `IterationPlanCommandService`；该写服务复用现有项目/节点权限、故事关联和成员同步规则，禁止在命令类中复制业务校验。
+- [x] **Step 6: 实现统一能力和查询服务。** 只调用现有领域 Service 和 Workflow Service；查询结果必须带资源版本和关联摘要。
+- [x] **Step 7: 暴露 `GET /integration/ai/v1/capabilities`、`POST /integration/ai/v1/query` 和 `GET /integration/ai/v1/context/{resourceType}/{resourceId}`。** 普通 PMS 登录 Token 使用用户权限；委托 Token 额外取连接器 scope 与用户权限的交集。
+- [x] **Step 8: 运行聚焦后端测试和已有 DSH 测试。** 运行 `mvn -q -Dtest=AiConnectorCapabilityServiceTest,AiConnectorQueryServiceTest,DynamicWorkflowCapabilityTest,DshCapabilityControllerTest test`。
+- [x] **Step 9: 自审并提交。** 检查新增流程类型、字段和组件不需要重新编译连接器；提交 `feat: expose dynamic pms ai capabilities`。
 
 ## Task 4: 实现共享 PMS Client
 
