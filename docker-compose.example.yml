@@ -9,7 +9,7 @@ services:
     ports:
       - "127.0.0.1:3306:3306"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - pms-mysql-data:/var/lib/mysql
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -137,7 +137,8 @@ services:
     networks: [pms-edge]
 
 volumes:
-  mysql-data:
+  pms-mysql-data:
+    name: pms-backend_pms-mysql-data
   pms-uploads:
 
 networks:
