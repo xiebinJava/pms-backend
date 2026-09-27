@@ -4,6 +4,7 @@ import com.brad.pms.ai.contract.PmsAgentContractRegistry;
 import com.brad.pms.entity.AiOperationDO;
 import com.brad.pms.mapper.AiOperationMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -98,6 +99,47 @@ class AiOperationAutomaticExecutionTest {
                 7L, request, "idem-reused", "mcp", "request-2"))
                 .isInstanceOf(com.brad.pms.common.exception.BusinessException.class)
                 .hasMessageContaining("其他操作");
+    }
+
+    @Test
+    void returnsTheWinningResultWhenTheIdempotencyInsertRaces() throws Exception {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsCommandRegistry registry = mock(PmsCommandRegistry.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        PmsCommand command = mock(PmsCommand.class);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        CommandResult expected = new CommandResult(
+                "operation-winner", "SUCCEEDED", "项目已创建", Map.of("projectId", 7L), List.of("project-list"));
+        CommandPreview proposal = new CommandPreview(
+                null, CommandName.PROJECT_CREATE, Instant.now().plusSeconds(600),
+                "v1", List.of(), List.of(Map.of("entity", "project")), List.of("project-list"));
+        AiOperationDO winner = succeededOperation(objectMapper, expected);
+        winner.setCommandName(CommandName.PROJECT_CREATE.code());
+        winner.setSourceClient("mcp");
+        winner.setContextId("global:pms");
+        winner.setContextVersion("v1");
+        winner.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "测试项目")));
+
+        when(mapper.selectByUserIdAndIdempotencyKeyForUpdate(7L, "idem-race"))
+                .thenReturn(null, winner);
+        when(registry.require(CommandName.PROJECT_CREATE)).thenReturn(command);
+        when(command.preview(any())).thenReturn(proposal);
+        doAnswer(invocation -> {
+            throw new DuplicateKeyException("duplicate idempotency key");
+        }).when(mapper).insert(any(AiOperationDO.class));
+
+        AiOperationService service = new AiOperationService(mapper, registry, objectMapper, contractRegistry);
+        CommandPreviewRequest request = new CommandPreviewRequest(
+                CommandName.PROJECT_CREATE, Map.of("name", "测试项目"), "global:pms", "v1");
+
+        CommandResult result = service.executeAutomatically(7L, request, "idem-race", "mcp", "request-race");
+
+        assertThat(result.operationId()).isEqualTo(expected.operationId());
+        assertThat(result.status()).isEqualTo(expected.status());
+        assertThat(result.message()).isEqualTo(expected.message());
+        assertThat(result.data()).containsEntry("projectId", 7);
+        assertThat(result.refreshScopes()).containsExactlyElementsOf(expected.refreshScopes());
+        verify(command, times(0)).execute(any(AiOperationDO.class));
     }
 
     private AiOperationDO succeededOperation(ObjectMapper objectMapper, CommandResult result) throws Exception {

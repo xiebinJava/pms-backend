@@ -8,7 +8,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -95,8 +97,14 @@ public class AiOperationService {
      * Executes a connector request atomically without exposing the legacy
      * preview/confirm lifecycle. The command registry and command services
      * remain the only source of business behavior.
+     *
+     * The first idempotency lookup uses a user/key unique index. Under MySQL's
+     * default REPEATABLE_READ isolation, two different new keys can acquire
+     * overlapping gap locks and deadlock before either command is persisted.
+     * READ_COMMITTED keeps the lookup's FOR UPDATE lock on existing rows while
+     * allowing independent automatic operations to reserve their keys safely.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CommandResult executeAutomatically(Long userId,
                                               CommandPreviewRequest request,
                                               String idempotencyKey,
@@ -147,7 +155,24 @@ public class AiOperationService {
         operation.setStatus(AUTOMATIC_RUNNING);
         operation.setIdempotencyKey(idempotencyKey);
         operation.setExpiresAt(now.plusMinutes(PREVIEW_TTL_MINUTES));
-        operationMapper.insert(operation);
+        try {
+            operationMapper.insert(operation);
+        } catch (DuplicateKeyException duplicateKey) {
+            // A concurrent request with the same key may have won the unique
+            // reservation between the initial lookup and this insert. Re-read
+            // the winner and preserve normal idempotency semantics instead of
+            // leaking a database 500 to the connector.
+            AiOperationDO existingAfterRace = operationMapper
+                    .selectByUserIdAndIdempotencyKeyForUpdate(userId, idempotencyKey);
+            if (existingAfterRace != null
+                    && matchesAutomaticRequest(existingAfterRace, request, sourceClient)) {
+                if (SUCCEEDED.equals(existingAfterRace.getStatus())) {
+                    return read(existingAfterRace.getResultJson(), CommandResult.class);
+                }
+                throw BusinessException.conflict("相同幂等键的操作正在处理或不可重试");
+            }
+            throw BusinessException.conflict("幂等键已经用于其他操作，请更换幂等键");
+        }
 
         CommandResult result = command.execute(operation);
         operation.setResultJson(write(result));
