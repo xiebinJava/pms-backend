@@ -5,7 +5,7 @@ import com.brad.pms.ai.command.CommandResult;
 import java.util.List;
 import java.util.Map;
 
-/** Stable neutral response envelope for MCP and OpenCLI adapters. */
+/** Stable response envelope for the PMS CLI operation facade. */
 public record AiOperationResultDTO(
         String operationId,
         String status,

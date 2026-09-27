@@ -48,7 +48,7 @@ class AutomaticCommandExecutionServiceTest {
     void normalizesGlobalOperationsWithoutRequiringPageContext() {
         UserContext.set(new LoginUser(7L, "admin", "管理员"));
         CommandResult expected = new CommandResult("op-1", "SUCCEEDED", "项目已创建", Map.of(), List.of());
-        when(operationService.executeAutomatically(eq(7L), any(), eq("idem-1"), eq("mcp"), eq("req-1")))
+        when(operationService.executeAutomatically(eq(7L), any(), eq("idem-1"), eq("pms-cli"), eq("req-1")))
                 .thenReturn(expected);
 
         AutomaticCommandExecutionService service = new AutomaticCommandExecutionService(operationService);
@@ -56,7 +56,7 @@ class AutomaticCommandExecutionServiceTest {
 
         assertThat(actual).isSameAs(expected);
         ArgumentCaptor<CommandPreviewRequest> captor = ArgumentCaptor.forClass(CommandPreviewRequest.class);
-        verify(operationService).executeAutomatically(eq(7L), captor.capture(), eq("idem-1"), eq("mcp"), eq("req-1"));
+        verify(operationService).executeAutomatically(eq(7L), captor.capture(), eq("idem-1"), eq("pms-cli"), eq("req-1"));
         assertThat(captor.getValue().contextId()).isEqualTo("global:pms");
         assertThat(captor.getValue().contextVersion()).isEqualTo("v1");
     }
@@ -90,7 +90,7 @@ class AutomaticCommandExecutionServiceTest {
                 null,
                 null,
                 "idem-1",
-                "mcp",
+                "pms-cli",
                 "req-1");
     }
 

@@ -37,7 +37,7 @@ class AiOperationAutomaticExecutionTest {
                 "v1", List.of(), List.of(Map.of("entity", "project")), List.of("project-list"));
         AiOperationDO stored = succeededOperation(objectMapper, expected);
         stored.setCommandName(CommandName.PROJECT_CREATE.code());
-        stored.setSourceClient("mcp");
+        stored.setSourceClient("pms-cli");
         stored.setContextId("global:pms");
         stored.setContextVersion("v1");
         stored.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "测试项目")));
@@ -56,8 +56,8 @@ class AiOperationAutomaticExecutionTest {
         CommandPreviewRequest request = new CommandPreviewRequest(
                 CommandName.PROJECT_CREATE, Map.of("name", "测试项目"), "global:pms", "v1");
 
-        CommandResult first = service.executeAutomatically(7L, request, "idem-1", "mcp", "request-1");
-        CommandResult retry = service.executeAutomatically(7L, request, "idem-1", "mcp", "request-2");
+        CommandResult first = service.executeAutomatically(7L, request, "idem-1", "pms-cli", "request-1");
+        CommandResult retry = service.executeAutomatically(7L, request, "idem-1", "pms-cli", "request-2");
 
         assertThat(first).isEqualTo(expected);
         assertThat(retry.operationId()).isEqualTo(expected.operationId());
@@ -70,7 +70,7 @@ class AiOperationAutomaticExecutionTest {
         verify(mapper).insert(captor.capture());
         assertThat(insertedStatus).hasValue("AUTOMATIC_RUNNING");
         assertThat(captor.getValue().getExecutionMode()).isEqualTo("AUTOMATIC");
-        assertThat(captor.getValue().getSourceClient()).isEqualTo("mcp");
+        assertThat(captor.getValue().getSourceClient()).isEqualTo("pms-cli");
         assertThat(captor.getValue().getRequestId()).isEqualTo("request-1");
         assertThat(captor.getValue().getIdempotencyKey()).isEqualTo("idem-1");
     }
@@ -85,7 +85,7 @@ class AiOperationAutomaticExecutionTest {
                 "operation-1", "SUCCEEDED", "项目已创建", Map.of("projectId", 7L), List.of("project-list"));
         AiOperationDO existing = succeededOperation(objectMapper, result);
         existing.setCommandName(CommandName.PROJECT_CREATE.code());
-        existing.setSourceClient("mcp");
+        existing.setSourceClient("pms-cli");
         existing.setContextId("global:pms");
         existing.setContextVersion("v1");
         existing.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "原项目")));
@@ -96,7 +96,7 @@ class AiOperationAutomaticExecutionTest {
                 CommandName.PROJECT_CREATE, Map.of("name", "另一个项目"), "global:pms", "v1");
 
         assertThatThrownBy(() -> service.executeAutomatically(
-                7L, request, "idem-reused", "mcp", "request-2"))
+                7L, request, "idem-reused", "pms-cli", "request-2"))
                 .isInstanceOf(com.brad.pms.common.exception.BusinessException.class)
                 .hasMessageContaining("其他操作");
     }
@@ -115,7 +115,7 @@ class AiOperationAutomaticExecutionTest {
                 "v1", List.of(), List.of(Map.of("entity", "project")), List.of("project-list"));
         AiOperationDO winner = succeededOperation(objectMapper, expected);
         winner.setCommandName(CommandName.PROJECT_CREATE.code());
-        winner.setSourceClient("mcp");
+        winner.setSourceClient("pms-cli");
         winner.setContextId("global:pms");
         winner.setContextVersion("v1");
         winner.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "测试项目")));
@@ -132,7 +132,7 @@ class AiOperationAutomaticExecutionTest {
         CommandPreviewRequest request = new CommandPreviewRequest(
                 CommandName.PROJECT_CREATE, Map.of("name", "测试项目"), "global:pms", "v1");
 
-        CommandResult result = service.executeAutomatically(7L, request, "idem-race", "mcp", "request-race");
+        CommandResult result = service.executeAutomatically(7L, request, "idem-race", "pms-cli", "request-race");
 
         assertThat(result.operationId()).isEqualTo(expected.operationId());
         assertThat(result.status()).isEqualTo(expected.status());

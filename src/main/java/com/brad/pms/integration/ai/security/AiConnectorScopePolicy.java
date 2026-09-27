@@ -25,8 +25,8 @@ public final class AiConnectorScopePolicy {
     public static final String REQUIREMENT_WRITE = "pms:requirement:write";
     public static final String ITERATION_WRITE = "pms:iteration:write";
 
-    /** Current first-party CLI plus legacy adapter identifiers during migration. */
-    private static final Set<String> CLIENTS = Set.of("pms-cli", "mcp", "opencli");
+    /** The first-party PMS CLI is the only supported connector client. */
+    private static final Set<String> CLIENTS = Set.of("pms-cli");
 
     private AiConnectorScopePolicy() {
     }

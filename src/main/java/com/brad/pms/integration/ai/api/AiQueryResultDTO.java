@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 
-/** Stable resource list envelope shared by MCP and OpenCLI. */
+/** Stable resource list envelope returned to the PMS CLI. */
 public record AiQueryResultDTO(
         String resourceType,
         List<Item> items,

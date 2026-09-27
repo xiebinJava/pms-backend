@@ -3,7 +3,7 @@ package com.brad.pms.integration.ai.api;
 import java.util.List;
 import java.util.Map;
 
-/** Dynamic, server-owned capability catalog for MCP and OpenCLI clients. */
+/** Dynamic, server-owned capability catalog for the PMS CLI. */
 public record AiCapabilityDTO(
         String version,
         List<ResourceCapability> resources,

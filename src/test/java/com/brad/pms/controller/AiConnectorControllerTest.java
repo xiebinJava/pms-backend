@@ -34,7 +34,7 @@ class AiConnectorControllerTest {
 
         ResponseResult<AiOperationResultDTO> response = controller.execute(new AiAutomaticExecuteRequest(
                 "project.create", Map.of("name", "订单中心"), null, null,
-                null, null, "idem-1", "mcp", "req-1"));
+                null, null, "idem-1", "pms-cli", "req-1"));
 
         assertThat(response.getData().operationId()).isEqualTo(result.operationId());
         assertThat(response.getData().status()).isEqualTo(result.status());
