@@ -111,6 +111,19 @@ public class JwtTokenProvider {
         }
     }
 
+    /**
+     * Identifies both the legacy AI bridge token and the DSH token without
+     * exposing parser failures to the authentication boundary.
+     */
+    public boolean isAiDelegationToken(String token) {
+        try {
+            parseAiDelegationToken(token);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
     public boolean hasAiDelegationScope(String token, String scope) {
         Claims claims = parseClaims(token);
         if (!"AI_DELEGATION".equals(claims.get("kind", String.class))) return false;

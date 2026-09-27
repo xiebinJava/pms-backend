@@ -18,6 +18,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AiOperationAutomaticExecutionTest {
 
@@ -33,8 +34,14 @@ class AiOperationAutomaticExecutionTest {
         CommandPreview proposal = new CommandPreview(
                 null, CommandName.PROJECT_CREATE, Instant.now().plusSeconds(600),
                 "v1", List.of(), List.of(Map.of("entity", "project")), List.of("project-list"));
+        AiOperationDO stored = succeededOperation(objectMapper, expected);
+        stored.setCommandName(CommandName.PROJECT_CREATE.code());
+        stored.setSourceClient("mcp");
+        stored.setContextId("global:pms");
+        stored.setContextVersion("v1");
+        stored.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "测试项目")));
         when(mapper.selectByUserIdAndIdempotencyKeyForUpdate(7L, "idem-1"))
-                .thenReturn(null, succeededOperation(objectMapper, expected));
+                .thenReturn(null, stored);
         when(registry.require(CommandName.PROJECT_CREATE)).thenReturn(command);
         when(command.preview(any())).thenReturn(proposal);
         when(command.execute(any())).thenReturn(expected);
@@ -65,6 +72,32 @@ class AiOperationAutomaticExecutionTest {
         assertThat(captor.getValue().getSourceClient()).isEqualTo("mcp");
         assertThat(captor.getValue().getRequestId()).isEqualTo("request-1");
         assertThat(captor.getValue().getIdempotencyKey()).isEqualTo("idem-1");
+    }
+
+    @Test
+    void rejectsReusingAnIdempotencyKeyForADifferentRequest() throws Exception {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsCommandRegistry registry = mock(PmsCommandRegistry.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        CommandResult result = new CommandResult(
+                "operation-1", "SUCCEEDED", "项目已创建", Map.of("projectId", 7L), List.of("project-list"));
+        AiOperationDO existing = succeededOperation(objectMapper, result);
+        existing.setCommandName(CommandName.PROJECT_CREATE.code());
+        existing.setSourceClient("mcp");
+        existing.setContextId("global:pms");
+        existing.setContextVersion("v1");
+        existing.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "原项目")));
+        when(mapper.selectByUserIdAndIdempotencyKeyForUpdate(7L, "idem-reused")).thenReturn(existing);
+
+        AiOperationService service = new AiOperationService(mapper, registry, objectMapper, contractRegistry);
+        CommandPreviewRequest request = new CommandPreviewRequest(
+                CommandName.PROJECT_CREATE, Map.of("name", "另一个项目"), "global:pms", "v1");
+
+        assertThatThrownBy(() -> service.executeAutomatically(
+                7L, request, "idem-reused", "mcp", "request-2"))
+                .isInstanceOf(com.brad.pms.common.exception.BusinessException.class)
+                .hasMessageContaining("其他操作");
     }
 
     private AiOperationDO succeededOperation(ObjectMapper objectMapper, CommandResult result) throws Exception {

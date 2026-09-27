@@ -74,9 +74,11 @@ public record AiCapabilityDTO(
     public record WorkflowComponentCapability(
             String key,
             String label,
-            List<FieldCapability> fields) {
+            List<FieldCapability> fields,
+            List<String> actions) {
         public WorkflowComponentCapability {
             fields = fields == null ? List.of() : List.copyOf(fields);
+            actions = actions == null ? List.of() : List.copyOf(actions);
         }
     }
 

@@ -14,6 +14,7 @@ import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.service.IterationPlanService;
 import com.brad.pms.service.ProjectService;
 import com.brad.pms.ai.query.AiTaskQueryService;
+import com.brad.pms.ai.command.PmsCommandRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -36,6 +37,7 @@ class AiConnectorQueryServiceTest {
     @Mock IterationPlanService iterationPlanService;
     @Mock AiTaskQueryService taskQueryService;
     @Mock DevelopmentItemWorkflowService workflowService;
+    @Mock PmsCommandRegistry commandRegistry;
 
     @Test
     void queriesResourcesThroughExistingPermissionAwareServices() {
@@ -103,6 +105,6 @@ class AiConnectorQueryServiceTest {
 
     private AiConnectorQueryService service() {
         return new AiConnectorQueryService(projectService, developmentItemService,
-                iterationPlanService, taskQueryService, workflowService);
+                iterationPlanService, taskQueryService, workflowService, commandRegistry);
     }
 }

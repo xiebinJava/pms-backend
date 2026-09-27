@@ -5,7 +5,7 @@ import com.brad.pms.ai.command.PmsCommandDescriptor;
 import com.brad.pms.ai.command.PmsCommandMetadata;
 import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.convertor.Convertors;
-import com.brad.pms.dto.response.DevelopmentWorkflowTemplateOptionsDTO;
+import com.brad.pms.dto.response.ProjectTypeDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
 import com.brad.pms.dto.response.WorkflowTemplateVersionSummaryDTO;
 import com.brad.pms.entity.UserDO;
@@ -58,7 +58,7 @@ public class AiConnectorCapabilityService {
                     name.code(), name.code(), descriptor.description(), "automatic", descriptor.risk(),
                     descriptor.scopes(), descriptor.parameters(), requiresContext(descriptor),
                     descriptor.refreshScopes());
-            for (String resourceType : resourceTypes(name)) {
+            for (String resourceType : PmsCommandMetadata.resourceTypes(name)) {
                 grouped.computeIfAbsent(resourceType, ignored -> new ArrayList<>()).add(action);
             }
         }
@@ -77,12 +77,19 @@ public class AiConnectorCapabilityService {
     }
 
     private List<AiCapabilityDTO.WorkflowTypeCapability> workflowTypes() {
-        DevelopmentWorkflowTemplateOptionsDTO options = workflowTemplateService.developmentOptions();
-        if (options == null) return List.of();
+        List<ProjectTypeDTO> activeTypes = workflowTemplateService.listProjectTypes();
+        List<WorkflowTemplateSummaryDTO> publishedTemplates = workflowTemplateService.listTemplates(null, true);
+        Map<Long, List<WorkflowTemplateSummaryDTO>> templatesByType = publishedTemplates.stream()
+                .filter(summary -> summary != null && summary.getProjectTypeId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        WorkflowTemplateSummaryDTO::getProjectTypeId,
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.toList()));
         List<AiCapabilityDTO.WorkflowTypeCapability> result = new ArrayList<>();
-        addWorkflowType(result, "topic-management", "专题管理", options.getTopicTemplates());
-        addWorkflowType(result, "story-management", "故事管理", options.getStoryTemplates());
-        addWorkflowType(result, "requirement-management", "需求管理", options.getRequirementTemplates());
+        for (ProjectTypeDTO type : activeTypes) {
+            if (type == null || type.getId() == null || type.getCode() == null || type.getCode().isBlank()) continue;
+            addWorkflowType(result, type.getCode(), type.getName(), templatesByType.get(type.getId()));
+        }
         return List.copyOf(result);
     }
 
@@ -129,12 +136,24 @@ public class AiConnectorCapabilityService {
             if (node == null) continue;
             List<AiCapabilityDTO.WorkflowComponentCapability> components = node.runtimeComponents().stream()
                     .map(component -> new AiCapabilityDTO.WorkflowComponentCapability(
-                            component, component, fields(node.fields())))
+                            component, component, fields(node.fields()), workflowComponentActions(component)))
                     .toList();
             nodes.add(new AiCapabilityDTO.WorkflowNodeCapability(
                     node.key(), node.name(), position, components));
         }
         return List.copyOf(nodes);
+    }
+
+    private List<String> workflowComponentActions(String componentKey) {
+        Set<String> domains = PmsCommandMetadata.workflowComponentDomains(componentKey);
+        if (domains.isEmpty()) return List.of();
+        return commandRegistry.list().stream()
+                .filter(PmsCommandMetadata::isWorkflowComponentAction)
+                .filter(name -> PmsCommandMetadata.resourceTypes(name).stream().anyMatch(domains::contains))
+                .filter(name -> PmsCommandMetadata.descriptor(name).scopes().stream().allMatch(this::scopeAvailable))
+                .map(CommandName::code)
+                .sorted()
+                .toList();
     }
 
     private List<AiCapabilityDTO.FieldCapability> fields(List<WorkflowFieldDefinition> definitions) {
@@ -160,26 +179,6 @@ public class AiConnectorCapabilityService {
         Set<String> ids = Set.of("projectId", "nodeId", "topicId", "storyId", "requirementId",
                 "iterationPlanId", "itemId", "taskId");
         return descriptor.parameters().keySet().stream().anyMatch(ids::contains);
-    }
-
-    private List<String> resourceTypes(CommandName name) {
-        return switch (name) {
-            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
-                 REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
-                 REQUIREMENT_EXECUTION_TARGET_UNLINK -> List.of("requirement");
-            case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK -> List.of("topic");
-            case STORY_CREATE, STORY_UPDATE, STORY_TOPIC_LINK -> List.of("story");
-            case DEVELOPMENT_ITEM_NODE_OWNER_UPDATE, DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
-                 DEVELOPMENT_ITEM_NODE_FIELD_UPDATE, DEVELOPMENT_ITEM_NODE_COMPLETE,
-                 DEVELOPMENT_ITEM_TASK_CREATE -> List.of("topic", "story", "requirement");
-            case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
-                 ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> List.of("iteration_plan");
-            case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> List.of("task");
-            case NODE_COMPLETE, NODE_FIELD_UPDATE, NODE_ROLLBACK,
-                 NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> List.of("project_node");
-            case PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE,
-                 FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE, BATCH_WRITE -> List.of("project");
-        };
     }
 
     private Set<String> allConnectorScopes() {

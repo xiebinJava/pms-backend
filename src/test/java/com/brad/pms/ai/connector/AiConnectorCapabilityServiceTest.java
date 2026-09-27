@@ -6,8 +6,8 @@ import com.brad.pms.ai.command.CommandPreviewRequest;
 import com.brad.pms.ai.command.CommandResult;
 import com.brad.pms.ai.command.PmsCommand;
 import com.brad.pms.ai.command.PmsCommandRegistry;
-import com.brad.pms.dto.response.DevelopmentWorkflowTemplateOptionsDTO;
 import com.brad.pms.integration.ai.api.AiCapabilityDTO;
+import com.brad.pms.dto.response.ProjectTypeDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
 import com.brad.pms.entity.AiOperationDO;
 import com.brad.pms.service.UserService;
@@ -15,6 +15,8 @@ import com.brad.pms.service.WorkflowTemplateService;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.security.LoginUser;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.workflow.WorkflowNodeDefinition;
+import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -38,16 +40,30 @@ class AiConnectorCapabilityServiceTest {
         UserContext.set(new LoginUser(7L, "alex", "张伟"));
         WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
         UserService userService = mock(UserService.class);
-        DevelopmentWorkflowTemplateOptionsDTO templates = new DevelopmentWorkflowTemplateOptionsDTO();
+        ProjectTypeDTO topicType = new ProjectTypeDTO();
+        topicType.setId(2L);
+        topicType.setCode("topic-management");
+        topicType.setName("专题管理");
+        ProjectTypeDTO customType = new ProjectTypeDTO();
+        customType.setId(9L);
+        customType.setCode("custom-management");
+        customType.setName("自定义管理");
         WorkflowTemplateSummaryDTO topic = new WorkflowTemplateSummaryDTO();
+        topic.setProjectTypeId(2L);
         topic.setName("专题默认流程");
         topic.setPublishedVersionId(88L);
         topic.setPublishedVersionNo(2);
         topic.setDefaultTemplate(true);
-        templates.setTopicTemplates(List.of(topic));
-        templates.setStoryTemplates(List.of());
-        templates.setRequirementTemplates(List.of());
-        when(workflowTemplateService.developmentOptions()).thenReturn(templates);
+        WorkflowTemplateSummaryDTO custom = new WorkflowTemplateSummaryDTO();
+        custom.setProjectTypeId(9L);
+        custom.setName("自定义流程");
+        custom.setPublishedVersionId(99L);
+        custom.setPublishedVersionNo(1);
+        when(workflowTemplateService.getDefinition(99L)).thenReturn(new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("custom-node", "自定义节点", null, null, null,
+                        List.of("development-control"), List.of(), false, List.of()))));
+        when(workflowTemplateService.listProjectTypes()).thenReturn(List.of(topicType, customType));
+        when(workflowTemplateService.listTemplates(null, true)).thenReturn(List.of(topic, custom));
         UserDO viewer = new UserDO();
         viewer.setId(7L);
         viewer.setNameZh("张伟");
@@ -65,13 +81,17 @@ class AiConnectorCapabilityServiceTest {
                 assertThat(action.refreshScopes()).contains("development-list");
             });
         });
-        assertThat(result.workflowTypes()).singleElement().satisfies(type -> {
-            assertThat(type.processType()).isEqualTo("topic-management");
-            assertThat(type.templates()).singleElement().satisfies(version -> {
-                assertThat(version.templateVersionId()).isEqualTo(88L);
-                assertThat(version.versionNo()).isEqualTo(2);
-            });
+        assertThat(result.workflowTypes()).hasSize(2);
+        assertThat(result.workflowTypes()).extracting(AiCapabilityDTO.WorkflowTypeCapability::processType)
+                .containsExactly("topic-management", "custom-management");
+        assertThat(result.workflowTypes().get(0).templates()).singleElement().satisfies(version -> {
+            assertThat(version.templateVersionId()).isEqualTo(88L);
+            assertThat(version.versionNo()).isEqualTo(2);
         });
+        AiCapabilityDTO.WorkflowNodeCapability customNode = result.workflowTypes().get(1)
+                .templates().get(0).nodes().get(0);
+        assertThat(customNode.components()).singleElement()
+                .satisfies(component -> assertThat(component.actions()).contains("topic.create"));
         assertThat(result.viewer().id()).isEqualTo(7L);
     }
 

@@ -1,6 +1,7 @@
 package com.brad.pms.ai.connector;
 
 import com.brad.pms.ai.query.AiTaskQueryService;
+import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
@@ -31,6 +32,7 @@ class DynamicWorkflowCapabilityTest {
     @Mock IterationPlanService iterationPlanService;
     @Mock AiTaskQueryService taskQueryService;
     @Mock DevelopmentItemWorkflowService workflowService;
+    @Mock PmsCommandRegistry commandRegistry;
 
     @Test
     void contextUsesTheBoundWorkflowSnapshotAndItsRuntimeComponents() {
@@ -71,6 +73,6 @@ class DynamicWorkflowCapabilityTest {
 
     private AiConnectorQueryService service() {
         return new AiConnectorQueryService(projectService, developmentItemService,
-                iterationPlanService, taskQueryService, workflowService);
+                iterationPlanService, taskQueryService, workflowService, commandRegistry);
     }
 }

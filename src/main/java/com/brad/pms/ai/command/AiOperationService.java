@@ -118,6 +118,9 @@ public class AiOperationService {
 
         AiOperationDO existing = operationMapper.selectByUserIdAndIdempotencyKeyForUpdate(userId, idempotencyKey);
         if (existing != null) {
+            if (!matchesAutomaticRequest(existing, request, sourceClient)) {
+                throw BusinessException.conflict("幂等键已经用于其他操作，请更换幂等键");
+            }
             if (SUCCEEDED.equals(existing.getStatus())) {
                 return read(existing.getResultJson(), CommandResult.class);
             }
@@ -182,6 +185,27 @@ public class AiOperationService {
         }
         if (operation.getContractId() == null && request.contractId() != null) {
             throw BusinessException.conflict("原操作预览未绑定契约，请重新生成预览");
+        }
+    }
+
+    private boolean matchesAutomaticRequest(AiOperationDO operation,
+                                             CommandPreviewRequest request,
+                                             String sourceClient) {
+        return Objects.equals(operation.getCommandName(), request.name().code())
+                && Objects.equals(operation.getSourceClient(), sourceClient)
+                && Objects.equals(operation.getContextId(), request.contextId())
+                && Objects.equals(operation.getContextVersion(), request.contextVersion())
+                && Objects.equals(operation.getContractId(), request.contractId())
+                && Objects.equals(operation.getContractVersion(), request.contractVersion())
+                && jsonEquals(operation.getArgumentsJson(), request.arguments());
+    }
+
+    private boolean jsonEquals(String storedJson, Object currentValue) {
+        if (storedJson == null) return currentValue == null;
+        try {
+            return objectMapper.readTree(storedJson).equals(objectMapper.valueToTree(currentValue));
+        } catch (JsonProcessingException | IllegalArgumentException exception) {
+            return false;
         }
     }
 

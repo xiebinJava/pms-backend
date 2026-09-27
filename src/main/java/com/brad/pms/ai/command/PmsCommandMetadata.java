@@ -2,6 +2,9 @@ package com.brad.pms.ai.command;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import com.brad.pms.workflow.WorkflowComponentKey;
 
 /** Central metadata for the commands currently implemented by PMS. */
 public final class PmsCommandMetadata {
@@ -28,6 +31,51 @@ public final class PmsCommandMetadata {
                  ITERATION_PLAN_STORY_REMOVE -> "pms:iteration:write";
             case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> "pms:task:write";
         };
+    }
+
+    /** Resource domains exposed by the command to the dynamic capability catalog. */
+    public static List<String> resourceTypes(CommandName name) {
+        return switch (name) {
+            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
+                 REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
+                 REQUIREMENT_EXECUTION_TARGET_UNLINK -> List.of("requirement");
+            case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK -> List.of("topic");
+            case STORY_CREATE, STORY_UPDATE, STORY_TOPIC_LINK -> List.of("story");
+            case DEVELOPMENT_ITEM_NODE_OWNER_UPDATE, DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
+                 DEVELOPMENT_ITEM_NODE_FIELD_UPDATE, DEVELOPMENT_ITEM_NODE_COMPLETE,
+                 DEVELOPMENT_ITEM_TASK_CREATE -> List.of("topic", "story", "requirement");
+            case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
+                 ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> List.of("iteration_plan");
+            case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> List.of("task");
+            case NODE_COMPLETE, NODE_FIELD_UPDATE, NODE_ROLLBACK,
+                 NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> List.of("project_node");
+            case PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE,
+                 FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE, BATCH_WRITE -> List.of("project");
+        };
+    }
+
+    /**
+     * Returns the resource domains a configured runtime component can operate on.
+     *
+     * The process type is deliberately not part of this mapping. A template may
+     * be attached to a newly-created process type, while its runtime component
+     * keys still identify the business surface and the command registry remains
+     * the source of the available actions.
+     */
+    public static Set<String> workflowComponentDomains(String componentKey) {
+        return switch (componentKey) {
+            case WorkflowComponentKey.DEVELOPMENT_CONTROL -> Set.of(
+                    "project_node", "topic", "story", "requirement", "task");
+            case WorkflowComponentKey.STORY_LIST, WorkflowComponentKey.STORY_SPLIT -> Set.of("story");
+            case WorkflowComponentKey.REQUIREMENT_EXECUTION -> Set.of("requirement");
+            default -> Set.of();
+        };
+    }
+
+    /** A workflow component action is discovered from the command registry. */
+    public static boolean isWorkflowComponentAction(CommandName name) {
+        return resourceTypes(name).stream().anyMatch(Set.of(
+                "project_node", "topic", "story", "requirement", "task")::contains);
     }
 
     public static PmsCommandDescriptor descriptor(CommandName name) {

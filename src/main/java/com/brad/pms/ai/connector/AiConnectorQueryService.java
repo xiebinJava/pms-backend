@@ -3,6 +3,10 @@ package com.brad.pms.ai.connector;
 import com.brad.pms.ai.query.AiTaskQueryRequest;
 import com.brad.pms.ai.query.AiTaskQueryResult;
 import com.brad.pms.ai.query.AiTaskQueryService;
+import com.brad.pms.ai.command.CommandName;
+import com.brad.pms.ai.command.PmsCommandDescriptor;
+import com.brad.pms.ai.command.PmsCommandMetadata;
+import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.common.enums.RequirementExecutionTargetType;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.common.page.PageResult;
@@ -24,6 +28,7 @@ import com.brad.pms.service.DevelopmentItemService;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.service.IterationPlanService;
 import com.brad.pms.service.ProjectService;
+import com.brad.pms.security.UserContext;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -32,11 +37,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Permission-aware read facade. It never queries PMS tables directly. */
 @Service
@@ -52,6 +59,7 @@ public class AiConnectorQueryService {
     private final IterationPlanService iterationPlanService;
     private final AiTaskQueryService taskQueryService;
     private final DevelopmentItemWorkflowService workflowService;
+    private final PmsCommandRegistry commandRegistry;
 
     public AiQueryResultDTO query(AiQueryRequest request) {
         String resourceType = normalizeResourceType(request == null ? null : request.resourceType());
@@ -187,8 +195,7 @@ public class AiConnectorQueryService {
         AiWorkflowContextDTO.CurrentNode currentNode = project.getCurrentNodeKey() == null
                 ? null : new AiWorkflowContextDTO.CurrentNode(null, project.getCurrentNodeKey(), project.getCurrentNodeName());
         return new AiWorkflowContextDTO("project", project.getId(), project.getVersion(), currentNode,
-                null, List.of("project.update", "node.owner.update", "node.schedule.update",
-                "node.field.update", "node.complete", "task.create"));
+                null, allowedProjectActions());
     }
 
     private AiWorkflowContextDTO developmentItemContext(String resourceType, Long resourceId) {
@@ -221,12 +228,7 @@ public class AiConnectorQueryService {
     private AiWorkflowContextDTO.Node toContextNode(DevelopmentItemWorkflowNodeDTO node,
                                                     String resourceType, int position) {
         List<AiWorkflowContextDTO.Field> fields = fields(node.getFields());
-        List<String> actions = List.of(
-                "development-item.node.owner.update",
-                "development-item.node.schedule.update",
-                "development-item.node.field.update",
-                "development-item.node.complete",
-                "development-item.task.create");
+        List<String> actions = workflowComponentActions(resourceType);
         List<AiWorkflowContextDTO.Component> components = safe(node.getRuntimeComponents()).stream()
                 .filter(StringUtils::hasText)
                 .map(key -> new AiWorkflowContextDTO.Component(key, key, fields, actions)).toList();
@@ -235,21 +237,42 @@ public class AiConnectorQueryService {
     }
 
     private List<String> allowedDevelopmentActions(String resourceType) {
-        List<String> actions = new ArrayList<>(List.of(
-                "development-item.node.owner.update",
-                "development-item.node.schedule.update",
-                "development-item.node.field.update",
-                "development-item.node.complete",
-                "development-item.task.create"));
-        if ("topic".equals(resourceType)) {
-            actions.addAll(List.of("topic.update", "topic.project.link"));
-        } else if ("story".equals(resourceType)) {
-            actions.addAll(List.of("story.update", "story.topic.link"));
-        } else {
-            actions.addAll(List.of("requirement.update", "requirement.execution-target.link",
-                    "requirement.execution-target.change", "requirement.execution-target.unlink"));
-        }
-        return List.copyOf(actions);
+        String identityKey = resourceType + "Id";
+        return commandRegistry.list().stream()
+                .sorted(Comparator.comparing(CommandName::code))
+                .filter(name -> PmsCommandMetadata.resourceTypes(name).contains(resourceType))
+                .filter(name -> PmsCommandMetadata.isWorkflowComponentAction(name)
+                        || PmsCommandMetadata.descriptor(name).parameters().containsKey(identityKey))
+                .filter(this::scopeAvailable)
+                .map(CommandName::code)
+                .toList();
+    }
+
+    private List<String> allowedProjectActions() {
+        return commandRegistry.list().stream()
+                .sorted(Comparator.comparing(CommandName::code))
+                .filter(name -> PmsCommandMetadata.resourceTypes(name).stream()
+                        .anyMatch(type -> Set.of("project", "project_node", "task").contains(type)))
+                .filter(name -> PmsCommandMetadata.descriptor(name).parameters().containsKey("projectId"))
+                .filter(this::scopeAvailable)
+                .map(CommandName::code)
+                .toList();
+    }
+
+    private List<String> workflowComponentActions(String resourceType) {
+        return commandRegistry.list().stream()
+                .sorted(Comparator.comparing(CommandName::code))
+                .filter(PmsCommandMetadata::isWorkflowComponentAction)
+                .filter(name -> PmsCommandMetadata.resourceTypes(name).contains(resourceType))
+                .filter(this::scopeAvailable)
+                .map(CommandName::code)
+                .toList();
+    }
+
+    private boolean scopeAvailable(CommandName name) {
+        PmsCommandDescriptor descriptor = PmsCommandMetadata.descriptor(name);
+        return !UserContext.isDshDelegation()
+                || descriptor.scopes().stream().allMatch(UserContext::hasDshScope);
     }
 
     private List<AiWorkflowContextDTO.Field> fields(List<WorkflowFieldDefinition> definitions) {

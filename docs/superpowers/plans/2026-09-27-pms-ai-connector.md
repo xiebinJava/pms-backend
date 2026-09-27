@@ -56,7 +56,7 @@
 - `src/main/java/com/brad/pms/controller/AiConnectorController.java`：`/integration/ai/v1` HTTP 门面，只做认证、校验、服务编排和响应转换。
 - `src/main/java/com/brad/pms/integration/ai/api/`：连接器请求、响应、能力和错误 DTO。
 - `src/main/java/com/brad/pms/integration/ai/security/AiConnectorScopePolicy.java`：连接器权限范围白名单。
-- `src/main/resources/db/migration/V50__ai_connector_operation_metadata.sql`：记录来源客户端、请求 ID 和自动执行模式；当前 release 分支的最大迁移版本为 V49。
+- `src/main/resources/db/migration/V58__ai_connector_operation_metadata.sql`：记录来源客户端、请求 ID 和自动执行模式；当前 release 分支已有 V57，连接器迁移使用下一个唯一版本 V58。
 
 ### 新连接器仓库
 
@@ -141,7 +141,7 @@ export interface OperationResult {
 - Modify: `src/main/java/com/brad/pms/security/AiDelegationRoutePolicy.java`
 - Modify: `src/main/java/com/brad/pms/entity/AiOperationDO.java`
 - Modify: `src/main/java/com/brad/pms/mapper/AiOperationMapper.java`
-- Create: `src/main/resources/db/migration/V50__ai_connector_operation_metadata.sql`
+- Create: `src/main/resources/db/migration/V58__ai_connector_operation_metadata.sql`
 - Test: `src/test/java/com/brad/pms/ai/connector/AutomaticCommandExecutionServiceTest.java`
 - Test: `src/test/java/com/brad/pms/controller/AiConnectorControllerTest.java`
 
@@ -396,35 +396,47 @@ OpenCLI 当前插件 API 是 `site/command` 两级命令，不提供真正的三
 
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/closed-loop.spec.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/invalid-relations.spec.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/concurrency-idempotency.spec.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/adapter-consistency.spec.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/helpers.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/mcp/http-main.test.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/opencli/bundle.test.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/scripts/build-opencli-plugin.mjs`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/scripts/build-opencli-plugin.d.mts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/http-main.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/deploy/Dockerfile`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/deploy/docker-compose.yml`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/.env.example`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/.dockerignore`
 - Modify: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/CHANGELOG.md`
 - Modify: `/Users/fs/Desktop/Project/pms-ai-connector/package.json`
 - Modify: `/Users/fs/Desktop/Project/pms-ai-connector/pnpm-lock.yaml`
 
-- [ ] **Step 0: 先固定真实运行边界。** 将 MCP stdio/HTTP 和 OpenCLI 默认 PMS 地址统一为 `http://localhost:8080/api` 形式；HTTP 入口使用 `@modelcontextprotocol/node` 的 `toNodeHandler`，增加 `/healthz`，并保持 Bearer、HTTPS/可信代理和 Origin 门禁。此步骤先补入口契约测试再实现，避免 Docker 只构建出不可启动的 handler。
-- [ ] **Step 1: 写配置驱动的闭环 E2E。** 通过 `PMS_E2E_BASE_URL`、`PMS_E2E_TOKEN` 和 `PMS_E2E_WRITE=true` 显式启用真实写入；测试运行时先读取能力目录和动态流程上下文，再创建需求、关联一个执行对象、创建专题/故事/任务和迭代计划，并通过查询回读完整关系。未配置真实 PMS 或未显式开启写入时，测试必须明确跳过，不触碰本地业务库。
-- [ ] **Step 2: 写非法关系 E2E。** 使用能力目录发现的命令验证一个需求不能同时关联多个目标、已完成/已终止/已删除项目不能绑定专题、迭代计划不创建流程节点；错误断言只检查稳定错误分类和业务码，不依赖中文文案。
-- [ ] **Step 3: 写并发和幂等 E2E。** 在显式写入场景下，并发更新同一对象时至少一个请求得到版本冲突；重复幂等键只返回同一操作结果。测试数据使用带运行 ID 的命名，并在测试结束按后端支持的业务删除/解绑路径清理；清理失败必须让测试失败并记录对象 ID。
-- [ ] **Step 4: 写多客户端一致性 E2E。** MCP 和 OpenCLI 复用同一测试上下文对同一测试数据执行等价读写，断言最终 API 结果、审计来源和刷新范围一致；不能直接读数据库做断言。
-- [ ] **Step 5: 生成可独立安装的 OpenCLI 包。** 使用显式 `esbuild` 构建脚本将顶层 OpenCLI 命令及 workspace 内部依赖 bundle 成 `dist/opencli-plugin`；发布包不包含 `workspace:*`，只保留由 OpenCLI 宿主提供的 peer dependency。使用临时 `HOME` 执行真实 `opencli plugin install file://.../dist/opencli-plugin`，再执行 `opencli pms capabilities` 和一条参数校验命令，验证安装后发现、加载和错误退出码。
-- [ ] **Step 6: 创建 Docker 镜像和健康检查。** Docker 运行 `http-main.ts` 的编译/运行产物，服务监听 `PMS_MCP_HOST`/`PMS_MCP_PORT`，只通过环境变量读取 PMS 地址和请求 Token 配置，不把 Token 写入镜像；`docker compose config` 必须能检查出必填的 `PMS_BASE_URL` 和 Origin 配置。
-- [ ] **Step 7: 运行完整验证。** 运行后端 Maven 聚焦测试和已有 DSH 兼容测试、连接器 `pnpm test`、`pnpm typecheck`、OpenCLI 独立安装烟测、MCP `initialize/tools/list` stdio 烟测、HTTP `/healthz` 烟测；Docker 未安装时必须明确记录为环境阻塞，不把未构建镜像写成通过。
-- [ ] **Step 8: 自审并提交。** 输出测试证据、风险清单、兼容矩阵和回滚说明；提交 `test: verify pms ai connector closed loop`。
+- [x] **Step 0: 先固定真实运行边界。** 将 MCP stdio/HTTP 和 OpenCLI 默认 PMS 地址统一为 `http://localhost:8080/api` 形式；HTTP 入口使用 `@modelcontextprotocol/node` 的 `toNodeHandler`，增加 `/healthz`，并保持 Bearer、HTTPS/可信代理和 Origin 门禁。此步骤先补入口契约测试再实现，避免 Docker 只构建出不可启动的 handler。
+- [x] **Step 1: 写配置驱动的闭环 E2E。** 通过 `PMS_E2E_BASE_URL`、`PMS_E2E_TOKEN`、`PMS_E2E_SCENARIO_FILE` 和 `PMS_E2E_WRITE=true` 显式启用真实写入；场景文件只描述能力目录中已发现的操作、参数、上下文和结果捕获规则，禁止测试代码假设固定节点名称或字段。测试运行时先读取能力目录和动态流程上下文，再创建需求、关联一个执行对象、创建专题/故事/任务和迭代计划，并通过查询回读完整关系。未配置真实 PMS、场景文件或未显式开启写入时，测试必须明确跳过，不触碰本地业务库。
+- [x] **Step 2: 写非法关系 E2E。** 使用能力目录发现的命令验证一个需求不能同时关联多个目标、已完成/已终止/已删除项目不能绑定专题、迭代计划不创建流程节点；错误断言只检查稳定错误分类和可用的 HTTP status，不依赖中文文案。
+- [x] **Step 3: 写并发和幂等 E2E。** 在显式写入场景下，并发更新同一对象时至少一个请求得到版本冲突；重复幂等键只返回同一操作结果。测试数据使用带运行 ID 的命名，并在测试结束按后端支持的业务删除/解绑路径清理；清理失败必须让测试失败并记录对象 ID。
+- [x] **Step 4: 写多客户端一致性 E2E。** MCP 和 OpenCLI 复用同一测试上下文对同一测试数据执行等价读写，断言最终 API 结果、审计来源和刷新范围一致；不能直接读数据库做断言。
+- [x] **Step 5: 生成可独立安装的 OpenCLI 包。** 使用显式 `esbuild` 构建脚本将顶层 OpenCLI 命令及 workspace 内部依赖 bundle 成 `dist/opencli-plugin`；发布包不包含 `workspace:*`，只保留由 OpenCLI 宿主提供的 peer dependency。使用临时 `HOME` 执行真实 `opencli plugin install file://.../dist/opencli-plugin`，再执行 `opencli pms capabilities` 和一条参数校验命令，验证安装后发现、加载和错误退出码。
+- [x] **Step 6: 创建 Docker 镜像和健康检查。** Docker 运行 `http-main.ts` 的编译/运行产物，服务监听 `PMS_MCP_HOST`/`PMS_MCP_PORT`，只通过环境变量读取 PMS 地址和请求 Token 配置，不把 Token 写入镜像；`docker compose config` 必须能检查出必填的 `PMS_BASE_URL` 和 Origin 配置。
+- [x] **Step 7: 运行完整验证。** 运行后端 Maven 聚焦测试和已有 DSH 兼容测试、连接器 `pnpm test`、`pnpm typecheck`、OpenCLI 独立安装烟测、MCP `initialize/tools/list` stdio 烟测、HTTP `/healthz` 烟测；迁移编号调整后先执行 clean，Docker 未安装时必须明确记录为环境阻塞，不把未构建镜像写成通过。
+- [x] **Step 8: 自审并提交。** 输出测试证据、风险清单、兼容矩阵和回滚说明；完成最终 staged diff review，并在两仓库创建本地提交。
 
 ### Task 7 Review Rulings
 
 - OpenCLI workspace 包不能直接作为发布包：当前插件使用 `workspace:*` 且入口依赖源码相对路径；发布流程改为显式 bundle，保留 OpenCLI 第一层命令发现约束，并以临时用户目录完成真实安装烟测。
 - MCP HTTP handler 不是监听服务器：新增 Node HTTP 入口和 `/healthz`，通过官方 `toNodeHandler` 适配 Node 请求，避免把单元测试通过误判为 Docker 可运行。
 - 闭环 E2E 不默认写本地数据库：真实写入必须由 `PMS_E2E_WRITE=true` 明确开启，并使用 API 回读断言；没有配置环境时测试跳过并说明原因。
+- 动态字段和必填参数不能写进测试代码：闭环场景通过 `PMS_E2E_SCENARIO_FILE` 提供，测试先用能力目录校验操作和流程上下文，再按场景执行并捕获返回 ID；没有场景文件时不尝试猜测创建参数。
+- 流程类型也不能在连接器中写死：能力目录从 PMS 当前启用的流程类型和已发布模板动态组装，项目、专题、故事、需求以及未来新增类型都沿用同一套节点/组件/字段结构。
 - PMS 集成地址统一包含 `/api`：后端 Controller 位于 `/api/integration/ai/v1`，连接器默认值、README 和 Docker 示例必须保持一致。
+- 迁移版本不能复用：历史上错误占用的 V50 连接器脚本移出 Flyway active 目录保留审计副本，正式迁移使用不可变 V58，V59 仅承载正式链路的幂等 guard。
+- E2E 清理不能先于断言：创建和关联步骤完成后先通过 MCP/OpenCLI 查询回读，再在 `finally` 阶段调用后端业务清理命令；清理失败不得覆盖主测试失败。
+- E2E 中途失败也不能丢失已创建对象：场景执行器把当前 captures 附加到异常，外层 `finally` 使用部分 captures 清理，避免只在完整成功时才可清理。
+- 新增迁移不能复用历史版本：提交前必须读取 release 分支最高迁移版本并执行 clean Flyway 校验；本次连接器元数据迁移使用唯一且不可变的 V58，V59 仅承载正式链路的幂等 guard。
+- 预发布开发数据库若曾记录冲突的 V50 连接器脚本，不能由 Flyway 自动猜测其语义；V58 保持已应用内容不变，已补充人工 repair runbook，异常历史库需人工审阅或重建。
+- Docker 采用多阶段构建：构建阶段使用 pnpm/esbuild，运行阶段只复制编译后的 HTTP 入口和 MCP 生产依赖，根文件系统只读并以非 root 用户启动。
 
 ## Task 8: 阶段 Review、发布和后续扩展边界
 
@@ -437,12 +449,12 @@ OpenCLI 当前插件 API 是 `site/command` 两级命令，不提供真正的三
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/compatibility-matrix.md`
 - Modify: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
 
-- [ ] **Step 1: 做代码和协议全量 Review。** 检查所有写路径最终都进入 PMS Service/Command，连接器没有直接业务 SQL或重复成员同步逻辑。
-- [ ] **Step 2: 做安全 Review。** 检查 Token、用户身份、scope、日志脱敏、任意 URL、SSRF、重试和高风险操作。
-- [ ] **Step 3: 做业务 Review。** 对照设计方案逐条验证需求单一执行对象、动态流程、专题/故事层级、迭代计划和成员自动同步。
-- [ ] **Step 4: 编写安装和部署文档。** 区分本地 OpenCLI/stdio MCP 与 ChatGPT 所需的远程 HTTPS MCP。
-- [ ] **Step 5: 创建首个版本。** 以 `0.1.0` 发布连接器，记录支持的 PMS AI API 版本和已知限制。
-- [ ] **Step 6: 生成阶段 Review 报告。** 报告测试结果、未覆盖场景、后续 OAuth/OIDC 和浏览器兜底计划；等待用户确认后再继续下一轮开发。
+- [x] **Step 1: 做代码和协议全量 Review。** 检查所有写路径最终都进入 PMS Service/Command，连接器没有直接业务 SQL或重复成员同步逻辑。
+- [x] **Step 2: 做安全 Review。** 检查 Token、用户身份、scope、日志脱敏、任意 URL、SSRF、重试和高风险操作。
+- [x] **Step 3: 做业务 Review。** 对照设计方案逐条验证需求单一执行对象、动态流程、专题/故事层级、迭代计划和成员自动同步。
+- [x] **Step 4: 编写安装和部署文档。** 区分本地 OpenCLI/stdio MCP 与 ChatGPT 所需的远程 HTTPS MCP。
+- [x] **Step 5: 创建首个版本。** 连接器包版本为 `0.1.0`，并记录支持的 PMS AI API 版本和已知限制；远程发布/推送不在本次未授权范围内。
+- [x] **Step 6: 生成阶段 Review 报告。** 报告测试结果、未覆盖场景、后续 OAuth/OIDC 和浏览器兜底计划，详见 `pms-ai-connector/docs/review-report.md`。
 
 ## 完成定义
 
