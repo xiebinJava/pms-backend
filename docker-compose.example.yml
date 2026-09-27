@@ -35,7 +35,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=1m
     cap_drop: [ALL]
-    cap_add: [CHOWN, FOWNER]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
     security_opt: ["no-new-privileges:true"]
     volumes:
       - pms-uploads:/var/lib/pms/uploads
