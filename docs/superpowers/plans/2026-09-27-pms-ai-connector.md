@@ -23,6 +23,7 @@
 - 每个写操作必须携带当前用户 Token、`clientId`、`requestId` 和 `idempotencyKey`；对象 ID、对象版本和动态节点版本按能力目录要求放在 `arguments` 中。
 - 连接器请求不定义通用 `resource` 或 `expectedVersion` 字段，避免与 PMS 后端逐命令 Schema 冲突；可选的契约绑定通过 `contract { id, version }` 传递。
 - 连接器不记录密码、长期 Token 或敏感字段原文；错误响应不得泄露 SQL、堆栈和内部凭据。
+- OpenCLI 插件必须符合当前 OpenCLI 的发现机制：插件目录第一层放可发现的 `.ts/.js` 命令入口；workspace 源码依赖只用于仓库开发，发布前必须生成可独立安装的运行包并做真实 `opencli plugin install` 烟测。
 - 每个阶段必须完成聚焦测试、权限/边界检查、diff Review 后才能进入下一阶段。
 - PMS 的 `ResponseResult` 可能以 HTTP 200 携带非 200 的业务 `code` 返回错误；连接器必须同时检查 HTTP 状态和业务响应码，不能只依赖 HTTP 状态。
 - 查询/能力读取可以进行有限重试；自动执行写操作不得因 409、422 或 5xx 自动重试，避免把连接器层重试误认为业务幂等保证。
@@ -63,8 +64,8 @@
 
 - `apps/mcp-server/src/server.ts`：MCP Server 入口。
 - `apps/mcp-server/src/tools/`：能力发现、查询、自动执行、流程动作工具。
-- `apps/opencli-plugin/src/index.ts`：OpenCLI 插件入口。
-- `apps/opencli-plugin/src/commands/`：OpenCLI 命令映射。
+- `apps/opencli-plugin/` 顶层 `.ts/.js`：OpenCLI 可发现的命令入口（当前 OpenCLI 不递归扫描 `src/commands/`）。
+- `apps/opencli-plugin/runtime.ts`：命令共用的 PMS Client 与结构化结果运行时。
 - `packages/pms-contracts/src/`：请求、响应、错误、能力和资源 Schema。
 - `packages/pms-client/src/PmsClient.ts`：PMS HTTP Client，统一 Token、请求 ID、重试和错误处理。
 - `packages/pms-capabilities/src/CapabilityResolver.ts`：动态能力和流程组件解析。
@@ -349,11 +350,13 @@ pms_workflow_action
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/src/index.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/src/commands/capabilities.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/src/commands/query.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/src/commands/execute.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/src/commands/workflow.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/capabilities.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/search.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/get.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/execute.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/workflow-action.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/runtime.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/opencli-plugin.json`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/opencli/commands.test.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/skills/pms-project-management/SKILL.md`
 - Modify: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
@@ -363,22 +366,29 @@ pms_workflow_action
 命令保持稳定的领域命名：
 
 ```text
-opencli pms capability list
-opencli pms requirement search
-opencli pms project get --id 78
-opencli pms topic create
-opencli pms story create
-opencli pms task create
-opencli pms workflow action
-opencli pms iteration-plan add-story
+opencli pms capabilities
+opencli pms search topic --keyword 订单
+opencli pms get project 78
+opencli pms execute topic.create --argumentsJson '{"title":"订单中心"}' --idempotencyKey idem-1
+opencli pms workflow-action topic 7 development-item.node.complete --idempotencyKey idem-2
 ```
 
-- [ ] **Step 1: 写命令测试。** 断言命令参数转换到共享 `AutomaticOperationRequest`，输出包含资源 ID、状态、审计 ID和刷新范围。
-- [ ] **Step 2: 实现 OpenCLI 插件入口。** 只调用共享 `PmsClient`，不从命令层直接拼接后端业务接口。
-- [ ] **Step 3: 实现命令解析和结构化输出。** 支持 JSON 默认输出，并提供人类可读摘要；错误码保持非零退出。
-- [ ] **Step 4: 编写 Skill。** 说明需求只能有一个执行对象、动态流程规则、项目状态限制、成员自动同步和迭代计划无流程等规则。
-- [ ] **Step 5: 运行 OpenCLI 插件测试和安装烟测。** 使用本地打包结果执行 `opencli plugin install`，验证插件可发现能力。
-- [ ] **Step 6: 自审并提交。** 确认 Skill 是使用规则，不包含凭据、不替代后端校验；提交 `feat: add pms opencli plugin`。
+OpenCLI 当前插件 API 是 `site/command` 两级命令，不提供真正的三级子命令；资源类型、稳定操作名和动态字段由参数及 PMS 能力目录表达。
+
+- [x] **Step 1: 写命令测试。** 断言命令参数转换到共享 `AutomaticOperationRequest`，输出包含资源 ID、状态、审计 ID和刷新范围；测试命令入口注册在插件目录第一层。
+- [x] **Step 2: 实现 OpenCLI 插件入口。** 只调用共享 `PmsClient`，不从命令层直接拼接后端业务接口；通过 `Strategy.LOCAL` 声明这是本地 API 适配器，不依赖浏览器登录态。
+- [x] **Step 3: 实现命令解析和结构化输出。** 支持 JSON 默认输出，并提供人类可读摘要；错误码保持非零退出。
+- [x] **Step 4: 编写 Skill。** 说明需求只能有一个执行对象、动态流程规则、项目状态限制、成员自动同步和迭代计划无流程等规则；强调先读能力目录再执行动态命令。
+- [x] **Step 5: 运行开发阶段验证。** `tests/opencli/commands.test.ts` 验证顶层命令注册、共享 Client 路由、幂等键、动态流程上下文和结构化错误；可独立安装包的烟测留给 Task 7。
+- [x] **Step 6: 自审并提交。** 确认 Skill 是使用规则，不包含凭据、不替代后端校验；顶层入口结构符合 OpenCLI 当前发现器；可发布依赖和真实安装加载在 Task 7 完成。
+
+### Task 6 Review Notes
+
+- OpenCLI 当前只扫描插件目录第一层，因此命令文件放在 `apps/opencli-plugin/` 顶层，没有继续使用计划初稿中的 `src/commands/` 目录。
+- 所有命令使用 `Strategy.LOCAL`，只通过共享 `PmsClient` 调用 PMS 集成 API；没有浏览器自动化、任意 URL、数据库或前端页面依赖。
+- 写命令严格要求幂等键；流程动作先读取事项上下文并检查后端返回的 `allowedActions` 与流程版本，再提交自动执行请求。
+- OpenCLI 三级命令示例已改为当前 API 实际支持的两级命令；资源类型、动态操作和字段仍由 PMS 能力目录及参数承载。
+- 当前 workspace 的 `workspace:*` 依赖只用于开发和测试；Task 7 必须产出可脱离 workspace 安装的包，并做真实 `opencli plugin install` 烟测后才能宣称可分发。
 
 ## Task 7: 闭环集成测试和发布部署
 
@@ -396,7 +406,7 @@ opencli pms iteration-plan add-story
 - [ ] **Step 2: 写非法关系 E2E。** 验证一个需求不能同时关联多个目标、已完成/已终止/已删除项目不能绑定专题、迭代计划不能创建流程节点。
 - [ ] **Step 3: 写并发和幂等 E2E。** 并发更新同一对象时至少一个请求得到版本冲突；重复幂等键只返回同一操作结果。
 - [ ] **Step 4: 写多客户端一致性 E2E。** 用 MCP 和 OpenCLI 对同一测试数据执行等价操作，断言最终数据库结果、审计来源和刷新范围一致。
-- [ ] **Step 5: 创建 Docker 镜像和健康检查。** MCP Server 只通过环境变量读取 PMS 地址和认证配置，不把 Token 写入镜像。
+- [ ] **Step 5: 创建 Docker 镜像和健康检查。** MCP Server 只通过环境变量读取 PMS 地址和认证配置，不把 Token 写入镜像；同时生成 OpenCLI 可独立安装包，完成 `opencli plugin install` 和 `opencli pms ...` 烟测。
 - [ ] **Step 6: 运行完整验证。** 运行后端 Maven 测试、连接器 `pnpm test`、`pnpm typecheck`、Docker 构建和 MCP Inspector/stdio 烟测。
 - [ ] **Step 7: 自审并提交。** 输出测试证据、风险清单、兼容矩阵和回滚说明；提交 `test: verify pms ai connector closed loop`。
 
