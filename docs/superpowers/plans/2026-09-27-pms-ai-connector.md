@@ -396,19 +396,35 @@ OpenCLI 当前插件 API 是 `site/command` 两级命令，不提供真正的三
 
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/closed-loop.spec.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/invalid-relations.spec.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/helpers.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/mcp/http-main.test.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/opencli/bundle.test.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/scripts/build-opencli-plugin.mjs`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/http-main.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/deploy/Dockerfile`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/deploy/docker-compose.yml`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/.env.example`
 - Modify: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/CHANGELOG.md`
+- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/package.json`
+- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/pnpm-lock.yaml`
 
-- [ ] **Step 1: 写闭环 E2E。** 创建需求，关联项目，依据动态项目节点创建专题，在专题节点创建故事，创建任务，把故事加入迭代计划，再从 MCP 和 OpenCLI 查询完整关系。
-- [ ] **Step 2: 写非法关系 E2E。** 验证一个需求不能同时关联多个目标、已完成/已终止/已删除项目不能绑定专题、迭代计划不能创建流程节点。
-- [ ] **Step 3: 写并发和幂等 E2E。** 并发更新同一对象时至少一个请求得到版本冲突；重复幂等键只返回同一操作结果。
-- [ ] **Step 4: 写多客户端一致性 E2E。** 用 MCP 和 OpenCLI 对同一测试数据执行等价操作，断言最终数据库结果、审计来源和刷新范围一致。
-- [ ] **Step 5: 创建 Docker 镜像和健康检查。** MCP Server 只通过环境变量读取 PMS 地址和认证配置，不把 Token 写入镜像；同时生成 OpenCLI 可独立安装包，完成 `opencli plugin install` 和 `opencli pms ...` 烟测。
-- [ ] **Step 6: 运行完整验证。** 运行后端 Maven 测试、连接器 `pnpm test`、`pnpm typecheck`、Docker 构建和 MCP Inspector/stdio 烟测。
-- [ ] **Step 7: 自审并提交。** 输出测试证据、风险清单、兼容矩阵和回滚说明；提交 `test: verify pms ai connector closed loop`。
+- [ ] **Step 0: 先固定真实运行边界。** 将 MCP stdio/HTTP 和 OpenCLI 默认 PMS 地址统一为 `http://localhost:8080/api` 形式；HTTP 入口使用 `@modelcontextprotocol/node` 的 `toNodeHandler`，增加 `/healthz`，并保持 Bearer、HTTPS/可信代理和 Origin 门禁。此步骤先补入口契约测试再实现，避免 Docker 只构建出不可启动的 handler。
+- [ ] **Step 1: 写配置驱动的闭环 E2E。** 通过 `PMS_E2E_BASE_URL`、`PMS_E2E_TOKEN` 和 `PMS_E2E_WRITE=true` 显式启用真实写入；测试运行时先读取能力目录和动态流程上下文，再创建需求、关联一个执行对象、创建专题/故事/任务和迭代计划，并通过查询回读完整关系。未配置真实 PMS 或未显式开启写入时，测试必须明确跳过，不触碰本地业务库。
+- [ ] **Step 2: 写非法关系 E2E。** 使用能力目录发现的命令验证一个需求不能同时关联多个目标、已完成/已终止/已删除项目不能绑定专题、迭代计划不创建流程节点；错误断言只检查稳定错误分类和业务码，不依赖中文文案。
+- [ ] **Step 3: 写并发和幂等 E2E。** 在显式写入场景下，并发更新同一对象时至少一个请求得到版本冲突；重复幂等键只返回同一操作结果。测试数据使用带运行 ID 的命名，并在测试结束按后端支持的业务删除/解绑路径清理；清理失败必须让测试失败并记录对象 ID。
+- [ ] **Step 4: 写多客户端一致性 E2E。** MCP 和 OpenCLI 复用同一测试上下文对同一测试数据执行等价读写，断言最终 API 结果、审计来源和刷新范围一致；不能直接读数据库做断言。
+- [ ] **Step 5: 生成可独立安装的 OpenCLI 包。** 使用显式 `esbuild` 构建脚本将顶层 OpenCLI 命令及 workspace 内部依赖 bundle 成 `dist/opencli-plugin`；发布包不包含 `workspace:*`，只保留由 OpenCLI 宿主提供的 peer dependency。使用临时 `HOME` 执行真实 `opencli plugin install file://.../dist/opencli-plugin`，再执行 `opencli pms capabilities` 和一条参数校验命令，验证安装后发现、加载和错误退出码。
+- [ ] **Step 6: 创建 Docker 镜像和健康检查。** Docker 运行 `http-main.ts` 的编译/运行产物，服务监听 `PMS_MCP_HOST`/`PMS_MCP_PORT`，只通过环境变量读取 PMS 地址和请求 Token 配置，不把 Token 写入镜像；`docker compose config` 必须能检查出必填的 `PMS_BASE_URL` 和 Origin 配置。
+- [ ] **Step 7: 运行完整验证。** 运行后端 Maven 聚焦测试和已有 DSH 兼容测试、连接器 `pnpm test`、`pnpm typecheck`、OpenCLI 独立安装烟测、MCP `initialize/tools/list` stdio 烟测、HTTP `/healthz` 烟测；Docker 未安装时必须明确记录为环境阻塞，不把未构建镜像写成通过。
+- [ ] **Step 8: 自审并提交。** 输出测试证据、风险清单、兼容矩阵和回滚说明；提交 `test: verify pms ai connector closed loop`。
+
+### Task 7 Review Rulings
+
+- OpenCLI workspace 包不能直接作为发布包：当前插件使用 `workspace:*` 且入口依赖源码相对路径；发布流程改为显式 bundle，保留 OpenCLI 第一层命令发现约束，并以临时用户目录完成真实安装烟测。
+- MCP HTTP handler 不是监听服务器：新增 Node HTTP 入口和 `/healthz`，通过官方 `toNodeHandler` 适配 Node 请求，避免把单元测试通过误判为 Docker 可运行。
+- 闭环 E2E 不默认写本地数据库：真实写入必须由 `PMS_E2E_WRITE=true` 明确开启，并使用 API 回读断言；没有配置环境时测试跳过并说明原因。
+- PMS 集成地址统一包含 `/api`：后端 Controller 位于 `/api/integration/ai/v1`，连接器默认值、README 和 Docker 示例必须保持一致。
 
 ## Task 8: 阶段 Review、发布和后续扩展边界
 
