@@ -33,7 +33,7 @@
 - 动态流程变更：流程模板把组件移动到另一个节点后，连接器必须从能力目录读取新位置；由 Task 3 的动态能力测试覆盖。
 - 单一需求执行对象：需求不能同时关联项目和专题，替换关联必须保留历史；由 Task 3 的业务合约测试覆盖。
 - 无权限和越权请求：能力目录过滤不能代替服务端校验，直接调用也必须拒绝；由 Task 2 和 Task 4 的权限测试覆盖。
-- 多客户端一致性：同一操作从 MCP 和 OpenCLI 发起时必须得到一致的 PMS 结果和审计记录；由 Task 5 的集成测试覆盖。
+- 多客户端一致性：同一操作从 MCP 和 OpenCLI 发起时必须得到一致的 PMS 结果和审计记录；由 Task 7 的跨适配器集成测试覆盖，MCP 单独阶段只验证稳定工具协议和共享 Client 路由。
 
 ## 文件与模块边界
 
@@ -313,6 +313,8 @@ export interface PmsClient {
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/tools/execute.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/tools/workflow.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/transport.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/main.ts`
+- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/package.json`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/mcp/tools.test.ts`
 
 **Interfaces:**
@@ -328,12 +330,20 @@ pms_execute_operation
 pms_workflow_action
 ```
 
-- [ ] **Step 1: 写 MCP 工具测试。** 断言工具 Schema 与 `pms-contracts` 完全一致，读工具调用查询，写工具调用自动执行接口。
-- [ ] **Step 2: 实现 stdio transport。** 用于本地 DeepSeek Harness 和其他本地 MCP 客户端。
-- [ ] **Step 3: 实现 HTTP transport。** 仅允许配置的 HTTPS/反向代理环境；生产环境拒绝不安全的任意来源配置。
-- [ ] **Step 4: 实现工具错误映射。** 候选项、权限不足、业务冲突和版本冲突返回结构化字段，不能只返回自然语言。
-- [ ] **Step 5: 运行 `pnpm test --filter mcp-server`。** 预期通过，并验证读写都带请求 ID。
-- [ ] **Step 6: 自审并提交。** 确认 MCP 工具没有暴露任意 URL、任意 HTTP 或数据库能力；提交 `feat: add pms mcp server`。
+- [x] **Step 1: 写 MCP 工具测试。** 工具注册使用 MCP SDK 要求的 Zod 4 Schema，字段、资源枚举和结果结构与 `pms-contracts` 对齐；读工具调用查询，写工具调用自动执行接口。
+- [x] **Step 2: 实现 stdio transport。** 用于本地 DeepSeek Harness 和其他本地 MCP 客户端；通过 `src/main.ts` 和环境变量创建共享 `PmsHttpClient`，不向 stdout 写日志。
+- [x] **Step 3: 实现 HTTP transport。** 默认拒绝非 HTTPS 请求，仅信任 `x-forwarded-proto: https` 的反向代理；开发环境只有显式开启 `allowInsecureLocalhost` 才允许 localhost，并要求 Bearer Token 与显式 Origin allow-list。
+- [x] **Step 4: 实现工具错误映射。** 候选项、权限不足、业务冲突、版本冲突和两套 Zod 校验错误返回结构化字段；未知异常使用固定脱敏消息。
+- [x] **Step 5: 运行 `pnpm test` 和 `pnpm typecheck`。** 当前仓库使用单根测试脚本；覆盖 MCP handler、HTTP 安全门禁、读写路由和请求 ID 传递。
+- [x] **Step 6: 自审并提交。** 确认 MCP 工具没有暴露任意 URL、任意 HTTP 或数据库能力，HTTP 默认拒绝不安全入口；提交 `feat: add pms mcp server`。
+
+### Task 5 Review Notes
+
+- MCP 工具只调用共享 `PmsClient` 和 PMS 后端集成门面，不接受任意 URL、表名或数据库参数；`pms_get` 在 PMS 详情门面尚未提供前明确复用流程上下文读取，不伪造不支持的详情查询。
+- stdio 入口使用环境变量注入短期 Token，stdio 日志走 stderr；HTTP 入口默认要求 Bearer、HTTPS/可信反向代理和配置的 Origin，localhost 明文仅供显式开发配置使用。
+- 错误映射同时识别共享协议的 Zod 3 和 MCP SDK 的 Zod 4 校验错误；未知异常不返回原始异常文本，避免泄露内部连接信息。
+- MCP SDK 的 HTTP handler 不自带 Token 验证，因此入口在进入 per-request server factory 前完成基本 Bearer 门禁；实际 Token 权限仍由 PMS 后端校验。
+- 本阶段不宣称 MCP/OpenCLI 一致性已经完成；跨适配器一致性延后到 OpenCLI 与 E2E 阶段验证。
 
 ## Task 6: 实现 OpenCLI Plugin 和 Agent Skill
 
