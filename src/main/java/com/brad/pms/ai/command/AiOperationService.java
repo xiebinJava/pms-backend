@@ -23,8 +23,10 @@ import java.util.UUID;
 public class AiOperationService {
 
     private static final String PREVIEW = "PREVIEW";
+    private static final String AUTOMATIC_RUNNING = "AUTOMATIC_RUNNING";
     private static final String SUCCEEDED = "SUCCEEDED";
     private static final String EXPIRED = "EXPIRED";
+    private static final String AUTOMATIC = "AUTOMATIC";
     private static final int PREVIEW_TTL_MINUTES = 10;
 
     private final AiOperationMapper operationMapper;
@@ -82,6 +84,69 @@ public class AiOperationService {
         PmsCommandScopeGuard.requireScope(commandName);
         CommandResult result = registry.require(commandName).execute(operation);
         operation.setIdempotencyKey(request.idempotencyKey());
+        operation.setResultJson(write(result));
+        operation.setStatus(SUCCEEDED);
+        operation.setExecutedAt(LocalDateTime.now());
+        operationMapper.updateById(operation);
+        return result;
+    }
+
+    /**
+     * Executes a connector request atomically without exposing the legacy
+     * preview/confirm lifecycle. The command registry and command services
+     * remain the only source of business behavior.
+     */
+    @Transactional
+    public CommandResult executeAutomatically(Long userId,
+                                              CommandPreviewRequest request,
+                                              String idempotencyKey,
+                                              String sourceClient,
+                                              String requestId) {
+        if (userId == null) throw BusinessException.unauthorized("未登录");
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw BusinessException.error("idempotencyKey 不能为空");
+        }
+        if (sourceClient == null || sourceClient.isBlank()) {
+            throw BusinessException.error("clientId 不能为空");
+        }
+        if (requestId == null || requestId.isBlank()) {
+            throw BusinessException.error("requestId 不能为空");
+        }
+
+        validateContractBinding(request.contractId(), request.contractVersion(), request.name().code());
+        PmsCommandScopeGuard.requireScope(request.name());
+
+        AiOperationDO existing = operationMapper.selectByUserIdAndIdempotencyKeyForUpdate(userId, idempotencyKey);
+        if (existing != null) {
+            if (SUCCEEDED.equals(existing.getStatus())) {
+                return read(existing.getResultJson(), CommandResult.class);
+            }
+            throw BusinessException.conflict("相同幂等键的操作正在处理或不可重试");
+        }
+
+        PmsCommand command = registry.require(request.name());
+        CommandPreview proposal = command.preview(request);
+        LocalDateTime now = LocalDateTime.now();
+        AiOperationDO operation = new AiOperationDO();
+        operation.setId(UUID.randomUUID().toString());
+        operation.setCommandName(request.name().code());
+        operation.setUserId(userId);
+        operation.setSourceClient(sourceClient);
+        operation.setRequestId(requestId);
+        operation.setExecutionMode(AUTOMATIC);
+        operation.setContextId(request.contextId());
+        operation.setContextVersion(request.contextVersion());
+        operation.setContractId(request.contractId());
+        operation.setContractVersion(request.contractVersion());
+        operation.setArgumentsJson(write(request.arguments()));
+        operation.setPreviewJson(write(proposal));
+        operation.setExpectedVersionsJson(write(proposal.changes()));
+        operation.setStatus(AUTOMATIC_RUNNING);
+        operation.setIdempotencyKey(idempotencyKey);
+        operation.setExpiresAt(now.plusMinutes(PREVIEW_TTL_MINUTES));
+        operationMapper.insert(operation);
+
+        CommandResult result = command.execute(operation);
         operation.setResultJson(write(result));
         operation.setStatus(SUCCEEDED);
         operation.setExecutedAt(LocalDateTime.now());

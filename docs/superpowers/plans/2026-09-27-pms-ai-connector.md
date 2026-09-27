@@ -130,6 +130,7 @@ export interface OperationResult {
 
 - Create: `src/main/java/com/brad/pms/ai/connector/AutomaticOperationRequest.java`
 - Create: `src/main/java/com/brad/pms/ai/connector/AutomaticCommandExecutionService.java`
+- Modify: `src/main/java/com/brad/pms/ai/command/AiOperationService.java`
 - Create: `src/main/java/com/brad/pms/integration/ai/api/AiAutomaticExecuteRequest.java`
 - Create: `src/main/java/com/brad/pms/integration/ai/api/AiOperationResultDTO.java`
 - Create: `src/main/java/com/brad/pms/integration/ai/security/AiConnectorScopePolicy.java`
@@ -160,12 +161,12 @@ public interface AutomaticCommandExecutionService {
 }
 ```
 
-`execute` 必须在一次服务调用内完成：权限校验 → 命令预览 → 操作持久化 → 幂等检查 → 命令执行 → 结果写回 → 审计信息返回。可以复用现有 `PmsCommandRegistry`、`CommandPreviewService`、`CommandExecutionService` 和 `AiOperationService`，不能复制命令的领域逻辑。
+`execute` 必须在一次服务调用内完成：权限校验 → 命令预览 → 操作持久化 → 幂等检查 → 命令执行 → 结果写回 → 审计信息返回。自动执行的原子性和幂等检查由 `AiOperationService` 承载，门面只负责请求归一化和用户上下文校验；可以复用现有 `PmsCommandRegistry`、`CommandPreviewService`、`CommandExecutionService` 和 `AiOperationService`，不能复制命令的领域逻辑。
 
 - [ ] **Step 1: 写自动执行失败测试。** 覆盖无 Token、无 scope、未知命令、参数不完整、资源权限不足、版本冲突、相同幂等键重试和不同幂等键重复操作。
 - [ ] **Step 2: 写迁移测试。** 断言新增来源客户端、请求 ID、执行模式字段；旧记录可以读取，旧 DSH 操作不受影响。
 - [ ] **Step 3: 增加 `AiConnectorScopePolicy`。** 至少定义 `pms:query:read`、`pms:command:execute`、`pms:workflow:write`、`pms:project:write`、`pms:development:write`、`pms:iteration:write`，并要求后端权限与连接器 scope 取交集。
-- [ ] **Step 4: 实现自动执行服务。** 内部仍可创建预览，但不得把状态暴露为“等待用户确认”；执行失败时事务回滚，重复幂等键返回原结果。
+- [ ] **Step 4: 实现自动执行服务。** 在 `AiOperationService` 增加带幂等键预占的自动执行事务：先锁定同用户同幂等键的历史记录，再生成内部预览、持久化 `AUTOMATIC_RUNNING` 状态并执行命令；不得把状态暴露为“等待用户确认”，执行失败时事务回滚，重复幂等键返回原结果。
 - [ ] **Step 5: 增加上下文规则。** 全局操作在服务端归一化为 `global:pms` 上下文；节点操作必须提供实际对象、节点和版本，不能用全局上下文绕过节点校验。
 - [ ] **Step 6: 实现 `/integration/ai/v1/operations/execute`。** Controller 从 `UserContext` 获取当前用户，不接受请求体覆盖用户身份；统一返回业务错误和 `requestId`。
 - [ ] **Step 7: 运行 `mvn -q -Dtest=AutomaticCommandExecutionServiceTest,AiConnectorControllerTest test`。** 预期通过。

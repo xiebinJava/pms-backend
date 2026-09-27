@@ -9,4 +9,10 @@ public interface AiOperationMapper extends BaseMapper<AiOperationDO> {
 
     @Select("SELECT * FROM pms_ai_operation WHERE id = #{id} FOR UPDATE")
     AiOperationDO selectByIdForUpdate(@Param("id") String id);
+
+    @Select("SELECT * FROM pms_ai_operation "
+            + "WHERE user_id = #{userId} AND idempotency_key = #{idempotencyKey} FOR UPDATE")
+    AiOperationDO selectByUserIdAndIdempotencyKeyForUpdate(
+            @Param("userId") Long userId,
+            @Param("idempotencyKey") String idempotencyKey);
 }

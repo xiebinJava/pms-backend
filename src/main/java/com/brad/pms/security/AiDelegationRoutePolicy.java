@@ -20,6 +20,10 @@ public final class AiDelegationRoutePolicy {
                 && !tokenProvider.isDshDelegationToken(token)) {
             return false;
         }
+        if (path.startsWith("/integration/ai/v1/")
+                && !tokenProvider.isDshDelegationToken(token)) {
+            return false;
+        }
 
         if ("POST".equalsIgnoreCase(method) && "/ai/context/inspect".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "ai:context:read");
@@ -62,6 +66,10 @@ public final class AiDelegationRoutePolicy {
         }
         if ("POST".equalsIgnoreCase(method)
                 && path.matches("/integration/dsh/v1/operations/[^/]+/execute")) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:command:execute");
+        }
+        if ("POST".equalsIgnoreCase(method)
+                && "/integration/ai/v1/operations/execute".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:command:execute");
         }
         return false;
