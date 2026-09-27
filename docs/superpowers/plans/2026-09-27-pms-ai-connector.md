@@ -20,9 +20,12 @@
 - 需求只能关联一个执行对象：项目、专题或故事三者之一；连接器只能调用后端规则，不能自行拆分或绕过。
 - 迭代计划不绑定流程模板，不创建流程节点。
 - 负责人、节点负责人和任务执行人的成员自动加入、解绑清理由 PMS 后端领域服务处理。
-- 每个写操作必须携带当前用户 Token、`clientId`、`requestId`、`idempotencyKey` 和可选的 `expectedVersion`。
+- 每个写操作必须携带当前用户 Token、`clientId`、`requestId` 和 `idempotencyKey`；对象 ID、对象版本和动态节点版本按能力目录要求放在 `arguments` 中。
+- 连接器请求不定义通用 `resource` 或 `expectedVersion` 字段，避免与 PMS 后端逐命令 Schema 冲突；可选的契约绑定通过 `contract { id, version }` 传递。
 - 连接器不记录密码、长期 Token 或敏感字段原文；错误响应不得泄露 SQL、堆栈和内部凭据。
 - 每个阶段必须完成聚焦测试、权限/边界检查、diff Review 后才能进入下一阶段。
+- PMS 的 `ResponseResult` 可能以 HTTP 200 携带非 200 的业务 `code` 返回错误；连接器必须同时检查 HTTP 状态和业务响应码，不能只依赖 HTTP 状态。
+- 查询/能力读取可以进行有限重试；自动执行写操作不得因 409、422 或 5xx 自动重试，避免把连接器层重试误认为业务幂等保证。
 
 ## Review Focus
 
@@ -98,10 +101,9 @@ export type ResourceType =
 
 export interface AutomaticOperationRequest {
   operation: string;
-  resource?: { type: ResourceType; id?: number };
   arguments: Record<string, unknown>;
   context?: { id: string; version: string };
-  expectedVersion?: number;
+  contract?: { id: string; version: string };
   idempotencyKey: string;
   clientId: "mcp" | "opencli";
   requestId: string;
@@ -274,8 +276,11 @@ iteration-plan.story.remove
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/RequestContext.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/Errors.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/index.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/package.json`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-capabilities/src/CapabilityResolver.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-capabilities/src/index.ts`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/package.json`
+- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-capabilities/package.json`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/pms-client.test.ts`
 - Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/capability-resolver.test.ts`
 
@@ -290,13 +295,13 @@ export interface PmsClient {
 }
 ```
 
-- [ ] **Step 1: 写 HTTP Mock 测试。** 断言所有请求携带 Bearer Token、`X-Request-Id`、`X-Client-Id`，错误码按 401/403/409/422/429/5xx 分类。
-- [ ] **Step 2: 实现 `AuthProvider`。** 第一版支持环境变量或进程注入的短期 Token，不持久化密码；为后续 OAuth 留接口。
-- [ ] **Step 3: 实现 `PmsClient`。** 统一 base URL、超时、请求 ID、错误转换和有限重试；409 不自动重试写操作。
-- [ ] **Step 4: 实现结构化结果。** 让 MCP 和 OpenCLI 直接复用同一个 `OperationResult`、`QueryResult` 和 `CapabilityCatalog`。
-- [ ] **Step 5: 实现 `CapabilityResolver`。** 将后端动态能力目录解析为资源、动作、上下文要求和组件字段；未知组件不得静默降级为固定节点。
-- [ ] **Step 6: 运行 `pnpm test --filter pms-client --filter pms-capabilities` 和 `pnpm typecheck`。** 预期通过。
-- [ ] **Step 7: 自审并提交。** 确认 Token 不出现在错误、日志或异常对象中；提交 `feat: add shared pms api client`。
+- [x] **Step 1: 写 HTTP Mock 测试。** 断言所有请求携带 Bearer Token、`X-Request-Id`、`X-Client-Id`；同时覆盖 HTTP 状态码和 `ResponseResult.code` 的 401/403/409/422/429/5xx 分类，确保不会把业务错误当成成功。
+- [x] **Step 2: 实现 `AuthProvider`。** 第一版支持环境变量或进程注入的短期 Token，不持久化密码；为后续 OAuth 留接口。
+- [x] **Step 3: 实现 `PmsClient`。** 统一 base URL、超时、请求 ID、响应信封解包、错误转换和有限重试；409/422/5xx 都不自动重试写操作，读请求只允许有限重试。
+- [x] **Step 4: 实现结构化结果。** 让 MCP 和 OpenCLI 直接复用同一个 `OperationResult`、`QueryResult` 和 `CapabilityCatalog`。
+- [x] **Step 5: 实现 `CapabilityResolver`。** 将后端动态能力目录解析为资源、动作、上下文要求和组件字段；未知组件不得静默降级为固定节点。
+- [x] **Step 6: 运行 `pnpm exec vitest run tests/contract/pms-client.test.ts tests/contract/capability-resolver.test.ts` 和 `pnpm typecheck`。** 当前仓库使用单根测试脚本，不能使用不存在的 workspace package filter。
+- [x] **Step 7: 自审并提交。** 确认 Token 不出现在错误、日志或异常对象中；提交 `feat: add shared pms api client`（280d771）。
 
 ## Task 5: 实现 MCP Server
 
