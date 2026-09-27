@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 
-/** Neutral write facade consumed by MCP and OpenCLI adapters. */
+/** Stable integration facade consumed by the PMS CLI and legacy adapters during migration. */
 @RestController
 @RequestMapping("/integration/ai/v1")
 public class AiConnectorController {

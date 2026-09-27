@@ -43,8 +43,8 @@ public record AutomaticOperationRequest(
         if ((contractId == null) != (contractVersion == null)) {
             throw new IllegalArgumentException("contractId 与 contractVersion 必须同时提供");
         }
-        if (!"mcp".equals(clientId) && !"opencli".equals(clientId)) {
-            throw new IllegalArgumentException("clientId 只支持 mcp 或 opencli");
+        if (!"pms-cli".equals(clientId) && !"mcp".equals(clientId) && !"opencli".equals(clientId)) {
+            throw new IllegalArgumentException("clientId 只支持 pms-cli（兼容旧适配器：mcp/opencli）");
         }
     }
 
