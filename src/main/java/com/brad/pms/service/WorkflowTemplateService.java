@@ -26,6 +26,7 @@ import com.brad.pms.workflow.BuiltInWorkflowTemplate;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinitionValidator;
+import com.brad.pms.workflow.WorkflowTemplateDefinitionNormalizer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -292,7 +293,9 @@ public class WorkflowTemplateService {
     private WorkflowTemplateDefinition validateDefinitionForProcessType(
             String processTypeCode, WorkflowTemplateDefinition definition) {
         try {
-            return WorkflowTemplateDefinitionValidator.validateForProcessType(processTypeCode, definition);
+            WorkflowTemplateDefinition normalized = WorkflowTemplateDefinitionNormalizer
+                    .normalizeForProcessType(processTypeCode, definition);
+            return WorkflowTemplateDefinitionValidator.validateForProcessType(processTypeCode, normalized);
         } catch (IllegalArgumentException e) {
             throw BusinessException.error(e.getMessage());
         }
@@ -527,7 +530,7 @@ public class WorkflowTemplateService {
         if (versionId == null) return BuiltInWorkflowTemplate.compatibilityDefinition();
         WorkflowTemplateVersionDO version = versionMapper.selectById(versionId);
         if (version == null) throw BusinessException.error("流程模板版本不存在");
-        return parse(version.getDefinitionJson());
+        return normalizeDefinition(version, parse(version.getDefinitionJson()));
     }
 
     public WorkflowNodeDefinition getNodeDefinition(Long versionId, String nodeKey) {
@@ -543,7 +546,7 @@ public class WorkflowTemplateService {
         if (!ids.isEmpty()) {
             for (WorkflowTemplateVersionDO version : versionMapper.selectList(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
                     .in(WorkflowTemplateVersionDO::getId, ids))) {
-                result.put(version.getId(), parse(version.getDefinitionJson()));
+                result.put(version.getId(), normalizeDefinition(version, parse(version.getDefinitionJson())));
             }
             if (!result.keySet().containsAll(ids)) throw BusinessException.error("流程模板版本不存在");
         }
@@ -629,7 +632,7 @@ public class WorkflowTemplateService {
         dto.setDraftRevision(draft == null ? null : draft.getVersion());
         dto.setPublishedVersionId(published == null ? null : published.getId());
         dto.setPublishedVersionNo(published == null ? null : published.getVersionNo());
-        dto.setDefinition(active == null ? null : parse(active.getDefinitionJson()));
+        dto.setDefinition(active == null ? null : normalizeDefinition(active, parse(active.getDefinitionJson())));
         dto.setFixedBlocks(List.of("owner", "schedule", "task-board"));
         return dto;
     }
@@ -677,6 +680,16 @@ public class WorkflowTemplateService {
         } catch (JsonProcessingException e) {
             throw BusinessException.error("流程模板定义无法保存");
         }
+    }
+
+    private WorkflowTemplateDefinition normalizeDefinition(
+            WorkflowTemplateVersionDO version, WorkflowTemplateDefinition definition) {
+        if (version == null || version.getTemplateId() == null) return definition;
+        WorkflowTemplateDO template = templateMapper.selectById(version.getTemplateId());
+        if (template == null || template.getProjectTypeId() == null) return definition;
+        ProjectTypeDO processType = projectTypeMapper.selectById(template.getProjectTypeId());
+        return WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                processType == null ? null : processType.getCode(), definition);
     }
 
     private WorkflowTemplateDefinition parse(String json) {

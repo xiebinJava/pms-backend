@@ -70,6 +70,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("develop");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(2L);
@@ -153,6 +155,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("design");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(0L);
@@ -175,6 +179,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("plan");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(0L);
@@ -197,6 +203,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("acceptance");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(0L);
@@ -219,6 +227,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("develop");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(0L);
@@ -241,6 +251,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("review");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(0L);
@@ -264,6 +276,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("custom-solution-stage");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(0L);
@@ -291,6 +305,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("custom-intake");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         var definition = new WorkflowNodeDefinition("custom-intake", "自定义登记", "说明", "交付物", "角色",
                 java.util.List.of(), java.util.List.of(
                 new com.brad.pms.workflow.WorkflowFieldDefinition("business-case", "业务价值",
@@ -320,6 +336,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey("orphan-stage");
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         when(permissionService.requireProject(1L)).thenReturn(project);
         when(permissionService.requireCompletableNode(1L, 10L)).thenReturn(node);
         when(taskMapper.selectCount(any())).thenReturn(0L);
@@ -453,6 +471,8 @@ class NodeServiceCompleteTest {
         node.setNodeKey(key);
         node.setOwnerId(3L);
         node.setStatus(1);
+        node.setStartDate(LocalDate.of(2026, 10, 1));
+        node.setEndDate(LocalDate.of(2026, 10, 3));
         return node;
     }
 }

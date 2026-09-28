@@ -20,6 +20,7 @@ public class RequirementSaveCmd {
     private Integer priority;
 
     private Long ownerId;
+    private Long orgUnitId;
     private Long templateVersionId;
     private Integer version;
 }

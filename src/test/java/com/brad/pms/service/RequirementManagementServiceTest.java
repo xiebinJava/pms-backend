@@ -7,6 +7,7 @@ import com.brad.pms.entity.RequirementDO;
 import com.brad.pms.mapper.RequirementMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
+import com.brad.pms.mapper.OrgUnitMapper;
 import com.brad.pms.entity.DevelopmentItemWorkflowDO;
 import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
 import com.brad.pms.workflow.DevelopmentItemType;
@@ -42,6 +43,7 @@ class RequirementManagementServiceTest {
     @Mock DevelopmentItemWorkflowMapper workflowMapper;
     @Mock DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
     @Mock WorkflowTemplateService workflowTemplateService;
+    @Mock OrgUnitMapper orgUnitMapper;
     @InjectMocks RequirementManagementService service;
 
     @BeforeEach
@@ -79,6 +81,36 @@ class RequirementManagementServiceTest {
         verify(requirementMapper).insert(saved.capture());
         assertThat(saved.getValue().getExecutionTargetType()).isNull();
         assertThat(saved.getValue().getExecutionTargetId()).isNull();
+    }
+
+    @Test
+    void persistsTheSelectedBusinessLineOnCreate() {
+        RequirementSaveCmd cmd = new RequirementSaveCmd();
+        cmd.setTitle("业务线需求");
+        cmd.setOrgUnitId(31L);
+        doAnswer(invocation -> {
+            RequirementDO saved = invocation.getArgument(0);
+            saved.setId(12L);
+            saved.setVersion(0);
+            return 1;
+        }).when(requirementMapper).insert(any(RequirementDO.class));
+        when(orgUnitMapper.selectById(31L)).thenReturn(activeOrg(31L));
+        when(workflowService.createIfDefaultExists(
+                com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 12L, null, null)).thenReturn(null);
+
+        service.create(cmd);
+
+        ArgumentCaptor<RequirementDO> saved = ArgumentCaptor.forClass(RequirementDO.class);
+        verify(requirementMapper).insert(saved.capture());
+        assertThat(saved.getValue().getOrgUnitId()).isEqualTo(31L);
+    }
+
+    private static com.brad.pms.entity.OrgUnitDO activeOrg(Long id) {
+        com.brad.pms.entity.OrgUnitDO org = new com.brad.pms.entity.OrgUnitDO();
+        org.setId(id);
+        org.setStatus("ACTIVE");
+        org.setDeleted(false);
+        return org;
     }
 
     @Test

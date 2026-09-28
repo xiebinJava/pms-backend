@@ -22,6 +22,7 @@ public class RequirementDO {
     private String description;
     private Integer priority;
     private Long ownerId;
+    private Long orgUnitId;
     private RequirementExecutionTargetType executionTargetType;
     private Long executionTargetId;
     private String status;

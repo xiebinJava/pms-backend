@@ -21,15 +21,20 @@ public final class WorkflowTemplateDefinitionValidator {
             WorkflowFieldType.TEXT, WorkflowFieldType.TEXTAREA, WorkflowFieldType.NUMBER, WorkflowFieldType.DATE,
             WorkflowFieldType.SINGLE_SELECT, WorkflowFieldType.MULTI_SELECT, WorkflowFieldType.PERSON,
             WorkflowFieldType.ATTACHMENT);
-    private static final Map<String, WorkflowFieldType> BINDING_TYPES = Map.of(
-            "project.description", WorkflowFieldType.TEXTAREA,
-            "project.priority", WorkflowFieldType.RADIO,
-            "project.projectLevel", WorkflowFieldType.SINGLE_SELECT,
-            "project.schedule", WorkflowFieldType.DATE_RANGE,
-            "project.businessLine", WorkflowFieldType.SINGLE_SELECT,
-            "project.projectManager", WorkflowFieldType.PERSON,
-            "project.projectMembers", WorkflowFieldType.PERSON_MULTI,
-            "project.followers", WorkflowFieldType.PERSON_MULTI);
+    private static final Map<String, WorkflowFieldType> BINDING_TYPES = Map.ofEntries(
+            Map.entry("project.description", WorkflowFieldType.TEXTAREA),
+            Map.entry("project.priority", WorkflowFieldType.RADIO),
+            Map.entry("project.projectLevel", WorkflowFieldType.SINGLE_SELECT),
+            Map.entry("project.schedule", WorkflowFieldType.DATE_RANGE),
+            Map.entry("project.businessLine", WorkflowFieldType.SINGLE_SELECT),
+            Map.entry("project.projectManager", WorkflowFieldType.PERSON),
+            Map.entry("project.projectMembers", WorkflowFieldType.PERSON_MULTI),
+            Map.entry("project.followers", WorkflowFieldType.PERSON_MULTI),
+            Map.entry("requirement.title", WorkflowFieldType.TEXT),
+            Map.entry("requirement.description", WorkflowFieldType.TEXTAREA),
+            Map.entry("requirement.priority", WorkflowFieldType.SINGLE_SELECT),
+            Map.entry("requirement.businessLine", WorkflowFieldType.SINGLE_SELECT),
+            Map.entry("requirement.owner", WorkflowFieldType.PERSON));
 
     private WorkflowTemplateDefinitionValidator() { }
 
@@ -75,6 +80,12 @@ public final class WorkflowTemplateDefinitionValidator {
                 .anyMatch(WorkflowComponentKey.STORY_LIST::equals);
         if (hasStoryList && !"topic-management".equals(processTypeCode)) {
             throw new IllegalArgumentException("故事列表工作台只能配置在专题流程");
+        }
+        boolean hasRequirementBindings = definition.nodes().stream()
+                .flatMap(node -> node.fields().stream())
+                .anyMatch(field -> field.binding() != null && field.binding().startsWith("requirement."));
+        if (hasRequirementBindings && !"requirement-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("需求字段绑定只能配置在需求流程");
         }
         if ("requirement-management".equals(processTypeCode)
                 && (!blank(definition.sourceProjectNodeKey()) || !blank(definition.sourceTopicNodeKey()))) {
@@ -142,7 +153,11 @@ public final class WorkflowTemplateDefinitionValidator {
             if (v2 && field.binding() != null) {
                 WorkflowFieldType expectedType = BINDING_TYPES.get(field.binding());
                 if (expectedType == null) throw new IllegalArgumentException("字段绑定无效");
-                if (field.type() != expectedType) throw new IllegalArgumentException("字段绑定控件类型不匹配");
+                boolean legacyRequirementPriority = "requirement.priority".equals(field.binding())
+                        && field.type() == WorkflowFieldType.NUMBER;
+                if (field.type() != expectedType && !legacyRequirementPriority) {
+                    throw new IllegalArgumentException("字段绑定控件类型不匹配");
+                }
                 if (!options.isEmpty()) throw new IllegalArgumentException("绑定字段不能配置选项");
                 continue;
             }

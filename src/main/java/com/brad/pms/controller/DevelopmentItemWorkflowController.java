@@ -3,6 +3,7 @@ package com.brad.pms.controller;
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.DevelopmentItemNodeUpdateCmd;
 import com.brad.pms.dto.request.DevelopmentItemTaskSaveCmd;
+import com.brad.pms.dto.request.NodeRollbackCmd;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/development")
@@ -54,6 +56,15 @@ public class DevelopmentItemWorkflowController {
         DevelopmentItemType itemType = DevelopmentItemType.from(type);
         permissionService.requireWrite(itemType);
         return ResponseResult.success(service.completeNode(itemType, id, nodeId));
+    }
+
+    @PostMapping("/items/{type}/{id}/nodes/{nodeId}/rollback")
+    public ResponseResult<DevelopmentItemWorkflowDetailDTO> rollbackNode(
+            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId,
+            @Validated @RequestBody NodeRollbackCmd cmd) {
+        DevelopmentItemType itemType = DevelopmentItemType.from(type);
+        permissionService.requireWrite(itemType);
+        return ResponseResult.success(service.rollbackNode(itemType, id, nodeId, cmd.getReason()));
     }
 
     @PostMapping("/items/{type}/{id}/nodes/{nodeId}/tasks")

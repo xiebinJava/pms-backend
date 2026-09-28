@@ -64,6 +64,7 @@ public class NodeService {
     private WorkflowComponentBindingService workflowComponentBindingService;
     private NodeCustomFieldService nodeCustomFieldService;
     private ProjectFollowerMapper followerMapper;
+    private WorkflowNodeCompletionPolicy completionPolicy = new WorkflowNodeCompletionPolicy();
 
     @Autowired
     public void setNotificationService(@Lazy NotificationService notificationService) {
@@ -88,6 +89,11 @@ public class NodeService {
     @Autowired
     public void setFollowerMapper(ProjectFollowerMapper followerMapper) {
         this.followerMapper = followerMapper;
+    }
+
+    @Autowired(required = false)
+    public void setCompletionPolicy(WorkflowNodeCompletionPolicy completionPolicy) {
+        if (completionPolicy != null) this.completionPolicy = completionPolicy;
     }
 
     @Transactional
@@ -260,14 +266,12 @@ public class NodeService {
     public List<ProjectNodeDTO> complete(Long projectId, Long nodeId) {
         ProjectDO project = permissionService.requireProject(projectId);
         ProjectNodeDO node = permissionService.requireCompletableNode(projectId, nodeId);
+        completionPolicy.validateOwnerAndSchedule(node.getOwnerId(), node.getStartDate(), node.getEndDate());
         WorkflowNodeDefinition definition = resolveNodeDefinition(project, node);
         if (definition != null && definition.projectBasicInfo()) {
             validateKickoffProfile(projectId, node, definition);
         } else if (definition != null && hasRequiredVisibleProjectBinding(definition)) {
             validateRequiredProjectBindings(projectId, definition);
-        }
-        if (node.getOwnerId() == null) {
-            throw BusinessException.error("请先分配节点负责人");
         }
         Long unfinished = taskMapper.selectCount(new LambdaQueryWrapper<ProjectTaskDO>()
                 .eq(ProjectTaskDO::getProjectId, projectId)

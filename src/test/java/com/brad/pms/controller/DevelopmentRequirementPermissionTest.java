@@ -18,6 +18,7 @@ class DevelopmentRequirementPermissionTest {
         assertPermission("update", PutMapping.class, PermissionCode.REQUIREMENT_WRITE);
         assertPermission("link", PostMapping.class, PermissionCode.REQUIREMENT_WRITE);
         assertPermission("changeTarget", PostMapping.class, PermissionCode.REQUIREMENT_MANAGE);
+        assertPermission("rollbackNode", PostMapping.class, PermissionCode.REQUIREMENT_WRITE);
         assertPermission("delete", DeleteMapping.class, PermissionCode.REQUIREMENT_MANAGE);
     }
 

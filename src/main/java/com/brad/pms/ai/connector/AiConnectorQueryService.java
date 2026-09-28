@@ -233,7 +233,8 @@ public class AiConnectorQueryService {
                 .filter(StringUtils::hasText)
                 .map(key -> new AiWorkflowContextDTO.Component(key, key, fields, actions)).toList();
         return new AiWorkflowContextDTO.Node(node.getId(), node.getNodeKey(), node.getName(), position,
-                node.getStatus(), components, fields, jsonValues(node.getFieldValues()));
+                node.getStatus(), components, fields,
+                jsonValues(node.getFieldValues(), node.getBoundFieldValues()));
     }
 
     private List<String> allowedDevelopmentActions(String resourceType) {
@@ -281,10 +282,10 @@ public class AiConnectorQueryService {
                 field.required(), field.options(), field.visible(), field.binding(), field.fullWidth())).toList();
     }
 
-    private Map<String, Object> jsonValues(Map<String, JsonNode> values) {
+    private Map<String, Object> jsonValues(Map<String, JsonNode> values, Map<String, JsonNode> boundValues) {
         Map<String, Object> result = new LinkedHashMap<>();
-        if (values == null) return result;
-        values.forEach((key, value) -> result.put(key, jsonValue(value)));
+        if (values != null) values.forEach((key, value) -> result.put(key, jsonValue(value)));
+        if (boundValues != null) boundValues.forEach((key, value) -> result.put(key, jsonValue(value)));
         return result;
     }
 

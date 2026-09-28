@@ -246,6 +246,36 @@ class WorkflowTemplateDefinitionValidatorTest {
     }
 
     @Test
+    void acceptsRequirementRecordBindingsOnlyForRequirementTemplates() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(
+                        v2Field("requirement-description", "需求描述", WorkflowFieldType.TEXTAREA,
+                                true, List.of(), true, "requirement.description"),
+                        v2Field("requirement-priority", "需求优先级", WorkflowFieldType.SINGLE_SELECT,
+                                true, List.of(), true, "requirement.priority"),
+                        v2Field("requirement-business-line", "业务线", WorkflowFieldType.SINGLE_SELECT,
+                                false, List.of(), true, "requirement.businessLine"),
+                        v2Field("requirement-owner", "需求负责人", WorkflowFieldType.PERSON,
+                                true, List.of(), true, "requirement.owner")), List.of("fields"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator
+                .validateForProcessType("requirement-management", definition)).isEqualTo(definition);
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("topic-management", definition))
+                .hasMessageContaining("需求字段绑定只能配置在需求流程");
+    }
+
+    @Test
+    void acceptsLegacyNumericRequirementPriorityForMigration() {
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(
+                        v2Field("requirement-priority", "需求优先级", WorkflowFieldType.NUMBER,
+                                true, List.of(), true, "requirement.priority")), List.of("fields"))));
+
+        assertThat(WorkflowTemplateDefinitionValidator.validate(definition)).isEqualTo(definition);
+    }
+
+    @Test
     void acceptsStoryListOnlyForTopicTemplates() {
         WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
                 v2Node("story-stage", List.of(), List.of("component:story-list"))));

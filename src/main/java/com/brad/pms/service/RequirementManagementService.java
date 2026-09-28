@@ -18,6 +18,7 @@ import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
 import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
 import com.brad.pms.mapper.RequirementMapper;
+import com.brad.pms.mapper.OrgUnitMapper;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.workflow.DevelopmentItemType;
 import lombok.RequiredArgsConstructor;
@@ -39,16 +40,19 @@ public class RequirementManagementService {
     private final DevelopmentItemWorkflowMapper workflowMapper;
     private final DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
     private final WorkflowTemplateService workflowTemplateService;
+    private final OrgUnitMapper orgUnitMapper;
 
     @Transactional
     public Long create(RequirementSaveCmd cmd) {
         validate(cmd);
         if (cmd.getOwnerId() != null) userService.requireActiveUser(cmd.getOwnerId());
+        validateBusinessLine(cmd.getOrgUnitId());
         RequirementDO requirement = new RequirementDO();
         requirement.setTitle(cmd.getTitle().trim());
         requirement.setDescription(trimToNull(cmd.getDescription()));
         requirement.setPriority(cmd.getPriority() == null ? 1 : cmd.getPriority());
         requirement.setOwnerId(cmd.getOwnerId());
+        requirement.setOrgUnitId(cmd.getOrgUnitId());
         requirement.setStatus("ACTIVE");
         requirement.setDeleted(false);
         requirement.setVersion(0);
@@ -77,10 +81,12 @@ public class RequirementManagementService {
         if (cmd.getOwnerId() != null && !Objects.equals(cmd.getOwnerId(), requirement.getOwnerId())) {
             userService.requireActiveUser(cmd.getOwnerId());
         }
+        validateBusinessLine(cmd.getOrgUnitId());
         requirement.setTitle(cmd.getTitle().trim());
         requirement.setDescription(trimToNull(cmd.getDescription()));
         if (cmd.getPriority() != null) requirement.setPriority(cmd.getPriority());
         requirement.setOwnerId(cmd.getOwnerId());
+        requirement.setOrgUnitId(cmd.getOrgUnitId());
         if (requirementMapper.updateById(requirement) != 1) {
             throw BusinessException.conflict("需求已被其他人修改，请刷新后重试");
         }
@@ -170,6 +176,7 @@ public class RequirementManagementService {
         dto.setDescription(requirement.getDescription());
         dto.setPriority(requirement.getPriority());
         dto.setOwnerId(requirement.getOwnerId());
+        dto.setOrgUnitId(requirement.getOrgUnitId());
         dto.setOwnerName(requirement.getOwnerId() == null ? null
                 : userService.listByIdsIncludingDeleted(List.of(requirement.getOwnerId())).stream().findFirst()
                 .map(com.brad.pms.convertor.Convertors::userDisplayName).orElse(null));
@@ -228,6 +235,7 @@ public class RequirementManagementService {
         snapshot.put("title", requirement.getTitle());
         snapshot.put("priority", requirement.getPriority());
         snapshot.put("ownerId", requirement.getOwnerId());
+        snapshot.put("orgUnitId", requirement.getOrgUnitId());
         snapshot.put("status", requirement.getStatus());
         snapshot.put("deleted", requirement.getDeleted());
         snapshot.put("executionTargetType", requirement.getExecutionTargetType());
@@ -243,5 +251,13 @@ public class RequirementManagementService {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void validateBusinessLine(Long orgUnitId) {
+        if (orgUnitId == null) return;
+        var orgUnit = orgUnitMapper.selectById(orgUnitId);
+        if (orgUnit == null || !"ACTIVE".equals(orgUnit.getStatus()) || Boolean.TRUE.equals(orgUnit.getDeleted())) {
+            throw BusinessException.error("业务线不存在或已停用");
+        }
     }
 }

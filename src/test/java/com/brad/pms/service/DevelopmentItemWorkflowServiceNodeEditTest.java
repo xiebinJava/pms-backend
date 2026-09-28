@@ -22,6 +22,9 @@ import com.brad.pms.mapper.RequirementMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
+import com.brad.pms.workflow.WorkflowFieldDefinition;
+import com.brad.pms.workflow.WorkflowFieldType;
+import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -137,6 +140,82 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
         assertThatThrownBy(() -> fixture.service.completeNode(DevelopmentItemType.TOPIC, 7L, 21L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("当前进行中");
+    }
+
+    @Test
+    void requiresOwnerBeforeCompletingAnActiveNode() {
+        Fixture fixture = new Fixture(1);
+        fixture.node.setStartDate(LocalDate.of(2026, 10, 1));
+        fixture.node.setEndDate(LocalDate.of(2026, 10, 3));
+
+        assertThatThrownBy(() -> fixture.service.completeNode(DevelopmentItemType.TOPIC, 7L, 21L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("请先分配节点负责人");
+    }
+
+    @Test
+    void requiresCompleteScheduleBeforeCompletingAnActiveNode() {
+        Fixture fixture = new Fixture(1);
+        fixture.node.setOwnerId(42L);
+
+        assertThatThrownBy(() -> fixture.service.completeNode(DevelopmentItemType.TOPIC, 7L, 21L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("请先设置节点排期");
+    }
+
+    @Test
+    void keepsTemplateRequiredFieldValidationAfterFixedNodeRules() {
+        Fixture fixture = new Fixture(1);
+        fixture.node.setOwnerId(42L);
+        fixture.node.setStartDate(LocalDate.of(2026, 10, 1));
+        fixture.node.setEndDate(LocalDate.of(2026, 10, 3));
+        WorkflowFieldDefinition field = new WorkflowFieldDefinition(
+                "researchReport", "调研报告", WorkflowFieldType.TEXTAREA, true, List.of());
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design"))
+                .thenReturn(new WorkflowNodeDefinition("design", "方案设计与评审", "", "", "",
+                        List.of(), List.of(field), false, List.of()));
+
+        assertThatThrownBy(() -> fixture.service.completeNode(DevelopmentItemType.TOPIC, 7L, 21L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("请先填写调研报告");
+    }
+
+    @Test
+    void rejectsIncompleteTasksBeforeCompletingAnActiveNode() {
+        Fixture fixture = new Fixture(1);
+        fixture.node.setOwnerId(42L);
+        fixture.node.setStartDate(LocalDate.of(2026, 10, 1));
+        fixture.node.setEndDate(LocalDate.of(2026, 10, 3));
+        when(fixture.taskMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> fixture.service.completeNode(DevelopmentItemType.TOPIC, 7L, 21L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("全部任务和子任务");
+    }
+
+    @Test
+    void completesValidNodeAndActivatesNextNode() {
+        Fixture fixture = new Fixture(1);
+        fixture.node.setOwnerId(42L);
+        fixture.node.setStartDate(LocalDate.of(2026, 10, 1));
+        fixture.node.setEndDate(LocalDate.of(2026, 10, 3));
+        DevelopmentItemWorkflowNodeDO next = new DevelopmentItemWorkflowNodeDO();
+        next.setId(22L);
+        next.setWorkflowId(31L);
+        next.setNodeKey("release");
+        next.setName("发布上线");
+        next.setSort(2);
+        next.setStatus(0);
+        next.setVersion(0);
+        when(fixture.nodeMapper.selectByWorkflowIdsForUpdate(anyList())).thenReturn(List.of(fixture.node, next));
+        when(fixture.nodeMapper.selectList(any())).thenReturn(List.of(fixture.node, next));
+
+        fixture.service.completeNode(DevelopmentItemType.TOPIC, 7L, 21L);
+
+        assertThat(fixture.node.getStatus()).isEqualTo(2);
+        assertThat(next.getStatus()).isEqualTo(1);
+        verify(fixture.nodeMapper).updateById(fixture.node);
+        verify(fixture.nodeMapper).updateById(next);
     }
 
     @Test
@@ -266,8 +345,10 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
             when(workflowMapper.selectByItem("TOPIC", 7L)).thenReturn(workflow);
             when(workflowMapper.selectForUpdate("TOPIC", 7L)).thenReturn(workflow);
             when(nodeMapper.selectById(21L)).thenReturn(node);
+            when(nodeMapper.selectByWorkflowIdsForUpdate(anyList())).thenReturn(List.of(node));
             when(nodeMapper.updateById(any(DevelopmentItemWorkflowNodeDO.class))).thenReturn(1);
             when(nodeMapper.selectList(any())).thenReturn(List.of(node));
+            when(taskMapper.selectCount(any())).thenReturn(0L);
             when(taskMapper.selectList(any())).thenAnswer(invocation -> List.copyOf(savedTasks));
             when(taskMapper.insert(any(DevelopmentItemTaskDO.class))).thenAnswer(invocation -> {
                 DevelopmentItemTaskDO task = invocation.getArgument(0);

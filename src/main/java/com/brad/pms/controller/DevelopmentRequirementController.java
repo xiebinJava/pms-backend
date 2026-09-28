@@ -4,6 +4,7 @@ import com.brad.pms.common.page.PageResult;
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.DevelopmentItemNodeUpdateCmd;
 import com.brad.pms.dto.request.DevelopmentItemTaskSaveCmd;
+import com.brad.pms.dto.request.NodeRollbackCmd;
 import com.brad.pms.dto.request.RequirementExecutionTargetCmd;
 import com.brad.pms.dto.request.RequirementExecutionTargetOptionQry;
 import com.brad.pms.dto.request.RequirementPageQry;
@@ -138,6 +139,15 @@ public class DevelopmentRequirementController {
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> completeNode(
             @PathVariable Long id, @PathVariable Long nodeId) {
         return ResponseResult.success(workflowService.completeNode(DevelopmentItemType.REQUIREMENT, id, nodeId));
+    }
+
+    @PostMapping("/{id}/nodes/{nodeId}/rollback")
+    @RequirePermission(PermissionCode.REQUIREMENT_WRITE)
+    public ResponseResult<DevelopmentItemWorkflowDetailDTO> rollbackNode(
+            @PathVariable Long id, @PathVariable Long nodeId,
+            @Valid @RequestBody NodeRollbackCmd cmd) {
+        return ResponseResult.success(workflowService.rollbackNode(
+                DevelopmentItemType.REQUIREMENT, id, nodeId, cmd.getReason()));
     }
 
     @PostMapping("/{id}/nodes/{nodeId}/tasks")

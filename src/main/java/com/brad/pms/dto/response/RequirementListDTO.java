@@ -10,6 +10,7 @@ public class RequirementListDTO {
     private Integer priority;
     private Long ownerId;
     private String ownerName;
+    private Long orgUnitId;
     private String status;
     private Boolean deleted;
     private Integer version;
