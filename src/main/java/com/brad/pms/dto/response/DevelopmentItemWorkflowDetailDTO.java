@@ -43,6 +43,7 @@ public class DevelopmentItemWorkflowDetailDTO {
     private Long workflowId;
     private Long templateVersionId;
     private Integer templateVersionNo;
+    private String terminalStatus;
     private Integer completedNodeCount;
     private Integer totalNodeCount;
     private List<DevelopmentItemWorkflowNodeDTO> nodes;

@@ -183,6 +183,7 @@ public class WorkflowComponentBindingService {
             contentOrder.add("component:" + componentKey);
         }
         return new WorkflowNodeDefinition(node.key(), node.name(), node.description(), node.deliverable(), node.roles(),
-                components, node.fields(), node.projectBasicInfo(), node.projectBasicInfoFields(), contentOrder);
+                components, node.fields(), node.projectBasicInfo(), node.projectBasicInfoFields(), contentOrder,
+                node.componentConfigs());
     }
 }

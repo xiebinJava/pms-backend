@@ -17,5 +17,6 @@ public class RequirementListDTO {
     private Boolean workflowConfigured;
     private String workflowStatus;
     private Integer workflowProgress;
+    private String terminalStatus;
     private RequirementExecutionTargetDTO executionTarget;
 }

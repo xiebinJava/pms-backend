@@ -14,6 +14,10 @@ public final class WorkflowComponentKey {
     public static final String STORY_LIST = "story-list";
     /** Configurable workbench for selecting one execution target for a requirement. */
     public static final String REQUIREMENT_EXECUTION = "requirement-execution";
+    /** Configurable requirement intake and value-analysis component. */
+    public static final String REQUIREMENT_RECEIVING_ANALYSIS = "requirement-receiving-analysis";
+    /** Configurable workbench generated from the selected requirement workflow node. */
+    public static final String REQUIREMENT_NODE_WORKBENCH = "requirement-node-workbench";
     /** Runtime-only component generated on the configured topic workflow mount node. */
     public static final String STORY_SPLIT = "story-split";
 

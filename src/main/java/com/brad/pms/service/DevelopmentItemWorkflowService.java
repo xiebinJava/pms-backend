@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.common.enums.DevelopmentAssignmentType;
@@ -43,6 +44,10 @@ import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
 import com.brad.pms.workflow.WorkflowFieldValueValidator;
+import com.brad.pms.workflow.RequirementReceivingAnalysisConfig;
+import com.brad.pms.workflow.RequirementReceivingAnalysisPolicy;
+import com.brad.pms.workflow.RequirementReceivingAnalysisState;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -265,7 +270,9 @@ public class DevelopmentItemWorkflowService {
                                 .anyMatch(field -> Objects.equals(field.key(), entry.getKey())))
                         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
                                 (left, right) -> right, LinkedHashMap::new));
-                values = WorkflowFieldValueValidator.validate(definition.fields(), customValues);
+                values = preserveComponentValues(
+                        WorkflowFieldValueValidator.validate(definition.fields(), customValues),
+                        node.getFieldValuesJson(), cmd.getFieldValues(), definition);
             } catch (IllegalArgumentException exception) {
                 throw BusinessException.error(exception.getMessage());
             }
@@ -277,6 +284,39 @@ public class DevelopmentItemWorkflowService {
             throw BusinessException.conflict("流程节点已被其他人修改，请刷新后重试");
         }
         return detail(itemType, itemId);
+    }
+
+    private Map<String, JsonNode> preserveComponentValues(Map<String, JsonNode> values, String fieldValuesJson) {
+        return preserveComponentValues(values, fieldValuesJson, null, null);
+    }
+
+    private Map<String, JsonNode> preserveComponentValues(Map<String, JsonNode> values,
+                                                           String fieldValuesJson,
+                                                           Map<String, JsonNode> incomingValues,
+                                                           WorkflowNodeDefinition definition) {
+        Map<String, JsonNode> merged = new LinkedHashMap<>(values == null ? Map.of() : values);
+        JsonNode componentValues = readFieldValues(fieldValuesJson).get("__components");
+        if (componentValues != null && !componentValues.isNull()) merged.put("__components", componentValues);
+
+        if (incomingValues == null || definition == null
+                || !definition.runtimeComponents().contains(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH)) {
+            return merged;
+        }
+        JsonNode incomingComponents = incomingValues.get("__components");
+        JsonNode incomingWorkbenchState = incomingComponents == null || !incomingComponents.isObject()
+                ? null : incomingComponents.get(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
+        if (incomingWorkbenchState == null || !incomingWorkbenchState.isObject()) return merged;
+
+        ObjectNode nextComponents;
+        JsonNode existingComponents = merged.get("__components");
+        if (existingComponents != null && existingComponents.isObject()) {
+            nextComponents = (ObjectNode) existingComponents.deepCopy();
+        } else {
+            nextComponents = objectMapper.createObjectNode();
+        }
+        nextComponents.set(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, incomingWorkbenchState.deepCopy());
+        merged.put("__components", nextComponents);
+        return merged;
     }
 
     @Transactional
@@ -296,6 +336,7 @@ public class DevelopmentItemWorkflowService {
             if (!missingFields.isEmpty()) {
                 throw BusinessException.error("请先填写" + String.join("、", missingFields));
             }
+            validateRequirementReceivingAnalysis(context, definition, node);
         }
         Long incompleteCount = taskMapper.selectCount(new LambdaQueryWrapper<DevelopmentItemTaskDO>()
                 .eq(DevelopmentItemTaskDO::getWorkflowId, workflow.getId())
@@ -327,22 +368,14 @@ public class DevelopmentItemWorkflowService {
     }
 
     private List<String> missingRequiredBoundFields(ItemContext context, WorkflowNodeDefinition definition) {
-        if (context == null || context.itemType() != DevelopmentItemType.REQUIREMENT || definition == null) {
+        if (context == null || definition == null) {
             return List.of();
         }
         List<String> missing = new ArrayList<>();
         for (WorkflowFieldDefinition field : definition.fields()) {
-            if (!field.required() || Boolean.FALSE.equals(field.visible()) || field.binding() == null
-                    || !field.binding().startsWith("requirement.")) continue;
-            Object value = switch (field.binding()) {
-                case "requirement.title" -> context.title();
-                case "requirement.description" -> context.description();
-                case "requirement.priority" -> context.priority();
-                case "requirement.businessLine" -> context.orgUnitId();
-                case "requirement.owner" -> context.ownerId();
-                default -> null;
-            };
-            if (value == null || value instanceof String text && !StringUtils.hasText(text)) {
+            if (!field.required() || Boolean.FALSE.equals(field.visible()) || field.binding() == null) continue;
+            Object value = boundFieldValue(context, field.binding());
+            if (isEmptyBoundValue(value)) {
                 missing.add(field.label());
             }
         }
@@ -518,6 +551,7 @@ public class DevelopmentItemWorkflowService {
         dto.setWorkflowConfigured(true);
         dto.setWorkflowId(workflow.getId());
         dto.setTemplateVersionId(workflow.getTemplateVersionId());
+        dto.setTerminalStatus(workflow.getTerminalStatus());
         WorkflowTemplateVersionDO templateVersion = templateVersionMapper.selectById(workflow.getTemplateVersionId());
         dto.setTemplateVersionNo(templateVersion == null ? null : templateVersion.getVersionNo());
 
@@ -548,7 +582,8 @@ public class DevelopmentItemWorkflowService {
         dto.setCompletedNodeCount(completed);
         dto.setTotalNodeCount(total);
         dto.setWorkflowProgress(total == 0 ? 0 : (int) Math.round(completed * 100.0 / total));
-        dto.setWorkflowStatus(total > 0 && completed == total ? "COMPLETED"
+        dto.setWorkflowStatus("REJECTED".equals(workflow.getTerminalStatus()) ? "REJECTED"
+                : total > 0 && completed == total ? "COMPLETED"
                 : nodes.stream().anyMatch(node -> Objects.equals(node.getStatus(), NODE_ACTIVE)) ? "IN_PROGRESS" : "NOT_STARTED");
         dto.setNodes(nodeDTOs);
         return dto;
@@ -581,6 +616,8 @@ public class DevelopmentItemWorkflowService {
                 .findFirst().orElse(null);
         dto.setFields(definition == null ? List.of() : definition.fields());
         dto.setRuntimeComponents(definition == null ? List.of() : definition.runtimeComponents());
+        dto.setComponentConfigs(definition == null ? Map.of()
+                : definition.componentConfigs() == null ? Map.of() : definition.componentConfigs());
         dto.setFieldValues(readFieldValues(node.getFieldValuesJson()));
         dto.setBoundFieldValues(boundFieldValues(context, definition));
         Map<Long, DevelopmentItemTaskDTO> taskDTOs = new HashMap<>();
@@ -599,24 +636,83 @@ public class DevelopmentItemWorkflowService {
     }
 
     private Map<String, JsonNode> boundFieldValues(ItemContext context, WorkflowNodeDefinition definition) {
-        if (context == null || definition == null || context.itemType() != DevelopmentItemType.REQUIREMENT) {
+        if (context == null || definition == null) {
             return Map.of();
         }
         Map<String, JsonNode> values = new LinkedHashMap<>();
         for (WorkflowFieldDefinition field : definition.fields()) {
             if (field.binding() == null) continue;
-            Object value = switch (field.binding()) {
-                case "requirement.title" -> context.title();
-                case "requirement.description" -> context.description();
-                case "requirement.priority" -> context.priority();
-                case "requirement.businessLine" -> context.orgUnitId();
-                case "requirement.owner" -> context.ownerId();
-                default -> null;
-            };
+            Object value = boundFieldValue(context, field.binding());
             if (value != null) values.put(field.key(), objectMapper.valueToTree(value));
             else values.put(field.key(), objectMapper.getNodeFactory().nullNode());
         }
         return values;
+    }
+
+    private Object boundFieldValue(ItemContext context, String binding) {
+        ProjectDO project = context.project();
+        return switch (binding) {
+            case "project.description" -> project == null ? null : project.getDescription();
+            case "project.priority" -> project == null ? null : project.getPriority();
+            case "project.projectLevel" -> project == null ? null : project.getProjectLevel();
+            case "project.schedule" -> project == null ? null : dateRange(project.getStartDate(), project.getEndDate());
+            case "project.businessLine" -> project == null ? null : project.getOrgUnitId();
+            case "project.projectManager" -> project == null ? null : project.getProjectManagerId();
+            case "requirement.title" -> context.itemType() == DevelopmentItemType.REQUIREMENT ? context.title() : null;
+            case "requirement.description" -> context.itemType() == DevelopmentItemType.REQUIREMENT ? context.description() : null;
+            case "requirement.priority" -> context.itemType() == DevelopmentItemType.REQUIREMENT ? context.priority() : null;
+            case "requirement.businessLine" -> context.itemType() == DevelopmentItemType.REQUIREMENT ? context.orgUnitId() : null;
+            case "requirement.owner" -> context.itemType() == DevelopmentItemType.REQUIREMENT ? context.ownerId() : null;
+            case "topic.title" -> context.itemType() == DevelopmentItemType.TOPIC ? context.title() : context.topicTitle();
+            case "topic.owner" -> context.itemType() == DevelopmentItemType.TOPIC ? context.ownerId() : null;
+            case "topic.project" -> project == null ? null : project.getName();
+            case "topic.status" -> context.itemType() == DevelopmentItemType.TOPIC ? context.developmentStatus() : null;
+            case "topic.progress" -> context.itemType() == DevelopmentItemType.TOPIC ? context.developmentProgress() : null;
+            case "topic.latestBuildVersion" -> context.itemType() == DevelopmentItemType.TOPIC ? context.latestBuildVersion() : null;
+            case "topic.testStatus" -> context.itemType() == DevelopmentItemType.TOPIC ? context.testStatus() : null;
+            case "story.title" -> context.itemType() == DevelopmentItemType.STORY ? context.title() : null;
+            case "story.owner" -> context.itemType() == DevelopmentItemType.STORY ? context.ownerId() : null;
+            case "story.status" -> context.itemType() == DevelopmentItemType.STORY ? context.developmentStatus() : null;
+            case "story.progress" -> context.itemType() == DevelopmentItemType.STORY ? context.developmentProgress() : null;
+            case "story.storyPoints" -> context.itemType() == DevelopmentItemType.STORY ? context.storyPoints() : null;
+            case "story.schedule" -> context.itemType() == DevelopmentItemType.STORY
+                    ? dateRange(context.startDate(), context.dueDate()) : null;
+            case "story.blocker" -> context.itemType() == DevelopmentItemType.STORY ? context.blocker() : null;
+            default -> null;
+        };
+    }
+
+    private List<String> dateRange(java.time.LocalDate start, java.time.LocalDate end) {
+        if (start == null || end == null) return null;
+        return List.of(start.toString(), end.toString());
+    }
+
+    private boolean isEmptyBoundValue(Object value) {
+        return value == null || value instanceof String text && !StringUtils.hasText(text)
+                || value instanceof List<?> list && list.isEmpty();
+    }
+
+    private void validateRequirementReceivingAnalysis(ItemContext context,
+                                                      WorkflowNodeDefinition definition,
+                                                      DevelopmentItemWorkflowNodeDO node) {
+        if (context == null || context.itemType() != DevelopmentItemType.REQUIREMENT
+                || !definition.runtimeComponents().contains(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS)) return;
+        JsonNode configNode = definition.componentConfigs() == null ? null
+                : definition.componentConfigs().get(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS);
+        RequirementReceivingAnalysisConfig config = RequirementReceivingAnalysisConfig.from(configNode);
+        Map<String, JsonNode> values = readFieldValues(node.getFieldValuesJson());
+        JsonNode components = values.get("__components");
+        JsonNode stateNode = components == null ? null
+                : components.get(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS);
+        RequirementReceivingAnalysisState state;
+        try {
+            state = stateNode == null || stateNode.isNull() ? null
+                    : objectMapper.treeToValue(stateNode, RequirementReceivingAnalysisState.class);
+        } catch (JsonProcessingException exception) {
+            throw BusinessException.error("需求接收分析内容格式不正确");
+        }
+        List<String> errors = RequirementReceivingAnalysisPolicy.validate(state, config, true);
+        if (!errors.isEmpty()) throw BusinessException.error(String.join("；", errors));
     }
 
     private void syncEditableRequirementBindings(
@@ -889,6 +985,9 @@ public class DevelopmentItemWorkflowService {
             workflow = createIfDefaultExists(itemType, itemId, projectId, sourceNodeId);
         }
         if (workflow == null) throw BusinessException.conflict("流程尚未配置，请先为该类型发布并设置默认流程模板");
+        if (itemType == DevelopmentItemType.REQUIREMENT && StringUtils.hasText(workflow.getTerminalStatus())) {
+            throw BusinessException.conflict("需求流程已终止，不能继续操作");
+        }
         if (!Objects.equals(workflow.getProjectId(), projectId)
                 || !Objects.equals(workflow.getSourceNodeId(), sourceNodeId)
                 || !Objects.equals(workflow.getItemId(), itemId)

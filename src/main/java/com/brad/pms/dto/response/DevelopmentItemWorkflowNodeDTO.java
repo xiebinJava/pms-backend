@@ -29,5 +29,7 @@ public class DevelopmentItemWorkflowNodeDTO {
     private Map<String, JsonNode> boundFieldValues;
     /** Runtime components after applying the item's pinned workflow bindings. */
     private List<String> runtimeComponents;
+    /** Runtime component configuration copied from the pinned workflow template. */
+    private Map<String, JsonNode> componentConfigs;
     private List<DevelopmentItemTaskDTO> tasks;
 }

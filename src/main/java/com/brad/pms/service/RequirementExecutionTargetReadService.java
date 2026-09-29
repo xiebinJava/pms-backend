@@ -85,6 +85,7 @@ public class RequirementExecutionTargetReadService {
                 .collect(Collectors.toMap(UserDO::getId, Function.identity(), (left, right) -> left));
         return requirements.stream()
                 .filter(requirement -> !Boolean.TRUE.equals(requirement.getDeleted()))
+                .filter(requirement -> "ACTIVE".equals(requirement.getStatus()))
                 .filter(requirement -> requirement.getExecutionTargetId() != null)
                 .collect(Collectors.groupingBy(RequirementDO::getExecutionTargetId,
                         LinkedHashMap::new,

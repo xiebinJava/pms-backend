@@ -3,6 +3,7 @@ package com.brad.pms.workflow;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Applies compatibility migrations that can be derived from a published template
@@ -14,14 +15,13 @@ public final class WorkflowTemplateDefinitionNormalizer {
 
     public static WorkflowTemplateDefinition normalizeForProcessType(
             String processTypeCode, WorkflowTemplateDefinition definition) {
-        if (!"requirement-management".equals(processTypeCode)
-                || definition == null || definition.schemaVersion() != 2) {
+        if (!"requirement-management".equals(processTypeCode) || definition == null) {
             return definition;
         }
         boolean changed = false;
         List<WorkflowNodeDefinition> nodes = new ArrayList<>();
         for (WorkflowNodeDefinition node : definition.nodes()) {
-            WorkflowNodeDefinition normalized = normalizeNode(node);
+            WorkflowNodeDefinition normalized = normalizeNode(node, definition.schemaVersion());
             nodes.add(normalized);
             changed |= normalized != node;
         }
@@ -29,22 +29,37 @@ public final class WorkflowTemplateDefinitionNormalizer {
                 definition.sourceProjectNodeKey(), definition.sourceTopicNodeKey()) : definition;
     }
 
-    private static WorkflowNodeDefinition normalizeNode(WorkflowNodeDefinition node) {
+    private static WorkflowNodeDefinition normalizeNode(WorkflowNodeDefinition node, int schemaVersion) {
         List<WorkflowFieldDefinition> fields = node.fields() == null ? List.of() : node.fields();
         boolean changed = false;
         List<WorkflowFieldDefinition> normalizedFields = new ArrayList<>();
         for (WorkflowFieldDefinition field : fields) {
-            WorkflowFieldDefinition normalized = normalizeField(field);
+            WorkflowFieldDefinition normalized = schemaVersion == 2 ? normalizeField(field) : field;
             normalizedFields.add(normalized);
             changed |= normalized != field;
         }
 
-        List<String> contentOrder = normalizeContentOrder(node.contentOrder(), normalizedFields);
-        changed |= !contentOrder.equals(node.contentOrder() == null ? List.of() : node.contentOrder());
+        boolean releaseVersionAdded = String.valueOf(node.name()).contains("需求上线")
+                && normalizedFields.stream().noneMatch(field -> field != null && "release-version".equals(field.key()));
+        if (releaseVersionAdded) {
+            normalizedFields.add(new WorkflowFieldDefinition("release-version", "发布版本", WorkflowFieldType.TEXT,
+                    true, List.of(), schemaVersion == 2 ? true : null, null, schemaVersion == 2 ? false : null));
+            changed = true;
+        }
+
+        List<String> contentOrder = schemaVersion == 2
+                ? normalizeContentOrder(node.contentOrder(), normalizedFields)
+                : node.contentOrder();
+        if (schemaVersion == 2 && releaseVersionAdded && !contentOrder.contains("legacy-custom-fields")) {
+            int fieldsIndex = contentOrder.indexOf("fields");
+            if (fieldsIndex >= 0) contentOrder.add(fieldsIndex + 1, "legacy-custom-fields");
+            else contentOrder.add("legacy-custom-fields");
+        }
+        changed |= !Objects.equals(contentOrder, node.contentOrder());
         if (!changed) return node;
         return new WorkflowNodeDefinition(node.key(), node.name(), node.description(), node.deliverable(),
                 node.roles(), node.components(), normalizedFields, node.projectBasicInfo(),
-                node.projectBasicInfoFields(), contentOrder);
+                node.projectBasicInfoFields(), contentOrder, node.componentConfigs());
     }
 
     private static WorkflowFieldDefinition normalizeField(WorkflowFieldDefinition field) {

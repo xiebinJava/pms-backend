@@ -14,13 +14,13 @@ public interface RequirementMapper extends BaseMapper<RequirementDO> {
     RequirementDO selectByIdForUpdate(@Param("id") Long id);
 
     @Select("SELECT * FROM pms_requirement WHERE execution_target_type = #{targetType} "
-            + "AND execution_target_id = #{targetId} AND deleted = FALSE ORDER BY id DESC LIMIT 1")
+            + "AND execution_target_id = #{targetId} AND deleted = FALSE AND status = 'ACTIVE' ORDER BY id DESC LIMIT 1")
     RequirementDO selectByExecutionTarget(@Param("targetType") RequirementExecutionTargetType targetType,
                                           @Param("targetId") Long targetId);
 
     @Select("<script>"
             + "SELECT * FROM pms_requirement "
-            + "WHERE deleted = FALSE AND execution_target_type = #{targetType} "
+            + "WHERE deleted = FALSE AND status = 'ACTIVE' AND execution_target_type = #{targetType} "
             + "AND execution_target_id IN "
             + "<foreach collection='targetIds' item='targetId' open='(' separator=',' close=')'>"
             + "#{targetId}"

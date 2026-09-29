@@ -8,17 +8,21 @@ import com.brad.pms.dto.request.NodeRollbackCmd;
 import com.brad.pms.dto.request.RequirementExecutionTargetCmd;
 import com.brad.pms.dto.request.RequirementExecutionTargetOptionQry;
 import com.brad.pms.dto.request.RequirementPageQry;
+import com.brad.pms.dto.request.RequirementReceivingAnalysisActionCmd;
+import com.brad.pms.dto.request.RequirementReceivingAnalysisSaveCmd;
 import com.brad.pms.dto.request.RequirementSaveCmd;
 import com.brad.pms.dto.response.RequirementExecutionTargetDTO;
 import com.brad.pms.dto.response.RequirementExecutionTargetHistoryDTO;
 import com.brad.pms.dto.response.RequirementExecutionTargetOptionDTO;
 import com.brad.pms.dto.response.RequirementListDTO;
+import com.brad.pms.dto.response.RequirementReceivingAnalysisDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.service.RequirementExecutionTargetService;
 import com.brad.pms.service.RequirementManagementService;
+import com.brad.pms.service.RequirementReceivingAnalysisService;
 import com.brad.pms.workflow.DevelopmentItemType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +44,7 @@ public class DevelopmentRequirementController {
     private final RequirementManagementService requirementService;
     private final RequirementExecutionTargetService targetService;
     private final DevelopmentItemWorkflowService workflowService;
+    private final RequirementReceivingAnalysisService receivingAnalysisService;
 
     @GetMapping("/page")
     @RequirePermission(PermissionCode.REQUIREMENT_READ)
@@ -169,5 +174,35 @@ public class DevelopmentRequirementController {
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> deleteTask(
             @PathVariable Long id, @PathVariable Long taskId) {
         return ResponseResult.success(workflowService.deleteTask(DevelopmentItemType.REQUIREMENT, id, taskId));
+    }
+
+    @GetMapping("/{id}/nodes/{nodeId}/requirement-receiving-analysis")
+    @RequirePermission(PermissionCode.REQUIREMENT_READ)
+    public ResponseResult<RequirementReceivingAnalysisDTO> receivingAnalysis(
+            @PathVariable Long id, @PathVariable Long nodeId) {
+        return ResponseResult.success(receivingAnalysisService.get(id, nodeId));
+    }
+
+    @PutMapping("/{id}/nodes/{nodeId}/requirement-receiving-analysis")
+    @RequirePermission(PermissionCode.REQUIREMENT_WRITE)
+    public ResponseResult<RequirementReceivingAnalysisDTO> saveReceivingAnalysis(
+            @PathVariable Long id, @PathVariable Long nodeId,
+            @Valid @RequestBody RequirementReceivingAnalysisSaveCmd cmd) {
+        return ResponseResult.success(receivingAnalysisService.save(id, nodeId, cmd));
+    }
+
+    @PostMapping("/{id}/nodes/{nodeId}/requirement-receiving-analysis/reject")
+    @RequirePermission(PermissionCode.REQUIREMENT_MANAGE)
+    public ResponseResult<RequirementReceivingAnalysisDTO> rejectReceivingAnalysis(
+            @PathVariable Long id, @PathVariable Long nodeId,
+            @Valid @RequestBody RequirementReceivingAnalysisActionCmd cmd) {
+        return ResponseResult.success(receivingAnalysisService.reject(id, nodeId, cmd));
+    }
+
+    @PostMapping("/{id}/requirement-receiving-analysis/reopen")
+    @RequirePermission(PermissionCode.REQUIREMENT_MANAGE)
+    public ResponseResult<RequirementReceivingAnalysisDTO> reopenReceivingAnalysis(
+            @PathVariable Long id, @Valid @RequestBody RequirementReceivingAnalysisActionCmd cmd) {
+        return ResponseResult.success(receivingAnalysisService.reopen(id, cmd));
     }
 }

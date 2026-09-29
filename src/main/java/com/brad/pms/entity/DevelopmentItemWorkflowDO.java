@@ -19,6 +19,7 @@ public class DevelopmentItemWorkflowDO {
     private Long sourceNodeId;
     private String projectMountNodeKey;
     private Long templateVersionId;
+    private String terminalStatus;
     private Long storyMountTemplateVersionId;
     private String storyMountNodeKey;
     @Version

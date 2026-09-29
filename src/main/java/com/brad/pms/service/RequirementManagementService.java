@@ -187,6 +187,7 @@ public class RequirementManagementService {
         dto.setWorkflowConfigured(summary.configured());
         dto.setWorkflowStatus(summary.status());
         dto.setWorkflowProgress(summary.progress());
+        dto.setTerminalStatus("REJECTED".equals(requirement.getStatus()) ? "REJECTED" : null);
         dto.setExecutionTarget(targetReadService.findCurrentTarget(requirement));
         return dto;
     }
@@ -217,7 +218,8 @@ public class RequirementManagementService {
                 List<DevelopmentItemWorkflowNodeDO> nodes = nodesByWorkflow.getOrDefault(workflow.getId(), List.of());
                 int total = nodes.size();
                 int completed = (int) nodes.stream().filter(node -> Objects.equals(node.getStatus(), 2)).count();
-                String status = total > 0 && completed == total ? "COMPLETED"
+                String status = "REJECTED".equals(workflow.getTerminalStatus()) ? "REJECTED"
+                        : total > 0 && completed == total ? "COMPLETED"
                         : nodes.stream().anyMatch(node -> Objects.equals(node.getStatus(), 1)) ? "IN_PROGRESS" : "NOT_STARTED";
                 int progress = total == 0 ? 0 : (int) Math.round(completed * 100.0 / total);
                 summaries.put(workflow.getItemId(), new FlowSummary(true, status, progress));

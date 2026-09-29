@@ -112,6 +112,17 @@ class RequirementExecutionTargetReadServiceTest {
         assertThat(target.getNavigationId()).isNull();
     }
 
+    @Test
+    void doesNotExposeRejectedRequirementsAsActiveSources() {
+        RequirementDO rejected = requirement(33L, "已驳回", 7L);
+        rejected.setStatus("REJECTED");
+        when(requirementMapper.selectByExecutionTargets(RequirementExecutionTargetType.TOPIC, java.util.List.of(7L)))
+                .thenReturn(java.util.List.of(rejected));
+
+        assertThat(service.findDirectSourcesForTargets(RequirementExecutionTargetType.TOPIC,
+                java.util.List.of(7L))).isEmpty();
+    }
+
     private RequirementDO requirement(Long id, String title, Long targetId) {
         RequirementDO requirement = new RequirementDO();
         requirement.setId(id);

@@ -331,16 +331,22 @@ public class WorkflowTemplateService {
         WorkflowTemplateDO template = requireTemplateForUpdate(templateId);
         WorkflowTemplateVersionDO draft = findLatestVersion(templateId, "DRAFT");
         if (draft == null) throw BusinessException.error("没有可发布的流程草稿");
+        ProjectTypeDO processType = projectTypeMapper.selectById(template.getProjectTypeId());
         WorkflowTemplateDefinition definition;
         try {
-            definition = WorkflowTemplateDefinitionValidator.validate(parse(draft.getDefinitionJson()));
+            definition = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                    processType == null ? null : processType.getCode(), parse(draft.getDefinitionJson()));
         } catch (IllegalArgumentException e) {
             throw BusinessException.error(e.getMessage());
         }
-        ProjectTypeDO processType = projectTypeMapper.selectById(template.getProjectTypeId());
-        definition = validateDefinitionForProcessType(
-                processType == null ? null : processType.getCode(), definition);
+        try {
+            definition = WorkflowTemplateDefinitionValidator.validateForPublish(
+                    processType == null ? null : processType.getCode(), definition);
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.error(e.getMessage());
+        }
         validateSourceNodeKeys(processType, definition);
+        draft.setDefinitionJson(serialize(definition));
         draft.setStatus("PUBLISHED");
         draft.setPublishedAt(LocalDateTime.now());
         if (versionMapper.updateById(draft) != 1) throw BusinessException.conflict("流程版本已被其他人修改");

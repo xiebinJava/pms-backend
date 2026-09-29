@@ -1,5 +1,7 @@
 package com.brad.pms.workflow;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +16,12 @@ public final class WorkflowTemplateDefinitionValidator {
             WorkflowComponentKey.DEVELOPMENT_CONTROL, WorkflowComponentKey.BUSINESS_ACCEPTANCE,
             WorkflowComponentKey.RELEASE_HANDOVER, WorkflowComponentKey.VALUE_REVIEW,
             WorkflowComponentKey.KNOWLEDGE_STANDARD, WorkflowComponentKey.STORY_LIST,
-            WorkflowComponentKey.REQUIREMENT_EXECUTION);
+            WorkflowComponentKey.REQUIREMENT_EXECUTION, WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS,
+            WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
+    private static final Set<String> RECEIVING_CONFIG_KEYS = Set.of(
+            "showFilter", "showAnalysis", "showDecision", "requireCategory", "showFeasibilityScore",
+            "requireFeasibilityScore", "showRoiScore", "requireRoiScore", "showStrategicFitScore",
+            "requireStrategicFitScore", "requireAnalysisConclusion", "allowReject");
     private static final Set<String> PROJECT_BASIC_INFO_FIELDS = Set.of("description", "priority", "projectLevel",
             "schedule", "businessLine", "projectManager", "projectMembers", "followers");
     private static final Set<WorkflowFieldType> V1_FIELD_TYPES = Set.of(
@@ -34,7 +41,21 @@ public final class WorkflowTemplateDefinitionValidator {
             Map.entry("requirement.description", WorkflowFieldType.TEXTAREA),
             Map.entry("requirement.priority", WorkflowFieldType.SINGLE_SELECT),
             Map.entry("requirement.businessLine", WorkflowFieldType.SINGLE_SELECT),
-            Map.entry("requirement.owner", WorkflowFieldType.PERSON));
+            Map.entry("requirement.owner", WorkflowFieldType.PERSON),
+            Map.entry("topic.title", WorkflowFieldType.TEXT),
+            Map.entry("topic.owner", WorkflowFieldType.PERSON),
+            Map.entry("topic.project", WorkflowFieldType.TEXT),
+            Map.entry("topic.status", WorkflowFieldType.TEXT),
+            Map.entry("topic.progress", WorkflowFieldType.NUMBER),
+            Map.entry("topic.latestBuildVersion", WorkflowFieldType.TEXT),
+            Map.entry("topic.testStatus", WorkflowFieldType.TEXT),
+            Map.entry("story.title", WorkflowFieldType.TEXT),
+            Map.entry("story.owner", WorkflowFieldType.PERSON),
+            Map.entry("story.status", WorkflowFieldType.TEXT),
+            Map.entry("story.progress", WorkflowFieldType.NUMBER),
+            Map.entry("story.storyPoints", WorkflowFieldType.NUMBER),
+            Map.entry("story.schedule", WorkflowFieldType.DATE_RANGE),
+            Map.entry("story.blocker", WorkflowFieldType.TEXTAREA));
 
     private WorkflowTemplateDefinitionValidator() { }
 
@@ -63,6 +84,13 @@ public final class WorkflowTemplateDefinitionValidator {
                 validateV2Node(node);
             }
         }
+        long receivingComponentCount = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .filter(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS::equals)
+                .count();
+        if (receivingComponentCount > 1) {
+            throw new IllegalArgumentException("需求接收与分析组件只能配置一次");
+        }
         return definition;
     }
 
@@ -74,6 +102,18 @@ public final class WorkflowTemplateDefinitionValidator {
                 .anyMatch(WorkflowComponentKey.REQUIREMENT_EXECUTION::equals);
         if (hasRequirementExecution && !"requirement-management".equals(processTypeCode)) {
             throw new IllegalArgumentException("需求执行对象组件只能配置在需求流程");
+        }
+        boolean hasRequirementReceivingAnalysis = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .anyMatch(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS::equals);
+        if (hasRequirementReceivingAnalysis && !"requirement-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("需求接收与分析组件只能配置在需求流程");
+        }
+        boolean hasRequirementNodeWorkbench = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .anyMatch(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH::equals);
+        if (hasRequirementNodeWorkbench && !"requirement-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("需求节点工作台只能配置在需求流程");
         }
         boolean hasStoryList = definition.nodes().stream()
                 .flatMap(node -> node.runtimeComponents().stream())
@@ -91,7 +131,25 @@ public final class WorkflowTemplateDefinitionValidator {
                 && (!blank(definition.sourceProjectNodeKey()) || !blank(definition.sourceTopicNodeKey()))) {
             throw new IllegalArgumentException("需求流程不能配置事项挂载点");
         }
+        if ("requirement-management".equals(processTypeCode)) {
+            validateRequirementWorkbenchPlacement(definition);
+        }
         return definition;
+    }
+
+    public static WorkflowTemplateDefinition validateForPublish(
+            String processTypeCode, WorkflowTemplateDefinition definition) {
+        WorkflowTemplateDefinition validated = validateForProcessType(processTypeCode, definition);
+        if ("requirement-management".equals(processTypeCode)) {
+            long count = validated.nodes().stream()
+                    .flatMap(node -> node.runtimeComponents().stream())
+                    .filter(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS::equals)
+                    .count();
+            if (count != 1) {
+                throw new IllegalArgumentException("需求模板必须配置一个需求接收与分析组件");
+            }
+        }
+        return validated;
     }
 
     public static Set<String> supportedComponents() {
@@ -110,6 +168,7 @@ public final class WorkflowTemplateDefinitionValidator {
             throw new IllegalArgumentException("项目信息组件配置不一致");
         }
         validateProjectFields(node);
+        validateComponentConfigs(node);
         validateFields(node.fields(), false);
     }
 
@@ -122,6 +181,7 @@ public final class WorkflowTemplateDefinitionValidator {
         }
         validateFields(node.fields(), true);
         validateContentOrder(node.contentOrder(), node.fields());
+        validateComponentConfigs(node);
     }
 
     private static void validateFields(List<WorkflowFieldDefinition> fields, boolean v2) {
@@ -219,6 +279,97 @@ public final class WorkflowTemplateDefinitionValidator {
             if (!keys.add(field.key())) throw new IllegalArgumentException("项目信息字段不能重复");
             if (blank(field.label())) throw new IllegalArgumentException("项目信息字段名称不能为空");
             if (field.required() && !field.visible()) throw new IllegalArgumentException("必填项目信息字段必须显示");
+        }
+    }
+
+    private static void validateComponentConfigs(WorkflowNodeDefinition node) {
+        if (node.componentConfigs() == null) return;
+        Set<String> runtimeComponents = new HashSet<>(node.runtimeComponents());
+        for (Map.Entry<String, JsonNode> entry : node.componentConfigs().entrySet()) {
+            if (!runtimeComponents.contains(entry.getKey())
+                    || !SUPPORTED_COMPONENTS.contains(entry.getKey())) {
+                throw new IllegalArgumentException("工作台组件配置无效: " + entry.getKey());
+            }
+            JsonNode config = entry.getValue();
+            if (config == null || !config.isObject()) {
+                throw new IllegalArgumentException("工作台组件配置必须是对象: " + entry.getKey());
+            }
+            if (WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS.equals(entry.getKey())) {
+                config.fieldNames().forEachRemaining(key -> {
+                    if (!RECEIVING_CONFIG_KEYS.contains(key)) {
+                        throw new IllegalArgumentException("需求接收与分析组件配置项无效: " + key);
+                    }
+                    if (!config.get(key).isBoolean()) {
+                        throw new IllegalArgumentException("需求接收与分析组件配置项必须是布尔值: " + key);
+                    }
+                });
+                if (config.has("showDecision") && !config.path("showDecision").asBoolean()) {
+                    throw new IllegalArgumentException("需求接收与分析组件必须显示接收结论区");
+                }
+                rejectHiddenRequired(config, "showFeasibilityScore", "requireFeasibilityScore");
+                rejectHiddenRequired(config, "showRoiScore", "requireRoiScore");
+                rejectHiddenRequired(config, "showStrategicFitScore", "requireStrategicFitScore");
+            }
+            if (WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH.equals(entry.getKey())) {
+                validateRequirementNodeWorkbenchConfig(node, config);
+            }
+        }
+    }
+
+    private static void validateRequirementWorkbenchPlacement(WorkflowTemplateDefinition definition) {
+        for (int index = 0; index < definition.nodes().size(); index++) {
+            WorkflowNodeDefinition node = definition.nodes().get(index);
+            Set<String> components = new HashSet<>(node.runtimeComponents());
+            boolean hasRequirementWorkbench = components.contains(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH)
+                    || components.contains(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS)
+                    || components.contains(WorkflowComponentKey.REQUIREMENT_EXECUTION);
+            if (index == 0 && hasRequirementWorkbench) {
+                throw new IllegalArgumentException("需求录入节点不能配置需求工作台");
+            }
+            if (components.contains(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS)
+                    && !String.valueOf(node.name()).contains("需求接收")) {
+                throw new IllegalArgumentException("需求接收与分析组件只能配置在需求接收节点");
+            }
+            if (components.contains(WorkflowComponentKey.REQUIREMENT_EXECUTION)
+                    && !String.valueOf(node.name()).contains("需求开发")) {
+                throw new IllegalArgumentException("需求执行对象组件只能配置在需求开发节点");
+            }
+            if (components.contains(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH)
+                    && (String.valueOf(node.name()).contains("需求接收")
+                    || String.valueOf(node.name()).contains("需求开发"))) {
+                throw new IllegalArgumentException("需求接收和需求开发节点必须使用对应的专用工作台");
+            }
+        }
+    }
+
+    private static void validateRequirementNodeWorkbenchConfig(WorkflowNodeDefinition node, JsonNode config) {
+        if (!config.has("nodeKey") || !config.path("nodeKey").isTextual()
+                || !node.key().equals(config.path("nodeKey").asText())) {
+            throw new IllegalArgumentException("需求节点工作台配置必须绑定当前节点");
+        }
+        if (config.has("nodeName") && !config.path("nodeName").isTextual()) {
+            throw new IllegalArgumentException("需求节点工作台节点名称配置无效");
+        }
+        if (config.has("purpose") && !config.path("purpose").isTextual()) {
+            throw new IllegalArgumentException("需求节点工作台说明配置无效");
+        }
+        if (config.has("activities")) {
+            if (!config.path("activities").isArray()
+                    || config.path("activities").size() == 0) {
+                throw new IllegalArgumentException("需求节点工作台活动配置无效");
+            }
+            config.path("activities").forEach(activity -> {
+                if (!activity.isTextual() || activity.asText().isBlank()) {
+                    throw new IllegalArgumentException("需求节点工作台活动配置无效");
+                }
+            });
+        }
+    }
+
+    private static void rejectHiddenRequired(JsonNode config, String visibleKey, String requiredKey) {
+        if (config.path(requiredKey).asBoolean(false) && config.has(visibleKey)
+                && !config.path(visibleKey).asBoolean()) {
+            throw new IllegalArgumentException("隐藏的评分项不能配置为必填: " + requiredKey);
         }
     }
 

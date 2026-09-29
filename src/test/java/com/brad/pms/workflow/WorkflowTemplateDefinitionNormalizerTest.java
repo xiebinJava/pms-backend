@@ -51,4 +51,36 @@ class WorkflowTemplateDefinitionNormalizerTest {
 
         assertThat(result.nodes().get(0).fields().get(0).type()).isEqualTo(WorkflowFieldType.SINGLE_SELECT);
     }
+
+    @Test
+    void restoresOnlyTheRequiredReleaseVersionFieldOnTheRequirementReleaseNode() {
+        WorkflowNodeDefinition node = new WorkflowNodeDefinition("release", "需求上线", "", "", "",
+                List.of(), List.of(), false, List.of(), List.of());
+
+        WorkflowTemplateDefinition result = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                "requirement-management", new WorkflowTemplateDefinition(2, List.of(node)));
+
+        assertThat(result.nodes().get(0).fields()).extracting(WorkflowFieldDefinition::key)
+                .containsExactly("release-version");
+        assertThat(result.nodes().get(0).fields().get(0).label()).isEqualTo("发布版本");
+        assertThat(result.nodes().get(0).fields().get(0).type()).isEqualTo(WorkflowFieldType.TEXT);
+        assertThat(result.nodes().get(0).fields().get(0).required()).isTrue();
+        assertThat(result.nodes().get(0).contentOrder()).containsExactly("legacy-custom-fields");
+    }
+
+    @Test
+    void restoresReleaseVersionForLegacyRequirementTemplatesWithoutAddingV2Metadata() {
+        WorkflowNodeDefinition node = new WorkflowNodeDefinition("release", "需求上线", "", "", "",
+                List.of(), List.of(), false, List.of());
+
+        WorkflowTemplateDefinition result = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                "requirement-management", new WorkflowTemplateDefinition(1, List.of(node)));
+
+        WorkflowFieldDefinition releaseVersion = result.nodes().get(0).fields().get(0);
+        assertThat(releaseVersion.key()).isEqualTo("release-version");
+        assertThat(releaseVersion.visible()).isNull();
+        assertThat(releaseVersion.binding()).isNull();
+        assertThat(releaseVersion.fullWidth()).isNull();
+        assertThat(result.nodes().get(0).contentOrder()).isNull();
+    }
 }

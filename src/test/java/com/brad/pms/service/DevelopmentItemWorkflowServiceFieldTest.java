@@ -2,6 +2,9 @@ package com.brad.pms.service;
 
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
+import com.brad.pms.entity.ProjectDO;
+import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
 import com.brad.pms.entity.RequirementDO;
 import com.brad.pms.entity.UserDO;
 import com.brad.pms.workflow.DevelopmentItemType;
@@ -28,17 +31,22 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 class DevelopmentItemWorkflowServiceFieldTest {
     private final WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
     private final RequirementMapper requirementMapper = mock(RequirementMapper.class);
+    private final ProjectNodeDevelopmentTopicMapper topicMapper = mock(ProjectNodeDevelopmentTopicMapper.class);
+    private final ProjectNodeDevelopmentStoryMapper storyMapper = mock(ProjectNodeDevelopmentStoryMapper.class);
+    private final ProjectNodeMapper projectNodeMapper = mock(ProjectNodeMapper.class);
+    private final ProjectPermissionService permissionService = mock(ProjectPermissionService.class);
     private final DevelopmentItemWorkflowService service = new DevelopmentItemWorkflowService(
             mock(DevelopmentItemWorkflowMapper.class), mock(DevelopmentItemWorkflowNodeMapper.class),
-            mock(DevelopmentItemTaskMapper.class), mock(ProjectNodeDevelopmentTopicMapper.class),
-            mock(ProjectNodeDevelopmentStoryMapper.class), requirementMapper, mock(ProjectNodeMapper.class),
+            mock(DevelopmentItemTaskMapper.class), topicMapper,
+            storyMapper, requirementMapper, projectNodeMapper,
             mock(ProjectNodeIterationPlanMapper.class), mock(WorkflowTemplateVersionMapper.class),
-            mock(ProjectPermissionService.class), mock(UserService.class), workflowTemplateService,
+            permissionService, mock(UserService.class), workflowTemplateService,
             mock(WorkflowComponentBindingService.class), mock(ProjectMemberAssignmentService.class), new ObjectMapper());
 
     @Test
@@ -97,6 +105,32 @@ class DevelopmentItemWorkflowServiceFieldTest {
     }
 
     @Test
+    void topicProjectBindingReadsTheAssociatedProjectName() {
+        ProjectDO project = new ProjectDO();
+        project.setId(78L);
+        project.setName("项目 A");
+        ProjectNodeDevelopmentTopicDO topic = new ProjectNodeDevelopmentTopicDO();
+        topic.setId(7L);
+        topic.setTitle("专题一");
+        topic.setProjectId(78L);
+        topic.setNodeId(88L);
+        topic.setOwnerId(9L);
+        topic.setDeleted(false);
+        ProjectNodeDO sourceNode = new ProjectNodeDO();
+        sourceNode.setId(88L);
+        sourceNode.setProjectId(78L);
+        when(topicMapper.selectById(7L)).thenReturn(topic);
+        when(storyMapper.selectList(any())).thenReturn(List.of());
+        when(projectNodeMapper.selectById(88L)).thenReturn(sourceNode);
+        when(permissionService.requireProjectReadable(78L)).thenReturn(project);
+
+        Object context = ReflectionTestUtils.invokeMethod(service, "loadContext", DevelopmentItemType.TOPIC, 7L);
+        Object value = ReflectionTestUtils.invokeMethod(service, "boundFieldValue", context, "topic.project");
+
+        assertThat(value).isEqualTo("项目 A");
+    }
+
+    @Test
     void savesEditableRequirementBindingsFromNodeFields() {
         RequirementDO requirement = new RequirementDO();
         requirement.setId(7L);
@@ -135,6 +169,44 @@ class DevelopmentItemWorkflowServiceFieldTest {
         assertThat(requirement.getTitle()).isEqualTo("新标题");
         assertThat(requirement.getDescription()).isEqualTo("新描述");
         assertThat(requirement.getPriority()).isEqualTo(3);
+    }
+
+    @Test
+    void keepsRuntimeComponentStateWhenSavingTemplateFields() {
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, JsonNode> values = Map.of(
+                "researchSummary", mapper.valueToTree("新的调研结论"));
+
+        Map<String, JsonNode> merged = ReflectionTestUtils.invokeMethod(
+                service, "preserveComponentValues", values,
+                "{\"__components\":{\"requirement-receiving-analysis\":{\"decision\":\"PASS\"}}}");
+
+        assertThat(merged).containsKey("researchSummary");
+        assertThat(merged.get("__components").path("requirement-receiving-analysis").path("decision").asText())
+                .isEqualTo("PASS");
+    }
+
+    @Test
+    void acceptsClarificationWorkbenchStateWhenNodeUsesTheWorkbenchComponent() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition(
+                "clarify", "需求澄清", "", "", "", List.of(), List.of(), false, List.of(),
+                List.of("component:requirement-node-workbench"), Map.of());
+        Map<String, JsonNode> values = Map.of();
+        Map<String, JsonNode> incoming = Map.of("__components", mapper.valueToTree(Map.of(
+                "requirement-node-workbench", Map.of(
+                        "background", "补充背景",
+                        "acceptanceCriteria", "可验证"))));
+
+        Map<String, JsonNode> merged = ReflectionTestUtils.invokeMethod(
+                service, "preserveComponentValues", values,
+                "{\"__components\":{\"requirement-receiving-analysis\":{\"decision\":\"PASS\"}}}",
+                incoming, definition);
+
+        assertThat(merged.get("__components").path("requirement-receiving-analysis").path("decision").asText())
+                .isEqualTo("PASS");
+        assertThat(merged.get("__components").path("requirement-node-workbench").path("background").asText())
+                .isEqualTo("补充背景");
     }
 
 }
