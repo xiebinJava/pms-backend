@@ -49,6 +49,11 @@ pms:
   upload-dir: ${PMS_UPLOAD_DIR:/var/lib/pms/uploads}
   upload:
     quota-bytes: ${PMS_UPLOAD_QUOTA_BYTES:524288000}
+  workflow:
+    defaults:
+      # Source-tree writes are deliberately opt-in and local-only.
+      write-enabled: ${PMS_WORKFLOW_DEFAULT_WRITE_ENABLED:false}
+      source-dir: ${PMS_WORKFLOW_DEFAULTS_DIR:src/main/resources/workflow-defaults}
   storage:
     type: ${PMS_STORAGE_TYPE:local}
     s3:

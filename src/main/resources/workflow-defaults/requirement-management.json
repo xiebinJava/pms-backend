@@ -1,0 +1,197 @@
+{
+  "processTypeCode" : "requirement-management",
+  "templateCode" : "wf-2122da1b0dd542b98887b3add9921441",
+  "name" : "需求管理流程",
+  "description" : null,
+  "versionNo" : 2,
+  "definition" : {
+    "schemaVersion" : 2,
+    "nodes" : [ {
+      "key" : "stage-1",
+      "name" : "需求录入",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ {
+        "key" : "requirement-description",
+        "label" : "需求描述",
+        "type" : "TEXTAREA",
+        "required" : false,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.description",
+        "fullWidth" : false
+      }, {
+        "key" : "requirement-priority",
+        "label" : "需求优先级",
+        "type" : "SINGLE_SELECT",
+        "required" : false,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.priority",
+        "fullWidth" : false
+      }, {
+        "key" : "requirement-business-line",
+        "label" : "业务线",
+        "type" : "SINGLE_SELECT",
+        "required" : false,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.businessLine",
+        "fullWidth" : false
+      }, {
+        "key" : "requirement-owner",
+        "label" : "需求负责人",
+        "type" : "PERSON",
+        "required" : false,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.owner",
+        "fullWidth" : false
+      } ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "fields" ],
+      "componentConfigs" : null
+    }, {
+      "key" : "custom-node",
+      "name" : "需求接收",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-receiving-analysis" ],
+      "componentConfigs" : {
+        "requirement-receiving-analysis" : {
+          "showFilter" : false,
+          "showAnalysis" : true,
+          "showDecision" : true,
+          "requireCategory" : true,
+          "showFeasibilityScore" : false,
+          "requireFeasibilityScore" : false,
+          "showRoiScore" : false,
+          "requireRoiScore" : false,
+          "showStrategicFitScore" : true,
+          "requireStrategicFitScore" : true,
+          "requireAnalysisConclusion" : false,
+          "allowReject" : true
+        }
+      }
+    }, {
+      "key" : "custom-node-2",
+      "name" : "需求澄清",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-2",
+          "nodeName" : "需求澄清",
+          "purpose" : "补充背景、目标、边界和验收标准，形成可执行的需求说明。",
+          "activities" : [ "补充需求背景与目标", "明确范围边界和约束", "确认验收标准", "记录澄清结论" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-3",
+      "name" : "需求整合",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-3",
+          "nodeName" : "需求整合",
+          "purpose" : "合并重复需求，梳理关联关系，形成统一需求基线。",
+          "activities" : [ "选择整合需求", "处理冲突和依赖关系", "确认需求规格", "确认整合结果" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-4",
+      "name" : "需求排期",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-4",
+          "nodeName" : "需求排期",
+          "purpose" : "确认目标对象和计划时间，形成可执行的交付安排。",
+          "activities" : [ "确认目标对象", "安排计划时间", "确认依赖与风险", "形成需求排期" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-5",
+      "name" : "需求开发",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-execution" ],
+      "componentConfigs" : null
+    }, {
+      "key" : "custom-node-6",
+      "name" : "需求验收",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-6",
+          "nodeName" : "需求验收",
+          "purpose" : "依据验收标准确认交付结果，处理遗留问题并给出结论。",
+          "activities" : [ "检查验收标准", "查看测试结果", "确认业务结果", "记录遗留问题" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-7",
+      "name" : "需求上线",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ {
+        "key" : "release-version",
+        "label" : "发布版本",
+        "type" : "TEXT",
+        "required" : true,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : null,
+        "fullWidth" : false
+      } ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "legacy-custom-fields" ],
+      "componentConfigs" : null
+    } ],
+    "sourceProjectNodeKey" : null,
+    "sourceTopicNodeKey" : null
+  }
+}

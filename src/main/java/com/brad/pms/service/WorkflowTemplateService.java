@@ -5,6 +5,8 @@ import com.brad.pms.audit.AuditAction;
 import com.brad.pms.audit.AuditEvent;
 import com.brad.pms.audit.AuditResourceType;
 import com.brad.pms.common.exception.BusinessException;
+import com.brad.pms.config.WorkflowDefaultTemplateFile;
+import com.brad.pms.config.WorkflowSystemDefaultWriter;
 import com.brad.pms.dto.request.ProjectTypeSaveCmd;
 import com.brad.pms.dto.request.WorkflowTemplateSaveCmd;
 import com.brad.pms.dto.response.ProjectTypeDTO;
@@ -14,6 +16,7 @@ import com.brad.pms.dto.response.WorkflowTemplateOptionsDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
 import com.brad.pms.dto.response.WorkflowTemplateVersionSummaryDTO;
 import com.brad.pms.dto.response.DevelopmentWorkflowTemplateOptionsDTO;
+import com.brad.pms.dto.response.WorkflowSystemDefaultDTO;
 import com.brad.pms.entity.ProjectTypeDO;
 import com.brad.pms.entity.WorkflowTemplateDO;
 import com.brad.pms.entity.WorkflowTemplateVersionDO;
@@ -44,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -59,6 +63,7 @@ public class WorkflowTemplateService {
     private final WorkflowTemplateVersionMapper versionMapper;
     private final OperationLogService operationLogService;
     private final ObjectMapper objectMapper;
+    private final WorkflowSystemDefaultWriter workflowSystemDefaultWriter;
 
     public List<ProjectTypeDTO> listProjectTypes() {
         return projectTypeMapper.selectList(new LambdaQueryWrapper<ProjectTypeDO>()
@@ -379,6 +384,43 @@ public class WorkflowTemplateService {
                 Map.of("templateVersionId", previous == null ? "NONE" : previous),
                 Map.of("templateVersionId", versionId)));
         return toProjectTypeDTO(type);
+    }
+
+    @Transactional
+    public WorkflowSystemDefaultDTO solidifyDefaultTemplate(Long projectTypeId) {
+        ProjectTypeDO type = requireActiveType(projectTypeId);
+        Long defaultVersionId = type.getDefaultTemplateVersionId();
+        if (defaultVersionId == null) {
+            throw BusinessException.error("当前项目类型还没有默认的已发布流程版本");
+        }
+        WorkflowTemplateVersionDO version = versionMapper.selectById(defaultVersionId);
+        if (version == null || !"PUBLISHED".equals(version.getStatus())) {
+            throw BusinessException.error("当前默认流程版本不存在或未发布");
+        }
+        WorkflowTemplateDO template = requireTemplate(version.getTemplateId());
+        if (!Objects.equals(type.getId(), template.getProjectTypeId())) {
+            throw BusinessException.error("默认流程版本与项目类型不匹配");
+        }
+
+        WorkflowTemplateDefinition definition;
+        try {
+            definition = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                    type.getCode(), parse(version.getDefinitionJson()));
+            definition = WorkflowTemplateDefinitionValidator.validateForPublish(type.getCode(), definition);
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.error(e.getMessage());
+        }
+        validateSourceNodeKeys(type, definition);
+
+        Path path = workflowSystemDefaultWriter.write(new WorkflowDefaultTemplateFile(
+                type.getCode(), template.getCode(), template.getName(), template.getDescription(),
+                version.getVersionNo(), definition));
+        operationLogService.record(AuditEvent.success(AuditAction.WORKFLOW_TEMPLATE_SYSTEM_DEFAULT_SOLIDIFIED.name(),
+                AuditResourceType.WORKFLOW_TEMPLATE.name(), template.getId(), null, null, null,
+                Map.of("processTypeCode", type.getCode(), "versionNo", version.getVersionNo(),
+                        "fileName", path.getFileName().toString())));
+        return new WorkflowSystemDefaultDTO(type.getCode(), template.getCode(), version.getVersionNo(),
+                path.getFileName().toString());
     }
 
     @Transactional

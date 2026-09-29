@@ -4,6 +4,7 @@ import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.lang.reflect.Method;
@@ -29,5 +30,20 @@ class AdminWorkflowConfigControllerTest {
         assertThat(endpointRoute.value()).containsExactly("/project-node-options");
         assertThat(permission).isNotNull();
         assertThat(permission.value()).isEqualTo(PermissionCode.WORKFLOW_READ);
+    }
+
+    @Test
+    void exposesLocalSystemDefaultSolidificationAsWorkflowWriteEndpoint() {
+        Optional<Method> method = Arrays.stream(AdminWorkflowConfigController.class.getDeclaredMethods())
+                .filter(candidate -> candidate.getName().equals("solidifySystemDefault"))
+                .findFirst();
+        assertThat(method).as("POST system-default workflow endpoint").isPresent();
+
+        PostMapping endpointRoute = method.orElseThrow().getAnnotation(PostMapping.class);
+        RequirePermission permission = method.orElseThrow().getAnnotation(RequirePermission.class);
+
+        assertThat(endpointRoute.value()).containsExactly("/project-types/{id}/default-template/system-default");
+        assertThat(permission).isNotNull();
+        assertThat(permission.value()).isEqualTo(PermissionCode.WORKFLOW_WRITE);
     }
 }
