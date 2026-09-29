@@ -33,7 +33,7 @@ public class DevelopmentTopicController {
 
     @GetMapping("/{topicId}/stories")
     @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<List<DevelopmentTopicStoryDTO>> stories(@PathVariable Long topicId) {
+    public ResponseResult<List<DevelopmentTopicStoryDTO>> stories(@PathVariable("topicId") Long topicId) {
         return ResponseResult.success(storyService.listByTopic(topicId));
     }
 
@@ -45,21 +45,21 @@ public class DevelopmentTopicController {
 
     @PutMapping("/{id}")
     @RequirePermission(PermissionCode.PROJECT_WRITE)
-    public ResponseResult<Void> update(@PathVariable Long id, @Valid @RequestBody DevelopmentTopicUpdateCmd cmd) {
+    public ResponseResult<Void> update(@PathVariable("id") Long id, @Valid @RequestBody DevelopmentTopicUpdateCmd cmd) {
         service.update(id, cmd);
         return ResponseResult.success();
     }
 
     @DeleteMapping("/{id}")
     @RequirePermission(PermissionCode.PROJECT_WRITE)
-    public ResponseResult<Void> delete(@PathVariable Long id) {
+    public ResponseResult<Void> delete(@PathVariable("id") Long id) {
         service.softDelete(id);
         return ResponseResult.success();
     }
 
     @PostMapping("/{id}/restore")
     @RequirePermission(PermissionCode.PROJECT_WRITE)
-    public ResponseResult<Void> restore(@PathVariable Long id) {
+    public ResponseResult<Void> restore(@PathVariable("id") Long id) {
         service.restore(id);
         return ResponseResult.success();
     }

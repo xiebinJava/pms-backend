@@ -68,6 +68,22 @@ class NodeServiceOwnerDefaultsTest {
     }
 
     @Test
+    void findsTheFirstNotStartedNodeWhenAnOpenLegacyProjectHasNoCurrentNode() {
+        ProjectDO project = new ProjectDO();
+        project.setStatus(0);
+        ProjectNodeDO kickoff = node(1L, "kickoff", 0, 11L);
+        ProjectNodeDO requirement = node(2L, "requirement", 1, 22L);
+        kickoff.setStatus(0);
+        requirement.setStatus(0);
+
+        assertThat(NodeService.findNodeToActivate(project, List.of(requirement, kickoff)))
+                .isSameAs(kickoff);
+        requirement.setStatus(1);
+        assertThat(NodeService.findNodeToActivate(project, List.of(kickoff, requirement)))
+                .isNull();
+    }
+
+    @Test
     void applyDefaultOwnersFillsEmptyNodesAndFollowsThePreviousManager() {
         ProjectDO project = new ProjectDO();
         project.setId(8L);

@@ -31,19 +31,19 @@ public class DevelopmentItemWorkflowController {
 
     @GetMapping("/topics/{id}")
     @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<DevelopmentItemWorkflowDetailDTO> topic(@PathVariable Long id) {
+    public ResponseResult<DevelopmentItemWorkflowDetailDTO> topic(@PathVariable("id") Long id) {
         return ResponseResult.success(service.detail(DevelopmentItemType.TOPIC, id));
     }
 
     @GetMapping("/stories/{id}")
     @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<DevelopmentItemWorkflowDetailDTO> story(@PathVariable Long id) {
+    public ResponseResult<DevelopmentItemWorkflowDetailDTO> story(@PathVariable("id") Long id) {
         return ResponseResult.success(service.detail(DevelopmentItemType.STORY, id));
     }
 
     @PutMapping("/items/{type}/{id}/nodes/{nodeId}")
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> updateNode(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId,
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId,
             @RequestBody DevelopmentItemNodeUpdateCmd cmd) {
         DevelopmentItemType itemType = DevelopmentItemType.from(type);
         permissionService.requireWrite(itemType);
@@ -52,7 +52,7 @@ public class DevelopmentItemWorkflowController {
 
     @PostMapping("/items/{type}/{id}/nodes/{nodeId}/complete")
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> completeNode(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId) {
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId) {
         DevelopmentItemType itemType = DevelopmentItemType.from(type);
         permissionService.requireWrite(itemType);
         return ResponseResult.success(service.completeNode(itemType, id, nodeId));
@@ -60,7 +60,7 @@ public class DevelopmentItemWorkflowController {
 
     @PostMapping("/items/{type}/{id}/nodes/{nodeId}/rollback")
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> rollbackNode(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId,
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId,
             @Validated @RequestBody NodeRollbackCmd cmd) {
         DevelopmentItemType itemType = DevelopmentItemType.from(type);
         permissionService.requireWrite(itemType);
@@ -69,7 +69,7 @@ public class DevelopmentItemWorkflowController {
 
     @PostMapping("/items/{type}/{id}/nodes/{nodeId}/tasks")
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> createTask(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId,
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId,
             @RequestBody DevelopmentItemTaskSaveCmd cmd) {
         DevelopmentItemType itemType = DevelopmentItemType.from(type);
         permissionService.requireWrite(itemType);
@@ -78,7 +78,7 @@ public class DevelopmentItemWorkflowController {
 
     @PutMapping("/items/{type}/{id}/tasks/{taskId}")
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> updateTask(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long taskId,
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("taskId") Long taskId,
             @RequestBody DevelopmentItemTaskSaveCmd cmd) {
         DevelopmentItemType itemType = DevelopmentItemType.from(type);
         permissionService.requireWrite(itemType);
@@ -87,7 +87,7 @@ public class DevelopmentItemWorkflowController {
 
     @DeleteMapping("/items/{type}/{id}/tasks/{taskId}")
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> deleteTask(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long taskId) {
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("taskId") Long taskId) {
         DevelopmentItemType itemType = DevelopmentItemType.from(type);
         permissionService.requireWrite(itemType);
         return ResponseResult.success(service.deleteTask(itemType, id, taskId));
