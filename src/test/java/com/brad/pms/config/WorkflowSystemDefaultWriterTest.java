@@ -18,6 +18,30 @@ class WorkflowSystemDefaultWriterTest {
     Path tempDir;
 
     @Test
+    void restoresPreviousFileWhenDatabaseTransactionRollsBack() throws Exception {
+        Path target = tempDir.resolve("general.json");
+        Files.writeString(target, "original");
+        WorkflowDefaultProperties properties = new WorkflowDefaultProperties();
+        properties.setWriteEnabled(true);
+        properties.setSourceDir(tempDir.toString());
+        WorkflowSystemDefaultWriter writer = new WorkflowSystemDefaultWriter(new ObjectMapper(), properties,
+                new MockEnvironment().withProperty("pms.deployment.environment", "local"));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            writer.write(new WorkflowDefaultTemplateFile("general", "current-process", "默认", "", 2,
+                    BuiltInWorkflowTemplate.compatibilityDefinition()));
+            assertThat(Files.readString(target)).contains("versionNo");
+            for (var synchronization : org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()) {
+                synchronization.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
+            }
+            assertThat(Files.readString(target)).isEqualTo("original");
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
+    }
+
+    @Test
     void writesDefaultTemplateAsReadableSourceJsonInLocalEnabledMode() throws Exception {
         WorkflowDefaultProperties properties = new WorkflowDefaultProperties();
         properties.setWriteEnabled(true);
@@ -39,7 +63,7 @@ class WorkflowSystemDefaultWriterTest {
     }
 
     @Test
-    void refusesToWriteOutsideLocalDevelopment() {
+    void refusesToWriteOutsideLocalDevelopment() throws Exception {
         WorkflowDefaultProperties properties = new WorkflowDefaultProperties();
         properties.setWriteEnabled(true);
         properties.setSourceDir(tempDir.toString());
@@ -56,7 +80,7 @@ class WorkflowSystemDefaultWriterTest {
     }
 
     @Test
-    void refusesToWriteWhenFeatureFlagIsDisabled() {
+    void refusesToWriteWhenFeatureFlagIsDisabled() throws Exception {
         WorkflowDefaultProperties properties = new WorkflowDefaultProperties();
         properties.setWriteEnabled(false);
         properties.setSourceDir(tempDir.toString());

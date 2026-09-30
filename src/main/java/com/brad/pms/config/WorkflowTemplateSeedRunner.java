@@ -88,6 +88,9 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
             template.setDeleted(false);
             templateMapper.insert(template);
         }
+        if (!java.util.Objects.equals(type.getId(), template.getProjectTypeId())) {
+            throw new IllegalStateException("系统默认流程模板所属类型不匹配: " + file.templateCode());
+        }
 
         WorkflowTemplateVersionDO published = versionMapper.selectOne(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
                 .eq(WorkflowTemplateVersionDO::getTemplateId, template.getId())
@@ -95,14 +98,23 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
                 .orderByDesc(WorkflowTemplateVersionDO::getVersionNo)
                 .last("LIMIT 1"));
         if (published == null) {
+            if (file.versionNo() == null || file.versionNo() < 1) {
+                throw new IllegalStateException("系统默认流程模板版本号无效: " + file.templateCode());
+            }
+            WorkflowTemplateVersionDO latest = versionMapper.selectOne(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
+                    .eq(WorkflowTemplateVersionDO::getTemplateId, template.getId())
+                    .orderByDesc(WorkflowTemplateVersionDO::getVersionNo).last("LIMIT 1"));
+            int nextVersion = Math.max(file.versionNo(),
+                    Math.max(template.getLatestVersionNo() == null ? 0 : template.getLatestVersionNo(),
+                            latest == null || latest.getVersionNo() == null ? 0 : latest.getVersionNo()) + 1);
             published = new WorkflowTemplateVersionDO();
             published.setTemplateId(template.getId());
-            published.setVersionNo(file.versionNo());
+            published.setVersionNo(nextVersion);
             published.setStatus("PUBLISHED");
             published.setDefinitionJson(serialize(definition));
             published.setPublishedAt(LocalDateTime.now());
             versionMapper.insert(published);
-            template.setLatestVersionNo(Math.max(template.getLatestVersionNo() == null ? 0 : template.getLatestVersionNo(), file.versionNo()));
+            template.setLatestVersionNo(nextVersion);
             templateMapper.updateById(template);
         }
 

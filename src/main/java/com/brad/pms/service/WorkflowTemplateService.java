@@ -423,6 +423,10 @@ public class WorkflowTemplateService {
                 path.getFileName().toString());
     }
 
+    public boolean isSystemDefaultWriteAvailable() {
+        return workflowSystemDefaultWriter.isAvailable();
+    }
+
     @Transactional
     public void archiveVersion(Long templateId, Long versionId) {
         WorkflowTemplateDO template = requireTemplateForUpdate(templateId);

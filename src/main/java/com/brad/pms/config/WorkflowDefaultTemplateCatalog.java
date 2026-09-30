@@ -16,8 +16,8 @@ public class WorkflowDefaultTemplateCatalog {
     public Optional<WorkflowDefaultTemplateFile> find(String processTypeCode) {
         ClassPathResource resource = new ClassPathResource("workflow-defaults/" + processTypeCode + ".json");
         if (!resource.exists()) return Optional.empty();
-        try {
-            return Optional.of(objectMapper.readValue(resource.getInputStream(), WorkflowDefaultTemplateFile.class));
+        try (var input = resource.getInputStream()) {
+            return Optional.of(objectMapper.readValue(input, WorkflowDefaultTemplateFile.class));
         } catch (IOException | RuntimeException e) {
             throw new IllegalStateException("系统默认流程模板文件无法读取: " + processTypeCode, e);
         }

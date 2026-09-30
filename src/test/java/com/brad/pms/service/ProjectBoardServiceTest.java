@@ -65,7 +65,8 @@ class ProjectBoardServiceTest {
                 WorkflowTemplateVersionDO.class, ProjectNodeRiskDO.class, ProjectNodeDevelopmentStoryDO.class,
                 ProjectNodeAcceptanceDefectDO.class)) TableInfoHelper.initTableInfo(assistant, entity);
         workflowService = new WorkflowTemplateService(mock(ProjectTypeMapper.class), mock(ProjectMapper.class),
-                mock(WorkflowTemplateMapper.class), versionMapper, operationLogService, new ObjectMapper());
+                mock(WorkflowTemplateMapper.class), versionMapper, operationLogService, new ObjectMapper(),
+                mock(com.brad.pms.config.WorkflowSystemDefaultWriter.class));
         board = new ProjectBoardService(projectService, workflowService, riskMapper, storyMapper, defectMapper,
                 new WorkflowComponentBindingService(workflowService, topicMapper),
                 Clock.fixed(Instant.parse("2026-09-12T16:30:00Z"), ZoneId.of("Asia/Shanghai")));

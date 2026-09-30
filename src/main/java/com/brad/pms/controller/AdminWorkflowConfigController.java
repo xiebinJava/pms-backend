@@ -32,6 +32,12 @@ import java.util.List;
 public class AdminWorkflowConfigController {
     private final WorkflowTemplateService workflowTemplateService;
 
+    @GetMapping("/system-default/availability")
+    @RequirePermission(PermissionCode.WORKFLOW_READ)
+    public ResponseResult<Boolean> systemDefaultAvailability() {
+        return ResponseResult.success(workflowTemplateService.isSystemDefaultWriteAvailable());
+    }
+
     @GetMapping("/project-types")
     @RequirePermission(PermissionCode.WORKFLOW_READ)
     public ResponseResult<List<ProjectTypeDTO>> listProjectTypes() {

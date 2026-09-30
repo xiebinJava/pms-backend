@@ -1,45 +1,45 @@
 {
   "processTypeCode" : "requirement-management",
-  "templateCode" : "wf-2122da1b0dd542b98887b3add9921441",
-  "name" : "需求管理流程",
+  "templateCode" : "wf-68a77dae0aeb4ed99c72de27b0a361fe",
+  "name" : "需求管理流程模版",
   "description" : null,
-  "versionNo" : 2,
+  "versionNo" : 6,
   "definition" : {
     "schemaVersion" : 2,
     "nodes" : [ {
       "key" : "stage-1",
       "name" : "需求录入",
-      "description" : "",
+      "description" : "确定外部来源：客户、行业分析、展览、友商、杂志等\n确定内部来源：销售、市场、研发、交付、服务\n完成需求背景、目标、问题、以及业务相关信息的内容输入\n完成前期的沟通，确保需求是合理且完整",
       "deliverable" : "",
       "roles" : "",
       "components" : null,
       "fields" : [ {
-        "key" : "requirement-description",
-        "label" : "需求描述",
-        "type" : "TEXTAREA",
-        "required" : false,
+        "key" : "requirement-title",
+        "label" : "需求名称",
+        "type" : "TEXT",
+        "required" : true,
         "options" : [ ],
         "visible" : true,
-        "binding" : "requirement.description",
+        "binding" : "requirement.title",
         "fullWidth" : false
       }, {
         "key" : "requirement-priority",
         "label" : "需求优先级",
         "type" : "SINGLE_SELECT",
-        "required" : false,
+        "required" : true,
         "options" : [ ],
         "visible" : true,
         "binding" : "requirement.priority",
         "fullWidth" : false
       }, {
-        "key" : "requirement-business-line",
-        "label" : "业务线",
-        "type" : "SINGLE_SELECT",
-        "required" : false,
+        "key" : "requirement-description",
+        "label" : "需求描述",
+        "type" : "TEXTAREA",
+        "required" : true,
         "options" : [ ],
         "visible" : true,
-        "binding" : "requirement.businessLine",
-        "fullWidth" : false
+        "binding" : "requirement.description",
+        "fullWidth" : true
       }, {
         "key" : "requirement-owner",
         "label" : "需求负责人",
@@ -49,6 +49,15 @@
         "visible" : true,
         "binding" : "requirement.owner",
         "fullWidth" : false
+      }, {
+        "key" : "requirement-business-line",
+        "label" : "业务线",
+        "type" : "SINGLE_SELECT",
+        "required" : true,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.businessLine",
+        "fullWidth" : false
       } ],
       "projectBasicInfo" : false,
       "projectBasicInfoFields" : null,
@@ -57,7 +66,7 @@
     }, {
       "key" : "custom-node",
       "name" : "需求接收",
-      "description" : "",
+      "description" : "需求过滤：解释、过滤、检视，去掉低价值或无效需求\n需求分析：分类（功能/非功能）、排序（优先级）、价值（可实现性、ROI、战略契合度）",
       "deliverable" : "",
       "roles" : "",
       "components" : null,
@@ -67,24 +76,24 @@
       "contentOrder" : [ "component:requirement-receiving-analysis" ],
       "componentConfigs" : {
         "requirement-receiving-analysis" : {
-          "showFilter" : false,
+          "showFilter" : true,
           "showAnalysis" : true,
           "showDecision" : true,
           "requireCategory" : true,
-          "showFeasibilityScore" : false,
-          "requireFeasibilityScore" : false,
-          "showRoiScore" : false,
-          "requireRoiScore" : false,
+          "showFeasibilityScore" : true,
+          "requireFeasibilityScore" : true,
+          "showRoiScore" : true,
+          "requireRoiScore" : true,
           "showStrategicFitScore" : true,
           "requireStrategicFitScore" : true,
-          "requireAnalysisConclusion" : false,
+          "requireAnalysisConclusion" : true,
           "allowReject" : true
         }
       }
     }, {
       "key" : "custom-node-2",
       "name" : "需求澄清",
-      "description" : "",
+      "description" : "与需求提出方共同澄清需求，确保需求价值得到双方认可。\n完成需求的规格（项目、专题、故事）定义与排序（优先级）",
       "deliverable" : "",
       "roles" : "",
       "components" : null,
@@ -103,7 +112,7 @@
     }, {
       "key" : "custom-node-3",
       "name" : "需求整合",
-      "description" : "",
+      "description" : "对需求进行整理、合并。\n明确整合后的需求的规格大小（项目、专题、故事）和最终优先级",
       "deliverable" : "",
       "roles" : "",
       "components" : null,
@@ -135,7 +144,7 @@
           "nodeKey" : "custom-node-4",
           "nodeName" : "需求排期",
           "purpose" : "确认目标对象和计划时间，形成可执行的交付安排。",
-          "activities" : [ "确认目标对象", "安排计划时间", "确认依赖与风险", "形成需求排期" ]
+          "activities" : [ "确认需求优先级", "选择目标对象", "安排计划时间", "确认依赖与风险" ]
         }
       }
     }, {
@@ -153,7 +162,7 @@
     }, {
       "key" : "custom-node-6",
       "name" : "需求验收",
-      "description" : "",
+      "description" : "需求验证（需求与实现一致性检查）\n客户验证（试点、Beta测试、客户反馈）\n内部验证（测试、QA验证）",
       "deliverable" : "",
       "roles" : "",
       "components" : null,
@@ -172,7 +181,7 @@
     }, {
       "key" : "custom-node-7",
       "name" : "需求上线",
-      "description" : "",
+      "description" : "制定上线计划，关联实际上线版本\n组织上线前的最终检查和环境准备\n上线后监控系统运行状态",
       "deliverable" : "",
       "roles" : "",
       "components" : null,
