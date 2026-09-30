@@ -17,7 +17,7 @@ public final class WorkflowTemplateDefinitionValidator {
             WorkflowComponentKey.RELEASE_HANDOVER, WorkflowComponentKey.VALUE_REVIEW,
             WorkflowComponentKey.KNOWLEDGE_STANDARD, WorkflowComponentKey.STORY_LIST,
             WorkflowComponentKey.REQUIREMENT_EXECUTION, WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS,
-            WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
+            WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, WorkflowComponentKey.TOPIC_RESEARCH, WorkflowComponentKey.TOPIC_DESIGN_REVIEW);
     private static final Set<String> RECEIVING_CONFIG_KEYS = Set.of(
             "showFilter", "showAnalysis", "showDecision", "requireCategory", "showFeasibilityScore",
             "requireFeasibilityScore", "showRoiScore", "requireRoiScore", "showStrategicFitScore",
@@ -97,6 +97,16 @@ public final class WorkflowTemplateDefinitionValidator {
     public static WorkflowTemplateDefinition validateForProcessType(
             String processTypeCode, WorkflowTemplateDefinition definition) {
         validate(definition);
+        if (!"topic-management".equals(processTypeCode) && definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream()).anyMatch(WorkflowComponentKey.TOPIC_DESIGN_REVIEW::equals)) {
+            throw new IllegalArgumentException("方案设计与评审工作台只能配置在专题流程");
+        }
+        boolean hasTopicResearch = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .anyMatch(WorkflowComponentKey.TOPIC_RESEARCH::equals);
+        if (hasTopicResearch && !"topic-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("需求调研工作台只能配置在专题流程");
+        }
         boolean hasRequirementExecution = definition.nodes().stream()
                 .flatMap(node -> node.runtimeComponents().stream())
                 .anyMatch(WorkflowComponentKey.REQUIREMENT_EXECUTION::equals);

@@ -1,0 +1,49 @@
+{
+  "processTypeCode" : "topic-management",
+  "templateCode" : "wf-911fb737b3364e3b8240db9f2882303f",
+  "name" : "专题管理流程",
+  "description" : null,
+  "versionNo" : 10,
+  "definition" : {
+    "schemaVersion" : 2,
+    "nodes" : [ {
+      "key" : "custom-node",
+      "name" : "需求调研",
+      "description" : "确认调研必要性，明确目标并填写竞品调研报告文档链接",
+      "deliverable" : "竞品调研报告文档链接，或无需调研原因",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:topic-research" ],
+      "componentConfigs" : null
+    }, {
+      "key" : "custom-node-2",
+      "name" : "方案设计与评审",
+      "description" : "填写详细方案文档、各方评审建议和最终评审结果",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:topic-design-review" ],
+      "componentConfigs" : null
+    }, {
+      "key" : "custom-node-3",
+      "name" : "开发与测试",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-list" ],
+      "componentConfigs" : null
+    } ],
+    "sourceProjectNodeKey" : "develop",
+    "sourceTopicNodeKey" : null
+  }
+}

@@ -54,6 +54,7 @@ class WorkflowTemplateServiceNodeBindingTest {
     @BeforeEach
     void initMybatisLambdaCaches() {
         Configuration configuration = new Configuration();
+        configuration.setMapUnderscoreToCamelCase(true);
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "workflow-node-binding-test");
         TableInfoHelper.initTableInfo(assistant, ProjectTypeDO.class);
         TableInfoHelper.initTableInfo(assistant, WorkflowTemplateDO.class);
@@ -61,7 +62,7 @@ class WorkflowTemplateServiceNodeBindingTest {
     }
 
     @Test
-    void listsSelectablePublishedNodesPinnedArchivedNodesAndCompatibilityNodes() throws Exception {
+    void listsOnlyLatestPublishedNodesPerProjectTemplate() throws Exception {
         ProjectTypeDO general = type(1L, "general", true);
         ProjectTypeDO partner = type(2L, "partner", true);
         ProjectTypeDO topicOnly = type(3L, "topic-management", false);
@@ -77,14 +78,17 @@ class WorkflowTemplateServiceNodeBindingTest {
                 node("archived-only", "历史模板节点", false)));
         when(projectTypeMapper.selectList(any())).thenReturn(List.of(general, partner, topicOnly));
         when(templateMapper.selectList(any())).thenReturn(List.of(template(11L, 1L), template(12L, 2L)));
-        when(versionMapper.selectList(any())).thenReturn(List.of(publishedGeneral, publishedPartner),
-                List.of(archivedPinned));
-        stubActivePinnedVersionIds(List.of(103L));
+        WorkflowTemplateVersionDO older = version(104L, 11L, "PUBLISHED", definitionJson(node("removed", "已删除节点", false)));
+        publishedGeneral.setVersionNo(2);
+        WorkflowTemplateVersionDO draft = version(105L, 11L, "DRAFT", definitionJson(node("draft-only", "草稿节点", false)));
+        draft.setVersionNo(3);
+        when(versionMapper.selectList(any())).thenReturn(List.of(older, draft, archivedPinned, publishedGeneral, publishedPartner));
 
         List<JsonNode> options = invokeOptions();
         List<String> keys = options.stream().map(option -> option.path("key").asText()).toList();
 
-        assertThat(keys).contains("without-component", "with-component", "archived-only", "develop");
+        assertThat(keys).contains("without-component", "with-component");
+        assertThat(keys).doesNotContain("removed", "draft-only", "archived-only", "develop");
         assertThat(keys).doesNotContain("topic-process-template-node");
         assertThat(keys.stream().filter("shared"::equals)).hasSize(1);
         assertThat(option(options, "duplicate-a").path("name").asText()).isEqualTo("同名节点 (duplicate-a)");
@@ -92,16 +96,28 @@ class WorkflowTemplateServiceNodeBindingTest {
     }
 
     @Test
-    void alwaysIncludesTheBuiltInCompatibilityNodeWhenNoProjectTemplateIsSelectable() throws Exception {
+    void returnsNoOptionsWhenNoProjectTemplateIsSelectable() throws Exception {
         when(projectTypeMapper.selectList(any())).thenReturn(List.of());
-        stubActivePinnedVersionIds(List.of());
 
         List<JsonNode> options = invokeOptions();
 
-        assertThat(options).anySatisfy(option -> {
-            assertThat(option.path("key").asText()).isEqualTo("develop");
-            assertThat(option.path("name").asText()).isEqualTo("开发测试与项目控制");
-        });
+        assertThat(options).isEmpty();
+    }
+
+    @Test
+    void storyMountOptionsExcludeRemovedDraftAndArchivedTopicNodes() throws Exception {
+        when(projectTypeMapper.selectList(any())).thenReturn(List.of(type(3L, "topic-management", false)));
+        when(templateMapper.selectList(any())).thenReturn(List.of(template(30L, 3L), template(31L, 3L)));
+        WorkflowTemplateVersionDO old = version(301L, 30L, "PUBLISHED", definitionJson(node("removed", "旧节点", false)));
+        WorkflowTemplateVersionDO latest = version(302L, 30L, "PUBLISHED", definitionJson(node("current", "最新名称", false)));
+        latest.setVersionNo(2);
+        WorkflowTemplateVersionDO draft = version(303L, 30L, "DRAFT", definitionJson(node("draft", "草稿", false)));
+        draft.setVersionNo(3);
+        WorkflowTemplateVersionDO other = version(311L, 31L, "PUBLISHED", definitionJson(node("other", "另一模板节点", false)));
+        WorkflowTemplateVersionDO archived = version(304L, 30L, "ARCHIVED", definitionJson(node("archived", "历史节点", false)));
+        when(versionMapper.selectList(any())).thenReturn(List.of(old, draft, archived, other, latest));
+        assertThat(service.listStorySourceTopicNodeOptions()).extracting("key").containsExactlyInAnyOrder("current", "other");
+        assertThat(service.listStorySourceTopicNodeOptions()).extracting("name").contains("最新名称");
     }
 
     @Test
@@ -142,8 +158,10 @@ class WorkflowTemplateServiceNodeBindingTest {
     void rejectsUnknownTopicBindingKeysButAcceptsAndPersistsASelectableKey() throws Exception {
         ProjectTypeDO topic = type(8L, "topic-management", false);
         when(projectTypeMapper.selectById(8L)).thenReturn(topic);
-        when(projectTypeMapper.selectList(any())).thenReturn(List.of());
-        stubActivePinnedVersionIds(List.of());
+        when(projectTypeMapper.selectList(any())).thenReturn(List.of(type(1L, "general", true)));
+        when(templateMapper.selectList(any())).thenReturn(List.of(template(11L, 1L)));
+        WorkflowTemplateVersionDO projectVersion = version(101L, 11L, "PUBLISHED", definitionJson(node("develop", "开发", true)));
+        when(versionMapper.selectList(any())).thenReturn(List.of(projectVersion));
 
         WorkflowTemplateSaveCmd invalid = saveCommand(topic.getId(), "not-a-project-node");
         assertThatThrownBy(() -> service.saveDraft(null, invalid))
@@ -157,6 +175,8 @@ class WorkflowTemplateServiceNodeBindingTest {
         });
         when(versionMapper.insert(any(WorkflowTemplateVersionDO.class))).thenReturn(1);
         when(templateMapper.updateById(any(WorkflowTemplateDO.class))).thenReturn(1);
+        when(templateMapper.selectActiveByIdForUpdate(11L)).thenReturn(template(11L, 1L));
+        when(versionMapper.selectOne(any())).thenReturn(null, projectVersion, null);
 
         service.saveDraft(null, valid);
 

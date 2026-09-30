@@ -278,6 +278,7 @@ public class DevelopmentItemWorkflowService {
             }
             validateFieldPeople(definition.fields(), values,
                     readFieldValues(node.getFieldValuesJson()));
+            validateTopicReviewPeople(definition, values, readFieldValues(node.getFieldValuesJson()));
             node.setFieldValuesJson(writeFieldValues(values));
         }
         if (nodeMapper.updateById(node) != 1) {
@@ -298,14 +299,11 @@ public class DevelopmentItemWorkflowService {
         JsonNode componentValues = readFieldValues(fieldValuesJson).get("__components");
         if (componentValues != null && !componentValues.isNull()) merged.put("__components", componentValues);
 
-        if (incomingValues == null || definition == null
-                || !definition.runtimeComponents().contains(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH)) {
+        if (incomingValues == null || definition == null) {
             return merged;
         }
         JsonNode incomingComponents = incomingValues.get("__components");
-        JsonNode incomingWorkbenchState = incomingComponents == null || !incomingComponents.isObject()
-                ? null : incomingComponents.get(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
-        if (incomingWorkbenchState == null || !incomingWorkbenchState.isObject()) return merged;
+        if (incomingComponents == null || !incomingComponents.isObject()) return merged;
 
         ObjectNode nextComponents;
         JsonNode existingComponents = merged.get("__components");
@@ -314,8 +312,13 @@ public class DevelopmentItemWorkflowService {
         } else {
             nextComponents = objectMapper.createObjectNode();
         }
-        nextComponents.set(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, incomingWorkbenchState.deepCopy());
-        merged.put("__components", nextComponents);
+        for (String key : List.of(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, WorkflowComponentKey.TOPIC_RESEARCH, WorkflowComponentKey.TOPIC_DESIGN_REVIEW)) {
+            JsonNode state = incomingComponents.get(key);
+            if (definition.runtimeComponents().contains(key) && state != null && state.isObject()) {
+                nextComponents.set(key, state.deepCopy());
+            }
+        }
+        if (!nextComponents.isEmpty()) merged.put("__components", nextComponents);
         return merged;
     }
 
@@ -337,6 +340,24 @@ public class DevelopmentItemWorkflowService {
                 throw BusinessException.error("请先填写" + String.join("、", missingFields));
             }
             validateRequirementReceivingAnalysis(context, definition, node);
+            if (itemType == DevelopmentItemType.TOPIC && definition.runtimeComponents().contains(WorkflowComponentKey.TOPIC_DESIGN_REVIEW)) {
+                JsonNode components = readFieldValues(node.getFieldValuesJson()).get("__components");
+                JsonNode state = components != null ? components.get(WorkflowComponentKey.TOPIC_DESIGN_REVIEW) : null;
+                try {
+                    com.brad.pms.workflow.TopicDesignReviewPolicy.validate(state != null && state.isObject() ? objectMapper.convertValue(state, Map.class) : Map.of());
+                } catch (IllegalArgumentException error) {
+                    throw BusinessException.error(error.getMessage());
+                }
+            }
+            if (itemType == DevelopmentItemType.TOPIC && definition.runtimeComponents().contains(WorkflowComponentKey.TOPIC_RESEARCH)) {
+                JsonNode components = readFieldValues(node.getFieldValuesJson()).get("__components");
+                JsonNode state = components != null ? components.get(WorkflowComponentKey.TOPIC_RESEARCH) : null;
+                try {
+                    com.brad.pms.workflow.TopicResearchPolicy.validate(state != null && state.isObject() ? objectMapper.convertValue(state, Map.class) : Map.of());
+                } catch (IllegalArgumentException error) {
+                    throw BusinessException.error(error.getMessage());
+                }
+            }
         }
         Long incompleteCount = taskMapper.selectCount(new LambdaQueryWrapper<DevelopmentItemTaskDO>()
                 .eq(DevelopmentItemTaskDO::getWorkflowId, workflow.getId())
@@ -563,7 +584,9 @@ public class DevelopmentItemWorkflowService {
                 .eq(DevelopmentItemTaskDO::getWorkflowId, workflow.getId())
                 .orderByAsc(DevelopmentItemTaskDO::getSort)
                 .orderByAsc(DevelopmentItemTaskDO::getId));
-        Map<Long, UserDO> users = loadUsers(nodes.stream().map(DevelopmentItemWorkflowNodeDO::getOwnerId).toList(),
+        List<Long> peopleIds = new ArrayList<>(nodes.stream().map(DevelopmentItemWorkflowNodeDO::getOwnerId).toList());
+        nodes.forEach(node -> peopleIds.addAll(topicReviewerIds(node)));
+        Map<Long, UserDO> users = loadUsers(peopleIds,
                 tasks.stream().map(DevelopmentItemTaskDO::getAssigneeId).toList());
         Map<Long, List<DevelopmentItemTaskDO>> tasksByNode = tasks.stream()
                 .collect(Collectors.groupingBy(DevelopmentItemTaskDO::getNodeId));
@@ -619,6 +642,14 @@ public class DevelopmentItemWorkflowService {
         dto.setComponentConfigs(definition == null ? Map.of()
                 : definition.componentConfigs() == null ? Map.of() : definition.componentConfigs());
         dto.setFieldValues(readFieldValues(node.getFieldValuesJson()));
+        Map<Long, String> reviewerNames = new LinkedHashMap<>();
+        if (definition != null && definition.runtimeComponents().contains(WorkflowComponentKey.TOPIC_DESIGN_REVIEW)) {
+            for (Long id : topicReviewerIds(node)) {
+                String label = displayName(users.get(id));
+                if (label != null) reviewerNames.put(id, label);
+            }
+        }
+        dto.setReviewerNames(reviewerNames);
         dto.setBoundFieldValues(boundFieldValues(context, definition));
         Map<Long, DevelopmentItemTaskDTO> taskDTOs = new HashMap<>();
         for (DevelopmentItemTaskDO task : tasks) taskDTOs.put(task.getId(), toTaskDTO(task, users));
@@ -805,6 +836,26 @@ public class DevelopmentItemWorkflowService {
         var orgUnit = orgUnitMapper.selectById(orgUnitId);
         if (orgUnit == null || !"ACTIVE".equals(orgUnit.getStatus()) || Boolean.TRUE.equals(orgUnit.getDeleted())) {
             throw BusinessException.error("业务线不存在或已停用");
+        }
+    }
+
+    private void validateTopicReviewPeople(WorkflowNodeDefinition definition, Map<String, JsonNode> values,
+                                         Map<String, JsonNode> previousValues) {
+        if (!definition.runtimeComponents().contains(WorkflowComponentKey.TOPIC_DESIGN_REVIEW)) return;
+        JsonNode components = values.get("__components");
+        JsonNode previous = previousValues.get("__components");
+        JsonNode state = components == null ? null : components.get(WorkflowComponentKey.TOPIC_DESIGN_REVIEW);
+        JsonNode oldState = previous == null ? null : previous.get(WorkflowComponentKey.TOPIC_DESIGN_REVIEW);
+        if (state == null || !state.isObject()) return;
+        for (String key : List.of("productReviewerIds", "designReviewerIds", "technicalReviewerIds")) {
+            JsonNode ids = state.get(key);
+            if (ids == null || ids.equals(oldState == null ? null : oldState.get(key))) continue;
+            if (!ids.isArray()) throw BusinessException.error("评审参与人无效，请重新选择");
+            for (JsonNode id : ids) {
+                if (!id.isIntegralNumber() || !id.canConvertToLong() || id.asLong() <= 0)
+                    throw BusinessException.error("评审参与人无效，请重新选择");
+                userService.requireActiveUser(id.asLong());
+            }
         }
     }
 
@@ -1112,6 +1163,19 @@ public class DevelopmentItemWorkflowService {
                     && projectId.equals(story.getProjectId()) && sourceNodeId.equals(story.getNodeId());
         }
         if (!belongsToScope) throw BusinessException.notFound("研发事项不存在或不属于当前项目节点");
+    }
+
+    private List<Long> topicReviewerIds(DevelopmentItemWorkflowNodeDO node) {
+        JsonNode components = readFieldValues(node.getFieldValuesJson()).get("__components");
+        JsonNode state = components == null ? null : components.get(WorkflowComponentKey.TOPIC_DESIGN_REVIEW);
+        List<Long> ids = new ArrayList<>();
+        if (state == null || !state.isObject()) return ids;
+        for (String key : List.of("productReviewerIds", "designReviewerIds", "technicalReviewerIds")) {
+            JsonNode values = state.get(key);
+            if (values != null && values.isArray()) for (JsonNode value : values)
+                if (value.isIntegralNumber() && value.canConvertToLong() && value.asLong() > 0) ids.add(value.asLong());
+        }
+        return ids;
     }
 
     private Map<Long, UserDO> loadUsers(List<Long> nodeOwnerIds, List<Long> assigneeIds) {

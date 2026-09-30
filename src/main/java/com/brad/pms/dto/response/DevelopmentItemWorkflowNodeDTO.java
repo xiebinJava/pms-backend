@@ -20,6 +20,8 @@ public class DevelopmentItemWorkflowNodeDTO {
     private Integer status;
     private Long ownerId;
     private String ownerName;
+    /** Display labels resolved server-side for saved topic reviewers. */
+    private Map<Long, String> reviewerNames;
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer version;

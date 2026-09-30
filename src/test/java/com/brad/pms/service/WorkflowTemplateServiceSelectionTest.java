@@ -42,6 +42,7 @@ class WorkflowTemplateServiceSelectionTest {
     @BeforeEach
     void initMybatisLambdaCaches() {
         Configuration configuration = new Configuration();
+        configuration.setMapUnderscoreToCamelCase(true);
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "workflow-test");
         TableInfoHelper.initTableInfo(assistant, ProjectTypeDO.class);
         TableInfoHelper.initTableInfo(assistant, WorkflowTemplateDO.class);

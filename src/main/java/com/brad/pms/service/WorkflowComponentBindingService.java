@@ -104,7 +104,7 @@ public class WorkflowComponentBindingService {
     }
 
     /**
-     * Adds the story-splitting runtime component to the node selected by the pinned topic snapshot.
+     * Adds the story-list runtime component to the node selected by the pinned topic snapshot.
      * The component is derived at read time and the immutable template definition is never mutated.
      */
     public WorkflowTemplateDefinition applyStoryBinding(WorkflowTemplateDefinition definition,
@@ -114,8 +114,9 @@ public class WorkflowComponentBindingService {
         boolean changed = false;
         for (WorkflowNodeDefinition node : definition.nodes()) {
             if (Objects.equals(node.key(), pinnedTopicNodeKey)
-                    && !node.runtimeComponents().contains(WorkflowComponentKey.STORY_SPLIT)) {
-                effectiveNodes.add(withComponent(node, WorkflowComponentKey.STORY_SPLIT));
+                    && !node.runtimeComponents().contains(WorkflowComponentKey.STORY_SPLIT)
+                    && !node.runtimeComponents().contains(WorkflowComponentKey.STORY_LIST)) {
+                effectiveNodes.add(withComponent(node, WorkflowComponentKey.STORY_LIST));
                 changed = true;
             } else {
                 effectiveNodes.add(node);

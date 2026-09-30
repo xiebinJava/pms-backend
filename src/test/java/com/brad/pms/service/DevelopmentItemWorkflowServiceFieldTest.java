@@ -35,6 +35,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 class DevelopmentItemWorkflowServiceFieldTest {
+    @Test void nodeDtoResolvesReviewersOutsideOwnersAndAssignees() {
+        var node = new DevelopmentItemWorkflowNodeDO(); node.setNodeKey("review"); node.setOwnerId(1L);
+        node.setFieldValuesJson("{\"__components\":{\"topic-design-review\":{\"productReviewerIds\":[42]}}}");
+        var definition = new WorkflowNodeDefinition("review", "方案设计与评审", "", "", "", List.of("topic-design-review"), List.of(), false, List.of());
+        var user = new UserDO(); user.setId(42L); user.setNameZh("评审人");
+        DevelopmentItemWorkflowNodeDTO dto = ReflectionTestUtils.invokeMethod(service, "toNodeDTO", node, List.of(),
+                Map.of(42L,user), new WorkflowTemplateDefinition(1,List.of(definition)));
+        assertThat(dto.getReviewerNames()).containsEntry(42L,"评审人");
+    }
+    @Test
+    void designReviewStateIsSavedOnlyWhenBoundAndPreservesResearchData() {
+        var mapper = new ObjectMapper();
+        var definition = new WorkflowNodeDefinition("review", "方案设计与评审", "", "", "",
+                List.of("topic-design-review"), List.of(), false, List.of());
+        Map<String, JsonNode> incoming = Map.of("__components", mapper.valueToTree(Map.of(
+                "topic-design-review", Map.of("productPlanUrl", "https://example.com/plan"),
+                "topic-research", Map.of("goal", "不应覆盖"))));
+        Map<String, JsonNode> saved = ReflectionTestUtils.invokeMethod(service, "preserveComponentValues", Map.of(),
+                "{\"__components\":{\"topic-research\":{\"goal\":\"旧调研\"}}}", incoming, definition);
+        assertThat(saved.get("__components").path("topic-design-review").path("productPlanUrl").asText()).isEqualTo("https://example.com/plan");
+        assertThat(saved.get("__components").path("topic-research").path("goal").asText()).isEqualTo("旧调研");
+    }
     private final WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
     private final RequirementMapper requirementMapper = mock(RequirementMapper.class);
     private final ProjectNodeDevelopmentTopicMapper topicMapper = mock(ProjectNodeDevelopmentTopicMapper.class);
@@ -184,6 +206,21 @@ class DevelopmentItemWorkflowServiceFieldTest {
         assertThat(merged).containsKey("researchSummary");
         assertThat(merged.get("__components").path("requirement-receiving-analysis").path("decision").asText())
                 .isEqualTo("PASS");
+    }
+
+    @Test
+    void acceptsTopicResearchStateOnlyWhenTheWorkbenchIsBound() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("research", "需求调研", "", "", "",
+                List.of(), List.of(), false, List.of(), List.of("component:topic-research"), Map.of());
+        Map<String, JsonNode> incoming = Map.of("__components", mapper.valueToTree(Map.of(
+                "topic-research", Map.of("needed", "YES", "goal", "比较竞品", "report", "分析报告"),
+                "requirement-node-workbench", Map.of("background", "禁止跨类型保存"))));
+        Map<String, JsonNode> merged = ReflectionTestUtils.invokeMethod(service, "preserveComponentValues",
+                Map.of(), "{}", incoming, definition);
+        assertThat(merged.get("__components")).isNotNull();
+        assertThat(merged.get("__components").path("topic-research").path("goal").asText()).isEqualTo("比较竞品");
+        assertThat(merged.get("__components").has("requirement-node-workbench")).isFalse();
     }
 
     @Test

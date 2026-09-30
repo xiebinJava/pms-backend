@@ -1,6 +1,8 @@
 package com.brad.pms.workflow;
 
 public final class WorkflowComponentKey {
+    public static final String TOPIC_RESEARCH = "topic-research";
+    public static final String TOPIC_DESIGN_REVIEW = "topic-design-review";
     public static final String PROJECT_BASIC_INFO = "project-basic-info";
     public static final String REQUIREMENT_SCOPE = "requirement-scope";
     public static final String SOLUTION_DESIGN = "solution-design";
