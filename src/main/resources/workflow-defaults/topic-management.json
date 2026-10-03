@@ -3,7 +3,7 @@
   "templateCode" : "wf-911fb737b3364e3b8240db9f2882303f",
   "name" : "专题管理流程",
   "description" : null,
-  "versionNo" : 10,
+  "versionNo" : 11,
   "definition" : {
     "schemaVersion" : 2,
     "nodes" : [ {
@@ -41,7 +41,11 @@
       "projectBasicInfo" : false,
       "projectBasicInfoFields" : null,
       "contentOrder" : [ "component:story-list" ],
-      "componentConfigs" : null
+      "componentConfigs" : {
+        "story-list" : {
+          "testingResultsEnabled" : true
+        }
+      }
     } ],
     "sourceProjectNodeKey" : "develop",
     "sourceTopicNodeKey" : null

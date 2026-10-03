@@ -48,6 +48,7 @@ import com.brad.pms.workflow.RequirementReceivingAnalysisConfig;
 import com.brad.pms.workflow.RequirementReceivingAnalysisPolicy;
 import com.brad.pms.workflow.RequirementReceivingAnalysisState;
 import com.brad.pms.workflow.WorkflowComponentKey;
+import com.brad.pms.workflow.TopicDevelopmentTestingPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -317,6 +318,16 @@ public class DevelopmentItemWorkflowService {
             if (definition.runtimeComponents().contains(key) && state != null && state.isObject()) {
                 nextComponents.set(key, state.deepCopy());
             }
+        }
+        JsonNode testingConfig = definition.componentConfigs() == null ? null
+                : definition.componentConfigs().get(WorkflowComponentKey.STORY_LIST);
+        JsonNode testingState = incomingComponents.get(WorkflowComponentKey.STORY_LIST);
+        JsonNode testingEnabled = testingConfig == null ? null : testingConfig.get("testingResultsEnabled");
+        if (definition.runtimeComponents().contains(WorkflowComponentKey.STORY_LIST)
+                && testingEnabled != null && testingEnabled.isBoolean() && testingEnabled.booleanValue()
+                && testingState != null && testingState.isObject()) {
+            nextComponents.set(WorkflowComponentKey.STORY_LIST,
+                    TopicDevelopmentTestingPolicy.merge(nextComponents.get(WorkflowComponentKey.STORY_LIST), testingState));
         }
         if (!nextComponents.isEmpty()) merged.put("__components", nextComponents);
         return merged;

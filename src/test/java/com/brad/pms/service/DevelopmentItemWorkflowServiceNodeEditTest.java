@@ -45,6 +45,91 @@ import static org.mockito.Mockito.doThrow;
 class DevelopmentItemWorkflowServiceNodeEditTest {
 
     @Test
+    void savesTestingResultsOnlyOnTheConfiguredTopicWorkbenchAndKeepsOtherData() throws Exception {
+        Fixture fixture = testingFixture();
+        fixture.node.setFieldValuesJson("{\"__components\":{\"topic-research\":{\"goal\":\"旧调研\"}}}");
+        fixture.savedTasks.add(fixture.task(51L));
+        var cmd = testingCommand("https://docs.example.com/test");
+
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd);
+
+        var values = result.getNodes().get(0).getFieldValues();
+        assertThat(values.get("__components").path("story-list").path("buildVersion").asText()).isEqualTo("1.2.3");
+        assertThat(values.get("__components").path("story-list").path("testStatus").asText()).isEqualTo("FAILED");
+        assertThat(values.get("__components").path("story-list").path("residualIssues").get(0).path("description").asText()).isEqualTo("页面兼容问题");
+        assertThat(values.get("__components").path("topic-research").path("goal").asText()).isEqualTo("旧调研");
+        assertThat(fixture.savedTasks).hasSize(1);
+        assertThat(fixture.node.getStatus()).isEqualTo(1);
+        assertThat(fixture.workflow.getTemplateVersionId()).isEqualTo(88L);
+    }
+
+    @Test
+    void rejectsUnsafeTestingReportLinksBeforeChangingTheNode() throws Exception {
+        Fixture fixture = testingFixture();
+        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L,
+                testingCommand("javascript:alert(1)")))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("http");
+        assertThat(fixture.node.getFieldValuesJson()).isNull();
+    }
+
+    @Test
+    void ignoresTestingResultsOnOldStoryListConfigurations() throws Exception {
+        Fixture fixture = new Fixture(1);
+        var definition = new WorkflowNodeDefinition("design", "开发与测试", "", "", "", List.of(), List.of(), false,
+                List.of(), List.of("component:story-list"), java.util.Map.of());
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(definition);
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, testingCommand("https://docs.example.com/test"));
+        assertThat(result.getNodes().get(0).getFieldValues().containsKey("__components")).isFalse();
+    }
+
+    private Fixture testingFixture() {
+        Fixture fixture = new Fixture(1);
+        var mapper = new ObjectMapper();
+        var definition = new WorkflowNodeDefinition("design", "开发与测试", "", "", "", List.of(), List.of(), false,
+                List.of(), List.of("component:story-list"), java.util.Map.of("story-list", mapper.valueToTree(java.util.Map.of("testingResultsEnabled", true))));
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(definition);
+        return fixture;
+    }
+
+    @Test
+    void stringConfigurationDoesNotEnableTestingResults() throws Exception {
+        Fixture fixture = new Fixture(1);
+        var definition = new WorkflowNodeDefinition("design", "开发与测试", "", "", "", List.of(), List.of(), false,
+                List.of(), List.of("component:story-list"), java.util.Map.of("story-list",
+                new ObjectMapper().readTree("{\"testingResultsEnabled\":\"true\"}")));
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(definition);
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, testingCommand("https://docs.example.com/test"));
+        assertThat(result.getNodes().get(0).getFieldValues().containsKey("__components")).isFalse();
+    }
+
+    @Test
+    void ignoresUnknownIncomingTestingPropertiesButRetainsServerHistory() throws Exception {
+        Fixture fixture = testingFixture();
+        fixture.node.setFieldValuesJson("{\"__components\":{\"story-list\":{\"legacyNote\":\"server\",\"residualIssues\":[{\"id\":\"issue-1\",\"legacyIssue\":\"keep\"}]}}}");
+        var cmd = testingCommand("https://docs.example.com/test");
+        var state = (com.fasterxml.jackson.databind.node.ObjectNode) cmd.getFieldValues().get("__components").path("story-list");
+        state.put("legacyNote", "must-not-overwrite");
+        state.put("unexpected", "x".repeat(10000));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) state.path("residualIssues").get(0)).put("unexpected", "x".repeat(10000));
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd);
+        var saved = result.getNodes().get(0).getFieldValues().get("__components").path("story-list");
+        assertThat(saved.path("legacyNote").asText()).isEqualTo("server");
+        assertThat(saved.has("unexpected")).isFalse();
+        assertThat(saved.path("residualIssues").get(0).path("legacyIssue").asText()).isEqualTo("keep");
+        assertThat(saved.path("residualIssues").get(0).has("unexpected")).isFalse();
+    }
+
+    private DevelopmentItemNodeUpdateCmd testingCommand(String reportUrl) throws Exception {
+        var cmd = new DevelopmentItemNodeUpdateCmd();
+        cmd.setVersion(0);
+        cmd.setFieldValues(new ObjectMapper().readValue("""
+            {"__components":{"story-list":{"buildVersion":"1.2.3","testStatus":"FAILED","reportUrl":"%s",
+            "residualIssues":[{"id":"issue-1","description":"页面兼容问题"}]}}}
+            """.formatted(reportUrl), new com.fasterxml.jackson.core.type.TypeReference<>() {}));
+        return cmd;
+    }
+
+    @Test
     void updatesOwnerAndScheduleOnAnUnstartedNode() {
         Fixture fixture = new Fixture(0);
         DevelopmentItemNodeUpdateCmd cmd = new DevelopmentItemNodeUpdateCmd();
