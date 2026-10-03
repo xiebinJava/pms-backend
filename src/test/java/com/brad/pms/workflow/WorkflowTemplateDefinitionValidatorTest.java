@@ -481,6 +481,117 @@ class WorkflowTemplateDefinitionValidatorTest {
                 .hasMessageContaining("只有单选或多选字段可以配置选项");
     }
 
+    @Test
+    void acceptsStoryWorkbenchAndTestingOnlyForStoryTemplates() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                v2Node("intake", List.of(), List.of()),
+                new WorkflowNodeDefinition("writing", "故事写卡", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-node-workbench"), Map.of(
+                                WorkflowComponentKey.STORY_NODE_WORKBENCH,
+                                mapper.createObjectNode().put("nodeKey", "writing").put("variant", "writing"))),
+                new WorkflowNodeDefinition("testing", "测试中", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-testing"), Map.of(
+                                WorkflowComponentKey.STORY_TESTING,
+                                mapper.createObjectNode().put("testingResultsEnabled", true)))));
+
+        assertThat(WorkflowTemplateDefinitionValidator
+                .validateForProcessType("story-management", definition)).isEqualTo(definition);
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("topic-management", definition))
+                .hasMessageContaining("故事节点工作台只能配置在故事流程");
+    }
+
+    @Test
+    void rejectsStoryTestingOutsideStoryTemplates() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("testing", "测试中", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-testing"), Map.of(
+                                WorkflowComponentKey.STORY_TESTING,
+                                mapper.createObjectNode().put("testingResultsEnabled", true)))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("topic-management", definition))
+                .hasMessageContaining("故事测试工作台只能配置在故事流程");
+    }
+
+    @Test
+    void rejectsStoryWorkbenchPlacedOnTheWrongNode() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("writing", "开发中", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-node-workbench"), Map.of(
+                                WorkflowComponentKey.STORY_NODE_WORKBENCH,
+                                mapper.createObjectNode().put("nodeKey", "writing").put("variant", "writing")))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("story-management", definition))
+                .hasMessageContaining("故事节点工作台只能配置在对应节点");
+    }
+
+    @Test
+    void rejectsDuplicateStoryWorkbenchVariants() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("writing-a", "故事写卡一", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-node-workbench"), Map.of(
+                                WorkflowComponentKey.STORY_NODE_WORKBENCH,
+                                mapper.createObjectNode().put("nodeKey", "writing-a").put("variant", "writing"))),
+                new WorkflowNodeDefinition("writing-b", "故事写卡二", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-node-workbench"), Map.of(
+                                WorkflowComponentKey.STORY_NODE_WORKBENCH,
+                                mapper.createObjectNode().put("nodeKey", "writing-b").put("variant", "writing")))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("story-management", definition))
+                .hasMessageContaining("故事节点工作台不能重复配置");
+    }
+
+    @Test
+    void rejectsStoryTestingOnANonTestingNode() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("writing", "故事写卡", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-testing"), Map.of(
+                                WorkflowComponentKey.STORY_TESTING,
+                                mapper.createObjectNode().put("testingResultsEnabled", true)))));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator
+                .validateForProcessType("story-management", definition))
+                .hasMessageContaining("故事测试工作台只能配置在测试节点");
+    }
+
+    @Test
+    void rejectsInvalidStoryWorkbenchConfigs() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowTemplateDefinition unknownKey = storyWorkbenchNode(mapper,
+                mapper.createObjectNode().put("nodeKey", "writing").put("variant", "writing").put("foo", "bar"));
+        WorkflowTemplateDefinition badVariant = storyWorkbenchNode(mapper,
+                mapper.createObjectNode().put("nodeKey", "writing").put("variant", "unknown"));
+        WorkflowTemplateDefinition mismatchedNode = storyWorkbenchNode(mapper,
+                mapper.createObjectNode().put("nodeKey", "other").put("variant", "writing"));
+        WorkflowTemplateDefinition emptyActivities = storyWorkbenchNode(mapper,
+                mapper.createObjectNode().put("nodeKey", "writing").put("variant", "writing")
+                        .set("activities", mapper.createArrayNode()));
+
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(unknownKey))
+                .hasMessageContaining("配置项无效");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(badVariant))
+                .hasMessageContaining("类型无效");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(mismatchedNode))
+                .hasMessageContaining("必须绑定当前节点");
+        assertThatThrownBy(() -> WorkflowTemplateDefinitionValidator.validate(emptyActivities))
+                .hasMessageContaining("活动配置无效");
+    }
+
+    private static WorkflowTemplateDefinition storyWorkbenchNode(ObjectMapper mapper, com.fasterxml.jackson.databind.node.ObjectNode config) {
+        return new WorkflowTemplateDefinition(2, List.of(
+                new WorkflowNodeDefinition("writing", "故事写卡", "", "", "", null, List.of(), false, null,
+                        List.of("component:story-node-workbench"), Map.of(
+                                WorkflowComponentKey.STORY_NODE_WORKBENCH, config))));
+    }
+
     private static WorkflowNodeDefinition node(String key, List<WorkflowFieldDefinition> fields) {
         return new WorkflowNodeDefinition(key, key, "说明", "交付物", "角色", List.of(), fields, false, List.of());
     }

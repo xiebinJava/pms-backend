@@ -22,6 +22,10 @@ public final class WorkflowComponentKey {
     public static final String REQUIREMENT_NODE_WORKBENCH = "requirement-node-workbench";
     /** Runtime-only component generated on the configured topic workflow mount node. */
     public static final String STORY_SPLIT = "story-split";
+    /** Configurable structured workbench for a story workflow node. */
+    public static final String STORY_NODE_WORKBENCH = "story-node-workbench";
+    /** Configurable structured testing record for the story testing node. */
+    public static final String STORY_TESTING = "story-testing";
 
     private WorkflowComponentKey() { }
 }

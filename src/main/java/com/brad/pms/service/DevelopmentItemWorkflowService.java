@@ -49,6 +49,7 @@ import com.brad.pms.workflow.RequirementReceivingAnalysisPolicy;
 import com.brad.pms.workflow.RequirementReceivingAnalysisState;
 import com.brad.pms.workflow.WorkflowComponentKey;
 import com.brad.pms.workflow.TopicDevelopmentTestingPolicy;
+import com.brad.pms.workflow.StoryNodeWorkbenchPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -328,6 +329,27 @@ public class DevelopmentItemWorkflowService {
                 && testingState != null && testingState.isObject()) {
             nextComponents.set(WorkflowComponentKey.STORY_LIST,
                     TopicDevelopmentTestingPolicy.merge(nextComponents.get(WorkflowComponentKey.STORY_LIST), testingState));
+        }
+        JsonNode storyWorkbenchConfig = definition.componentConfigs() == null ? null
+                : definition.componentConfigs().get(WorkflowComponentKey.STORY_NODE_WORKBENCH);
+        JsonNode storyWorkbenchState = incomingComponents.get(WorkflowComponentKey.STORY_NODE_WORKBENCH);
+        String storyVariant = storyWorkbenchConfig == null ? null : storyWorkbenchConfig.path("variant").asText(null);
+        if (definition.runtimeComponents().contains(WorkflowComponentKey.STORY_NODE_WORKBENCH)
+                && StoryNodeWorkbenchPolicy.supports(storyVariant)
+                && storyWorkbenchState != null && storyWorkbenchState.isObject()) {
+            nextComponents.set(WorkflowComponentKey.STORY_NODE_WORKBENCH,
+                    StoryNodeWorkbenchPolicy.merge(nextComponents.get(WorkflowComponentKey.STORY_NODE_WORKBENCH),
+                            storyWorkbenchState, storyVariant));
+        }
+        JsonNode storyTestingConfig = definition.componentConfigs() == null ? null
+                : definition.componentConfigs().get(WorkflowComponentKey.STORY_TESTING);
+        JsonNode storyTestingState = incomingComponents.get(WorkflowComponentKey.STORY_TESTING);
+        JsonNode storyTestingEnabled = storyTestingConfig == null ? null : storyTestingConfig.get("testingResultsEnabled");
+        if (definition.runtimeComponents().contains(WorkflowComponentKey.STORY_TESTING)
+                && storyTestingEnabled != null && storyTestingEnabled.isBoolean() && storyTestingEnabled.booleanValue()
+                && storyTestingState != null && storyTestingState.isObject()) {
+            nextComponents.set(WorkflowComponentKey.STORY_TESTING,
+                    TopicDevelopmentTestingPolicy.merge(nextComponents.get(WorkflowComponentKey.STORY_TESTING), storyTestingState));
         }
         if (!nextComponents.isEmpty()) merged.put("__components", nextComponents);
         return merged;

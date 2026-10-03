@@ -25,6 +25,7 @@ import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
+import com.brad.pms.workflow.WorkflowComponentKey;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -126,6 +127,74 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
             {"__components":{"story-list":{"buildVersion":"1.2.3","testStatus":"FAILED","reportUrl":"%s",
             "residualIssues":[{"id":"issue-1","description":"页面兼容问题"}]}}}
             """.formatted(reportUrl), new com.fasterxml.jackson.core.type.TypeReference<>() {}));
+        return cmd;
+    }
+
+    @Test
+    void savesStoryWorkbenchWhitelistedFieldsAndKeepsServerHistory() throws Exception {
+        Fixture fixture = storyWorkbenchFixture("writing");
+        fixture.node.setFieldValuesJson("{\"__components\":{\"story-node-workbench\":{\"background\":\"旧背景\",\"legacyNote\":\"server\"}}}");
+        var cmd = componentCommand("story-node-workbench", "{\"acceptanceCriteria\":\"新标准\",\"unexpected\":\"x\"}");
+
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd);
+
+        var saved = result.getNodes().get(0).getFieldValues().get("__components").path("story-node-workbench");
+        assertThat(saved.path("acceptanceCriteria").asText()).isEqualTo("新标准");
+        assertThat(saved.path("background").asText()).isEqualTo("旧背景");
+        assertThat(saved.path("legacyNote").asText()).isEqualTo("server");
+        assertThat(saved.has("unexpected")).isFalse();
+    }
+
+    @Test
+    void ignoresStoryWorkbenchWhenVariantConfigIsMissing() throws Exception {
+        Fixture fixture = new Fixture(1);
+        var definition = new WorkflowNodeDefinition("design", "开发与测试", "", "", "", List.of(), List.of(), false,
+                List.of(), List.of("component:story-node-workbench"), java.util.Map.of());
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(definition);
+        var cmd = componentCommand("story-node-workbench", "{\"acceptanceCriteria\":\"x\"}");
+
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd);
+
+        assertThat(result.getNodes().get(0).getFieldValues().containsKey("__components")).isFalse();
+    }
+
+    @Test
+    void savesStoryTestingRecordsOnTheConfiguredNode() throws Exception {
+        Fixture fixture = new Fixture(1);
+        var mapper = new ObjectMapper();
+        var definition = new WorkflowNodeDefinition("design", "开发与测试", "", "", "", List.of(), List.of(), false,
+                List.of(), List.of("component:story-testing"), java.util.Map.of(
+                        WorkflowComponentKey.STORY_TESTING,
+                        mapper.valueToTree(java.util.Map.of("testingResultsEnabled", true))));
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(definition);
+        var cmd = componentCommand("story-testing",
+                "{\"buildVersion\":\"1.2.3\",\"testStatus\":\"PASSED\",\"residualIssues\":[{\"id\":\"i1\",\"description\":\"问题\"}]}");
+
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd);
+
+        var saved = result.getNodes().get(0).getFieldValues().get("__components").path("story-testing");
+        assertThat(saved.path("buildVersion").asText()).isEqualTo("1.2.3");
+        assertThat(saved.path("testStatus").asText()).isEqualTo("PASSED");
+        assertThat(saved.path("residualIssues").get(0).path("description").asText()).isEqualTo("问题");
+    }
+
+    private Fixture storyWorkbenchFixture(String variant) throws Exception {
+        Fixture fixture = new Fixture(1);
+        var mapper = new ObjectMapper();
+        var definition = new WorkflowNodeDefinition("design", "开发与测试", "", "", "", List.of(), List.of(), false,
+                List.of(), List.of("component:story-node-workbench"), java.util.Map.of(
+                        WorkflowComponentKey.STORY_NODE_WORKBENCH,
+                        mapper.valueToTree(java.util.Map.of("nodeKey", "design", "variant", variant))));
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(definition);
+        return fixture;
+    }
+
+    private DevelopmentItemNodeUpdateCmd componentCommand(String componentKey, String stateJson) throws Exception {
+        var cmd = new DevelopmentItemNodeUpdateCmd();
+        cmd.setVersion(0);
+        cmd.setFieldValues(new ObjectMapper().readValue(
+                "{\"__components\":{\"" + componentKey + "\":" + stateJson + "}}",
+                new com.fasterxml.jackson.core.type.TypeReference<>() {}));
         return cmd;
     }
 

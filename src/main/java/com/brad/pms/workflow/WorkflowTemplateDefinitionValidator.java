@@ -17,11 +17,21 @@ public final class WorkflowTemplateDefinitionValidator {
             WorkflowComponentKey.RELEASE_HANDOVER, WorkflowComponentKey.VALUE_REVIEW,
             WorkflowComponentKey.KNOWLEDGE_STANDARD, WorkflowComponentKey.STORY_LIST,
             WorkflowComponentKey.REQUIREMENT_EXECUTION, WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS,
-            WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, WorkflowComponentKey.TOPIC_RESEARCH, WorkflowComponentKey.TOPIC_DESIGN_REVIEW);
+            WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, WorkflowComponentKey.TOPIC_RESEARCH, WorkflowComponentKey.TOPIC_DESIGN_REVIEW,
+            WorkflowComponentKey.STORY_NODE_WORKBENCH, WorkflowComponentKey.STORY_TESTING);
     private static final Set<String> RECEIVING_CONFIG_KEYS = Set.of(
             "showFilter", "showAnalysis", "showDecision", "requireCategory", "showFeasibilityScore",
             "requireFeasibilityScore", "showRoiScore", "requireRoiScore", "showStrategicFitScore",
             "requireStrategicFitScore", "requireAnalysisConclusion", "allowReject");
+    private static final Set<String> STORY_WORKBENCH_CONFIG_KEYS = Set.of(
+            "nodeKey", "nodeName", "variant", "purpose", "activities");
+    private static final Map<String, String> STORY_VARIANT_NODE_MATCH = Map.of(
+            "writing", "写卡",
+            "iteration", "迭代",
+            "development", "开发",
+            "acceptance", "验收",
+            "release", "发布",
+            "launch", "上线");
     private static final Set<String> PROJECT_BASIC_INFO_FIELDS = Set.of("description", "priority", "projectLevel",
             "schedule", "businessLine", "projectManager", "projectMembers", "followers");
     private static final Set<WorkflowFieldType> V1_FIELD_TYPES = Set.of(
@@ -131,6 +141,18 @@ public final class WorkflowTemplateDefinitionValidator {
         if (hasStoryList && !"topic-management".equals(processTypeCode)) {
             throw new IllegalArgumentException("故事列表工作台只能配置在专题流程");
         }
+        boolean hasStoryNodeWorkbench = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .anyMatch(WorkflowComponentKey.STORY_NODE_WORKBENCH::equals);
+        if (hasStoryNodeWorkbench && !"story-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("故事节点工作台只能配置在故事流程");
+        }
+        boolean hasStoryTesting = definition.nodes().stream()
+                .flatMap(node -> node.runtimeComponents().stream())
+                .anyMatch(WorkflowComponentKey.STORY_TESTING::equals);
+        if (hasStoryTesting && !"story-management".equals(processTypeCode)) {
+            throw new IllegalArgumentException("故事测试工作台只能配置在故事流程");
+        }
         boolean hasRequirementBindings = definition.nodes().stream()
                 .flatMap(node -> node.fields().stream())
                 .anyMatch(field -> field.binding() != null && field.binding().startsWith("requirement."));
@@ -143,6 +165,9 @@ public final class WorkflowTemplateDefinitionValidator {
         }
         if ("requirement-management".equals(processTypeCode)) {
             validateRequirementWorkbenchPlacement(definition);
+        }
+        if ("story-management".equals(processTypeCode)) {
+            validateStoryWorkbenchPlacement(definition);
         }
         return definition;
     }
@@ -323,6 +348,12 @@ public final class WorkflowTemplateDefinitionValidator {
             if (WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH.equals(entry.getKey())) {
                 validateRequirementNodeWorkbenchConfig(node, config);
             }
+            if (WorkflowComponentKey.STORY_NODE_WORKBENCH.equals(entry.getKey())) {
+                validateStoryNodeWorkbenchConfig(node, config);
+            }
+            if (WorkflowComponentKey.STORY_TESTING.equals(entry.getKey())) {
+                validateStoryTestingConfig(config);
+            }
         }
     }
 
@@ -373,6 +404,79 @@ public final class WorkflowTemplateDefinitionValidator {
                     throw new IllegalArgumentException("需求节点工作台活动配置无效");
                 }
             });
+        }
+    }
+
+    private static void validateStoryWorkbenchPlacement(WorkflowTemplateDefinition definition) {
+        Set<String> seenVariants = new HashSet<>();
+        boolean seenTesting = false;
+        for (WorkflowNodeDefinition node : definition.nodes()) {
+            Set<String> components = new HashSet<>(node.runtimeComponents());
+            String name = String.valueOf(node.name());
+            if (components.contains(WorkflowComponentKey.STORY_NODE_WORKBENCH)) {
+                JsonNode config = node.componentConfigs() == null ? null
+                        : node.componentConfigs().get(WorkflowComponentKey.STORY_NODE_WORKBENCH);
+                String variant = config == null ? null : config.path("variant").asText(null);
+                String requiredMatch = variant == null ? null : STORY_VARIANT_NODE_MATCH.get(variant);
+                if (requiredMatch == null || !name.contains(requiredMatch)) {
+                    throw new IllegalArgumentException("故事节点工作台只能配置在对应节点");
+                }
+                if (!seenVariants.add(variant)) {
+                    throw new IllegalArgumentException("故事节点工作台不能重复配置");
+                }
+            }
+            if (components.contains(WorkflowComponentKey.STORY_TESTING)) {
+                if (!name.contains("测试")) {
+                    throw new IllegalArgumentException("故事测试工作台只能配置在测试节点");
+                }
+                if (seenTesting) {
+                    throw new IllegalArgumentException("故事测试工作台只能配置一次");
+                }
+                seenTesting = true;
+            }
+        }
+    }
+
+    private static void validateStoryNodeWorkbenchConfig(WorkflowNodeDefinition node, JsonNode config) {
+        config.fieldNames().forEachRemaining(key -> {
+            if (!STORY_WORKBENCH_CONFIG_KEYS.contains(key)) {
+                throw new IllegalArgumentException("故事节点工作台配置项无效: " + key);
+            }
+        });
+        if (!config.has("nodeKey") || !config.path("nodeKey").isTextual()
+                || !node.key().equals(config.path("nodeKey").asText())) {
+            throw new IllegalArgumentException("故事节点工作台配置必须绑定当前节点");
+        }
+        if (!config.has("variant") || !config.path("variant").isTextual()
+                || !STORY_VARIANT_NODE_MATCH.containsKey(config.path("variant").asText())) {
+            throw new IllegalArgumentException("故事节点工作台类型无效");
+        }
+        if (config.has("nodeName") && !config.path("nodeName").isTextual()) {
+            throw new IllegalArgumentException("故事节点工作台节点名称配置无效");
+        }
+        if (config.has("purpose") && !config.path("purpose").isTextual()) {
+            throw new IllegalArgumentException("故事节点工作台说明配置无效");
+        }
+        if (config.has("activities")) {
+            if (!config.path("activities").isArray() || config.path("activities").size() == 0) {
+                throw new IllegalArgumentException("故事节点工作台活动配置无效");
+            }
+            config.path("activities").forEach(activity -> {
+                if (!activity.isTextual() || activity.asText().isBlank()) {
+                    throw new IllegalArgumentException("故事节点工作台活动配置无效");
+                }
+            });
+        }
+    }
+
+    private static void validateStoryTestingConfig(JsonNode config) {
+        config.fieldNames().forEachRemaining(key -> {
+            if (!"testingResultsEnabled".equals(key)) {
+                throw new IllegalArgumentException("故事测试工作台配置项无效: " + key);
+            }
+        });
+        if (config.has("testingResultsEnabled") && !config.path("testingResultsEnabled").isBoolean()) {
+            throw new IllegalArgumentException("故事测试工作台配置项必须是布尔值");
         }
     }
 
