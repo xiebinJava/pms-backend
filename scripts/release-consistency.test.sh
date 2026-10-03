@@ -42,7 +42,8 @@ for browser_command in \
   'pnpm exec playwright test --config tests/e2e/playwright.enterprise-board.config.mjs' \
   'pnpm exec playwright test --config tests/e2e/playwright.project-list.config.mjs' \
   'pnpm exec playwright test --config tests/workflows/playwright.config.mjs' \
-  'pnpm exec playwright test --config tests/workflows/solution-design-autosave.config.mjs'; do
+  'pnpm exec playwright test --config tests/workflows/solution-design-autosave.config.mjs' \
+  'pnpm exec playwright test --config tests/workflows/story-workbench.config.mjs'; do
   grep -F -- "$browser_command" "$integration_workflow" >/dev/null \
     || fail "integration workflow is missing the dedicated browser command: $browser_command"
 done

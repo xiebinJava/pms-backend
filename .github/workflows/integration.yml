@@ -193,6 +193,11 @@ jobs:
       - name: Run solution design autosave browser smoke tests
         working-directory: pms-front
         run: pnpm exec playwright test --config tests/workflows/solution-design-autosave.config.mjs
+      - name: Run story workbench browser smoke tests
+        working-directory: pms-front
+        env:
+          PMS_E2E_BASE_URL: http://127.0.0.1:5173
+        run: pnpm exec playwright test --config tests/workflows/story-workbench.config.mjs
       - name: Show service status on failure
         if: ${{ failure() && hashFiles('.env') != '' }}
         run: |
