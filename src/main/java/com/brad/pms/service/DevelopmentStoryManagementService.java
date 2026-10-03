@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -110,8 +111,11 @@ public class DevelopmentStoryManagementService {
     public List<DevelopmentTopicStoryDTO> listByTopic(Long topicId) {
         ProjectNodeDevelopmentTopicDO topic = topicManagementService.requireReadableTopic(topicId);
         List<ProjectNodeDevelopmentStoryDO> stories = storyMapper.selectByTopicId(topic.getId());
-        return (stories == null ? List.<ProjectNodeDevelopmentStoryDO>of() : stories).stream()
-                .map(this::toDTO).toList();
+        List<ProjectNodeDevelopmentStoryDO> list = stories == null ? List.of() : stories;
+        Map<Long, DevelopmentItemWorkflowService.StoryTestingSummary> summaries = developmentItemWorkflowService
+                .storyTestingSummaries(list.stream().map(ProjectNodeDevelopmentStoryDO::getId).toList());
+        return list.stream()
+                .map(story -> toDTO(story, summaries.get(story.getId()))).toList();
     }
 
     /** Domain-owned lookup used by partial command adapters without exposing mapper rules. */
@@ -172,7 +176,8 @@ public class DevelopmentStoryManagementService {
         story.setSort(cmd.getSort() == null ? defaultSort : cmd.getSort());
     }
 
-    private DevelopmentTopicStoryDTO toDTO(ProjectNodeDevelopmentStoryDO story) {
+    private DevelopmentTopicStoryDTO toDTO(ProjectNodeDevelopmentStoryDO story,
+                                           DevelopmentItemWorkflowService.StoryTestingSummary summary) {
         DevelopmentTopicStoryDTO dto = new DevelopmentTopicStoryDTO();
         dto.setId(story.getId());
         dto.setTitle(story.getTitle());
@@ -188,6 +193,10 @@ public class DevelopmentStoryManagementService {
         dto.setDueDate(story.getDueDate());
         dto.setBlocker(story.getBlocker());
         dto.setSort(story.getSort());
+        if (summary != null) {
+            dto.setBuildVersion(summary.buildVersion());
+            dto.setTestStatus(summary.testStatus());
+        }
         return dto;
     }
 

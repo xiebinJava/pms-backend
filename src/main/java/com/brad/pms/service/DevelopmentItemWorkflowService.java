@@ -222,6 +222,41 @@ public class DevelopmentItemWorkflowService {
         return nodes.get(0).getId();
     }
 
+    /** Read-only story testing state used by the topic testing aggregate view. */
+    public record StoryTestingSummary(String buildVersion, String testStatus) { }
+
+    /** Batch reads each story's story-testing node state with two queries to avoid N+1 lookups. */
+    public Map<Long, StoryTestingSummary> storyTestingSummaries(java.util.Collection<Long> storyIds) {
+        if (storyIds == null || storyIds.isEmpty()) return Map.of();
+        List<DevelopmentItemWorkflowDO> workflows = workflowMapper.selectByItems(
+                DevelopmentItemType.STORY.name(), storyIds);
+        if (workflows == null || workflows.isEmpty()) return Map.of();
+        Map<Long, Long> workflowToItem = new HashMap<>();
+        for (DevelopmentItemWorkflowDO workflow : workflows) {
+            if (workflow.getId() != null && workflow.getItemId() != null) {
+                workflowToItem.put(workflow.getId(), workflow.getItemId());
+            }
+        }
+        if (workflowToItem.isEmpty()) return Map.of();
+        List<DevelopmentItemWorkflowNodeDO> nodes = nodeMapper.selectByWorkflowIds(workflowToItem.keySet());
+        Map<Long, StoryTestingSummary> summaries = new HashMap<>();
+        for (DevelopmentItemWorkflowNodeDO node : nodes == null ? List.<DevelopmentItemWorkflowNodeDO>of() : nodes) {
+            Long itemId = workflowToItem.get(node.getWorkflowId());
+            if (itemId == null) continue;
+            JsonNode components = readFieldValues(node.getFieldValuesJson()).get("__components");
+            JsonNode state = components == null ? null : components.get(WorkflowComponentKey.STORY_TESTING);
+            if (state != null && state.isObject()) {
+                summaries.put(itemId, new StoryTestingSummary(textValue(state, "buildVersion"), textValue(state, "testStatus")));
+            }
+        }
+        return summaries;
+    }
+
+    private static String textValue(JsonNode node, String key) {
+        JsonNode value = node.get(key);
+        return value == null || !value.isTextual() ? null : value.asText();
+    }
+
     @Transactional
     public void remove(DevelopmentItemType itemType, Long itemId) {
         if (itemId == null) return;

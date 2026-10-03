@@ -19,4 +19,6 @@ public class DevelopmentTopicStoryDTO {
     private LocalDate dueDate;
     private String blocker;
     private Integer sort;
+    private String buildVersion;
+    private String testStatus;
 }
