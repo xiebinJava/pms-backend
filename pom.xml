@@ -30,7 +30,7 @@
         <spring-framework.version>6.2.19</spring-framework.version>
         <spring-security.version>6.5.7</spring-security.version>
         <tomcat.version>11.0.25</tomcat.version>
-        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <jackson-bom.version>2.21.7</jackson-bom.version>
         <micrometer.version>1.15.12</micrometer.version>
         <logback.version>1.5.18</logback.version>
         <!-- Keep AWS SDK's Netty transport on the latest patched 4.1 line. -->
