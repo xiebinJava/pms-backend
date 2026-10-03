@@ -435,7 +435,7 @@ git commit -m "docs: document requirement execution rules"
 - [ ] **Step 1: Run backend unit and integration tests with Docker/Testcontainers.** Run:
 
 ~~~bash
-DOCKER_HOST=unix:///Users/fs/.colima/fsclaw/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1 mvn -q test
+DOCKER_HOST=unix:///var/run/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1 mvn -q test
 ~~~
 
 Expected: the full suite passes with zero failures and zero errors; any skipped test is explained in the review note.

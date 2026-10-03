@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 连接器必须位于独立仓库 `/Users/fs/Desktop/Project/pms-ai-connector`，不能把 OpenCLI 或 MCP 运行时依赖直接塞进 PMS 前端。
+- 连接器必须位于独立仓库 `pms-ai-connector`，不能把 OpenCLI 或 MCP 运行时依赖直接塞进 PMS 前端。
 - PMS 后端是唯一业务真源；连接器不得访问数据库、绕过权限或复制项目/需求/专题/故事/任务的业务规则。
 - 新连接器写操作默认自动执行，不增加人工确认；但每次操作必须经过 PMS 的权限、业务规则、版本、幂等和审计校验。
 - 现有 `/integration/dsh/v1` 预览/确认接口保持兼容，不因新连接器改变旧 DSH UI 的行为。
@@ -60,7 +60,7 @@
 
 ### 新连接器仓库
 
-根目录：`/Users/fs/Desktop/Project/pms-ai-connector`
+根目录：`pms-ai-connector`
 
 - `apps/mcp-server/src/server.ts`：MCP Server 入口。
 - `apps/mcp-server/src/tools/`：能力发现、查询、自动执行、流程动作工具。
@@ -81,16 +81,16 @@
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/package.json`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/pnpm-workspace.yaml`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tsconfig.json`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/operation.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/capability.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/query.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/error.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/index.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/schema.test.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
+- Create: `pms-ai-connector/package.json`
+- Create: `pms-ai-connector/pnpm-workspace.yaml`
+- Create: `pms-ai-connector/tsconfig.json`
+- Create: `pms-ai-connector/packages/pms-contracts/src/operation.ts`
+- Create: `pms-ai-connector/packages/pms-contracts/src/capability.ts`
+- Create: `pms-ai-connector/packages/pms-contracts/src/query.ts`
+- Create: `pms-ai-connector/packages/pms-contracts/src/error.ts`
+- Create: `pms-ai-connector/packages/pms-contracts/src/index.ts`
+- Create: `pms-ai-connector/tests/contract/schema.test.ts`
+- Create: `pms-ai-connector/README.md`
 
 **Interfaces:**
 
@@ -272,18 +272,18 @@ iteration-plan.story.remove
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/PmsClient.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/AuthProvider.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/RequestContext.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/Errors.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/index.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/package.json`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-capabilities/src/CapabilityResolver.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-capabilities/src/index.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/package.json`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-capabilities/package.json`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/pms-client.test.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/capability-resolver.test.ts`
+- Create: `pms-ai-connector/packages/pms-client/src/PmsClient.ts`
+- Create: `pms-ai-connector/packages/pms-client/src/AuthProvider.ts`
+- Create: `pms-ai-connector/packages/pms-client/src/RequestContext.ts`
+- Create: `pms-ai-connector/packages/pms-client/src/Errors.ts`
+- Create: `pms-ai-connector/packages/pms-client/src/index.ts`
+- Create: `pms-ai-connector/packages/pms-client/package.json`
+- Create: `pms-ai-connector/packages/pms-capabilities/src/CapabilityResolver.ts`
+- Create: `pms-ai-connector/packages/pms-capabilities/src/index.ts`
+- Create: `pms-ai-connector/packages/pms-contracts/package.json`
+- Create: `pms-ai-connector/packages/pms-capabilities/package.json`
+- Create: `pms-ai-connector/tests/contract/pms-client.test.ts`
+- Create: `pms-ai-connector/tests/contract/capability-resolver.test.ts`
 
 **Interfaces:**
 
@@ -308,15 +308,15 @@ export interface PmsClient {
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/server.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/tools/capabilities.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/tools/query.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/tools/execute.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/tools/workflow.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/transport.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/main.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/package.json`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/mcp/tools.test.ts`
+- Create: `pms-ai-connector/apps/mcp-server/src/server.ts`
+- Create: `pms-ai-connector/apps/mcp-server/src/tools/capabilities.ts`
+- Create: `pms-ai-connector/apps/mcp-server/src/tools/query.ts`
+- Create: `pms-ai-connector/apps/mcp-server/src/tools/execute.ts`
+- Create: `pms-ai-connector/apps/mcp-server/src/tools/workflow.ts`
+- Create: `pms-ai-connector/apps/mcp-server/src/transport.ts`
+- Create: `pms-ai-connector/apps/mcp-server/src/main.ts`
+- Modify: `pms-ai-connector/apps/mcp-server/package.json`
+- Create: `pms-ai-connector/tests/mcp/tools.test.ts`
 
 **Interfaces:**
 
@@ -350,16 +350,16 @@ pms_workflow_action
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/capabilities.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/search.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/get.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/execute.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/workflow-action.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/runtime.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/opencli-plugin/opencli-plugin.json`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/opencli/commands.test.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/skills/pms-project-management/SKILL.md`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
+- Create: `pms-ai-connector/apps/opencli-plugin/capabilities.ts`
+- Create: `pms-ai-connector/apps/opencli-plugin/search.ts`
+- Create: `pms-ai-connector/apps/opencli-plugin/get.ts`
+- Create: `pms-ai-connector/apps/opencli-plugin/execute.ts`
+- Create: `pms-ai-connector/apps/opencli-plugin/workflow-action.ts`
+- Create: `pms-ai-connector/apps/opencli-plugin/runtime.ts`
+- Create: `pms-ai-connector/apps/opencli-plugin/opencli-plugin.json`
+- Create: `pms-ai-connector/tests/opencli/commands.test.ts`
+- Create: `pms-ai-connector/skills/pms-project-management/SKILL.md`
+- Modify: `pms-ai-connector/README.md`
 
 **Interfaces:**
 
@@ -394,24 +394,24 @@ OpenCLI 当前插件 API 是 `site/command` 两级命令，不提供真正的三
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/closed-loop.spec.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/invalid-relations.spec.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/concurrency-idempotency.spec.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/adapter-consistency.spec.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/helpers.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/mcp/http-main.test.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/opencli/bundle.test.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/scripts/build-opencli-plugin.mjs`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/scripts/build-opencli-plugin.d.mts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/mcp-server/src/http-main.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/deploy/Dockerfile`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/deploy/docker-compose.yml`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/.env.example`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/.dockerignore`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/CHANGELOG.md`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/package.json`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/pnpm-lock.yaml`
+- Create: `pms-ai-connector/tests/e2e/closed-loop.spec.ts`
+- Create: `pms-ai-connector/tests/e2e/invalid-relations.spec.ts`
+- Create: `pms-ai-connector/tests/e2e/concurrency-idempotency.spec.ts`
+- Create: `pms-ai-connector/tests/e2e/adapter-consistency.spec.ts`
+- Create: `pms-ai-connector/tests/e2e/helpers.ts`
+- Create: `pms-ai-connector/tests/mcp/http-main.test.ts`
+- Create: `pms-ai-connector/tests/opencli/bundle.test.ts`
+- Create: `pms-ai-connector/scripts/build-opencli-plugin.mjs`
+- Create: `pms-ai-connector/scripts/build-opencli-plugin.d.mts`
+- Create: `pms-ai-connector/apps/mcp-server/src/http-main.ts`
+- Create: `pms-ai-connector/deploy/Dockerfile`
+- Create: `pms-ai-connector/deploy/docker-compose.yml`
+- Create: `pms-ai-connector/.env.example`
+- Create: `pms-ai-connector/.dockerignore`
+- Modify: `pms-ai-connector/README.md`
+- Create: `pms-ai-connector/CHANGELOG.md`
+- Modify: `pms-ai-connector/package.json`
+- Modify: `pms-ai-connector/pnpm-lock.yaml`
 
 - [x] **Step 0: 先固定真实运行边界。** 将 MCP stdio/HTTP 和 OpenCLI 默认 PMS 地址统一为 `http://localhost:8080/api` 形式；HTTP 入口使用 `@modelcontextprotocol/node` 的 `toNodeHandler`，增加 `/healthz`，并保持 Bearer、HTTPS/可信代理和 Origin 门禁。此步骤先补入口契约测试再实现，避免 Docker 只构建出不可启动的 handler。
 - [x] **Step 1: 写配置驱动的闭环 E2E。** 通过 `PMS_E2E_BASE_URL`、`PMS_E2E_TOKEN`、`PMS_E2E_SCENARIO_FILE` 和 `PMS_E2E_WRITE=true` 显式启用真实写入；场景文件只描述能力目录中已发现的操作、参数、上下文和结果捕获规则，禁止测试代码假设固定节点名称或字段。测试运行时先读取能力目录和动态流程上下文，再创建需求、关联一个执行对象、创建专题/故事/任务和迭代计划，并通过查询回读完整关系。未配置真实 PMS、场景文件或未显式开启写入时，测试必须明确跳过，不触碰本地业务库。
@@ -442,12 +442,12 @@ OpenCLI 当前插件 API 是 `site/command` 两级命令，不提供真正的三
 
 **Files:**
 
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/security-model.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/chatgpt-mcp-setup.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/deepseek-harness-setup.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/opencli-setup.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/compatibility-matrix.md`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/README.md`
+- Create: `pms-ai-connector/docs/security-model.md`
+- Create: `pms-ai-connector/docs/chatgpt-mcp-setup.md`
+- Create: `pms-ai-connector/docs/deepseek-harness-setup.md`
+- Create: `pms-ai-connector/docs/opencli-setup.md`
+- Create: `pms-ai-connector/docs/compatibility-matrix.md`
+- Modify: `pms-ai-connector/README.md`
 
 - [x] **Step 1: 做代码和协议全量 Review。** 检查所有写路径最终都进入 PMS Service/Command，连接器没有直接业务 SQL或重复成员同步逻辑。
 - [x] **Step 2: 做安全 Review。** 检查 Token、用户身份、scope、日志脱敏、任意 URL、SSRF、重试和高风险操作。

@@ -84,10 +84,10 @@
 ### Task 4: 前端研发事项节点操作对齐
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/api/development-item.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/locales/zh-CN.ts` and corresponding locale file if required
-- Test: `/Users/fs/Desktop/Project/pms-front/src/views/development/development-item-detail-visual.test.mjs`
+- Modify: `pms-front/src/api/development-item.ts`
+- Modify: `pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
+- Modify: `pms-front/src/locales/zh-CN.ts` and corresponding locale file if required
+- Test: `pms-front/src/views/development/development-item-detail-visual.test.mjs`
 
 **Interfaces:**
 - Add `rollbackDevelopmentItemNode(itemType, itemId, nodeId, reason)`.

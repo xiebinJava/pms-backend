@@ -30,12 +30,12 @@
 - Modify `src/main/java/com/brad/pms/workflow/WorkflowTemplateDefinitionValidator.java`
 - Modify `src/test/java/com/brad/pms/workflow/WorkflowTemplateDefinitionValidatorTest.java`
 - Modify `src/test/java/com/brad/pms/workflow/WorkflowTemplateDefinitionNormalizerTest.java`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/types/workflow.ts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/components/workflow/workflow-component-registry.ts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-model.mjs`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-schema.mjs`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-model.d.mts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-schema.test.mjs`
+- Modify `pms-front/src/types/workflow.ts`
+- Modify `pms-front/src/components/workflow/workflow-component-registry.ts`
+- Modify `pms-front/src/views/admin/workflows/workflow-template-model.mjs`
+- Modify `pms-front/src/views/admin/workflows/workflow-template-schema.mjs`
+- Modify `pms-front/src/views/admin/workflows/workflow-template-model.d.mts`
+- Modify `pms-front/src/views/admin/workflows/workflow-template-schema.test.mjs`
 
 **Steps:**
 
@@ -57,8 +57,8 @@
 - Modify `src/main/java/com/brad/pms/dto/DevelopmentItemWorkflowDetailDTO.java`
 - Modify `src/main/java/com/brad/pms/service/DevelopmentItemWorkflowService.java`
 - Modify requirement list/detail DTOs and services that expose requirement status or active source requirements
-- Modify `/Users/fs/Desktop/Project/pms-front/src/types/domain.ts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/api/development-item.ts`
+- Modify `pms-front/src/types/domain.ts`
+- Modify `pms-front/src/api/development-item.ts`
 
 **Steps:**
 
@@ -118,13 +118,13 @@
 
 **Files:**
 
-- Add `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/RequirementReceivingAnalysisComponent.vue`
-- Add `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/requirement-receiving-analysis.ts` or colocated typed model/helpers
-- Modify `/Users/fs/Desktop/Project/pms-front/src/components/workflow/workflow-component-registry.ts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/types/domain.ts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/api/development-item.ts`
-- Add `/Users/fs/Desktop/Project/pms-front/src/views/development/requirement-receiving-analysis.visual.test.mjs`
+- Add `pms-front/src/views/development/detail/RequirementReceivingAnalysisComponent.vue`
+- Add `pms-front/src/views/development/detail/requirement-receiving-analysis.ts` or colocated typed model/helpers
+- Modify `pms-front/src/components/workflow/workflow-component-registry.ts`
+- Modify `pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
+- Modify `pms-front/src/types/domain.ts`
+- Modify `pms-front/src/api/development-item.ts`
+- Add `pms-front/src/views/development/requirement-receiving-analysis.visual.test.mjs`
 
 **Steps:**
 
@@ -141,12 +141,12 @@
 
 **Files:**
 
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/index.vue`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-model.mjs`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-template-schema.mjs`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/locales/zh-CN.ts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/locales/en-US.ts`
-- Modify `/Users/fs/Desktop/Project/pms-front/src/views/admin/workflows/workflow-admin-visual.test.mjs`
+- Modify `pms-front/src/views/admin/workflows/index.vue`
+- Modify `pms-front/src/views/admin/workflows/workflow-template-model.mjs`
+- Modify `pms-front/src/views/admin/workflows/workflow-template-schema.mjs`
+- Modify `pms-front/src/locales/zh-CN.ts`
+- Modify `pms-front/src/locales/en-US.ts`
+- Modify `pms-front/src/views/admin/workflows/workflow-admin-visual.test.mjs`
 
 **Steps:**
 
