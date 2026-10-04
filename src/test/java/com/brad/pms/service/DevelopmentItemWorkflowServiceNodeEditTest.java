@@ -178,6 +178,21 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
         assertThat(saved.path("residualIssues").get(0).path("description").asText()).isEqualTo("问题");
     }
 
+    @Test
+    void savesStoryTestingRecordsEvenWithoutAnExplicitFlag() throws Exception {
+        Fixture fixture = new Fixture(1);
+        var definition = new WorkflowNodeDefinition("design", "测试中", "", "", "", List.of(), List.of(), false,
+                List.of(), List.of("component:story-testing"), java.util.Map.of());
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(definition);
+        var cmd = componentCommand("story-testing", "{\"buildVersion\":\"9.9.9\",\"testStatus\":\"FAILED\"}");
+
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L, cmd);
+
+        var saved = result.getNodes().get(0).getFieldValues().get("__components").path("story-testing");
+        assertThat(saved.path("buildVersion").asText()).isEqualTo("9.9.9");
+        assertThat(saved.path("testStatus").asText()).isEqualTo("FAILED");
+    }
+
     private Fixture storyWorkbenchFixture(String variant) throws Exception {
         Fixture fixture = new Fixture(1);
         var mapper = new ObjectMapper();

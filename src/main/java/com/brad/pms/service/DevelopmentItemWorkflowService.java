@@ -376,12 +376,8 @@ public class DevelopmentItemWorkflowService {
                     StoryNodeWorkbenchPolicy.merge(nextComponents.get(WorkflowComponentKey.STORY_NODE_WORKBENCH),
                             storyWorkbenchState, storyVariant));
         }
-        JsonNode storyTestingConfig = definition.componentConfigs() == null ? null
-                : definition.componentConfigs().get(WorkflowComponentKey.STORY_TESTING);
         JsonNode storyTestingState = incomingComponents.get(WorkflowComponentKey.STORY_TESTING);
-        JsonNode storyTestingEnabled = storyTestingConfig == null ? null : storyTestingConfig.get("testingResultsEnabled");
         if (definition.runtimeComponents().contains(WorkflowComponentKey.STORY_TESTING)
-                && storyTestingEnabled != null && storyTestingEnabled.isBoolean() && storyTestingEnabled.booleanValue()
                 && storyTestingState != null && storyTestingState.isObject()) {
             nextComponents.set(WorkflowComponentKey.STORY_TESTING,
                     TopicDevelopmentTestingPolicy.merge(nextComponents.get(WorkflowComponentKey.STORY_TESTING), storyTestingState));
