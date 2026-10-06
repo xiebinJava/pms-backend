@@ -14,6 +14,98 @@ class StoryNodeWorkbenchPolicyTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    void developmentRejectsNonUuidCaseIds() throws Exception {
+        var state = mapper.readTree("{\"testCases\":[{\"id\":\"c1\",\"priority\":\"NORMAL\"}]}");
+        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.validate(state, "development")).hasMessageContaining("标识");
+    }
+
+    @Test
+    void developmentRejectsNonCanonicalUuidToProtectStableHistoryMatching() throws Exception {
+        var state = mapper.readTree("{\"testCases\":[{\"id\":\"ABCDEF00-0000-4000-8000-000000000001\",\"priority\":\"NORMAL\"}]}");
+        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.validate(state, "development")).hasMessageContaining("标识");
+    }
+
+    @Test
+    void developmentRetainsLegacyAndStableCaseHistoryButDropsIncomingUnknownFields() throws Exception {
+        var result = StoryNodeWorkbenchPolicy.merge(mapper.readTree("{\"implementationNote\":\"旧方案\",\"testCases\":[{\"id\":\"00000000-0000-4000-8000-000000000001\",\"history\":\"保留\"}]}"),
+                mapper.readTree("{\"testCases\":[{\"id\":\"00000000-0000-4000-8000-000000000001\",\"name\":\"退款\",\"priority\":\"HIGH\",\"expectedResult\":\"到账\",\"unknown\":\"丢弃\"}],\"mergeStatus\":\"MERGED\",\"deployEnv\":\"测试环境\"}"), "development");
+        assertThat(result.path("implementationNote").asText()).isEqualTo("旧方案");
+        assertThat(result.path("testCases").get(0).path("history").asText()).isEqualTo("保留");
+        assertThat(result.path("testCases").get(0).has("unknown")).isFalse();
+        assertThat(result.path("mergeStatus").asText()).isEqualTo("MERGED");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"testCases\":[{\"id\":\"00000000-0000-4000-8000-000000000001\",\"priority\":\"BAD\"}]}", "{\"testCases\":null}", "{\"mergeStatus\":null}", "{\"testCases\":[{\"id\":\"00000000-0000-4000-8000-000000000001\",\"priority\":null}]}"})
+    void developmentRejectsMalformedCasesAndStatuses(String json) throws Exception {
+        var state = mapper.readTree(json);
+        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.validate(state, "development")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void developmentRejectsMoreThan100CasesAndDuplicateIdsButAllowsDeletingAllCases() throws Exception {
+        var state = mapper.createObjectNode(); var cases = state.putArray("testCases");
+        for (int i = 0; i < 100; i++) cases.addObject().put("id", String.format("00000000-0000-4000-8000-%012d", i)).put("priority", "NORMAL");
+        assertThatCode(() -> StoryNodeWorkbenchPolicy.validate(state, "development")).doesNotThrowAnyException();
+        cases.addObject().put("id", "case-101").put("priority", "NORMAL");
+        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.validate(state, "development")).hasMessageContaining("100");
+        cases.remove(100); ((ObjectNode) cases.get(99)).put("id", "00000000-0000-4000-8000-000000000000");
+        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.validate(state, "development")).hasMessageContaining("重复");
+        assertThat(StoryNodeWorkbenchPolicy.merge(state, mapper.readTree("{\"testCases\":[]}"), "development").path("testCases")).isEmpty();
+    }
+
+    @Test
+    void writingPersistsCombinedDescriptionAndPriorityWithoutDuplicatingIdentity() throws Exception {
+        var merged = StoryNodeWorkbenchPolicy.merge(mapper.readTree("{\"background\":\"旧背景\",\"acceptanceCriteria\":\"旧标准\"}"),
+                mapper.readTree("{\"title\":\"故事\",\"baseTitle\":\"旧名\",\"topicId\":\"7\",\"baseTopicId\":\"\",\"descriptionAndAcceptance\":\"新的描述及标准\",\"priority\":\"HIGH\"}"), "writing");
+        assertThat(merged.path("descriptionAndAcceptance").asText()).isEqualTo("新的描述及标准");
+        assertThat(merged.path("priority").asText()).isEqualTo("HIGH");
+        assertThat(merged.path("background").asText()).isEqualTo("旧背景");
+        assertThat(merged.has("title")).isFalse();
+        assertThat(merged.has("topicId")).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"priority\":\"unknown\"}", "{\"topicId\":\"-1\"}", "{\"title\":\"   \"}", "{\"descriptionAndAcceptance\":123}"})
+    void rejectsInvalidWritingFields(String json) throws Exception {
+        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.validate(mapper.readTree(json), "writing"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void iterationPersistsPlanLinkAndConfirmedPeopleWithoutDroppingHistory() throws Exception {
+        var merged = StoryNodeWorkbenchPolicy.merge(
+                mapper.readTree("{\"meetingNote\":\"旧结论\"}"),
+                mapper.readTree("{\"iterationPlanId\":\"12\",\"developerIds\":[3,5],\"testerIds\":[7],\"unexpected\":\"丢弃\"}"),
+                "iteration");
+        assertThat(merged.path("iterationPlanId").asText()).isEqualTo("12");
+        assertThat(merged.path("developerIds")).hasSize(2);
+        assertThat(merged.path("testerIds")).hasSize(1);
+        assertThat(merged.path("meetingNote").asText()).isEqualTo("旧结论");
+        assertThat(merged.has("unexpected")).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"iterationPlanId\":\"-1\"}",
+            "{\"iterationPlanId\":\"abc\"}",
+            "{\"developerIds\":\"3\"}",
+            "{\"testerIds\":[0]}",
+            "{\"developerIds\":[1,\"x\"]}"
+    })
+    void rejectsInvalidIterationFields(String json) throws Exception {
+        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.validate(mapper.readTree(json), "iteration"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void acceptsEmptyIterationPlanAndPeople() throws Exception {
+        assertThatCode(() -> StoryNodeWorkbenchPolicy.validate(
+                mapper.readTree("{\"iterationPlanId\":\"\",\"developerIds\":[],\"testerIds\":[]}"), "iteration"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void acceptsEveryVariantWithItsWhitelistedFields() throws Exception {
         assertThatCode(() -> StoryNodeWorkbenchPolicy.validate(
                 mapper.readTree("{\"acceptanceCriteria\":\"标准\",\"background\":\"背景\"}"), "writing"))
@@ -25,7 +117,7 @@ class StoryNodeWorkbenchPolicyTest {
                 mapper.readTree("{\"implementationNote\":\"说明\",\"selfTestResult\":\"自测\",\"codeLink\":\"https://git.example.com/pr/1\"}"), "development"))
                 .doesNotThrowAnyException();
         assertThatCode(() -> StoryNodeWorkbenchPolicy.validate(
-                mapper.readTree("{\"acceptanceConclusion\":\"通过\",\"acceptanceNote\":\"备注\"}"), "acceptance"))
+                mapper.readTree("{\"acceptanceConclusion\":\"PASS\",\"acceptanceNote\":\"备注\"}"), "acceptance"))
                 .doesNotThrowAnyException();
         assertThatCode(() -> StoryNodeWorkbenchPolicy.validate(
                 mapper.readTree("{\"releaseVersion\":\"1.0.0\",\"releaseWindow\":\"窗口\",\"releaseNote\":\"说明\"}"), "release"))

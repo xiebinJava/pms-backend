@@ -280,7 +280,25 @@ public class DevelopmentItemWorkflowService {
             DevelopmentItemType itemType, Long itemId, Long nodeId, DevelopmentItemNodeUpdateCmd cmd) {
         if (cmd == null) throw BusinessException.error("节点更新内容不能为空");
         ItemContext context = requireWritableItem(itemType, itemId, "更新研发事项流程节点");
+        JsonNode incomingWorkbench = cmd.getFieldValues() == null ? null : cmd.getFieldValues().get("__components");
+        incomingWorkbench = incomingWorkbench == null ? null : incomingWorkbench.get(WorkflowComponentKey.STORY_NODE_WORKBENCH);
+        // Lock parent topics in a stable order before requireWorkflowForUpdate locks the story.
+        if (itemType == DevelopmentItemType.STORY && incomingWorkbench != null) {
+            java.util.Set<Long> topicLocks = new java.util.TreeSet<>();
+            if (context.topicId() != null) topicLocks.add(context.topicId());
+            try {
+                String requested = incomingWorkbench.path("topicId").asText("");
+                if (!requested.isEmpty() && Long.parseLong(requested) > 0) topicLocks.add(Long.parseLong(requested));
+            } catch (NumberFormatException ignored) { /* The configured policy validates malformed input below. */ }
+            for (Long id : topicLocks) topicMapper.selectByIdForUpdate(id);
+        }
         DevelopmentItemWorkflowDO workflow = requireWorkflowForUpdate(itemType, itemId);
+        ProjectNodeDevelopmentStoryDO writingStory = itemType == DevelopmentItemType.STORY && incomingWorkbench != null
+                ? storyMapper.selectByIdForUpdate(itemId) : null;
+        if (writingStory != null && (!Objects.equals(writingStory.getProjectId(), context.project() == null ? null : context.project().getId())
+                || !Objects.equals(writingStory.getTopicId(), context.topicId()))) {
+            throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
+        }
         DevelopmentItemWorkflowNodeDO node = requireNode(workflow.getId(), nodeId);
         requireEditableNode(node);
         requireExpectedVersion(node.getVersion(), cmd.getVersion(), "流程节点已被其他人修改，请刷新后重试");
@@ -294,6 +312,7 @@ public class DevelopmentItemWorkflowService {
         node.setOwnerId(cmd.getOwnerId());
         node.setStartDate(cmd.getStartDate());
         node.setEndDate(cmd.getEndDate());
+        boolean storyTopicChanged = false;
         if (cmd.getFieldValues() != null) {
             WorkflowNodeDefinition definition = workflowTemplateService.getNodeDefinition(
                     workflow.getTemplateVersionId(), node.getNodeKey());
@@ -316,12 +335,114 @@ public class DevelopmentItemWorkflowService {
             validateFieldPeople(definition.fields(), values,
                     readFieldValues(node.getFieldValuesJson()));
             validateTopicReviewPeople(definition, values, readFieldValues(node.getFieldValuesJson()));
+            storyTopicChanged = syncStoryWriting(context, workflow, writingStory, definition, incomingWorkbench);
+            syncStoryIteration(context, writingStory, definition, incomingWorkbench);
             node.setFieldValuesJson(writeFieldValues(values));
         }
         if (nodeMapper.updateById(node) != 1) {
             throw BusinessException.conflict("流程节点已被其他人修改，请刷新后重试");
         }
+        if (storyTopicChanged) assignmentService.synchronizeItemAssignments(
+                context.project() == null ? null : context.project().getId(), writingStory.getProjectId(),
+                DevelopmentItemType.STORY, itemId);
         return detail(itemType, itemId);
+    }
+
+    private boolean syncStoryWriting(ItemContext context, DevelopmentItemWorkflowDO workflow,
+                                  ProjectNodeDevelopmentStoryDO story, WorkflowNodeDefinition definition, JsonNode state) {
+        JsonNode config = definition.componentConfigs() == null ? null
+                : definition.componentConfigs().get(WorkflowComponentKey.STORY_NODE_WORKBENCH);
+        if (context.itemType() != DevelopmentItemType.STORY || state == null || story == null || config == null
+                || !"writing".equals(config.path("variant").asText())
+                || !definition.runtimeComponents().contains(WorkflowComponentKey.STORY_NODE_WORKBENCH)) return false;
+        String title = state.hasNonNull("title") ? state.path("title").asText().trim() : story.getTitle();
+        boolean titleChanged = state.has("title") && !Objects.equals(title, state.path("baseTitle").asText().trim());
+        boolean topicChanged = state.has("topicId") && !Objects.equals(state.path("topicId").asText(), state.path("baseTopicId").asText());
+        if (titleChanged && (!state.hasNonNull("baseTitle") || !Objects.equals(story.getTitle(), state.path("baseTitle").asText()))) {
+            throw BusinessException.conflict("故事名称已被其他人修改，请刷新后重试");
+        }
+        String actualTopic = story.getTopicId() == null ? "" : story.getTopicId().toString();
+        if (topicChanged && (!state.hasNonNull("baseTopicId") || !actualTopic.equals(state.path("baseTopicId").asText()))) {
+            throw BusinessException.conflict("关联专题已被其他人修改，请刷新后重试");
+        }
+        if (!titleChanged && !topicChanged) return false;
+        if (topicChanged) {
+            Long topicId = state.path("topicId").asText().isEmpty() ? null : Long.valueOf(state.path("topicId").asText());
+            ProjectNodeDevelopmentTopicDO topic = topicId == null ? null : topicMapper.selectByIdForUpdate(topicId);
+            if (topicId != null && (topic == null || Boolean.TRUE.equals(topic.getDeleted()))) throw BusinessException.notFound("专题不存在");
+            if (topic != null && topic.getProjectId() != null) permissionService.requireProjectWritable(topic.getProjectId(), "关联故事专题");
+            Long mountNodeId = topic == null ? null : resolveTopicStoryMountNodeId(topic.getId());
+            if (topic != null && mountNodeId == null) throw BusinessException.error("专题流程未配置故事挂载节点");
+            taskMapper.selectByWorkflowIdsForUpdate(List.of(workflow.getId()));
+            Long projectId = topic == null ? null : topic.getProjectId();
+            Long nodeId = topic == null ? null : topic.getNodeId();
+            int expectedVersion = workflow.getVersion() == null ? 0 : workflow.getVersion();
+            if (workflowMapper.updateScopeFromStory(workflow.getId(), projectId, nodeId, expectedVersion) != 1)
+                throw BusinessException.conflict("故事流程已被其他人修改，请刷新后重试");
+            workflow.setProjectId(projectId);
+            workflow.setSourceNodeId(nodeId);
+            if (storyMapper.updateScope(story.getId(), topicId, mountNodeId, projectId, nodeId) != 1)
+                throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
+            story.setTopicId(topicId);
+            story.setTopicWorkflowNodeId(mountNodeId);
+            story.setProjectId(projectId);
+            story.setNodeId(nodeId);
+            story.setIterationPlanId(null);
+        }
+        if (titleChanged) {
+            if (storyMapper.updateTitle(story.getId(), title) != 1) {
+                throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
+            }
+            story.setTitle(title);
+        }
+        return topicChanged;
+    }
+
+    /** Iteration/release node: link or detach the story's iteration plan; the iteration node also confirms members. */
+    private void syncStoryIteration(ItemContext context, ProjectNodeDevelopmentStoryDO story,
+                                    WorkflowNodeDefinition definition, JsonNode state) {
+        JsonNode config = definition.componentConfigs() == null ? null
+                : definition.componentConfigs().get(WorkflowComponentKey.STORY_NODE_WORKBENCH);
+        if (context.itemType() != DevelopmentItemType.STORY || state == null || story == null || config == null
+                || !definition.runtimeComponents().contains(WorkflowComponentKey.STORY_NODE_WORKBENCH)) return;
+        String variant = config.path("variant").asText();
+        boolean iterationVariant = "iteration".equals(variant);
+        if (!iterationVariant && !"release".equals(variant)) return;
+        if (state.has("iterationPlanId") || (iterationVariant && (state.has("developerIds") || state.has("testerIds")))) {
+            // Lock the story row before mutating the iteration plan link or the confirmed members.
+            if (storyMapper.selectByIdForUpdate(story.getId()) == null) {
+                throw BusinessException.notFound("故事不存在");
+            }
+        }
+        if (state.has("iterationPlanId")) {
+            String requested = state.path("iterationPlanId").asText("");
+            Long planId = requested.isEmpty() ? null : Long.valueOf(requested);
+            Long projectId = story.getProjectId();
+            if (planId != null) {
+                ProjectNodeIterationPlanDO plan = iterationPlanMapper.selectByIdForUpdate(planId);
+                if (plan == null) throw BusinessException.notFound("迭代计划不存在");
+                if (!Objects.equals(plan.getProjectId(), projectId)) {
+                    throw BusinessException.error("故事和迭代计划必须属于同一个项目");
+                }
+            }
+            if (!Objects.equals(story.getIterationPlanId(), planId)) {
+                if (storyMapper.updateIterationPlan(story.getId(), planId) != 1) {
+                    throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
+                }
+                story.setIterationPlanId(planId);
+            }
+        }
+        if (!iterationVariant) return;
+        if (story.getProjectId() == null) return;
+        for (String key : List.of("developerIds", "testerIds")) {
+            JsonNode ids = state.get(key);
+            if (ids == null || !ids.isArray()) continue;
+            for (JsonNode id : ids) {
+                Long userId = id.asLong();
+                userService.requireActiveUser(userId);
+                assignmentService.ensureMember(story.getProjectId(), userId);
+            }
+        }
     }
 
     private Map<String, JsonNode> preserveComponentValues(Map<String, JsonNode> values, String fieldValuesJson) {
@@ -449,7 +570,19 @@ public class DevelopmentItemWorkflowService {
                 throw BusinessException.conflict("下一流程节点已被其他人修改，请刷新后重试");
             }
         }
+        syncStoryWorkflowProgress(itemType, itemId, lockedNodes);
         return detail(itemType, itemId);
+    }
+
+    private void syncStoryWorkflowProgress(DevelopmentItemType itemType, Long itemId,
+                                          List<DevelopmentItemWorkflowNodeDO> nodes) {
+        if (itemType != DevelopmentItemType.STORY || nodes.isEmpty()) return;
+        long completed = nodes.stream().filter(node -> Objects.equals(node.getStatus(), NODE_COMPLETED)).count();
+        String status = completed == nodes.size() ? "DONE" : "IN_PROGRESS";
+        int progress = (int) Math.round(completed * 100.0 / nodes.size());
+        if (storyMapper.updateWorkflowProgress(itemId, status, progress) != 1) {
+            throw BusinessException.conflict("故事状态同步失败，请刷新后重试");
+        }
     }
 
     private List<String> missingRequiredBoundFields(ItemContext context, WorkflowNodeDefinition definition) {
@@ -491,6 +624,7 @@ public class DevelopmentItemWorkflowService {
                 }
             }
         }
+        syncStoryWorkflowProgress(itemType, itemId, lockedNodes);
         return detail(itemType, itemId);
     }
 
@@ -602,6 +736,7 @@ public class DevelopmentItemWorkflowService {
         dto.setBlocker(context.blocker());
         dto.setLatestBuildVersion(context.latestBuildVersion());
         dto.setTestStatus(context.testStatus());
+        dto.setIterationPlanId(context.iterationPlanId());
         dto.setIterationPlanName(context.iterationPlanName());
         if (context.itemType() == DevelopmentItemType.REQUIREMENT) {
             if (requirementTargetReadService != null) {
@@ -650,8 +785,16 @@ public class DevelopmentItemWorkflowService {
                 .orderByAsc(DevelopmentItemTaskDO::getId));
         List<Long> peopleIds = new ArrayList<>(nodes.stream().map(DevelopmentItemWorkflowNodeDO::getOwnerId).toList());
         nodes.forEach(node -> peopleIds.addAll(topicReviewerIds(node)));
+        nodes.forEach(node -> peopleIds.addAll(storyWorkbenchPeopleIds(node)));
         Map<Long, UserDO> users = loadUsers(peopleIds,
                 tasks.stream().map(DevelopmentItemTaskDO::getAssigneeId).toList());
+        Map<Long, String> workbenchPeople = new LinkedHashMap<>();
+        for (Long id : peopleIds) {
+            if (id == null) continue;
+            String label = displayName(users.get(id));
+            if (label != null) workbenchPeople.put(id, label);
+        }
+        dto.setWorkbenchPeople(workbenchPeople);
         Map<Long, List<DevelopmentItemTaskDO>> tasksByNode = tasks.stream()
                 .collect(Collectors.groupingBy(DevelopmentItemTaskDO::getNodeId));
         WorkflowTemplateDefinition effectiveDefinition = workflowTemplateService.getDefinition(workflow.getTemplateVersionId());
@@ -991,6 +1134,7 @@ public class DevelopmentItemWorkflowService {
         String blocker = null;
         String latestBuildVersion = null;
         String testStatus = null;
+        Long iterationPlanId = null;
         String iterationPlanName = null;
         Long topicId = null;
         String topicTitle = null;
@@ -1066,8 +1210,9 @@ public class DevelopmentItemWorkflowService {
                     topicWorkflowNodeName = topicNode.getName();
                 }
             }
-            ProjectNodeIterationPlanDO plan = story.getIterationPlanId() == null
-                    ? null : iterationPlanMapper.selectById(story.getIterationPlanId());
+            iterationPlanId = story.getIterationPlanId();
+            ProjectNodeIterationPlanDO plan = iterationPlanId == null
+                    ? null : iterationPlanMapper.selectById(iterationPlanId);
             iterationPlanName = plan == null ? null : plan.getName();
         }
         ProjectDO project = projectId == null ? null : permissionService.requireProjectReadable(projectId);
@@ -1080,7 +1225,7 @@ public class DevelopmentItemWorkflowService {
         return new ItemContext(itemType, itemId, title, description, priority, project, sourceNode, topicId, topicTitle,
                 topicWorkflowNodeId, topicWorkflowNodeName, ownerId, orgUnitId,
                 developmentStatus, developmentProgress, storyPoints, startDate, dueDate, blocker,
-                latestBuildVersion, testStatus, iterationPlanName, executionTargetType, executionTargetId);
+                latestBuildVersion, testStatus, iterationPlanId, iterationPlanName, executionTargetType, executionTargetId);
     }
 
     private ItemContext requireWritableItem(DevelopmentItemType itemType, Long itemId, String action) {
@@ -1201,9 +1346,29 @@ public class DevelopmentItemWorkflowService {
                 }
                 return;
             }
+            ProjectNodeDevelopmentStoryDO observedStory = storyMapper.selectById(itemId);
+            ProjectNodeDevelopmentTopicDO topic = observedStory == null || observedStory.getTopicId() == null
+                    ? null : topicMapper.selectByIdForUpdate(observedStory.getTopicId());
             ProjectNodeDevelopmentStoryDO story = storyMapper.selectByIdForUpdate(itemId);
-            if (story == null || story.getTopicId() != null || story.getProjectId() != null || story.getNodeId() != null) {
+            if (story == null || story.getProjectId() != null || story.getNodeId() != null) {
                 throw BusinessException.notFound("研发事项不属于独立事项范围");
+            }
+            if (story.getTopicId() == null) {
+                if (topic != null || story.getTopicWorkflowNodeId() != null) {
+                    throw BusinessException.notFound("故事所属专题流程节点不存在");
+                }
+                return;
+            }
+            if (topic == null || !Objects.equals(story.getTopicId(), topic.getId())
+                    || Boolean.TRUE.equals(topic.getDeleted()) || topic.getProjectId() != null || topic.getNodeId() != null) {
+                throw BusinessException.notFound("故事所属专题不存在");
+            }
+            DevelopmentItemWorkflowDO topicWorkflow = workflowMapper.selectByItem(DevelopmentItemType.TOPIC.name(), topic.getId());
+            DevelopmentItemWorkflowNodeDO mount = story.getTopicWorkflowNodeId() == null
+                    ? null : nodeMapper.selectById(story.getTopicWorkflowNodeId());
+            if (topicWorkflow == null || mount == null || !Objects.equals(mount.getWorkflowId(), topicWorkflow.getId())
+                    || !Objects.equals(mount.getNodeKey(), topicWorkflow.getStoryMountNodeKey())) {
+                throw BusinessException.notFound("故事所属专题流程节点不存在");
             }
             return;
         }
@@ -1235,6 +1400,20 @@ public class DevelopmentItemWorkflowService {
         List<Long> ids = new ArrayList<>();
         if (state == null || !state.isObject()) return ids;
         for (String key : List.of("productReviewerIds", "designReviewerIds", "technicalReviewerIds")) {
+            JsonNode values = state.get(key);
+            if (values != null && values.isArray()) for (JsonNode value : values)
+                if (value.isIntegralNumber() && value.canConvertToLong() && value.asLong() > 0) ids.add(value.asLong());
+        }
+        return ids;
+    }
+
+    /** Person ids confirmed inside a story node workbench (iteration developers/testers). */
+    private List<Long> storyWorkbenchPeopleIds(DevelopmentItemWorkflowNodeDO node) {
+        JsonNode components = readFieldValues(node.getFieldValuesJson()).get("__components");
+        JsonNode state = components == null ? null : components.get(WorkflowComponentKey.STORY_NODE_WORKBENCH);
+        List<Long> ids = new ArrayList<>();
+        if (state == null || !state.isObject()) return ids;
+        for (String key : List.of("developerIds", "testerIds")) {
             JsonNode values = state.get(key);
             if (values != null && values.isArray()) for (JsonNode value : values)
                 if (value.isIntegralNumber() && value.canConvertToLong() && value.asLong() > 0) ids.add(value.asLong());
@@ -1318,6 +1497,7 @@ public class DevelopmentItemWorkflowService {
             String blocker,
             String latestBuildVersion,
             String testStatus,
+            Long iterationPlanId,
             String iterationPlanName,
             RequirementExecutionTargetType executionTargetType,
             Long executionTargetId) { }

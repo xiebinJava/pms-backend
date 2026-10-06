@@ -73,6 +73,7 @@ class DevelopmentStoryManagementServiceTest {
         ProjectNodeDevelopmentStoryDO story = story(30L, 10L, 1L, 11L, 88L);
         ProjectNodeDevelopmentTopicDO oldTopic = topic(10L, 1L, 11L);
         DevelopmentItemWorkflowDO workflow = workflow(300L, 1L, 11L);
+        when(storyMapper.selectById(30L)).thenReturn(story);
         when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
         when(topicManagementService.requireWritableTopic(10L)).thenReturn(oldTopic);
         when(workflowMapper.selectForUpdate("STORY", 30L)).thenReturn(workflow);
@@ -104,6 +105,7 @@ class DevelopmentStoryManagementServiceTest {
         ProjectNodeDevelopmentTopicDO oldTopic = topic(10L, 1L, 11L);
         ProjectNodeDevelopmentTopicDO targetTopic = topic(20L, 2L, 22L);
         DevelopmentItemWorkflowDO workflow = workflow(300L, 1L, 11L);
+        when(storyMapper.selectById(30L)).thenReturn(story);
         when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
         when(topicManagementService.requireWritableTopic(10L)).thenReturn(oldTopic);
         when(topicManagementService.requireWritableTopic(20L)).thenReturn(targetTopic);
@@ -128,8 +130,27 @@ class DevelopmentStoryManagementServiceTest {
     }
 
     @Test
+    void locksParentTopicsInIdOrderBeforeStoryToAvoidWorkflowDeadlocks() {
+        ProjectNodeDevelopmentStoryDO story = story(30L, 20L, null, null, null);
+        when(storyMapper.selectById(30L)).thenReturn(story);
+        when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
+        when(topicManagementService.requireWritableTopic(10L)).thenReturn(topic(10L, null, null));
+        when(topicManagementService.requireWritableTopic(20L)).thenReturn(topic(20L, null, null));
+        when(developmentItemWorkflowService.resolveTopicStoryMountNodeId(10L)).thenReturn(84L);
+        when(storyMapper.updateById(story)).thenReturn(1);
+        when(developmentItemWorkflowService.createIfDefaultExists(DevelopmentItemType.STORY, 30L, null, null))
+                .thenReturn(workflow(300L, null, null));
+        service.update(30L, command("改绑独立专题", 10L, null));
+        var order = inOrder(topicManagementService, storyMapper);
+        order.verify(topicManagementService).requireWritableTopic(10L);
+        order.verify(topicManagementService).requireWritableTopic(20L);
+        order.verify(storyMapper).selectByIdForUpdate(30L);
+    }
+
+    @Test
     void changingOwnerOnTheSameContextReplacesTheStableAssignment() {
         ProjectNodeDevelopmentStoryDO story = story(30L, null, null, null, 88L);
+        when(storyMapper.selectById(30L)).thenReturn(story);
         when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
         when(developmentItemWorkflowService.createIfDefaultExists(
                 DevelopmentItemType.STORY, 30L, null, null)).thenReturn(workflow(300L, null, null));

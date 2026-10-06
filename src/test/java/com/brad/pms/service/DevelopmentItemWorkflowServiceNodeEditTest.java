@@ -46,6 +46,152 @@ import static org.mockito.Mockito.doThrow;
 class DevelopmentItemWorkflowServiceNodeEditTest {
 
     @Test
+    void writingUpdatesTheActualStoryNameWithoutCopyingItIntoNodeState() throws Exception {
+        Fixture fixture = writingFixture();
+        var result = fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"title\":\"新故事名\",\"baseTitle\":\"旧故事名\",\"topicId\":\"7\",\"baseTopicId\":\"7\",\"descriptionAndAcceptance\":\"描述及标准\",\"priority\":\"HIGH\"}"));
+        assertThat(result.getTitle()).isEqualTo("新故事名");
+        var state = result.getNodes().get(0).getFieldValues().get("__components").path("story-node-workbench");
+        assertThat(state.path("priority").asText()).isEqualTo("HIGH");
+        assertThat(state.has("title")).isFalse();
+    }
+
+    @Test
+    void writingRejectsConflictingStoryNamesInsteadOfOverwritingAnotherEdit() throws Exception {
+        Fixture fixture = writingFixture();
+        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"title\":\"新名字\",\"baseTitle\":\"过期名字\"}")))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("修改");
+        verify(fixture.nodeMapper, org.mockito.Mockito.never()).updateById(any(DevelopmentItemWorkflowNodeDO.class));
+    }
+
+    @Test
+    void writingUnlinksTopicAndSynchronizesStoryWorkflowScope() throws Exception {
+        Fixture fixture = writingFixture();
+        when(fixture.workflowMapper.updateScopeFromStory(any(), any(), any(), any())).thenReturn(1);
+        var result = fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"topicId\":\"\",\"baseTopicId\":\"7\"}"));
+        assertThat(result.getTopicId()).isNull();
+        assertThat(result.getProjectId()).isNull();
+        assertThat(fixture.workflow.getProjectId()).isNull();
+        verify(fixture.storyMapper).updateScope(8L, null, null, null, null);
+        verify(fixture.assignmentService).synchronizeItemAssignments(5L, null, DevelopmentItemType.STORY, 8L);
+        var order = org.mockito.Mockito.inOrder(fixture.nodeMapper, fixture.assignmentService);
+        order.verify(fixture.nodeMapper).updateById(fixture.node);
+        order.verify(fixture.assignmentService).synchronizeItemAssignments(5L, null, DevelopmentItemType.STORY, 8L);
+    }
+
+    @Test
+    void writingRejectsATopicWithoutAMountBeforeMovingTheStory() throws Exception {
+        Fixture fixture = writingFixture();
+        var topic = new ProjectNodeDevelopmentTopicDO();
+        topic.setId(15L); topic.setProjectId(5L); topic.setNodeId(9L);
+        when(fixture.topicMapper.selectByIdForUpdate(15L)).thenReturn(topic);
+        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"topicId\":\"15\",\"baseTopicId\":\"7\"}")))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("挂载节点");
+        verify(fixture.storyMapper, org.mockito.Mockito.never()).updateScope(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void writingRejectsATargetProjectWithoutWritePermission() throws Exception {
+        Fixture fixture = writingFixture();
+        var topic = new ProjectNodeDevelopmentTopicDO();
+        topic.setId(15L); topic.setProjectId(6L); topic.setNodeId(10L);
+        when(fixture.topicMapper.selectByIdForUpdate(15L)).thenReturn(topic);
+        doThrow(BusinessException.error("无编辑权限")).when(fixture.permissionService).requireProjectWritable(6L, "关联故事专题");
+        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"topicId\":\"15\",\"baseTopicId\":\"7\"}")))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("权限");
+        verify(fixture.storyMapper, org.mockito.Mockito.never()).updateScope(any(), any(), any(), any(), any());
+    }
+
+    private Fixture writingFixture() {
+        Fixture fixture = new Fixture(1);
+        var story = new ProjectNodeDevelopmentStoryDO();
+        story.setId(8L); story.setTitle("旧故事名"); story.setTopicId(7L);
+        story.setProjectId(5L); story.setNodeId(9L);
+        fixture.workflow.setItemType("STORY"); fixture.workflow.setItemId(8L);
+        when(fixture.storyMapper.selectById(8L)).thenReturn(story);
+        when(fixture.storyMapper.selectByIdForUpdate(8L)).thenReturn(story);
+        when(fixture.storyMapper.updateTitle(any(), any())).thenReturn(1);
+        when(fixture.storyMapper.updateScope(any(), any(), any(), any(), any())).thenReturn(1);
+        when(fixture.workflowMapper.selectByItem("STORY", 8L)).thenReturn(fixture.workflow);
+        when(fixture.workflowMapper.selectForUpdate("STORY", 8L)).thenReturn(fixture.workflow);
+        var config = new ObjectMapper().valueToTree(java.util.Map.of("variant", "writing", "nodeKey", "design"));
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(
+                new WorkflowNodeDefinition("design", "任意改名节点", "", "", "", List.of(), List.of(), false,
+                        List.of(), List.of("component:story-node-workbench"), java.util.Map.of("story-node-workbench", config)));
+        return fixture;
+    }
+
+    @Test
+    void iterationLinksTheStoryToAnIterationPlanAndConfirmsPeopleAsMembers() throws Exception {
+        Fixture fixture = iterationFixture();
+        var plan = new com.brad.pms.entity.ProjectNodeIterationPlanDO();
+        plan.setId(30L); plan.setProjectId(5L);
+        when(fixture.iterationPlanMapper.selectByIdForUpdate(30L)).thenReturn(plan);
+        when(fixture.storyMapper.updateIterationPlan(8L, 30L)).thenReturn(1);
+
+        var result = fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"iterationPlanId\":\"30\",\"developerIds\":[3,5],\"testerIds\":[7]}"));
+
+        var state = result.getNodes().get(0).getFieldValues().get("__components").path("story-node-workbench");
+        assertThat(state.path("iterationPlanId").asText()).isEqualTo("30");
+        assertThat(state.path("developerIds")).hasSize(2);
+        verify(fixture.storyMapper).updateIterationPlan(8L, 30L);
+        verify(fixture.assignmentService).ensureMember(5L, 3L);
+        verify(fixture.assignmentService).ensureMember(5L, 5L);
+        verify(fixture.assignmentService).ensureMember(5L, 7L);
+    }
+
+    @Test
+    void iterationRejectsAPlanFromAnotherProject() throws Exception {
+        Fixture fixture = iterationFixture();
+        var plan = new com.brad.pms.entity.ProjectNodeIterationPlanDO();
+        plan.setId(30L); plan.setProjectId(6L);
+        when(fixture.iterationPlanMapper.selectByIdForUpdate(30L)).thenReturn(plan);
+
+        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"iterationPlanId\":\"30\"}")))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("同一个项目");
+        verify(fixture.storyMapper, org.mockito.Mockito.never()).updateIterationPlan(any(), any());
+    }
+
+    @Test
+    void iterationDetachesTheIterationPlan() throws Exception {
+        Fixture fixture = iterationFixture(30L);
+        when(fixture.storyMapper.updateIterationPlan(8L, null)).thenReturn(1);
+
+        fixture.service.updateNode(DevelopmentItemType.STORY, 8L, 21L,
+                componentCommand("story-node-workbench", "{\"iterationPlanId\":\"\"}"));
+
+        verify(fixture.storyMapper).updateIterationPlan(8L, null);
+    }
+
+    private Fixture iterationFixture() {
+        return iterationFixture(null);
+    }
+
+    private Fixture iterationFixture(Long currentPlanId) {
+        Fixture fixture = new Fixture(1);
+        var story = new ProjectNodeDevelopmentStoryDO();
+        story.setId(8L); story.setTitle("故事"); story.setTopicId(7L);
+        story.setProjectId(5L); story.setNodeId(9L);
+        story.setIterationPlanId(currentPlanId);
+        fixture.workflow.setItemType("STORY"); fixture.workflow.setItemId(8L);
+        when(fixture.storyMapper.selectById(8L)).thenReturn(story);
+        when(fixture.storyMapper.selectByIdForUpdate(8L)).thenReturn(story);
+        when(fixture.workflowMapper.selectByItem("STORY", 8L)).thenReturn(fixture.workflow);
+        when(fixture.workflowMapper.selectForUpdate("STORY", 8L)).thenReturn(fixture.workflow);
+        var config = new ObjectMapper().valueToTree(java.util.Map.of("variant", "iteration", "nodeKey", "design"));
+        when(fixture.workflowTemplateService.getNodeDefinition(88L, "design")).thenReturn(
+                new WorkflowNodeDefinition("design", "迭代计划会", "", "", "", List.of(), List.of(), false,
+                        List.of(), List.of("component:story-node-workbench"), java.util.Map.of("story-node-workbench", config)));
+        return fixture;
+    }
+
+    @Test
     void savesTestingResultsOnlyOnTheConfiguredTopicWorkbenchAndKeepsOtherData() throws Exception {
         Fixture fixture = testingFixture();
         fixture.node.setFieldValuesJson("{\"__components\":{\"topic-research\":{\"goal\":\"旧调研\"}}}");

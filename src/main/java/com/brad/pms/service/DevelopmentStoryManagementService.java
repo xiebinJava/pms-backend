@@ -67,12 +67,28 @@ public class DevelopmentStoryManagementService {
     public void update(Long id, DevelopmentStorySaveCmd cmd) {
         if (id == null) throw BusinessException.notFound("故事不存在");
         validate(cmd);
+        ProjectNodeDevelopmentStoryDO observed = storyMapper.selectById(id);
+        if (observed == null) throw BusinessException.notFound("故事不存在");
+        Long observedTopicId = observed.getTopicId();
+        Long observedProjectId = observed.getProjectId();
+        Long observedNodeId = observed.getNodeId();
+        // All entry points lock parent topics before a story; use a stable order for rebinds.
+        var topicIds = new java.util.TreeSet<Long>();
+        if (observedTopicId != null) topicIds.add(observedTopicId);
+        if (cmd.getTopicId() != null) topicIds.add(cmd.getTopicId());
+        Map<Long, ProjectNodeDevelopmentTopicDO> lockedTopics = new java.util.HashMap<>();
+        for (Long topicId : topicIds) lockedTopics.put(topicId, topicManagementService.requireWritableTopic(topicId));
         ProjectNodeDevelopmentStoryDO story = storyMapper.selectByIdForUpdate(id);
         if (story == null) throw BusinessException.notFound("故事不存在");
+        if (!Objects.equals(observedTopicId, story.getTopicId())
+                || !Objects.equals(observedProjectId, story.getProjectId())
+                || !Objects.equals(observedNodeId, story.getNodeId())) {
+            throw BusinessException.conflict("故事所属范围已被其他人修改，请刷新后重试");
+        }
         ProjectNodeDevelopmentTopicDO oldTopic = story.getTopicId() == null ? null
-                : topicManagementService.requireWritableTopic(story.getTopicId());
+                : lockedTopics.get(story.getTopicId());
         ProjectNodeDevelopmentTopicDO targetTopic = cmd.getTopicId() == null ? null
-                : topicManagementService.requireWritableTopic(cmd.getTopicId());
+                : lockedTopics.get(cmd.getTopicId());
         if (cmd.getOwnerId() != null) userService.requireActiveUser(cmd.getOwnerId());
 
         Long sourceProjectId = story.getProjectId();

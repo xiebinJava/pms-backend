@@ -63,7 +63,7 @@ public class DevelopmentTopicManagementService {
     }
 
     public ProjectNodeDevelopmentTopicDO requireWritableTopic(Long id) {
-        ProjectNodeDevelopmentTopicDO topic = requireTopic(id, false);
+        ProjectNodeDevelopmentTopicDO topic = requireTopicForUpdate(id, false);
         if (topic.getProjectId() != null) permissionService.requireProjectWritable(topic.getProjectId(), "维护专题下的故事");
         return topic;
     }
