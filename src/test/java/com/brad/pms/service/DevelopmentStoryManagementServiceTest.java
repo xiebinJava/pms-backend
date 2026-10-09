@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DevelopmentStoryManagementServiceTest {
+    @Mock IterationPlanSystemService iterationPlanSystemService;
 
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
     @Mock DevelopmentTopicManagementService topicManagementService;
@@ -41,6 +42,9 @@ class DevelopmentStoryManagementServiceTest {
     @Mock UserService userService;
     @Mock ProjectMemberAssignmentService assignmentService;
     @InjectMocks DevelopmentStoryManagementService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void configureSystemPolicy() { service.setIterationPlanSystemService(iterationPlanSystemService); }
 
     @Test
     void createsIndependentStoryWithCompanyWideOwnerValidation() {

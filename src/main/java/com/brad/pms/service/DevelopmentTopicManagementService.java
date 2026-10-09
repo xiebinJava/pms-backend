@@ -41,6 +41,14 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class DevelopmentTopicManagementService {
+    private IterationPlanSystemService iterationPlanSystemService;
+    private RequirementSystemReferenceService requirementSystemReferenceService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setSystemServices(IterationPlanSystemService iterations, RequirementSystemReferenceService requirements) {
+        iterationPlanSystemService = iterations;
+        requirementSystemReferenceService = requirements;
+    }
 
     private final ProjectMapper projectMapper;
     private final ProjectNodeMapper nodeMapper;
@@ -159,9 +167,8 @@ public class DevelopmentTopicManagementService {
         lockWorkflowTasks(workflows);
         Long sourceProjectId = topic.getProjectId();
         Long sourceOwnerId = topic.getOwnerId();
-        Map<Long, Long> sourceStoryProjects = stories.stream()
-                .collect(Collectors.toMap(ProjectNodeDevelopmentStoryDO::getId,
-                        ProjectNodeDevelopmentStoryDO::getProjectId, (left, right) -> left));
+        Map<Long, Long> sourceStoryProjects = new java.util.HashMap<>();
+        stories.forEach(story -> sourceStoryProjects.put(story.getId(), story.getProjectId()));
 
         TopicSnapshot before = snapshot(topic);
         topic.setTitle(title);
@@ -174,10 +181,12 @@ public class DevelopmentTopicManagementService {
         if (topicMapper.updateById(topic) != 1) throw BusinessException.conflict("专题已被其他人修改，请刷新后重试");
 
         if (rebound) {
+            Long systemId = requirementSystemReferenceService.resolveForTopic(topic.getId());
+            requirementSystemReferenceService.validateDestinationSystem(topic.getProjectId(), topic.getId(), systemId);
             for (ProjectNodeDevelopmentStoryDO story : stories) {
                 story.setProjectId(targetProject == null ? null : targetProject.getId());
                 story.setNodeId(targetNode == null ? null : targetNode.getId());
-                story.setIterationPlanId(null);
+                iterationPlanSystemService.validateStoryScope(story);
                 if (storyMapper.updateById(story) != 1) {
                     throw BusinessException.conflict("专题下的故事已被其他人修改，请刷新后重试");
                 }

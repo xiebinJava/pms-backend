@@ -19,13 +19,17 @@ class TopicDevelopmentTestingPolicyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"{\"reportUrl\":\"javascript:alert(1)\"}", "{\"reportUrl\":\"https://user:secret@example.com/test\"}",
-            "{\"reportUrl\":123}", "{\"testStatus\":\"UNKNOWN\"}", "{\"residualIssues\":{}}",
+    @ValueSource(strings = {"{\"reportUrl\":123}", "{\"testStatus\":\"UNKNOWN\"}", "{\"residualIssues\":{}}",
             "{\"residualIssues\":[{\"id\":\"duplicate\"},{\"id\":\"duplicate\"}]}",
             "{\"residualIssues\":[{\"id\":\"\",\"description\":\"问题\"}]}"})
     void rejectsMalformedRecords(String json) throws Exception {
         var state = mapper.readTree(json);
         assertThatThrownBy(() -> TopicDevelopmentTestingPolicy.validate(state)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void acceptsReportReferencesWithoutProtocolValidation() throws Exception {
+        var state = mapper.readTree("{\"reportUrl\":\"内部文档/测试报告\"}");
+        assertThatCode(() -> TopicDevelopmentTestingPolicy.validate(state)).doesNotThrowAnyException();
     }
 
     @Test void enforcesIssueAndTextLimits() {

@@ -77,6 +77,9 @@ public class RequirementReceivingAnalysisService {
         ComponentContext context = componentContext(workflow, node);
         RequirementReceivingAnalysisState state = parseState(cmd.getState());
         validateState(state, context.config(), false);
+        if (state.category() == RequirementReceivingAnalysisState.Category.NON_FUNCTIONAL) {
+            clearRequirementSystem(requirementId);
+        }
         persistState(node, state);
         if (nodeMapper.updateById(node) != 1) {
             throw BusinessException.conflict("流程节点已被其他人修改，请刷新后重试");
@@ -171,6 +174,18 @@ public class RequirementReceivingAnalysisService {
             throw BusinessException.notFound("需求不存在");
         }
         return requirement;
+    }
+
+    private void clearRequirementSystem(Long requirementId) {
+        RequirementDO requirement = requirementMapper.selectByIdForUpdate(requirementId);
+        if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) {
+            throw BusinessException.notFound("需求不存在");
+        }
+        if (requirement.getSystemId() == null) return;
+        requirement.setSystemId(null);
+        if (requirementMapper.updateById(requirement) != 1) {
+            throw BusinessException.conflict("需求系统已被其他人修改，请刷新后重试");
+        }
     }
 
     private DevelopmentItemWorkflowDO requireWorkflow(Long requirementId, boolean forUpdate) {

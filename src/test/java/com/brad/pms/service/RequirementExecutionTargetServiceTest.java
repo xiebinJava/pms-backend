@@ -132,6 +132,61 @@ class RequirementExecutionTargetServiceTest {
                 .hasMessageContaining("需求不存在");
     }
 
+    @Test
+    void syncFromWorkbenchLinksWhenTheRequirementHasNoTarget() {
+        RequirementDO requirement = requirement(30L, 0);
+        ProjectDO project = project(78L, ProjectStatus.ACTIVE.getCode());
+        when(requirementMapper.selectByIdForUpdate(30L)).thenReturn(requirement);
+        when(projectMapper.selectIncludingDeleted(78L)).thenReturn(project);
+        when(permissionService.requireProjectReadable(78L)).thenReturn(project);
+        when(requirementMapper.updateById(requirement)).thenReturn(1);
+        when(historyMapper.insert(any(RequirementExecutionTargetHistoryDO.class))).thenReturn(1);
+
+        service.syncFromWorkbench(30L, RequirementExecutionTargetType.PROJECT, 78L);
+
+        assertThat(requirement.getExecutionTargetType()).isEqualTo(RequirementExecutionTargetType.PROJECT);
+        assertThat(requirement.getExecutionTargetId()).isEqualTo(78L);
+        ArgumentCaptor<RequirementExecutionTargetHistoryDO> history =
+                ArgumentCaptor.forClass(RequirementExecutionTargetHistoryDO.class);
+        verify(historyMapper).insert(history.capture());
+        assertThat(history.getValue().getAction()).isEqualTo("LINK");
+    }
+
+    @Test
+    void syncFromWorkbenchSkipsWhenTheTargetIsUnchanged() {
+        RequirementDO requirement = requirement(31L, 1);
+        requirement.setExecutionTargetType(RequirementExecutionTargetType.PROJECT);
+        requirement.setExecutionTargetId(78L);
+        when(requirementMapper.selectByIdForUpdate(31L)).thenReturn(requirement);
+
+        service.syncFromWorkbench(31L, RequirementExecutionTargetType.PROJECT, 78L);
+
+        verify(requirementMapper, never()).updateById(any(RequirementDO.class));
+        verify(historyMapper, never()).insert(any(RequirementExecutionTargetHistoryDO.class));
+    }
+
+    @Test
+    void syncFromWorkbenchReplacesWhenTheTargetChanged() {
+        RequirementDO requirement = requirement(32L, 1);
+        requirement.setExecutionTargetType(RequirementExecutionTargetType.TOPIC);
+        requirement.setExecutionTargetId(9L);
+        when(requirementMapper.selectByIdForUpdate(32L)).thenReturn(requirement);
+        when(projectMapper.selectIncludingDeleted(78L)).thenReturn(project(78L, ProjectStatus.ACTIVE.getCode()));
+        when(permissionService.requireProjectReadable(78L)).thenReturn(project(78L, ProjectStatus.ACTIVE.getCode()));
+        when(requirementMapper.updateById(requirement)).thenReturn(1);
+        when(historyMapper.insert(any(RequirementExecutionTargetHistoryDO.class))).thenReturn(1);
+
+        service.syncFromWorkbench(32L, RequirementExecutionTargetType.PROJECT, 78L);
+
+        assertThat(requirement.getExecutionTargetType()).isEqualTo(RequirementExecutionTargetType.PROJECT);
+        assertThat(requirement.getExecutionTargetId()).isEqualTo(78L);
+        ArgumentCaptor<RequirementExecutionTargetHistoryDO> history =
+                ArgumentCaptor.forClass(RequirementExecutionTargetHistoryDO.class);
+        verify(historyMapper).insert(history.capture());
+        assertThat(history.getValue().getAction()).isEqualTo("REPLACE");
+        assertThat(history.getValue().getPreviousTargetId()).isEqualTo(9L);
+    }
+
     private static RequirementDO requirement(Long id, int version) {
         RequirementDO requirement = new RequirementDO();
         requirement.setId(id);

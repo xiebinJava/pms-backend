@@ -7,6 +7,12 @@ import org.apache.ibatis.annotations.Select;
 
 public interface ProjectNodeDevelopmentTopicMapper extends BaseMapper<ProjectNodeDevelopmentTopicDO> {
 
+    @Select("SELECT * FROM project_node_development_topic WHERE project_id = #{projectId} AND deleted = FALSE ORDER BY id ASC")
+    java.util.List<ProjectNodeDevelopmentTopicDO> selectActiveByProjectId(@Param("projectId") Long projectId);
+
+    @Select("SELECT * FROM project_node_development_topic WHERE project_id = #{projectId} AND deleted = FALSE ORDER BY id ASC FOR UPDATE")
+    java.util.List<ProjectNodeDevelopmentTopicDO> selectByProjectIdForUpdate(@Param("projectId") Long projectId);
+
     @Select("SELECT * FROM project_node_development_topic WHERE project_id IS NULL AND deleted = #{deleted} ORDER BY sort ASC, id ASC")
     java.util.List<ProjectNodeDevelopmentTopicDO> selectUnbound(@Param("deleted") Boolean deleted);
 

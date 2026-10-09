@@ -10,6 +10,15 @@ import java.util.List;
 
 public interface ProjectNodeDevelopmentStoryMapper extends BaseMapper<ProjectNodeDevelopmentStoryDO> {
 
+    @Select("SELECT * FROM project_node_development_story WHERE project_id = #{projectId} ORDER BY id ASC")
+    List<ProjectNodeDevelopmentStoryDO> selectActiveByProjectId(@Param("projectId") Long projectId);
+
+    @Select("SELECT * FROM project_node_development_story WHERE project_id = #{projectId} ORDER BY id ASC FOR UPDATE")
+    List<ProjectNodeDevelopmentStoryDO> selectByProjectIdForUpdate(@Param("projectId") Long projectId);
+
+    @Select("SELECT * FROM project_node_development_story WHERE topic_id = #{topicId} ORDER BY id ASC FOR UPDATE")
+    List<ProjectNodeDevelopmentStoryDO> selectByTopicIdForUpdate(@Param("topicId") Long topicId);
+
     @Select("SELECT * FROM project_node_development_story WHERE topic_id IS NULL ORDER BY sort ASC, id ASC")
     java.util.List<ProjectNodeDevelopmentStoryDO> selectIndependent();
 
@@ -28,9 +37,9 @@ public interface ProjectNodeDevelopmentStoryMapper extends BaseMapper<ProjectNod
     @Update("UPDATE project_node_development_story SET title = #{title}, updated_at = NOW() WHERE id = #{id}")
     int updateTitle(@Param("id") Long id, @Param("title") String title);
 
-    /** Rebinds a story to a topic (or detaches it) and clears the now-stale iteration plan. */
+    /** Rebinds a story after the iteration-system policy validates its prospective scope. */
     @Update("UPDATE project_node_development_story SET topic_id = #{topicId}, topic_workflow_node_id = #{topicWorkflowNodeId}, "
-            + "project_id = #{projectId}, node_id = #{nodeId}, iteration_plan_id = NULL, updated_at = NOW() WHERE id = #{id}")
+            + "project_id = #{projectId}, node_id = #{nodeId}, updated_at = NOW() WHERE id = #{id}")
     int updateScope(@Param("id") Long id, @Param("topicId") Long topicId,
                     @Param("topicWorkflowNodeId") Long topicWorkflowNodeId,
                     @Param("projectId") Long projectId, @Param("nodeId") Long nodeId);

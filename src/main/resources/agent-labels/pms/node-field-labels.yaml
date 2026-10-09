@@ -44,20 +44,8 @@ workbenches:
   release-handover:
     label: 发布决策与运营交接
     fields:
-      releaseVersion: 发布版本
-      releaseWindowStart: 发布窗口开始
-      releaseWindowEnd: 发布窗口结束
-      releaseType: 发布类型
-      packageReady: 发布包就绪
-      configConfirmed: 配置确认
-      rollbackReady: 回滚预案就绪
-      monitoringConfirmed: 监控告警确认
-      onCallConfirmed: 值班安排确认
-      decisionResult: 发布决策结果
-      decisionNote: 决策说明
+      handoverOwnerId: 交接人
       handoverNotes: 交接说明
-      observationItems: 发布后观察事项
-      emergencyContact: 值班与应急联系人
   value-review:
     label: 价值验证与项目复盘
     fields:

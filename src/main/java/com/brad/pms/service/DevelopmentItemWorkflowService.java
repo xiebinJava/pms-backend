@@ -58,6 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -95,7 +96,14 @@ public class DevelopmentItemWorkflowService {
     private WorkflowNodeCompletionPolicy completionPolicy = new WorkflowNodeCompletionPolicy();
     private RequirementExecutionTargetReadService requirementTargetReadService;
     private RequirementExecutionTargetService requirementExecutionTargetService;
+    private RequirementSystemReferenceService requirementSystemReferenceService;
     private OrgUnitMapper orgUnitMapper;
+    private IterationPlanSystemService iterationPlanSystemService;
+
+    @Autowired
+    public void setIterationPlanSystemService(IterationPlanSystemService service) {
+        this.iterationPlanSystemService = service;
+    }
 
     @Autowired(required = false)
     public void setCompletionPolicy(WorkflowNodeCompletionPolicy completionPolicy) {
@@ -110,6 +118,11 @@ public class DevelopmentItemWorkflowService {
     @Autowired(required = false)
     public void setRequirementExecutionTargetService(RequirementExecutionTargetService requirementExecutionTargetService) {
         this.requirementExecutionTargetService = requirementExecutionTargetService;
+    }
+
+    @Autowired(required = false)
+    public void setRequirementSystemReferenceService(RequirementSystemReferenceService requirementSystemReferenceService) {
+        this.requirementSystemReferenceService = requirementSystemReferenceService;
     }
 
     @Autowired(required = false)
@@ -338,6 +351,8 @@ public class DevelopmentItemWorkflowService {
             storyTopicChanged = syncStoryWriting(context, workflow, writingStory, definition, incomingWorkbench);
             syncStoryIteration(context, writingStory, definition, incomingWorkbench);
             node.setFieldValuesJson(writeFieldValues(values));
+            syncRequirementExecutionTarget(context, values);
+            syncRequirementSystem(context, workflow, node, values);
         }
         if (nodeMapper.updateById(node) != 1) {
             throw BusinessException.conflict("流程节点已被其他人修改，请刷新后重试");
@@ -376,6 +391,9 @@ public class DevelopmentItemWorkflowService {
             taskMapper.selectByWorkflowIdsForUpdate(List.of(workflow.getId()));
             Long projectId = topic == null ? null : topic.getProjectId();
             Long nodeId = topic == null ? null : topic.getNodeId();
+            story.setTopicId(topicId);
+            story.setProjectId(projectId);
+            iterationPlanSystemService.validateStoryScope(story);
             int expectedVersion = workflow.getVersion() == null ? 0 : workflow.getVersion();
             if (workflowMapper.updateScopeFromStory(workflow.getId(), projectId, nodeId, expectedVersion) != 1)
                 throw BusinessException.conflict("故事流程已被其他人修改，请刷新后重试");
@@ -387,7 +405,6 @@ public class DevelopmentItemWorkflowService {
             story.setTopicWorkflowNodeId(mountNodeId);
             story.setProjectId(projectId);
             story.setNodeId(nodeId);
-            story.setIterationPlanId(null);
         }
         if (titleChanged) {
             if (storyMapper.updateTitle(story.getId(), title) != 1) {
@@ -421,9 +438,7 @@ public class DevelopmentItemWorkflowService {
             if (planId != null) {
                 ProjectNodeIterationPlanDO plan = iterationPlanMapper.selectByIdForUpdate(planId);
                 if (plan == null) throw BusinessException.notFound("迭代计划不存在");
-                if (!Objects.equals(plan.getProjectId(), projectId)) {
-                    throw BusinessException.error("故事和迭代计划必须属于同一个项目");
-                }
+                iterationPlanSystemService.bindStory(plan, story);
             }
             if (!Objects.equals(story.getIterationPlanId(), planId)) {
                 if (storyMapper.updateIterationPlan(story.getId(), planId) != 1) {
@@ -952,6 +967,89 @@ public class DevelopmentItemWorkflowService {
         List<String> errors = RequirementReceivingAnalysisPolicy.validate(state, config, true);
         if (!errors.isEmpty()) throw BusinessException.error(String.join("；", errors));
     }
+
+    private void syncRequirementExecutionTarget(ItemContext context, Map<String, JsonNode> values) {
+        if (context == null || context.itemType() != DevelopmentItemType.REQUIREMENT
+                || requirementExecutionTargetService == null || values == null) return;
+        JsonNode components = values.get("__components");
+        JsonNode workbench = components == null ? null
+                : components.get(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
+        if (workbench == null || !workbench.isObject()) return;
+        JsonNode typeNode = workbench.get("targetType");
+        JsonNode idNode = workbench.get("targetId");
+        if (typeNode == null || !typeNode.isTextual() || idNode == null || !idNode.isIntegralNumber()) return;
+        RequirementExecutionTargetType targetType;
+        try {
+            targetType = RequirementExecutionTargetType.valueOf(typeNode.asText());
+        } catch (IllegalArgumentException exception) {
+            throw BusinessException.error("交付目标类型无效");
+        }
+        requirementExecutionTargetService.syncFromWorkbench(context.itemId(), targetType, idNode.asLong());
+    }
+
+    private void syncRequirementSystem(ItemContext context, DevelopmentItemWorkflowDO workflow,
+                                       DevelopmentItemWorkflowNodeDO node, Map<String, JsonNode> values) {
+        if (context == null || context.itemType() != DevelopmentItemType.REQUIREMENT
+                || requirementSystemReferenceService == null || values == null) return;
+        JsonNode components = values.get("__components");
+        JsonNode workbench = components == null ? null
+                : components.get(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
+        boolean clarificationNode = node != null && String.valueOf(node.getName()).contains("需求澄清");
+        String receivingCategory = clarificationNode ? resolveRequirementReceivingCategory(workflow, node) : null;
+        if (!clarificationNode || (!"NON_FUNCTIONAL".equals(receivingCategory)
+                && (workbench == null || !workbench.isObject() || !workbench.has("systemId")))) return;
+        JsonNode systemNode = workbench == null ? null : workbench.get("systemId");
+        Long systemId = null;
+        if (!"NON_FUNCTIONAL".equals(receivingCategory) && systemNode != null && !systemNode.isNull()) {
+            if (systemNode.isIntegralNumber()) systemId = systemNode.asLong();
+            else if (systemNode.isTextual() && !systemNode.asText().isBlank()) {
+                try {
+                    systemId = Long.valueOf(systemNode.asText().trim());
+                } catch (NumberFormatException exception) {
+                    throw BusinessException.error("系统选择无效");
+                }
+            }
+            if (systemId == null || systemId <= 0) throw BusinessException.error("系统选择无效");
+        }
+        RequirementDO requirement = requirementMapper.selectByIdForUpdate(context.itemId());
+        if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) {
+            throw BusinessException.notFound("需求不存在");
+        }
+        if (Objects.equals(requirement.getSystemId(), systemId)) return;
+        if (systemId != null) {
+            requirementSystemReferenceService.requireActiveSystem(systemId);
+            requirement.setSystemId(systemId);
+            requirementSystemReferenceService.validateRequirementSystem(requirement);
+        } else {
+            requirement.setSystemId(null);
+        }
+        if (requirementMapper.updateById(requirement) != 1) {
+            throw BusinessException.conflict("需求系统已被其他人修改，请刷新后重试");
+        }
+    }
+
+    private String resolveRequirementReceivingCategory(DevelopmentItemWorkflowDO workflow,
+                                                        DevelopmentItemWorkflowNodeDO currentNode) {
+        if (workflow == null || workflow.getId() == null || currentNode == null) return null;
+        List<DevelopmentItemWorkflowNodeDO> nodes = nodeMapper.selectByWorkflowIds(List.of(workflow.getId()));
+        return nodes.stream()
+                .filter(candidate -> candidate.getSort() != null && currentNode.getSort() != null
+                        && candidate.getSort() < currentNode.getSort())
+                .sorted(Comparator.comparing(DevelopmentItemWorkflowNodeDO::getSort).reversed())
+                .map(this::readRequirementReceivingCategory)
+                .filter(category -> "FUNCTIONAL".equals(category) || "NON_FUNCTIONAL".equals(category))
+                .findFirst().orElse(null);
+    }
+
+    private String readRequirementReceivingCategory(DevelopmentItemWorkflowNodeDO node) {
+        Map<String, JsonNode> values = readFieldValues(node.getFieldValuesJson());
+        JsonNode components = values.get("__components");
+        JsonNode state = components == null ? null
+                : components.get(WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS);
+        JsonNode category = state == null || !state.isObject() ? null : state.get("category");
+        return category == null || !category.isTextual() ? null : category.asText();
+    }
+
 
     private void syncEditableRequirementBindings(
             ItemContext context, WorkflowNodeDefinition definition, Map<String, JsonNode> rawValues) {

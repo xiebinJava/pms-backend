@@ -62,10 +62,13 @@ class DevelopmentTopicManagementServiceTest {
     @Mock OperationLogService operationLogService;
     @Mock UserService userService;
     @Mock ProjectMemberAssignmentService projectMemberAssignmentService;
+    @Mock IterationPlanSystemService iterationPlanSystemService;
+    @Mock RequirementSystemReferenceService requirementSystemReferenceService;
     @InjectMocks DevelopmentTopicManagementService service;
 
     @BeforeEach
     void initMybatisLambdaCaches() {
+        service.setSystemServices(iterationPlanSystemService, requirementSystemReferenceService);
         Configuration configuration = new Configuration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "topic-management-test");
         TableInfoHelper.initTableInfo(assistant, ProjectDO.class);
@@ -267,7 +270,8 @@ class DevelopmentTopicManagementServiceTest {
         assertThat(topic.getMilestoneId()).isNull();
         assertThat(story.getProjectId()).isEqualTo(2L);
         assertThat(story.getNodeId()).isEqualTo(22L);
-        assertThat(story.getIterationPlanId()).isNull();
+        assertThat(story.getIterationPlanId()).isEqualTo(900L);
+        verify(iterationPlanSystemService).validateStoryScope(story);
         assertThat(story.getOwnerId()).isEqualTo(99L);
         assertThat(topicWorkflow.getTemplateVersionId()).isEqualTo(501L);
         assertThat(topicWorkflow.getProjectId()).isEqualTo(2L);

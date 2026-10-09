@@ -165,6 +165,7 @@ public class AiConnectorQueryService {
         IterationPlanPageQry query = new IterationPlanPageQry();
         query.setKeyword(keyword);
         query.setProjectId(longValue(filters, "projectId"));
+        query.setSystemVersionId(longValue(filters, "systemVersionId"));
         query.setStatus(text(filters, "status"));
         query.setCurrPage(page);
         query.setPageSize(pageSize);
@@ -352,6 +353,10 @@ public class AiConnectorQueryService {
         Map<String, Object> summary = new LinkedHashMap<>();
         put(summary, "projectId", item.getProjectId()); put(summary, "projectName", item.getProjectName());
         put(summary, "nodeId", item.getNodeId()); put(summary, "nodeName", item.getNodeName());
+        put(summary, "systemVersionId", item.getSystemVersionId());
+        put(summary, "systemVersionNo", item.getSystemVersionNo());
+        put(summary, "systemVersionName", item.getSystemVersionName());
+        put(summary, "systemName", item.getSystemName());
         put(summary, "ownerId", item.getOwnerId()); put(summary, "ownerName", item.getOwnerName());
         put(summary, "goal", item.getGoal()); put(summary, "progress", item.getProgress());
         put(summary, "storyCount", item.getStoryCount()); put(summary, "taskCount", item.getTaskCount());

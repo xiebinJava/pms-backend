@@ -3,7 +3,7 @@
   "templateCode" : "wf-5f5496d0ab8d46c29f5ff737bdf26e79",
   "name" : "故事管理流程",
   "description" : null,
-  "versionNo" : 6,
+  "versionNo" : 1,
   "definition" : {
     "schemaVersion" : 2,
     "nodes" : [ {

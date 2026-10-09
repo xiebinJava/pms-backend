@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.net.URI;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
@@ -12,10 +11,9 @@ import java.util.Set;
 
 /** Validates and merges the structured state of a story node workbench variant. */
 public final class StoryNodeWorkbenchPolicy {
-    private record FieldSpec(int maxLength, boolean requiresUrl, boolean requiresDate) {
-        static FieldSpec text(int maxLength) { return new FieldSpec(maxLength, false, false); }
-        static FieldSpec url(int maxLength) { return new FieldSpec(maxLength, true, false); }
-        static FieldSpec date() { return new FieldSpec(10, false, true); }
+    private record FieldSpec(int maxLength, boolean requiresDate) {
+        static FieldSpec text(int maxLength) { return new FieldSpec(maxLength, false); }
+        static FieldSpec date() { return new FieldSpec(10, true); }
     }
 
     private static final Map<String, Map<String, FieldSpec>> VARIANTS = Map.of(
@@ -32,7 +30,7 @@ public final class StoryNodeWorkbenchPolicy {
             "development", Map.of(
                     "implementationNote", FieldSpec.text(2000),
                     "selfTestResult", FieldSpec.text(2000),
-                    "codeLink", FieldSpec.url(2000),
+                    "codeLink", FieldSpec.text(2000),
                     "mergeStatus", FieldSpec.text(20),
                     "deployEnv", FieldSpec.text(100)),
             "acceptance", Map.of(
@@ -173,9 +171,6 @@ public final class StoryNodeWorkbenchPolicy {
         if (!value.isTextual()) throw new IllegalArgumentException("故事节点工作台字段格式不正确");
         String text = value.asText();
         if (text.length() > spec.maxLength()) throw new IllegalArgumentException("故事节点工作台字段超过长度限制");
-        if (spec.requiresUrl() && !text.isBlank() && !validHttpUrl(text)) {
-            throw new IllegalArgumentException("请填写有效的 http 或 https 链接");
-        }
         if (spec.requiresDate() && !text.isBlank() && !validDate(text.trim())) {
             throw new IllegalArgumentException("请填写有效的日期");
         }
@@ -184,16 +179,6 @@ public final class StoryNodeWorkbenchPolicy {
     private static boolean validUuid(String value) {
         try { return java.util.UUID.fromString(value).toString().equals(value); }
         catch (IllegalArgumentException exception) { return false; }
-    }
-
-    private static boolean validHttpUrl(String value) {
-        try {
-            URI uri = URI.create(value);
-            return ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                    && uri.getHost() != null && uri.getUserInfo() == null;
-        } catch (IllegalArgumentException exception) {
-            return false;
-        }
     }
 
     private static boolean validDate(String value) {

@@ -211,12 +211,13 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
     }
 
     @Test
-    void rejectsUnsafeTestingReportLinksBeforeChangingTheNode() throws Exception {
+    void savesTestingReportReferencesWithoutProtocolValidation() throws Exception {
         Fixture fixture = testingFixture();
-        assertThatThrownBy(() -> fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L,
-                testingCommand("javascript:alert(1)")))
-                .isInstanceOf(BusinessException.class).hasMessageContaining("http");
-        assertThat(fixture.node.getFieldValuesJson()).isNull();
+        var result = fixture.service.updateNode(DevelopmentItemType.TOPIC, 7L, 21L,
+                testingCommand("内部文档/测试报告"));
+        assertThat(result.getNodes().get(0).getFieldValues().get("__components")
+                .path("story-list").path("reportUrl").asText()).isEqualTo("内部文档/测试报告");
+        assertThat(fixture.node.getStatus()).isEqualTo(1);
     }
 
     @Test
@@ -626,6 +627,10 @@ class DevelopmentItemWorkflowServiceNodeEditTest {
                     storyMapper, requirementMapper, projectNodeMapper, iterationPlanMapper, templateVersionMapper,
                     permissionService, userService, workflowTemplateService, workflowComponentBindingService,
                     assignmentService, new ObjectMapper());
+            RequirementSystemReferenceService systems = mock(RequirementSystemReferenceService.class);
+            org.mockito.Mockito.lenient().when(systems.resolveForStory(org.mockito.ArgumentMatchers.any(ProjectNodeDevelopmentStoryDO.class))).thenReturn(null);
+            service.setIterationPlanSystemService(new IterationPlanSystemService(systems,
+                    mock(SystemVersionReferenceService.class), iterationPlanMapper));
 
             project.setId(5L);
             project.setName("项目");

@@ -301,21 +301,25 @@ public final class PmsCommandMetadata {
                     Map.entry("projectId", Map.of("type", "integer", "required", true)),
                     Map.entry("nodeId", Map.of("type", "integer", "required", true)),
                     Map.entry("name", Map.of("type", "string", "required", true)),
+                    Map.entry("systemId", Map.of("type", "integer", "description", "无需求系统来源时选择所属系统")),
                     Map.entry("ownerId", Map.of("type", "integer")),
                     Map.entry("goal", Map.of("type", "string")),
                     Map.entry("status", Map.of("type", "string")),
-                    Map.entry("startDate", Map.of("type", "string", "format", "date")),
-                    Map.entry("dueDate", Map.of("type", "string", "format", "date")),
-                    Map.entry("sort", Map.of("type", "integer"))));
+                     Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("dueDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("sort", Map.of("type", "integer")),
+                     Map.entry("systemVersionId", Map.of("type", "integer"))));
             case ITERATION_PLAN_UPDATE -> descriptor(name, "更新迭代计划基本信息", "high", List.of(
                     Map.entry("iterationPlanId", Map.of("type", "integer", "required", true)),
                     Map.entry("name", Map.of("type", "string", "required", true)),
+                    Map.entry("systemId", Map.of("type", "integer")),
                     Map.entry("ownerId", Map.of("type", "integer")),
                     Map.entry("goal", Map.of("type", "string")),
                     Map.entry("status", Map.of("type", "string")),
-                    Map.entry("startDate", Map.of("type", "string", "format", "date")),
-                    Map.entry("dueDate", Map.of("type", "string", "format", "date")),
-                    Map.entry("sort", Map.of("type", "integer"))));
+                     Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("dueDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("sort", Map.of("type", "integer")),
+                     Map.entry("systemVersionId", Map.of("type", "integer"))));
             case ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> descriptor(name,
                     name == CommandName.ITERATION_PLAN_STORY_ADD ? "将故事加入迭代计划" : "将故事移出迭代计划", "medium", List.of(
                     Map.entry("iterationPlanId", Map.of("type", "integer", "required", true)),

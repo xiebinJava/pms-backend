@@ -1,6 +1,5 @@
 package com.brad.pms.workflow;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -12,14 +11,7 @@ public final class TopicDesignReviewPolicy {
         for (String key : List.of("productPlanUrl", "uiPlanUrl", "technicalPlanUrl")) {
             Object value = state.get(key);
             if (value == null || "".equals(value) || value instanceof String s && s.isBlank()) continue;
-            try {
-                if (!(value instanceof String)) throw new IllegalArgumentException();
-                URI uri = URI.create(((String) value).trim());
-                if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                        || uri.getHost() == null || uri.getUserInfo() != null) throw new IllegalArgumentException();
-            } catch (IllegalArgumentException error) {
-                throw new IllegalArgumentException("请填写有效的 http 或 https 方案文档链接");
-            }
+            if (!(value instanceof String)) throw new IllegalArgumentException("方案文档链接格式不正确");
         }
         Object reviewers = state.get("productReviewerIds");
         if (!(reviewers instanceof List<?> list) || list.isEmpty()) throw new IllegalArgumentException("请选择产品评审参与人");

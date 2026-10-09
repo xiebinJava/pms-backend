@@ -22,12 +22,14 @@ import com.brad.pms.entity.ProjectNodeIterationPlanDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
 import com.brad.pms.entity.ProjectNodeSolutionDecisionDO;
 import com.brad.pms.entity.UserDO;
+import com.brad.pms.entity.SystemDO;
 import com.brad.pms.mapper.ProjectNodePlanBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeResourceMapper;
 import com.brad.pms.mapper.ProjectNodeRiskMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionDecisionMapper;
+import com.brad.pms.mapper.SystemMapper;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.workflow.WorkflowComponentKey;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +64,9 @@ public class NodePlanResourceRiskService {
     private final MemberService memberService;
     private final ProjectPermissionService permissionService;
     private final UserService userService;
+    private final SystemVersionReferenceService systemVersionReferenceService;
+    private final IterationPlanSystemService iterationPlanSystemService;
+    private final SystemMapper systemMapper;
     private final OperationLogService operationLogService;
 
     public NodePlanResourceRiskDTO get(Long projectId, Long nodeId) {
@@ -175,7 +180,7 @@ public class NodePlanResourceRiskService {
             item.setName(trim(item.getName()));
             item.setGoal(trim(item.getGoal()));
             item.setStatus(normalize(item.getStatus(), "PLANNED"));
-            if (!Set.of("PLANNED", "IN_PROGRESS", "DONE").contains(item.getStatus())) {
+            if (!Set.of("PLANNED", "IN_PROGRESS", "DONE", "PAUSED").contains(item.getStatus())) {
                 throw BusinessException.error("迭代计划状态不合法");
             }
             if (item.getStartDate() != null && item.getDueDate() != null
@@ -197,6 +202,9 @@ public class NodePlanResourceRiskService {
     }
 
     private void validateComplete(NodePlanResourceRiskDTO current) {
+        if (current.getIterationPlans().stream().anyMatch(item -> item.getSystemId() == null)) {
+            throw BusinessException.error("请为每条迭代计划选择所属系统");
+        }
         if (current.getIterationPlans().isEmpty()
                 || current.getIterationPlans().stream().anyMatch(item -> trim(item.getName()) == null
                 || item.getOwnerId() == null || item.getStartDate() == null || item.getDueDate() == null)) {
@@ -261,6 +269,8 @@ public class NodePlanResourceRiskService {
                 .filter(item -> item.getId() != null)
                 .collect(Collectors.toMap(ProjectNodeIterationPlanDO::getId, item -> item));
         Set<Long> retainedIds = new HashSet<>();
+        List<IterationPlanMutation> mutations = new ArrayList<>();
+        List<SystemVersionReferenceService.Binding> bindings = new ArrayList<>();
         for (NodeIterationPlanCmd cmd : items) {
             ProjectNodeIterationPlanDO item;
             if (cmd.getId() == null) {
@@ -273,7 +283,17 @@ public class NodePlanResourceRiskService {
                 if (item == null) throw BusinessException.error("迭代计划不存在，请刷新后重试");
                 if (!retainedIds.add(item.getId())) throw BusinessException.error("迭代计划不能重复");
             }
-            applyIterationPlanFields(item, cmd, cmd.getSort() == null ? retainedIds.size() : cmd.getSort());
+            Long systemVersionId = systemVersionReferenceService.resolveForSave(cmd, item.getSystemVersionId());
+            Long systemId = iterationPlanSystemService.resolveForSave(item, cmd, false);
+            systemVersionReferenceService.validateSystem(systemVersionId, systemId);
+            bindings.add(new SystemVersionReferenceService.Binding(systemVersionId, item.getSystemVersionId()));
+            mutations.add(new IterationPlanMutation(item, cmd,
+                    cmd.getSort() == null ? retainedIds.size() : cmd.getSort(), systemVersionId, systemId));
+        }
+        systemVersionReferenceService.validateForSave(bindings);
+        for (IterationPlanMutation mutation : mutations) {
+            ProjectNodeIterationPlanDO item = mutation.item();
+            applyIterationPlanFields(item, mutation.cmd(), mutation.sort(), mutation.systemVersionId(), mutation.systemId());
             if (item.getId() == null) {
                 if (iterationPlanMapper.insert(item) != 1) throw BusinessException.conflict("迭代计划保存失败，请刷新后重试");
                 if (item.getId() != null) retainedIds.add(item.getId());
@@ -293,8 +313,11 @@ public class NodePlanResourceRiskService {
         }
     }
 
-    private void applyIterationPlanFields(ProjectNodeIterationPlanDO item, NodeIterationPlanCmd cmd, int sort) {
+    private void applyIterationPlanFields(ProjectNodeIterationPlanDO item, NodeIterationPlanCmd cmd, int sort,
+                                          Long systemVersionId, Long systemId) {
         item.setName(cmd.getName());
+        item.setSystemId(systemId);
+        item.setSystemVersionId(systemVersionId);
         item.setOwnerId(cmd.getOwnerId());
         item.setGoal(cmd.getGoal());
         item.setStatus(cmd.getStatus());
@@ -338,17 +361,32 @@ public class NodePlanResourceRiskService {
                 .eq(ProjectNodeIterationPlanDO::getNodeId, node.getId())
                 .orderByAsc(ProjectNodeIterationPlanDO::getSort)
                 .orderByAsc(ProjectNodeIterationPlanDO::getId)));
+        Set<Long> systemVersionIds = iterationPlans.stream().map(ProjectNodeIterationPlanDO::getSystemVersionId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, SystemVersionReferenceService.Reference> loadedSystemVersions = systemVersionIds.isEmpty()
+                ? Map.of() : systemVersionReferenceService.load(systemVersionIds);
+        Map<Long, SystemVersionReferenceService.Reference> systemVersions = loadedSystemVersions == null
+                ? Map.of() : loadedSystemVersions;
         Set<Long> ownerIds = new HashSet<>();
+        Set<Long> systemIds = iterationPlans.stream().map(ProjectNodeIterationPlanDO::getSystemId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
         resources.forEach(item -> addIfPresent(ownerIds, item.getOwnerId()));
         risks.forEach(item -> addIfPresent(ownerIds, item.getOwnerId()));
         iterationPlans.forEach(item -> addIfPresent(ownerIds, item.getOwnerId()));
         addIfPresent(ownerIds, dto.getConfirmedBy());
         List<UserDO> users = ownerIds.isEmpty() ? List.of() : userService.listByIds(new ArrayList<>(ownerIds));
         Map<Long, UserDO> userMap = Convertors.userMap(users == null ? List.of() : users);
+        Map<Long, SystemDO> systemMap = systemMapper == null || systemIds.isEmpty()
+                ? Map.of() : systemMapper.selectBatchIds(new ArrayList<>(systemIds)).stream()
+                .collect(Collectors.toMap(SystemDO::getId, item -> item, (left, right) -> left));
         if (dto.getConfirmedBy() != null) dto.setConfirmedByName(Convertors.userDisplayName(userMap.get(dto.getConfirmedBy())));
         dto.setResources(resources.stream().map(item -> toResourceDTO(item, userMap.get(item.getOwnerId()))).collect(Collectors.toList()));
         dto.setRisks(risks.stream().map(item -> toRiskDTO(item, userMap.get(item.getOwnerId()))).collect(Collectors.toList()));
-        dto.setIterationPlans(iterationPlans.stream().map(item -> toIterationPlanDTO(item, userMap.get(item.getOwnerId()))).collect(Collectors.toList()));
+        dto.setIterationPlans(iterationPlans.stream()
+                .map(item -> toIterationPlanDTO(item, userMap.get(item.getOwnerId()),
+                        item.getSystemVersionId() == null ? null : systemVersions.get(item.getSystemVersionId()),
+                        item.getSystemId() == null ? null : systemMap.get(item.getSystemId())))
+                .collect(Collectors.toList()));
         return dto;
     }
 
@@ -368,9 +406,21 @@ public class NodePlanResourceRiskService {
         return dto;
     }
 
-    private NodeIterationPlanDTO toIterationPlanDTO(ProjectNodeIterationPlanDO item, UserDO owner) {
+    private NodeIterationPlanDTO toIterationPlanDTO(ProjectNodeIterationPlanDO item, UserDO owner,
+                                                    SystemVersionReferenceService.Reference systemVersion,
+                                                    SystemDO system) {
         NodeIterationPlanDTO dto = new NodeIterationPlanDTO();
         dto.setId(item.getId());
+        dto.setSystemId(item.getSystemId());
+        if (system != null) {
+            dto.setSystemName(system.getName());
+        }
+        dto.setSystemVersionId(item.getSystemVersionId());
+        if (systemVersion != null) {
+            dto.setSystemVersionNo(systemVersion.versionNo());
+            dto.setSystemVersionName(systemVersion.versionName());
+            if (system == null) dto.setSystemName(systemVersion.systemName());
+        }
         dto.setName(item.getName());
         dto.setOwnerId(item.getOwnerId());
         dto.setOwnerName(Convertors.userDisplayName(owner));
@@ -434,4 +484,7 @@ public class NodePlanResourceRiskService {
     }
 
     private void addIfPresent(Set<Long> ids, Long id) { if (id != null) ids.add(id); }
+
+    private record IterationPlanMutation(ProjectNodeIterationPlanDO item, NodeIterationPlanCmd cmd,
+                                         int sort, Long systemVersionId, Long systemId) { }
 }

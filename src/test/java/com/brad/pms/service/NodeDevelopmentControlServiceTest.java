@@ -49,6 +49,8 @@ class NodeDevelopmentControlServiceTest {
     @Mock ProjectNodeDevelopmentTopicMapper topicMapper;
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
     @Mock IterationPlanService iterationPlanService;
+    @Mock IterationPlanOptionsService iterationPlanOptionsService;
+    @Mock IterationPlanSystemService iterationPlanSystemService;
     @Mock ProjectMemberMapper memberMapper;
     @Mock ProjectPermissionService permissionService;
     @Mock UserService userService;
@@ -459,7 +461,7 @@ class NodeDevelopmentControlServiceTest {
     }
 
     @Test
-    void completionRequiresAtLeastOneDevelopmentStory() {
+    void completionRequiresAtLeastOneTopic() {
         ProjectNodeDO node = node("develop");
         when(permissionService.requireProjectReadable(1L)).thenReturn(new ProjectDO());
         when(permissionService.requireNode(1L, 10L)).thenReturn(node);
@@ -471,7 +473,7 @@ class NodeDevelopmentControlServiceTest {
     }
 
     @Test
-    void completionRequiresAllStoriesDone() {
+    void completionDoesNotRequireStoriesToBeDone() {
         ProjectNodeDO node = node("develop");
         ProjectNodeDevelopmentTopicDO topic = topic(20L, "订单中心");
         topic.setMilestoneId(301L);
@@ -481,9 +483,18 @@ class NodeDevelopmentControlServiceTest {
         when(topicMapper.selectList(any())).thenReturn(List.of(topic));
         when(storyMapper.selectList(any())).thenReturn(List.of(story(20L, "统一订单状态", "TESTING", 80)));
 
-        assertThatThrownBy(() -> service.requireCompleted(1L, 10L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("全部故事");
+        service.requireCompleted(1L, 10L);
+    }
+
+    @Test
+    void completionPassesWithOneTopicAndNoStories() {
+        ProjectNodeDO node = node("develop");
+        when(permissionService.requireProjectReadable(1L)).thenReturn(new ProjectDO());
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        when(topicMapper.selectList(any())).thenReturn(List.of(topic(20L, "订单中心")));
+        when(storyMapper.selectList(any())).thenReturn(List.of());
+
+        service.requireCompleted(1L, 10L);
     }
 
     @Test

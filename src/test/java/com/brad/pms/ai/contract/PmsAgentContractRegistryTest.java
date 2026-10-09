@@ -55,6 +55,22 @@ class PmsAgentContractRegistryTest {
     }
 
     @Test
+    void loadsTheReleaseContractWithOnlyTheCurrentHandoverInputs() {
+        PmsAgentContractLoader loader = new PmsAgentContractLoader(WRITE_COMMANDS, READ_TOOLS);
+
+        PmsAgentContract contract = loader.load(new ClassPathResource(
+                "agent-contracts/pms/node-release.yaml"));
+
+        assertThat(contract.contractVersion()).isEqualTo("1.1.0");
+        assertThat(contract.inputs()).anyMatch(input -> input.contains("交接人账号 ID"));
+        assertThat(contract.inputs()).anyMatch(input -> input.contains("交接说明"));
+        assertThat(contract.inputs()).noneMatch(input -> input.contains("发布窗口"));
+        assertThat(contract.completionCriteria()).anyMatch(criteria -> criteria.contains("handoverOwnerId"));
+        assertThat(contract.completionCriteria()).anyMatch(criteria -> criteria.contains("handoverNotes"));
+        assertThat(contract.completionCriteria()).noneMatch(criteria -> criteria.contains("回滚预案"));
+    }
+
+    @Test
     void rejectsAWriteCommandThatIsNotRegisteredByPms() {
         PmsAgentContractLoader loader = new PmsAgentContractLoader(WRITE_COMMANDS, READ_TOOLS);
         String yaml = validYaml("project.purge", "pms_project_get");

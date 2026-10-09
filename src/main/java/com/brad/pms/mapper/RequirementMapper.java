@@ -30,4 +30,11 @@ public interface RequirementMapper extends BaseMapper<RequirementDO> {
     List<RequirementDO> selectByExecutionTargets(
             @Param("targetType") RequirementExecutionTargetType targetType,
             @Param("targetIds") List<Long> targetIds);
+
+    @Select("<script>SELECT * FROM pms_requirement WHERE deleted = FALSE AND status = 'ACTIVE' "
+            + "AND execution_target_type = #{targetType} AND execution_target_id IN "
+            + "<foreach collection='targetIds' item='targetId' open='(' separator=',' close=')'>#{targetId}</foreach> "
+            + "ORDER BY id ASC FOR UPDATE</script>")
+    List<RequirementDO> selectByExecutionTargetsForUpdate(@Param("targetType") RequirementExecutionTargetType targetType,
+                                                         @Param("targetIds") List<Long> targetIds);
 }

@@ -58,7 +58,8 @@ class WorkflowSystemDefaultWriterTest {
         assertThat(Files.readString(written))
                 .contains("\"processTypeCode\" : \"general\"")
                 .contains("\"templateCode\" : \"current-process\"")
-                .contains("\"versionNo\" : 2")
+                .contains("\"versionNo\" : 1")
+                .contains("\"name\" : \"项目管理流程\"")
                 .contains("\"nodes\"");
     }
 

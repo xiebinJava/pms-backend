@@ -3,7 +3,7 @@
   "templateCode" : "current-process",
   "name" : "项目管理流程",
   "description" : "兼容现有项目的九阶段顺序流程",
-  "versionNo" : 7,
+  "versionNo" : 1,
   "definition" : {
     "schemaVersion" : 2,
     "nodes" : [ {

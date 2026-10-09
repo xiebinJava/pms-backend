@@ -25,6 +25,12 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class DevelopmentStoryManagementService {
+    private IterationPlanSystemService iterationPlanSystemService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setIterationPlanSystemService(IterationPlanSystemService service) {
+        this.iterationPlanSystemService = service;
+    }
 
     private static final String NOT_STARTED = "NOT_STARTED";
     private static final String IN_PROGRESS = "IN_PROGRESS";
@@ -103,7 +109,7 @@ public class DevelopmentStoryManagementService {
         if (workflow != null) taskMapper.selectByWorkflowIdsForUpdate(List.of(workflow.getId()));
 
         apply(story, cmd, targetTopic, story.getSort() == null ? 0 : story.getSort(), targetTopicWorkflowNodeId);
-        if (contextChanged) story.setIterationPlanId(null);
+        if (contextChanged) iterationPlanSystemService.validateStoryScope(story);
         if (storyMapper.updateById(story) != 1) throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
 
         if (workflow != null && contextChanged) {

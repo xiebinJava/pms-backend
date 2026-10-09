@@ -24,7 +24,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class IterationPlanUpdateCommand implements PmsCommand {
     private static final Set<String> ALLOWED = Set.of("iterationPlanId", "name", "ownerId", "goal", "status",
-            "startDate", "dueDate", "sort");
+            "startDate", "dueDate", "sort", "systemId", "systemVersionId");
     private static final List<String> REFRESH = List.of("iteration-plan", "project-detail");
     private final IterationPlanCommandService planService;
     private final ProjectNodeIterationPlanMapper planMapper;

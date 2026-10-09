@@ -26,10 +26,11 @@ class TopicResearchPolicyTest {
         assertDoesNotThrow(() -> TopicResearchPolicy.validate(Map.of("needed", "YES", "goal", "比较竞品", "reportUrl", "https://docs.example.com/report")));
         assertThrows(IllegalArgumentException.class, () -> TopicResearchPolicy.validate(Map.of("needed", "YES", "goal", "比较竞品", "report", "旧正文")));
     }
-    @Test void rejectsTextAndUnsafeLinksAsReports() {
+    @Test void acceptsNonEmptyReportReferencesWithoutProtocolValidation() {
         for (String url : java.util.List.of("报告", "javascript:alert(1)", "file:///report", "https://", "https://bad link")) {
-            assertThrows(IllegalArgumentException.class, () -> TopicResearchPolicy.validate(Map.of("needed", "YES", "goal", "比较竞品", "reportUrl", url)));
+            assertDoesNotThrow(() -> TopicResearchPolicy.validate(Map.of("needed", "YES", "goal", "比较竞品", "reportUrl", url)));
         }
+        assertThrows(IllegalArgumentException.class, () -> TopicResearchPolicy.validate(Map.of("needed", "YES", "goal", "目标", "reportUrl", "  ")));
     }
     @Test void clientAttachmentMetadataCannotBypassValidation() {
         assertThrows(IllegalArgumentException.class, () -> TopicResearchPolicy.validate(Map.of("needed", "YES", "goal", "目标", "attachments", java.util.List.of("fake"))));

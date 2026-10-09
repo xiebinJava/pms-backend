@@ -51,6 +51,12 @@ public class RequirementExecutionTargetService {
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final OperationLogService operationLogService;
+    private RequirementSystemReferenceService requirementSystemReferenceService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setRequirementSystemReferenceService(RequirementSystemReferenceService service) {
+        this.requirementSystemReferenceService = service;
+    }
 
     @Transactional
     public RequirementExecutionTargetDTO link(Long requirementId, RequirementExecutionTargetCmd cmd) {
@@ -58,6 +64,7 @@ public class RequirementExecutionTargetService {
         if (hasTarget(requirement)) throw BusinessException.conflict("需求已有执行对象，请使用改绑操作");
         TargetSnapshot target = validateTarget(cmd);
         applyTarget(requirement, target);
+        validateRequirementSystem(requirement);
         updateRequirement(requirement);
         appendHistory(requirement, "LINK", target, null, cmd.getReason());
         audit(requirement, AuditAction.REQUIREMENT_EXECUTION_TARGET_LINKED.name(), null, target, cmd.getReason());
@@ -87,10 +94,40 @@ public class RequirementExecutionTargetService {
         TargetSnapshot target = validateTarget(cmd);
         if (previous.sameTarget(target)) throw BusinessException.error("新的执行对象不能与当前对象相同");
         applyTarget(requirement, target);
+        validateRequirementSystem(requirement);
         updateRequirement(requirement);
         appendHistory(requirement, "REPLACE", target, previous, cmd.getReason());
         audit(requirement, AuditAction.REQUIREMENT_EXECUTION_TARGET_REPLACED.name(), previous, target, cmd.getReason());
         return toTargetDTO(target);
+    }
+
+    /**
+     * Applies the delivery target chosen on a requirement workflow node (for
+     * example the scheduling node) to the requirement itself, so list and
+     * detail reads that rely on the requirement columns stay in sync.
+     */
+    @Transactional
+    public void syncFromWorkbench(Long requirementId, RequirementExecutionTargetType targetType, Long targetId) {
+        if (requirementId == null || targetType == null || targetId == null) return;
+        RequirementDO requirement = requirementMapper.selectByIdForUpdate(requirementId);
+        if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) {
+            throw BusinessException.notFound("需求不存在");
+        }
+        if (Objects.equals(requirement.getExecutionTargetType(), targetType)
+                && Objects.equals(requirement.getExecutionTargetId(), targetId)) {
+            return;
+        }
+        TargetSnapshot target = validateTarget(targetType, targetId);
+        TargetSnapshot previous = hasTarget(requirement)
+                ? snapshot(requirement.getExecutionTargetType(), requirement.getExecutionTargetId()) : null;
+        applyTarget(requirement, target);
+        validateRequirementSystem(requirement);
+        updateRequirement(requirement);
+        String reason = "需求排期节点确认交付目标";
+        appendHistory(requirement, previous == null ? "LINK" : "REPLACE", target, previous, reason);
+        audit(requirement, (previous == null
+                ? AuditAction.REQUIREMENT_EXECUTION_TARGET_LINKED
+                : AuditAction.REQUIREMENT_EXECUTION_TARGET_REPLACED).name(), previous, target, reason);
     }
 
     public PageResult<RequirementExecutionTargetOptionDTO> options(
@@ -163,10 +200,17 @@ public class RequirementExecutionTargetService {
         if (cmd == null || cmd.getTargetType() == null || cmd.getTargetId() == null) {
             throw BusinessException.error("执行对象信息不完整");
         }
-        return switch (cmd.getTargetType()) {
-            case PROJECT -> validateProject(cmd.getTargetId());
-            case TOPIC -> validateTopic(cmd.getTargetId());
-            case STORY -> validateStory(cmd.getTargetId());
+        return validateTarget(cmd.getTargetType(), cmd.getTargetId());
+    }
+
+    private TargetSnapshot validateTarget(RequirementExecutionTargetType targetType, Long targetId) {
+        if (targetType == null || targetId == null) {
+            throw BusinessException.error("执行对象信息不完整");
+        }
+        return switch (targetType) {
+            case PROJECT -> validateProject(targetId);
+            case TOPIC -> validateTopic(targetId);
+            case STORY -> validateStory(targetId);
         };
     }
 
@@ -258,6 +302,12 @@ public class RequirementExecutionTargetService {
     private void updateRequirement(RequirementDO requirement) {
         if (requirementMapper.updateById(requirement) != 1) {
             throw BusinessException.conflict("需求已被其他人修改，请刷新后重试");
+        }
+    }
+
+    private void validateRequirementSystem(RequirementDO requirement) {
+        if (requirementSystemReferenceService != null) {
+            requirementSystemReferenceService.validateRequirementSystem(requirement);
         }
     }
 

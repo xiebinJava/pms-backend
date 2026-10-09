@@ -136,8 +136,6 @@ class StoryNodeWorkbenchPolicyTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "{\"codeLink\":\"javascript:alert(1)\"}",
-            "{\"codeLink\":\"https://user:secret@example.com/pr\"}",
             "{\"codeLink\":123}",
             "{\"launchDate\":\"2026-13-40\"}",
             "{\"launchDate\":\"next week\"}",
@@ -185,10 +183,10 @@ class StoryNodeWorkbenchPolicyTest {
     }
 
     @Test
-    void mergeRejectsMalformedIncomingBeforeWriting() {
+    void mergeAcceptsNonHttpCodeReferences() {
         ObjectNode incoming = mapper.createObjectNode();
         incoming.put("codeLink", "ftp://example.com/file");
-        assertThatThrownBy(() -> StoryNodeWorkbenchPolicy.merge(null, incoming, "development"))
-                .hasMessageContaining("http");
+        assertThat(StoryNodeWorkbenchPolicy.merge(null, incoming, "development").path("codeLink").asText())
+                .isEqualTo("ftp://example.com/file");
     }
 }

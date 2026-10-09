@@ -23,7 +23,7 @@ latest_migration="$({ find "$BACKEND_DIR/src/main/resources/db/migration" -maxde
   | sed -nE 's/^V([0-9]+)__.*\.sql$/\1/p' \
   | sort -n \
   | tail -n 1)"
-[[ "$latest_migration" == "62" ]] || fail "expected current migration baseline V1–V62, found V${latest_migration:-unknown}"
+[[ "$latest_migration" == "69" ]] || fail "expected current migration baseline V1–V69, found V${latest_migration:-unknown}"
 
 integration_workflow="$BACKEND_DIR/.github/workflows/integration.yml"
 [[ -f "$integration_workflow" ]] || fail "integration workflow does not exist: $integration_workflow"
@@ -73,4 +73,4 @@ for route in \
   grep -F -- "$route" "$openapi" >/dev/null || fail "feedback route missing from OpenAPI contract: $route"
 done
 
-echo "Release consistency checks passed: migration=V1–V62, readiness=aligned, READMEs=current, feedback routes=documented"
+echo "Release consistency checks passed: migration=V1–V69, readiness=aligned, READMEs=current, feedback routes=documented"

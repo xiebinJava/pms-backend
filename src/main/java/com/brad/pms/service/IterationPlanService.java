@@ -19,6 +19,7 @@ import com.brad.pms.entity.ProjectNodePlanBaselineDO;
 import com.brad.pms.entity.ProjectNodeSolutionDecisionDO;
 import com.brad.pms.entity.ProjectTaskDO;
 import com.brad.pms.entity.UserDO;
+import com.brad.pms.entity.SystemDO;
 import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
@@ -26,6 +27,7 @@ import com.brad.pms.mapper.ProjectNodePlanBaselineMapper;
 import com.brad.pms.mapper.ProjectNodeSolutionDecisionMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
 import com.brad.pms.mapper.ProjectTaskMapper;
+import com.brad.pms.mapper.SystemMapper;
 import com.brad.pms.workflow.WorkflowComponentKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -55,6 +57,8 @@ public class IterationPlanService {
     private final ProjectNodeDevelopmentTopicMapper topicMapper;
     private final ProjectNodeDevelopmentStoryMapper storyMapper;
     private final ProjectTaskMapper taskMapper;
+    private final SystemVersionReferenceService systemVersionReferenceService;
+    private final SystemMapper systemMapper;
 
     @Autowired
     public IterationPlanService(
@@ -67,7 +71,9 @@ public class IterationPlanService {
             ProjectNodeMapper nodeMapper,
             ProjectNodeDevelopmentTopicMapper topicMapper,
             ProjectNodeDevelopmentStoryMapper storyMapper,
-            ProjectTaskMapper taskMapper) {
+            ProjectTaskMapper taskMapper,
+            SystemVersionReferenceService systemVersionReferenceService,
+            SystemMapper systemMapper) {
         this.iterationPlanMapper = iterationPlanMapper;
         this.baselineMapper = baselineMapper;
         this.decisionMapper = decisionMapper;
@@ -78,11 +84,22 @@ public class IterationPlanService {
         this.topicMapper = topicMapper;
         this.storyMapper = storyMapper;
         this.taskMapper = taskMapper;
+        this.systemVersionReferenceService = systemVersionReferenceService;
+        this.systemMapper = systemMapper;
     }
 
     public List<NodeIterationPlanDTO> listByProject(Long projectId) {
         permissionService.requireProjectReadable(projectId);
         return listConfirmedByProject(projectId);
+    }
+
+    /** Independent iterations are selectable by system, not by a fabricated project link. */
+    public List<NodeIterationPlanDTO> listIndependentForSystem(Long systemId) {
+        LambdaQueryWrapper<ProjectNodeIterationPlanDO> query = new LambdaQueryWrapper<>();
+        query.isNull(ProjectNodeIterationPlanDO::getProjectId);
+        if (systemId != null) query.and(scope -> scope.isNull(ProjectNodeIterationPlanDO::getSystemId)
+                .or().eq(ProjectNodeIterationPlanDO::getSystemId, systemId));
+        return toDTOs(iterationPlanMapper.selectList(query.orderByAsc(ProjectNodeIterationPlanDO::getId)));
     }
 
     public Set<Long> confirmedPlanIds(Long projectId) {
@@ -148,7 +165,7 @@ public class IterationPlanService {
     public IterationPlanDetailDTO detail(Long id) {
         ProjectNodeIterationPlanDO plan = iterationPlanMapper.selectById(id);
         if (plan == null) throw BusinessException.notFound("迭代计划不存在");
-        permissionService.requireProjectReadable(plan.getProjectId());
+        if (plan.getProjectId() != null) permissionService.requireProjectReadable(plan.getProjectId());
         Aggregate aggregate = aggregates(List.of(plan)).get(plan.getId());
         if (aggregate == null) throw BusinessException.notFound("迭代计划不存在");
         IterationPlanDetailDTO result = new IterationPlanDetailDTO();
@@ -162,11 +179,20 @@ public class IterationPlanService {
         List<Long> readableProjectIds = projectService.listReadableIds();
         if (projectId != null) {
             if (!readableProjectIds.contains(projectId)) return List.of();
-            readableProjectIds = List.of(projectId);
+            return iterationPlanMapper.selectList(new LambdaQueryWrapper<ProjectNodeIterationPlanDO>()
+                    .eq(ProjectNodeIterationPlanDO::getProjectId, projectId)
+                    .orderByAsc(ProjectNodeIterationPlanDO::getSort)
+                    .orderByAsc(ProjectNodeIterationPlanDO::getId));
         }
-        if (readableProjectIds.isEmpty()) return List.of();
-        return iterationPlanMapper.selectList(new LambdaQueryWrapper<ProjectNodeIterationPlanDO>()
-                .in(ProjectNodeIterationPlanDO::getProjectId, readableProjectIds)
+        LambdaQueryWrapper<ProjectNodeIterationPlanDO> wrapper = new LambdaQueryWrapper<>();
+        if (readableProjectIds.isEmpty()) {
+            wrapper.isNull(ProjectNodeIterationPlanDO::getProjectId);
+        } else {
+            wrapper.and(item -> item.isNull(ProjectNodeIterationPlanDO::getProjectId)
+                    .or()
+                    .in(ProjectNodeIterationPlanDO::getProjectId, readableProjectIds));
+        }
+        return iterationPlanMapper.selectList(wrapper
                 .orderByAsc(ProjectNodeIterationPlanDO::getSort)
                 .orderByAsc(ProjectNodeIterationPlanDO::getId));
     }
@@ -177,16 +203,27 @@ public class IterationPlanService {
                 .filter(Objects::nonNull).collect(Collectors.toCollection(HashSet::new));
         Set<Long> planIds = plans.stream().map(ProjectNodeIterationPlanDO::getId)
                 .filter(Objects::nonNull).collect(Collectors.toCollection(HashSet::new));
+        Set<Long> systemVersionIds = plans.stream().map(ProjectNodeIterationPlanDO::getSystemVersionId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, SystemVersionReferenceService.Reference> loadedSystemVersions = systemVersionIds.isEmpty()
+                ? Map.of() : systemVersionReferenceService.load(systemVersionIds);
+        Map<Long, SystemVersionReferenceService.Reference> systemVersions = loadedSystemVersions == null
+                ? Map.of() : loadedSystemVersions;
+        Map<Long, SystemDO> systems = loadSystems(plans.stream().map(ProjectNodeIterationPlanDO::getSystemId)
+                .filter(Objects::nonNull).collect(Collectors.toSet()));
         Map<Long, ProjectDTO> projects = projectService.listReadableByIds(projectIds).stream()
                 .collect(Collectors.toMap(ProjectDTO::getId, item -> item, (left, right) -> left, LinkedHashMap::new));
         List<ProjectNodeDO> nodes = projectIds.isEmpty() ? List.of() : nodeMapper.selectList(
                 new LambdaQueryWrapper<ProjectNodeDO>().in(ProjectNodeDO::getProjectId, projectIds));
         Map<Long, ProjectNodeDO> nodesById = nodes.stream().filter(item -> item.getId() != null)
                 .collect(Collectors.toMap(ProjectNodeDO::getId, item -> item, (left, right) -> left));
+        Set<Long> readableSources = plans.stream().anyMatch(plan -> plan.getProjectId() == null)
+                ? new HashSet<>(projectService.listReadableIds()) : new HashSet<>(projectIds);
         List<ProjectNodeDevelopmentStoryDO> storyRows = storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
                 .in(ProjectNodeDevelopmentStoryDO::getIterationPlanId, planIds)
                 .orderByAsc(ProjectNodeDevelopmentStoryDO::getSort)
-                .orderByAsc(ProjectNodeDevelopmentStoryDO::getId));
+                .orderByAsc(ProjectNodeDevelopmentStoryDO::getId)).stream()
+                .filter(story -> story.getProjectId() == null || readableSources.contains(story.getProjectId())).toList();
         Set<Long> topicIds = storyRows.stream().map(ProjectNodeDevelopmentStoryDO::getTopicId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> topicNames = topicIds.isEmpty() ? Map.of() : topicMapper.selectList(
@@ -197,7 +234,12 @@ public class IterationPlanService {
                 .in(ProjectTaskDO::getIterationPlanId, planIds)
                 .orderByAsc(ProjectTaskDO::getParentId)
                 .orderByAsc(ProjectTaskDO::getSort)
-                .orderByAsc(ProjectTaskDO::getId));
+                .orderByAsc(ProjectTaskDO::getId)).stream()
+                .filter(task -> task.getProjectId() == null || readableSources.contains(task.getProjectId())).toList();
+        Set<Long> extraProjects = taskRows.stream().map(ProjectTaskDO::getProjectId)
+                .filter(Objects::nonNull).filter(id -> !projectIds.contains(id)).collect(Collectors.toSet());
+        if (!extraProjects.isEmpty()) nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
+                .in(ProjectNodeDO::getProjectId, extraProjects)).forEach(node -> nodesById.put(node.getId(), node));
         Set<Long> userIds = new HashSet<>();
         plans.stream().map(ProjectNodeIterationPlanDO::getOwnerId).filter(Objects::nonNull).forEach(userIds::add);
         storyRows.stream().map(ProjectNodeDevelopmentStoryDO::getOwnerId).filter(Objects::nonNull).forEach(userIds::add);
@@ -214,15 +256,22 @@ public class IterationPlanService {
                     .map(story -> toStory(story, topicNames, users)).toList();
             List<IterationPlanTaskDTO> tasks = tasksByPlan.getOrDefault(plan.getId(), List.of()).stream()
                     .map(task -> toTask(task, nodesById, users)).toList();
-            result.put(plan.getId(), new Aggregate(toSummary(plan, projects.get(plan.getProjectId()), nodesById.get(plan.getNodeId()), users,
-                    stories, tasks), stories, tasks));
+            SystemVersionReferenceService.Reference systemVersion = plan.getSystemVersionId() == null
+                    ? null : systemVersions.get(plan.getSystemVersionId());
+            result.put(plan.getId(), new Aggregate(toSummary(plan, projects.get(plan.getProjectId()),
+                    nodesById.get(plan.getNodeId()), users, stories, tasks,
+                    systemVersion,
+                    plan.getSystemId() == null ? null : systems.get(plan.getSystemId())),
+                stories, tasks));
         }
         return result;
     }
 
     private IterationPlanListDTO toSummary(ProjectNodeIterationPlanDO plan, ProjectDTO project, ProjectNodeDO node,
                                            Map<Long, UserDO> users, List<IterationPlanStoryDTO> stories,
-                                           List<IterationPlanTaskDTO> tasks) {
+                                           List<IterationPlanTaskDTO> tasks,
+                                           SystemVersionReferenceService.Reference systemVersion,
+                                           SystemDO system) {
         IterationPlanListDTO dto = new IterationPlanListDTO();
         dto.setId(plan.getId());
         dto.setProjectId(plan.getProjectId());
@@ -230,6 +279,16 @@ public class IterationPlanService {
         dto.setProjectName(project == null ? null : project.getName());
         dto.setNodeId(plan.getNodeId());
         dto.setNodeName(node == null ? null : node.getName());
+        dto.setSystemId(plan.getSystemId());
+        if (system != null) {
+            dto.setSystemName(system.getName());
+        }
+        dto.setSystemVersionId(plan.getSystemVersionId());
+        if (systemVersion != null) {
+            dto.setSystemVersionNo(systemVersion.versionNo());
+            dto.setSystemVersionName(systemVersion.versionName());
+            if (system == null) dto.setSystemName(systemVersion.systemName());
+        }
         dto.setName(plan.getName());
         dto.setOwnerId(plan.getOwnerId());
         dto.setOwnerName(Convertors.userDisplayName(user(users, plan.getOwnerId())));
@@ -289,11 +348,14 @@ public class IterationPlanService {
 
     private boolean matches(IterationPlanListDTO item, IterationPlanPageQry qry) {
         if (qry.getProjectId() != null && !Objects.equals(qry.getProjectId(), item.getProjectId())) return false;
+        if (qry.getSystemVersionId() != null && !Objects.equals(qry.getSystemVersionId(), item.getSystemVersionId())) return false;
         if (StringUtils.hasText(qry.getStatus()) && !qry.getStatus().equalsIgnoreCase(item.getStatus())) return false;
         if (!StringUtils.hasText(qry.getKeyword())) return true;
         String keyword = qry.getKeyword().trim().toLowerCase();
         return contains(item.getName(), keyword) || contains(item.getProjectName(), keyword)
-                || contains(item.getProjectCode(), keyword) || contains(item.getOwnerName(), keyword);
+                || contains(item.getProjectCode(), keyword) || contains(item.getOwnerName(), keyword)
+                || contains(item.getSystemVersionNo(), keyword) || contains(item.getSystemVersionName(), keyword)
+                || contains(item.getSystemName(), keyword);
     }
 
     private boolean contains(String value, String keyword) {
@@ -364,6 +426,14 @@ public class IterationPlanService {
 
     private List<NodeIterationPlanDTO> toDTOs(List<ProjectNodeIterationPlanDO> rows) {
         if (rows == null || rows.isEmpty()) return List.of();
+        Set<Long> systemVersionIds = rows.stream().map(ProjectNodeIterationPlanDO::getSystemVersionId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, SystemVersionReferenceService.Reference> loadedSystemVersions = systemVersionIds.isEmpty()
+                ? Map.of() : systemVersionReferenceService.load(systemVersionIds);
+        Map<Long, SystemVersionReferenceService.Reference> systemVersions = loadedSystemVersions == null
+                ? Map.of() : loadedSystemVersions;
+        Map<Long, SystemDO> systems = loadSystems(rows.stream().map(ProjectNodeIterationPlanDO::getSystemId)
+                .filter(Objects::nonNull).collect(Collectors.toSet()));
         Set<Long> ownerIds = rows.stream().map(ProjectNodeIterationPlanDO::getOwnerId)
                 .filter(id -> id != null).collect(Collectors.toSet());
         List<UserDO> users = ownerIds.isEmpty() ? List.of() : userService.listByIds(new ArrayList<>(ownerIds));
@@ -371,6 +441,19 @@ public class IterationPlanService {
         return rows.stream().map(row -> {
             NodeIterationPlanDTO dto = new NodeIterationPlanDTO();
             dto.setId(row.getId());
+            dto.setSystemId(row.getSystemId());
+            SystemDO system = row.getSystemId() == null ? null : systems.get(row.getSystemId());
+            if (system != null) {
+                dto.setSystemName(system.getName());
+            }
+            dto.setSystemVersionId(row.getSystemVersionId());
+            SystemVersionReferenceService.Reference systemVersion = row.getSystemVersionId() == null
+                    ? null : systemVersions.get(row.getSystemVersionId());
+            if (systemVersion != null) {
+                dto.setSystemVersionNo(systemVersion.versionNo());
+                dto.setSystemVersionName(systemVersion.versionName());
+                if (system == null) dto.setSystemName(systemVersion.systemName());
+            }
             dto.setName(row.getName());
             dto.setOwnerId(row.getOwnerId());
             dto.setOwnerName(Convertors.userDisplayName(userMap.get(row.getOwnerId())));
@@ -381,5 +464,12 @@ public class IterationPlanService {
             dto.setSort(row.getSort());
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    private Map<Long, SystemDO> loadSystems(Set<Long> ids) {
+        if (systemMapper == null || ids == null || ids.isEmpty()) return Map.of();
+        List<SystemDO> systems = systemMapper.selectBatchIds(new ArrayList<>(ids));
+        return systems == null ? Map.of() : systems.stream().filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(SystemDO::getId, item -> item, (left, right) -> left));
     }
 }

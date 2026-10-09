@@ -53,6 +53,17 @@ expected = {
   "/admin/import/template/organizations.csv" => ["get"], "/admin/import/template/users.csv" => ["get"],
   "/admin/audit" => ["get"],
   "/admin/audit/{id}" => ["get"],
+  "/iteration-plans/page" => ["post"],
+  "/iteration-plans/{id}" => ["get"],
+  "/iteration-plans/{id}/status" => ["put"],
+  "/development/system-versions/systems/page" => ["post"],
+  "/development/system-versions/systems" => ["post"],
+  "/development/system-versions/systems/{id}" => ["put"],
+  "/development/system-versions/systems/{id}/status" => ["post"],
+  "/development/system-versions/page" => ["post"],
+  "/development/system-versions/{id}" => ["get", "put"],
+  "/development/system-versions/{id}/status" => ["post"],
+  "/development/system-versions/{id}/history" => ["get"],
   "/health" => ["get"], "/healthz" => ["get"], "/health/ready" => ["get"], "/health/live" => ["get"]
 }
 expected.each do |route, methods|
@@ -112,6 +123,17 @@ expected = {
     "/admin/import/template/organizations.csv": {"get"}, "/admin/import/template/users.csv": {"get"},
     "/admin/audit": {"get"},
     "/admin/audit/{id}": {"get"},
+    "/iteration-plans/page": {"post"},
+    "/iteration-plans/{id}": {"get"},
+    "/iteration-plans/{id}/status": {"put"},
+    "/development/system-versions/systems/page": {"post"},
+    "/development/system-versions/systems": {"post"},
+    "/development/system-versions/systems/{id}": {"put"},
+    "/development/system-versions/systems/{id}/status": {"post"},
+    "/development/system-versions/page": {"post"},
+    "/development/system-versions/{id}": {"get", "put"},
+    "/development/system-versions/{id}/status": {"post"},
+    "/development/system-versions/{id}/history": {"get"},
     "/health": {"get"}, "/healthz": {"get"}, "/health/ready": {"get"}, "/health/live": {"get"},
 }
 for route, methods in expected.items():

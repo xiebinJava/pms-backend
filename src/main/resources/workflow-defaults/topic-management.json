@@ -3,7 +3,7 @@
   "templateCode" : "wf-911fb737b3364e3b8240db9f2882303f",
   "name" : "专题管理流程",
   "description" : null,
-  "versionNo" : 11,
+  "versionNo" : 1,
   "definition" : {
     "schemaVersion" : 2,
     "nodes" : [ {

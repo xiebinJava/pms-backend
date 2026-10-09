@@ -405,6 +405,24 @@ public final class WorkflowTemplateDefinitionValidator {
                 }
             });
         }
+        if (config.has("systemField")) {
+            if (!String.valueOf(node.name()).contains("需求澄清")) {
+                throw new IllegalArgumentException("需求系统字段只能配置在需求澄清节点");
+            }
+            JsonNode systemField = config.path("systemField");
+            if (!systemField.isObject()) {
+                throw new IllegalArgumentException("需求系统字段配置必须是对象");
+            }
+            if (systemField.has("visibleWhenCategory")) {
+                String category = systemField.path("visibleWhenCategory").asText(null);
+                if (!"FUNCTIONAL".equals(category) && !"NON_FUNCTIONAL".equals(category)) {
+                    throw new IllegalArgumentException("需求系统字段联动分类无效");
+                }
+            }
+            if (systemField.has("required") && !systemField.path("required").isBoolean()) {
+                throw new IllegalArgumentException("需求系统字段必填配置无效");
+            }
+        }
     }
 
     private static void validateStoryWorkbenchPlacement(WorkflowTemplateDefinition definition) {

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.net.URI;
 import java.util.Set;
 
 /** Validates optional testing records without introducing a new node-completion gate. */
@@ -48,16 +47,6 @@ public final class TopicDevelopmentTestingPolicy {
         if (status != null && !status.isNull() && (!status.isTextual()
                 || !Set.of("NOT_STARTED", "IN_PROGRESS", "PASSED", "FAILED").contains(status.asText()))) {
             throw new IllegalArgumentException("请选择有效的测试状态");
-        }
-        String reportUrl = state.path("reportUrl").asText("").trim();
-        if (!reportUrl.isEmpty()) {
-            try {
-                URI uri = URI.create(reportUrl);
-                if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                        || uri.getHost() == null || uri.getUserInfo() != null) throw new IllegalArgumentException();
-            } catch (IllegalArgumentException exception) {
-                throw new IllegalArgumentException("请填写有效的 http 或 https 测试报告链接");
-            }
         }
         JsonNode issues = state.get("residualIssues");
         if (issues == null || issues.isNull()) return;

@@ -46,10 +46,10 @@
 ## Task 2：连续编辑时不丢失草稿
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
-- Modify if needed: `/Users/fs/Desktop/Project/pms-front/src/views/development/detail/StoryNodeWorkbenchComponent.vue`
-- Create: `/Users/fs/Desktop/Project/pms-front/tests/workflows/story-autosave.spec.mjs`
-- Create: `/Users/fs/Desktop/Project/pms-front/tests/workflows/story-autosave.config.mjs`
+- Modify: `../pms-front/src/views/development/detail/DevelopmentItemDetailPage.vue`
+- Modify if needed: `../pms-front/src/views/development/detail/StoryNodeWorkbenchComponent.vue`
+- Create: `../pms-front/tests/workflows/story-autosave.spec.mjs`
+- Create: `../pms-front/tests/workflows/story-autosave.config.mjs`
 
 **Interfaces:**
 - Consumes: 现有 `onNodeFieldValuesChange`、`saveNode(): Promise<boolean>`、nodeFormEditRevision、queuedNodeSave 与乐观版本字段。

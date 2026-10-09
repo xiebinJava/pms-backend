@@ -26,11 +26,13 @@ class TopicDesignReviewPolicyTest {
         var state = valid(); state.put("decision", "REJECTED"); state.put("finalOpinion", "旧意见");
         assertDoesNotThrow(() -> TopicDesignReviewPolicy.validate(state));
     }
-    @Test void nonEmptyOptionalLinksMustBeSafeDocumentLinks() {
+    @Test void documentReferencesOnlyNeedContentNotAProtocol() {
         for (String key : List.of("productPlanUrl", "uiPlanUrl", "technicalPlanUrl")) {
-            var state = valid(); state.put(key, "javascript:alert(1)");
-            assertThrows(IllegalArgumentException.class, () -> TopicDesignReviewPolicy.validate(state));
+            var state = valid(); state.put(key, "内部文档/方案一");
+            assertDoesNotThrow(() -> TopicDesignReviewPolicy.validate(state));
         }
+        var state = valid(); state.put("productPlanUrl", "  ");
+        assertThrows(IllegalArgumentException.class, () -> TopicDesignReviewPolicy.validate(state));
     }
     @Test void reviewersMustBePositiveIntegralIds() {
         for (Object ids : List.of(List.of(-1), List.of(1.5), "1")) {

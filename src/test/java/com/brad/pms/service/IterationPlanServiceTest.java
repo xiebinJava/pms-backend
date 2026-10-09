@@ -28,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +47,7 @@ class IterationPlanServiceTest {
     @Mock ProjectNodeDevelopmentTopicMapper topicMapper;
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
     @Mock ProjectTaskMapper taskMapper;
+    @Mock SystemVersionReferenceService systemVersionReferenceService;
 
     @InjectMocks IterationPlanService service;
 
@@ -63,6 +65,7 @@ class IterationPlanServiceTest {
     @Test
     void pageAggregatesExplicitStoriesAndTasksWithoutResolvingAWorkflow() {
         ProjectNodeIterationPlanDO plan = plan();
+        plan.setSystemVersionId(501L);
         ProjectDTO project = project();
         ProjectNodeDevelopmentStoryDO story = story();
         ProjectTaskDO task = task(31L, null, 0);
@@ -73,6 +76,8 @@ class IterationPlanServiceTest {
         when(storyMapper.selectList(any())).thenReturn(List.of(story));
         when(topicMapper.selectList(any())).thenReturn(List.of(topic()));
         when(taskMapper.selectList(any())).thenReturn(List.of(task));
+        when(systemVersionReferenceService.load(any())).thenReturn(Map.of(501L,
+                new SystemVersionReferenceService.Reference(501L, "2026.10", "十月版", "支付系统")));
 
         IterationPlanPageQry query = new IterationPlanPageQry();
         query.setPageSize(20);
@@ -85,6 +90,10 @@ class IterationPlanServiceTest {
         assertThat(result.getTaskCount()).isEqualTo(1);
         assertThat(result.getCompletedTaskCount()).isZero();
         assertThat(result.getProgress()).isEqualTo(100);
+        assertThat(result.getSystemVersionId()).isEqualTo(501L);
+        assertThat(result.getSystemVersionNo()).isEqualTo("2026.10");
+        assertThat(result.getSystemVersionName()).isEqualTo("十月版");
+        assertThat(result.getSystemName()).isEqualTo("支付系统");
     }
 
     @Test
@@ -107,6 +116,29 @@ class IterationPlanServiceTest {
         assertThat(result.getStories()).extracting(item -> item.getId()).containsExactly(41L);
         assertThat(result.getTasks()).extracting(item -> item.getId()).containsExactly(31L, 32L);
         assertThat(result.getTasks().get(1).getParentId()).isEqualTo(31L);
+    }
+
+    @Test
+    void independentIterationDoesNotExposeStoriesOrTasksFromUnreadableProjects() {
+        ProjectNodeIterationPlanDO plan = plan();
+        plan.setProjectId(null);
+        plan.setNodeId(null);
+        ProjectNodeDevelopmentStoryDO independentStory = story();
+        independentStory.setId(42L);
+        independentStory.setProjectId(null);
+        independentStory.setTopicId(null);
+        ProjectTaskDO independentTask = task(32L, null, 0);
+        independentTask.setProjectId(null);
+        when(iterationPlanMapper.selectById(21L)).thenReturn(plan);
+        when(storyMapper.selectList(any())).thenReturn(List.of(story(), independentStory));
+        when(taskMapper.selectList(any())).thenReturn(List.of(task(31L, null, 0), independentTask));
+        when(projectService.listReadableIds()).thenReturn(List.of());
+
+        IterationPlanDetailDTO result = service.detail(21L);
+
+        assertThat(result.getStories()).extracting(item -> item.getId()).containsExactly(42L);
+        assertThat(result.getTasks()).extracting(item -> item.getId()).containsExactly(32L);
+        assertThat(result.getPlan().getStoryCount()).isEqualTo(1);
     }
 
     private static ProjectNodeIterationPlanDO plan() {

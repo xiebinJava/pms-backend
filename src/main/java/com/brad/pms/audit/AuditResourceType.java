@@ -20,5 +20,7 @@ public enum AuditResourceType {
     ORG_UNIT,
     IMPORT_JOB,
     FEEDBACK_TICKET,
+    SYSTEM,
+    SYSTEM_VERSION,
     AUDIT
 }

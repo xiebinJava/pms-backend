@@ -3,7 +3,7 @@ agentId: project_assistant
 contractKey: release
 workflowNodeKeys:
   - release
-contractVersion: 1.0.0
+contractVersion: 1.1.0
 required: true
 locale: zh-CN
 principalRole: PMS 项目助手独立履行发布协调人职责
@@ -40,28 +40,29 @@ entryConditions:
   - 用户已登录且当前 PMS 用户具备对应项目权限
   - 发布交接工作台和任务写入能力可用
 inputs:
-  - 发布交接工作台字段（工作台标识 release-handover），包括发布版本、发布窗口、发布类型、发布决策和运营交接
-  - 发布记录与回滚预案、可交付版本与代码库、运维交接清单
+  - 发布交接工作台字段（工作台标识 release-handover），包括 handoverOwnerId（交接人账号 ID）和 handoverNotes（交接说明）
+  - 当前项目关联的迭代及系统版本清单（只读汇总）
+  - 运维接手范围、操作入口和注意事项
   - 页面已配置的节点自定义字段
   - 节点负责人、节点排期和本节点任务
 missingInputRules:
   - 只使用用户明确提供的信息和 PMS 返回的事实
   - 不猜测用户身份、组织、权限、负责人和关键日期
   - 缺少关键字段时先询问，不生成写入预览
-  - 发布决策由负责人确认，助手不得代替用户决定是否上线
+  - 交接人必须从 PMS 返回的已激活账号中选择，不得猜测或代填账号 ID
 executionSteps:
   - 先读取项目、当前节点、发布交接工作台字段和任务状态
   - 识别缺失信息并向用户补充询问
-  - 汇总发布信息、发布决策、交接内容、负责人和任务变更
+  - 汇总关联迭代及系统版本、交接人、交接说明、负责人和任务变更
   - 对批量变更统一生成一份预览并直接执行，无需等待用户逐次确认
   - 使用原操作编号和幂等键执行，不重复执行未知结果的操作
   - 核验 PMS 返回结果，成功后统一刷新一次当前 PMS 页面
   - 汇报结果并生成下一节点预览，不自动推进节点
 completionCriteria:
-  - 发布信息、发布决策和运营交接内容已填写并保存
-  - 回滚预案、监控告警和值班安排符合当前权限与流程要求
+  - handoverOwnerId 已选择并保存
+  - handoverNotes 已填写并保存
   - 节点负责人、节点排期和本节点任务已按用户要求维护
-  - 页面已配置的自定义字段和检查项已填写
+  - 页面已配置的自定义字段已填写
   - PMS 当前节点状态已核验
 failureStrategies:
   - 鉴权失败立即停止写入并提示重新建立 PMS 登录态

@@ -11,6 +11,7 @@ public class RequirementListDTO {
     private Long ownerId;
     private String ownerName;
     private Long orgUnitId;
+    private Long systemId;
     private String status;
     private Boolean deleted;
     private Integer version;

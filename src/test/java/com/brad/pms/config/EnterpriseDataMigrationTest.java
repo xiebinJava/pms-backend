@@ -52,6 +52,15 @@ class EnterpriseDataMigrationTest {
         assertThat(beforePrimary).isGreaterThanOrEqualTo(1);
     }
 
+    @Test
+    void projectManagerCanReadSystemVersionsButCannotManageThem() throws Exception {
+        String roleId = "(SELECT id FROM sys_role WHERE code = 'PROJECT_MANAGER')";
+        assertThat(count("sys_role_permission", "role_id = " + roleId
+                + " AND permission_id = (SELECT id FROM sys_permission WHERE code = 'system-version:read')")).isEqualTo(1);
+        assertThat(count("sys_role_permission", "role_id = " + roleId
+                + " AND permission_id IN (SELECT id FROM sys_permission WHERE code IN ('system-version:write', 'system-version:manage'))")).isZero();
+    }
+
     private long count(String table, String where) throws Exception {
         try (Connection connection = dataSource.getConnection();
              var statement = connection.createStatement();

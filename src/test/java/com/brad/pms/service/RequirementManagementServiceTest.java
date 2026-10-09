@@ -44,6 +44,7 @@ class RequirementManagementServiceTest {
     @Mock DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
     @Mock WorkflowTemplateService workflowTemplateService;
     @Mock OrgUnitMapper orgUnitMapper;
+    @Mock RequirementSystemReferenceService requirementSystemReferenceService;
     @InjectMocks RequirementManagementService service;
 
     @BeforeEach

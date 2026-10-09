@@ -1,8 +1,14 @@
 package com.brad.pms.workflow;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -39,27 +45,55 @@ public final class WorkflowTemplateDefinitionNormalizer {
             changed |= normalized != field;
         }
 
-        boolean releaseVersionAdded = String.valueOf(node.name()).contains("需求上线")
-                && normalizedFields.stream().noneMatch(field -> field != null && "release-version".equals(field.key()));
-        if (releaseVersionAdded) {
-            normalizedFields.add(new WorkflowFieldDefinition("release-version", "发布版本", WorkflowFieldType.TEXT,
-                    true, List.of(), schemaVersion == 2 ? true : null, null, schemaVersion == 2 ? false : null));
-            changed = true;
+        if (String.valueOf(node.name()).contains("需求上线")) {
+            boolean removed = normalizedFields.removeIf(field -> field != null && "release-version".equals(field.key()));
+            changed |= removed;
         }
 
         List<String> contentOrder = schemaVersion == 2
                 ? normalizeContentOrder(node.contentOrder(), normalizedFields)
                 : node.contentOrder();
-        if (schemaVersion == 2 && releaseVersionAdded && !contentOrder.contains("legacy-custom-fields")) {
-            int fieldsIndex = contentOrder.indexOf("fields");
-            if (fieldsIndex >= 0) contentOrder.add(fieldsIndex + 1, "legacy-custom-fields");
-            else contentOrder.add("legacy-custom-fields");
+        if (normalizedFields.isEmpty() && contentOrder != null && contentOrder.contains("legacy-custom-fields")) {
+            contentOrder = new ArrayList<>(contentOrder);
+            contentOrder.removeIf("legacy-custom-fields"::equals);
         }
         changed |= !Objects.equals(contentOrder, node.contentOrder());
+        Map<String, JsonNode> componentConfigs = normalizeComponentConfigs(node);
+        changed |= componentConfigs != node.componentConfigs();
         if (!changed) return node;
         return new WorkflowNodeDefinition(node.key(), node.name(), node.description(), node.deliverable(),
                 node.roles(), node.components(), normalizedFields, node.projectBasicInfo(),
-                node.projectBasicInfoFields(), contentOrder, node.componentConfigs());
+                node.projectBasicInfoFields(), contentOrder, componentConfigs);
+    }
+
+    private static Map<String, JsonNode> normalizeComponentConfigs(WorkflowNodeDefinition node) {
+        if (!String.valueOf(node.name()).contains("需求澄清")
+                || !node.runtimeComponents().contains(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH)) {
+            return node.componentConfigs();
+        }
+        Map<String, JsonNode> original = node.componentConfigs();
+        Map<String, JsonNode> normalized = new LinkedHashMap<>(original == null ? Map.of() : original);
+        JsonNode originalConfig = normalized.get(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
+        ObjectNode config = originalConfig != null && originalConfig.isObject()
+                ? (ObjectNode) originalConfig.deepCopy() : JsonNodeFactory.instance.objectNode();
+        boolean changed = false;
+        if (!config.has("nodeKey")) {
+            config.put("nodeKey", node.key());
+            changed = true;
+        }
+        if (!config.has("nodeName")) {
+            config.put("nodeName", node.name());
+            changed = true;
+        }
+        if (!config.has("systemField")) {
+            ObjectNode systemField = config.putObject("systemField");
+            systemField.put("visibleWhenCategory", "FUNCTIONAL");
+            systemField.put("required", false);
+            changed = true;
+        }
+        if (!changed && original != null) return original;
+        normalized.put(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, config);
+        return normalized;
     }
 
     private static WorkflowFieldDefinition normalizeField(WorkflowFieldDefinition field) {

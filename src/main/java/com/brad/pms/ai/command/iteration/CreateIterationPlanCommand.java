@@ -22,7 +22,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CreateIterationPlanCommand implements PmsCommand {
     private static final Set<String> ALLOWED = Set.of("projectId", "nodeId", "name", "ownerId", "goal", "status",
-            "startDate", "dueDate", "sort");
+            "startDate", "dueDate", "sort", "systemId", "systemVersionId");
     private static final List<String> REFRESH = List.of("iteration-plan", "project-detail");
     private final IterationPlanCommandService planService;
     private final PmsCommandSupport support;
@@ -51,6 +51,10 @@ public class CreateIterationPlanCommand implements PmsCommand {
     static NodeIterationPlanCmd command(Map<String, Object> args) {
         NodeIterationPlanCmd cmd = new NodeIterationPlanCmd();
         cmd.setName(CommandArgumentReader.requiredText(args, "name"));
+        if (args.containsKey("systemId")) cmd.setSystemId(CommandArgumentReader.optionalLong(args, "systemId"));
+        if (args.containsKey("systemVersionId")) {
+            cmd.setSystemVersionId(CommandArgumentReader.optionalLong(args, "systemVersionId"));
+        }
         cmd.setOwnerId(CommandArgumentReader.optionalLong(args, "ownerId"));
         cmd.setGoal(CommandArgumentReader.optionalText(args, "goal"));
         cmd.setStatus(CommandArgumentReader.optionalText(args, "status"));

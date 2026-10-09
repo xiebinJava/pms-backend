@@ -1,6 +1,7 @@
 package com.brad.pms.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -23,6 +24,9 @@ public class RequirementDO {
     private Integer priority;
     private Long ownerId;
     private Long orgUnitId;
+    /** System selected in the requirement workflow. */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private Long systemId;
     private RequirementExecutionTargetType executionTargetType;
     private Long executionTargetId;
     private String status;

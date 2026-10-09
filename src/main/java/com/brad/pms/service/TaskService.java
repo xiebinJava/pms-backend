@@ -63,6 +63,7 @@ public class TaskService {
     private final NotificationService notificationService;
     private final OperationLogService operationLogService;
     private final MemberService memberService;
+    private final IterationPlanSystemService iterationPlanSystemService;
 
     public List<ProjectTaskDTO> listByProject(Long projectId, Long nodeId) {
         LocalDate today = currentDate();
@@ -477,10 +478,9 @@ public class TaskService {
     }
 
     private ProjectNodeIterationPlanDO requireIterationPlan(Long iterationPlanId, Long projectId) {
-        ProjectNodeIterationPlanDO plan = iterationPlanMapper.selectById(iterationPlanId);
-        if (plan == null || !Objects.equals(plan.getProjectId(), projectId)) {
-            throw BusinessException.error("任务关联的迭代计划必须属于当前项目");
-        }
+        ProjectNodeIterationPlanDO plan = iterationPlanMapper.selectByIdForUpdate(iterationPlanId);
+        if (plan == null) throw BusinessException.notFound("迭代计划不存在");
+        iterationPlanSystemService.bindProject(plan, projectId);
         return plan;
     }
 

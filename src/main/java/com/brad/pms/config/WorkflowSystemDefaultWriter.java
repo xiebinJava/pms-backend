@@ -75,7 +75,17 @@ public class WorkflowSystemDefaultWriter {
             }
             Path temporary = Files.createTempFile(root, ".workflow-default-", ".tmp");
             try {
-                byte[] json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(template);
+                // A source default is the baseline of a new installation, not this database's history.
+                String name = switch (template.processTypeCode()) {
+                    case "general" -> "项目管理流程";
+                    case "requirement-management" -> "需求管理流程";
+                    case "topic-management" -> "专题管理流程";
+                    case "story-management" -> "故事管理流程";
+                    default -> template.name();
+                };
+                var baseline = new WorkflowDefaultTemplateFile(template.processTypeCode(), template.templateCode(),
+                        name, template.description(), 1, template.definition());
+                byte[] json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(baseline);
                 Files.write(temporary, json);
                 try {
                     Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,

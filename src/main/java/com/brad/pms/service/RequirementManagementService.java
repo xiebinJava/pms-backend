@@ -41,6 +41,7 @@ public class RequirementManagementService {
     private final DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
     private final WorkflowTemplateService workflowTemplateService;
     private final OrgUnitMapper orgUnitMapper;
+    private final RequirementSystemReferenceService requirementSystemReferenceService;
 
     @Transactional
     public Long create(RequirementSaveCmd cmd) {
@@ -109,6 +110,7 @@ public class RequirementManagementService {
     public void restore(Long id) {
         RequirementDO requirement = requireForMutation(id, true);
         requirement.setDeleted(false);
+        requirementSystemReferenceService.validateRequirementSystem(requirement);
         if (requirementMapper.updateById(requirement) != 1) {
             throw BusinessException.conflict("需求已被其他人修改，请刷新后重试");
         }
@@ -177,6 +179,7 @@ public class RequirementManagementService {
         dto.setPriority(requirement.getPriority());
         dto.setOwnerId(requirement.getOwnerId());
         dto.setOrgUnitId(requirement.getOrgUnitId());
+        dto.setSystemId(requirement.getSystemId());
         dto.setOwnerName(requirement.getOwnerId() == null ? null
                 : userService.listByIdsIncludingDeleted(List.of(requirement.getOwnerId())).stream().findFirst()
                 .map(com.brad.pms.convertor.Convertors::userDisplayName).orElse(null));
@@ -238,6 +241,7 @@ public class RequirementManagementService {
         snapshot.put("priority", requirement.getPriority());
         snapshot.put("ownerId", requirement.getOwnerId());
         snapshot.put("orgUnitId", requirement.getOrgUnitId());
+        snapshot.put("systemId", requirement.getSystemId());
         snapshot.put("status", requirement.getStatus());
         snapshot.put("deleted", requirement.getDeleted());
         snapshot.put("executionTargetType", requirement.getExecutionTargetType());

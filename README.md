@@ -5,7 +5,9 @@
 
 PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时和测试都只使用 MySQL 8。
 
-当前源码发行基线：`1.0.8`。最终用户请使用下方发行仓库中的预构建镜像。
+当前源码发行基线：`1.1.0`。最终用户请使用下方发行仓库中的预构建镜像。
+
+`1.1.0` 打通需求、项目、专题和故事流程，新增系统与系统版本管理、独立迭代计划和系统版本关联。功能需求在需求澄清节点选择所属系统，相关交付对象关联迭代时继承系统；系统版本只在迭代中维护。项目运营交接保存交接人 ID 和交接说明，完成节点时两项必填。
 
 如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](https://github.com/xiebinJava/pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
 
@@ -61,10 +63,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V55）和前端：
+首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V69）和前端：
 
 ```text
-MySQL → uploads-init → backend（Flyway V1–V55）→ frontend
+MySQL → uploads-init → backend（Flyway V1–V69）→ frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -143,7 +145,7 @@ set +a
 ./scripts/verify-enterprise-migration.sh
 ```
 
-当前基线为 V1–V55。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+当前基线为 V1–V69。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
 ## 本地直接启动后端（已有 MySQL 时）
 
@@ -222,7 +224,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V55 MySQL / Flyway 迁移脚本
+├── db/migration/  V1–V69 MySQL / Flyway 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/

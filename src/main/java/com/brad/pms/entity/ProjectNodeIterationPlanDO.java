@@ -1,6 +1,7 @@
 package com.brad.pms.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -18,6 +19,10 @@ public class ProjectNodeIterationPlanDO {
     private Long id;
     private Long projectId;
     private Long nodeId;
+    /** Inherited from related requirements, or selected for an independent iteration. */
+    private Long systemId;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private Long systemVersionId;
     private String name;
     private Long ownerId;
     private String goal;

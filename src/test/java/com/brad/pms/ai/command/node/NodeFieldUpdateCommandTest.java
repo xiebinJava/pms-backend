@@ -163,9 +163,7 @@ class NodeFieldUpdateCommandTest {
         assertThat(sent.getHandoverNotes()).isEqualTo("已完成运维交接");
         assertThat(sent.getVersion()).isEqualTo(2);
         // Untouched fields must survive the partial update.
-        assertThat(sent.getReleaseVersion()).isEqualTo("v2.6.0");
-        assertThat(sent.getEmergencyContact()).isEqualTo("张三 13800000000");
-        assertThat(sent.getRollbackReady()).isTrue();
+        assertThat(sent.getHandoverOwnerId()).isEqualTo(42L);
         assertThat(result.message()).isEqualTo("发布决策与运营交接已更新");
     }
 
@@ -270,12 +268,10 @@ class NodeFieldUpdateCommandTest {
         dto.setProjectId(22L);
         dto.setNodeId(7L);
         dto.setVersion(2);
-        dto.setReleaseVersion("v2.6.0");
-        dto.setReleaseType("gray");
-        dto.setPackageReady(true);
-        dto.setRollbackReady(true);
+        dto.setHandoverOwnerId(42L);
+        dto.setHandoverOwnerName("张三（zhangsan）");
+        dto.setHandoverOwnerUsername("zhangsan");
         dto.setHandoverNotes("旧交接说明");
-        dto.setEmergencyContact("张三 13800000000");
         return dto;
     }
 

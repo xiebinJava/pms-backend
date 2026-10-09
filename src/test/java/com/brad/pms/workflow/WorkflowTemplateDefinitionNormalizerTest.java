@@ -8,6 +8,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class WorkflowTemplateDefinitionNormalizerTest {
     @Test
+    void addsTheFunctionalSystemFieldToLegacyRequirementClarificationTemplates() {
+        WorkflowNodeDefinition node = new WorkflowNodeDefinition("clarify", "需求澄清", "", "", "",
+                List.of(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH), List.of(), false, List.of());
+
+        WorkflowTemplateDefinition result = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                "requirement-management", new WorkflowTemplateDefinition(1, List.of(node)));
+
+        assertThat(result.nodes().get(0).componentConfigs())
+                .containsKey(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH);
+        assertThat(result.nodes().get(0).componentConfigs()
+                .get(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH).path("systemField").path("visibleWhenCategory").asText())
+                .isEqualTo("FUNCTIONAL");
+        assertThat(result.nodes().get(0).componentConfigs()
+                .get(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH).path("systemField").path("required").asBoolean())
+                .isFalse();
+    }
+
+    @Test
     void migratesLegacyRequirementFieldsToRecordBindingsAndKeepsTheFieldSection() {
         WorkflowFieldDefinition description = new WorkflowFieldDefinition(
                 "field-a", "需求描述", WorkflowFieldType.TEXTAREA, true, List.of(), true, null, true);
@@ -53,34 +71,28 @@ class WorkflowTemplateDefinitionNormalizerTest {
     }
 
     @Test
-    void restoresOnlyTheRequiredReleaseVersionFieldOnTheRequirementReleaseNode() {
+    void doesNotAddAReleaseVersionFieldToANewRequirementReleaseNode() {
         WorkflowNodeDefinition node = new WorkflowNodeDefinition("release", "需求上线", "", "", "",
-                List.of(), List.of(), false, List.of(), List.of());
+                List.of(), List.of(), false, List.of(), List.of("component:requirement-node-workbench"));
+
+        WorkflowTemplateDefinition definition = new WorkflowTemplateDefinition(2, List.of(node));
+        WorkflowTemplateDefinition result = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                "requirement-management", definition);
+
+        assertThat(result).isSameAs(definition);
+    }
+
+    @Test
+    void removesTheLegacyReleaseVersionFieldFromRequirementReleaseNodes() {
+        WorkflowFieldDefinition releaseVersion = new WorkflowFieldDefinition(
+                "release-version", "发布版本", WorkflowFieldType.TEXT, true, List.of(), true, null, false);
+        WorkflowNodeDefinition node = new WorkflowNodeDefinition("release", "需求上线", "", "", "",
+                List.of(), List.of(releaseVersion), false, List.of(), List.of("legacy-custom-fields"));
 
         WorkflowTemplateDefinition result = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
                 "requirement-management", new WorkflowTemplateDefinition(2, List.of(node)));
 
-        assertThat(result.nodes().get(0).fields()).extracting(WorkflowFieldDefinition::key)
-                .containsExactly("release-version");
-        assertThat(result.nodes().get(0).fields().get(0).label()).isEqualTo("发布版本");
-        assertThat(result.nodes().get(0).fields().get(0).type()).isEqualTo(WorkflowFieldType.TEXT);
-        assertThat(result.nodes().get(0).fields().get(0).required()).isTrue();
-        assertThat(result.nodes().get(0).contentOrder()).containsExactly("legacy-custom-fields");
-    }
-
-    @Test
-    void restoresReleaseVersionForLegacyRequirementTemplatesWithoutAddingV2Metadata() {
-        WorkflowNodeDefinition node = new WorkflowNodeDefinition("release", "需求上线", "", "", "",
-                List.of(), List.of(), false, List.of());
-
-        WorkflowTemplateDefinition result = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
-                "requirement-management", new WorkflowTemplateDefinition(1, List.of(node)));
-
-        WorkflowFieldDefinition releaseVersion = result.nodes().get(0).fields().get(0);
-        assertThat(releaseVersion.key()).isEqualTo("release-version");
-        assertThat(releaseVersion.visible()).isNull();
-        assertThat(releaseVersion.binding()).isNull();
-        assertThat(releaseVersion.fullWidth()).isNull();
-        assertThat(result.nodes().get(0).contentOrder()).isNull();
+        assertThat(result.nodes().get(0).fields()).isEmpty();
+        assertThat(result.nodes().get(0).contentOrder()).isEmpty();
     }
 }

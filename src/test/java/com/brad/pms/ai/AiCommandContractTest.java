@@ -3,6 +3,7 @@ package com.brad.pms.ai;
 import com.brad.pms.ai.command.CommandName;
 import com.brad.pms.ai.command.CommandPreviewRequest;
 import com.brad.pms.ai.command.OperationExecuteRequest;
+import com.brad.pms.ai.command.PmsCommandMetadata;
 import com.brad.pms.ai.context.PageContextRequest;
 import com.brad.pms.ai.context.PageContextType;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,14 @@ class AiCommandContractTest {
     void commandNamesExposeStableWireNames() {
         assertThat(CommandName.TASK_CREATE.code()).isEqualTo("task.create");
         assertThat(CommandName.TASK_ASSIGN.code()).isEqualTo("task.assign");
+    }
+
+    @Test
+    void iterationPlanCommandsExposeTheOptionalSystemVersionReference() {
+        assertThat(PmsCommandMetadata.descriptor(CommandName.ITERATION_PLAN_CREATE).parameters())
+                .containsKey("systemVersionId");
+        assertThat(PmsCommandMetadata.descriptor(CommandName.ITERATION_PLAN_UPDATE).parameters())
+                .containsKey("systemVersionId");
     }
 
     @Test

@@ -1,9 +1,9 @@
 {
   "processTypeCode" : "requirement-management",
   "templateCode" : "wf-68a77dae0aeb4ed99c72de27b0a361fe",
-  "name" : "需求管理流程模版",
+  "name" : "需求管理流程",
   "description" : null,
-  "versionNo" : 6,
+  "versionNo" : 1,
   "definition" : {
     "schemaVersion" : 2,
     "nodes" : [ {
@@ -106,7 +106,11 @@
           "nodeKey" : "custom-node-2",
           "nodeName" : "需求澄清",
           "purpose" : "补充背景、目标、边界和验收标准，形成可执行的需求说明。",
-          "activities" : [ "补充需求背景与目标", "明确范围边界和约束", "确认验收标准", "记录澄清结论" ]
+          "activities" : [ "补充需求背景与目标", "明确范围边界和约束", "确认验收标准", "记录澄清结论" ],
+          "systemField" : {
+            "visibleWhenCategory" : "FUNCTIONAL",
+            "required" : false
+          }
         }
       }
     }, {
@@ -185,19 +189,10 @@
       "deliverable" : "",
       "roles" : "",
       "components" : null,
-      "fields" : [ {
-        "key" : "release-version",
-        "label" : "发布版本",
-        "type" : "TEXT",
-        "required" : true,
-        "options" : [ ],
-        "visible" : true,
-        "binding" : null,
-        "fullWidth" : false
-      } ],
+      "fields" : [ ],
       "projectBasicInfo" : false,
       "projectBasicInfoFields" : null,
-      "contentOrder" : [ "legacy-custom-fields" ],
+      "contentOrder" : [ ],
       "componentConfigs" : null
     } ],
     "sourceProjectNodeKey" : null,

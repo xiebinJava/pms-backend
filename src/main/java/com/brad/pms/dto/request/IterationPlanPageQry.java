@@ -12,5 +12,7 @@ public class IterationPlanPageQry extends BasePage {
 
     private Long projectId;
 
+    private Long systemVersionId;
+
     private String status;
 }

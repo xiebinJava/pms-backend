@@ -72,6 +72,7 @@ class TaskServiceTest {
     @Mock NotificationService notificationService;
     @Mock OperationLogService operationLogService;
     @Mock MemberService memberService;
+    @Mock IterationPlanSystemService iterationPlanSystemService;
 
     @InjectMocks TaskService taskService;
 
@@ -183,7 +184,7 @@ class TaskServiceTest {
         ProjectNodeIterationPlanDO plan = new ProjectNodeIterationPlanDO();
         plan.setId(21L);
         plan.setProjectId(9L);
-        when(iterationPlanMapper.selectById(21L)).thenReturn(plan);
+        when(iterationPlanMapper.selectByIdForUpdate(21L)).thenReturn(plan);
         when(taskMapper.insert(any(ProjectTaskDO.class))).thenAnswer(invocation -> {
             invocation.getArgument(0, ProjectTaskDO.class).setId(77L);
             return 1;
@@ -213,7 +214,9 @@ class TaskServiceTest {
         ProjectNodeIterationPlanDO plan = new ProjectNodeIterationPlanDO();
         plan.setId(22L);
         plan.setProjectId(88L);
-        when(iterationPlanMapper.selectById(22L)).thenReturn(plan);
+        when(iterationPlanMapper.selectByIdForUpdate(22L)).thenReturn(plan);
+        org.mockito.Mockito.doThrow(BusinessException.error("任务关联的迭代计划必须属于当前项目"))
+                .when(iterationPlanSystemService).bindProject(plan, 9L);
 
         TaskCreateCmd cmd = new TaskCreateCmd();
         cmd.setProjectId(9L);
@@ -237,7 +240,7 @@ class TaskServiceTest {
         ProjectNodeIterationPlanDO plan = new ProjectNodeIterationPlanDO();
         plan.setId(21L);
         plan.setProjectId(9L);
-        when(iterationPlanMapper.selectById(21L)).thenReturn(plan);
+        when(iterationPlanMapper.selectByIdForUpdate(21L)).thenReturn(plan);
         when(taskMapper.insert(any(ProjectTaskDO.class))).thenAnswer(invocation -> {
             invocation.getArgument(0, ProjectTaskDO.class).setId(78L);
             return 1;

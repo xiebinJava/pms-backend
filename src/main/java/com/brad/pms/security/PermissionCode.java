@@ -22,11 +22,13 @@ public final class PermissionCode {
     public static final String FEEDBACK_READ = "feedback:read";
     public static final String FEEDBACK_WRITE = "feedback:write";
     public static final String FEEDBACK_MANAGE = "feedback:manage";
+    public static final String SYSTEM_VERSION_READ = "system-version:read";
+    public static final String SYSTEM_VERSION_WRITE = "system-version:write";
+    public static final String SYSTEM_VERSION_MANAGE = "system-version:manage";
 
     /**
-     * Feedback permissions are intentionally hierarchical: a manager can
-     * read and submit feedback, while a writer can read their own feedback.
-     * Other permission families remain exact-match to avoid broadening access
+     * Feedback and system-version permissions are intentionally hierarchical;
+     * other permission families remain exact-match to avoid broadening access
      * accidentally.
      */
     public static boolean isSatisfiedBy(String requested, String granted) {
@@ -36,6 +38,10 @@ public final class PermissionCode {
             return FEEDBACK_WRITE.equals(granted) || FEEDBACK_MANAGE.equals(granted);
         }
         if (FEEDBACK_WRITE.equals(requested)) return FEEDBACK_MANAGE.equals(granted);
+        if (SYSTEM_VERSION_READ.equals(requested)) {
+            return SYSTEM_VERSION_WRITE.equals(granted) || SYSTEM_VERSION_MANAGE.equals(granted);
+        }
+        if (SYSTEM_VERSION_WRITE.equals(requested)) return SYSTEM_VERSION_MANAGE.equals(granted);
         return false;
     }
 

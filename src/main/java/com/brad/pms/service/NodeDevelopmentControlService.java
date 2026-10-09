@@ -59,6 +59,8 @@ public class NodeDevelopmentControlService {
     private final DevelopmentItemWorkflowService developmentItemWorkflowService;
     private final WorkflowComponentBindingService workflowComponentBindingService;
     private final ProjectMemberAssignmentService assignmentService;
+    private final IterationPlanOptionsService iterationPlanOptionsService;
+    private final IterationPlanSystemService iterationPlanSystemService;
 
     public NodeDevelopmentControlDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
@@ -67,7 +69,7 @@ public class NodeDevelopmentControlService {
     }
 
     /**
-     * 节点完成前的业务校验。专题状态由故事状态推导，节点完成只要求所有故事已完成。
+     * 节点完成前的业务校验：至少建立一个专题，不限制故事数量或完成状态。
      */
     public void requireCompleted(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
@@ -76,22 +78,6 @@ public class NodeDevelopmentControlService {
         if (control.getTopics().isEmpty()) {
             throw BusinessException.error("请先至少建立一个专题");
         }
-        List<NodeDevelopmentStoryDTO> stories = control.getTopics().stream()
-                .flatMap(topic -> topic.getStories().stream())
-                .collect(Collectors.toList());
-        if (stories.isEmpty()) {
-            throw BusinessException.error("请先至少建立一个故事");
-        }
-
-        List<String> incompleteStories = stories.stream()
-                .filter(story -> !"DONE".equals(story.getStatus()))
-                .map(NodeDevelopmentStoryDTO::getTitle)
-                .limit(3)
-                .collect(Collectors.toList());
-        if (!incompleteStories.isEmpty()) {
-            throw BusinessException.error("请先完成全部故事：" + String.join("、", incompleteStories));
-        }
-
     }
 
     @Transactional
@@ -181,6 +167,8 @@ public class NodeDevelopmentControlService {
                 .collect(Collectors.toSet());
         if (iterationPlanIds.isEmpty()) return;
         Set<Long> allowedPlanIds = new HashSet<>(iterationPlanService.confirmedPlanIds(projectId));
+        iterationPlanOptionsService.independentForProject(projectId).stream()
+                .map(NodeIterationPlanDTO::getId).filter(Objects::nonNull).forEach(allowedPlanIds::add);
         List<ProjectNodeDevelopmentStoryDO> existingStories = storyMapper.selectList(new LambdaQueryWrapper<ProjectNodeDevelopmentStoryDO>()
                 .eq(ProjectNodeDevelopmentStoryDO::getProjectId, projectId)
                 .eq(ProjectNodeDevelopmentStoryDO::getNodeId, nodeId));
@@ -400,6 +388,7 @@ public class NodeDevelopmentControlService {
         story.setTopicId(topic.getId());
         story.setTopicWorkflowNodeId(developmentItemWorkflowService.resolveTopicStoryMountNodeId(topic.getId()));
         story.setIterationPlanId(cmd.getIterationPlanId());
+        if (cmd.getIterationPlanId() != null) iterationPlanSystemService.bindStory(cmd.getIterationPlanId(), story);
         story.setTitle(cmd.getTitle());
         story.setOwnerId(cmd.getOwnerId());
         story.setStatus(cmd.getStatus());
@@ -433,7 +422,10 @@ public class NodeDevelopmentControlService {
                 .map(ProjectNodeDevelopmentStoryDO::getIterationPlanId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        List<NodeIterationPlanDTO> developmentPlans = iterationPlanService.listForDevelopment(node.getProjectId(), referencedIterationPlanIds);
+        List<NodeIterationPlanDTO> developmentPlans = new ArrayList<>(safeList(iterationPlanService.listForDevelopment(node.getProjectId(), referencedIterationPlanIds)));
+        iterationPlanOptionsService.independentForProject(node.getProjectId()).stream()
+                .filter(candidate -> developmentPlans.stream().noneMatch(plan -> Objects.equals(plan.getId(), candidate.getId())))
+                .forEach(developmentPlans::add);
         Map<Long, String> iterationPlanNamesById = (developmentPlans == null ? List.<NodeIterationPlanDTO>of() : developmentPlans).stream()
                 .filter(plan -> plan.getId() != null)
                 .collect(Collectors.toMap(NodeIterationPlanDTO::getId, NodeIterationPlanDTO::getName));
