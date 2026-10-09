@@ -1,8 +1,16 @@
 package com.brad.pms.service;
 
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.DevelopmentStorySaveCmd;
+import com.brad.pms.entity.DevelopmentItemWorkflowDO;
+import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
+import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
+import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
 import com.brad.pms.workflow.DevelopmentItemType;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +28,17 @@ class StandaloneTopicStoryIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired DevelopmentStoryManagementService stories;
     @Autowired DevelopmentItemWorkflowService workflows;
+    @Autowired SqlSessionFactory sessions;
+
+    @BeforeEach
+    void restoreApplicationMappings() {
+        // Mock-only tests may replace MyBatis-Plus's shared metadata cache.
+        var assistant = new MapperBuilderAssistant(sessions.getConfiguration(), "standalone-story-integration");
+        for (var entity : java.util.List.of(DevelopmentItemWorkflowDO.class, DevelopmentItemWorkflowNodeDO.class,
+                ProjectNodeDevelopmentStoryDO.class, ProjectNodeDevelopmentTopicDO.class)) {
+            TableInfoHelper.initTableInfo(assistant, entity);
+        }
+    }
 
     @Test
     void createsStoryUnderStandaloneTopicWithPinnedVersionAndCorrectMount() {
