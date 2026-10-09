@@ -276,6 +276,7 @@ docs/
 | [基础设施状态](docs/operations/infrastructure-status.md) | 近期演练与发布快照 |
 | [贡献指南](CONTRIBUTING.md) | 如何提交改动 |
 | [安全策略](SECURITY.md) | 漏洞私下报告 |
+| [1.1.0 安全适用性评估](docs/security/1.1.0-spring-mvc-assessment.md) | 两项 Spring MVC 限定例外、验证依据与复核期限 |
 
 ## 许可证
 

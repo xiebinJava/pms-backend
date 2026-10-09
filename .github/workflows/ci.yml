@@ -55,6 +55,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: os,library
           severity: HIGH,CRITICAL
+          trivyignores: .trivyignore.yaml
       - name: Generate backend SPDX SBOM
         uses: anchore/sbom-action@v0.17.0
         with:

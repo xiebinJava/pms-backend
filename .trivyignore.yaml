@@ -1,0 +1,22 @@
+# Approved applicability assessment: docs/security/1.1.0-spring-mvc-assessment.md
+# Both the package version and JAR path must match. Re-review in one month.
+vulnerabilities:
+  - id: CVE-2026-47884
+    paths:
+      - app/pms-backend.jar
+    purls:
+      - pkg:maven/org.springframework/spring-webmvc@6.2.19
+    expired_at: 2026-11-09
+    statement: >-
+      Not affected: PMS exposes REST response bodies and has no XsltView,
+      XsltViewResolver or implicit view-rendering controller. The runtime
+      contract is checked by SpringMvcSecurityApplicabilityIntegrationTest.
+  - id: CVE-2026-47890
+    paths:
+      - app/pms-backend.jar
+    purls:
+      - pkg:maven/org.springframework/spring-webmvc@6.2.19
+    expired_at: 2026-11-09
+    statement: >-
+      Not affected: PMS has no SSE endpoint or view-fragment streaming.
+      The runtime contract is checked by SpringMvcSecurityApplicabilityIntegrationTest.
