@@ -3,9 +3,11 @@ package com.brad.pms.controller;
 import com.brad.pms.common.response.ResponseResult;
 import com.brad.pms.dto.request.DevelopmentItemNodeUpdateCmd;
 import com.brad.pms.dto.request.DevelopmentItemTaskSaveCmd;
+import com.brad.pms.dto.request.NodeRollbackCmd;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
+import com.brad.pms.service.DevelopmentItemPermissionService;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.workflow.DevelopmentItemType;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/development")
@@ -24,54 +27,69 @@ import org.springframework.web.bind.annotation.RestController;
 public class DevelopmentItemWorkflowController {
 
     private final DevelopmentItemWorkflowService service;
+    private final DevelopmentItemPermissionService permissionService;
 
     @GetMapping("/topics/{id}")
     @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<DevelopmentItemWorkflowDetailDTO> topic(@PathVariable Long id) {
+    public ResponseResult<DevelopmentItemWorkflowDetailDTO> topic(@PathVariable("id") Long id) {
         return ResponseResult.success(service.detail(DevelopmentItemType.TOPIC, id));
     }
 
     @GetMapping("/stories/{id}")
     @RequirePermission(PermissionCode.PROJECT_READ)
-    public ResponseResult<DevelopmentItemWorkflowDetailDTO> story(@PathVariable Long id) {
+    public ResponseResult<DevelopmentItemWorkflowDetailDTO> story(@PathVariable("id") Long id) {
         return ResponseResult.success(service.detail(DevelopmentItemType.STORY, id));
     }
 
     @PutMapping("/items/{type}/{id}/nodes/{nodeId}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> updateNode(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId,
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId,
             @RequestBody DevelopmentItemNodeUpdateCmd cmd) {
-        return ResponseResult.success(service.updateNode(DevelopmentItemType.from(type), id, nodeId, cmd));
+        DevelopmentItemType itemType = DevelopmentItemType.from(type);
+        permissionService.requireWrite(itemType);
+        return ResponseResult.success(service.updateNode(itemType, id, nodeId, cmd));
     }
 
     @PostMapping("/items/{type}/{id}/nodes/{nodeId}/complete")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> completeNode(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId) {
-        return ResponseResult.success(service.completeNode(DevelopmentItemType.from(type), id, nodeId));
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId) {
+        DevelopmentItemType itemType = DevelopmentItemType.from(type);
+        permissionService.requireWrite(itemType);
+        return ResponseResult.success(service.completeNode(itemType, id, nodeId));
+    }
+
+    @PostMapping("/items/{type}/{id}/nodes/{nodeId}/rollback")
+    public ResponseResult<DevelopmentItemWorkflowDetailDTO> rollbackNode(
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId,
+            @Validated @RequestBody NodeRollbackCmd cmd) {
+        DevelopmentItemType itemType = DevelopmentItemType.from(type);
+        permissionService.requireWrite(itemType);
+        return ResponseResult.success(service.rollbackNode(itemType, id, nodeId, cmd.getReason()));
     }
 
     @PostMapping("/items/{type}/{id}/nodes/{nodeId}/tasks")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> createTask(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long nodeId,
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("nodeId") Long nodeId,
             @RequestBody DevelopmentItemTaskSaveCmd cmd) {
-        return ResponseResult.success(service.saveTask(DevelopmentItemType.from(type), id, nodeId, null, cmd));
+        DevelopmentItemType itemType = DevelopmentItemType.from(type);
+        permissionService.requireWrite(itemType);
+        return ResponseResult.success(service.saveTask(itemType, id, nodeId, null, cmd));
     }
 
     @PutMapping("/items/{type}/{id}/tasks/{taskId}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> updateTask(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long taskId,
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("taskId") Long taskId,
             @RequestBody DevelopmentItemTaskSaveCmd cmd) {
-        return ResponseResult.success(service.saveTask(DevelopmentItemType.from(type), id, null, taskId, cmd));
+        DevelopmentItemType itemType = DevelopmentItemType.from(type);
+        permissionService.requireWrite(itemType);
+        return ResponseResult.success(service.saveTask(itemType, id, null, taskId, cmd));
     }
 
     @DeleteMapping("/items/{type}/{id}/tasks/{taskId}")
-    @RequirePermission(PermissionCode.PROJECT_WRITE)
     public ResponseResult<DevelopmentItemWorkflowDetailDTO> deleteTask(
-            @PathVariable String type, @PathVariable Long id, @PathVariable Long taskId) {
-        return ResponseResult.success(service.deleteTask(DevelopmentItemType.from(type), id, taskId));
+            @PathVariable("type") String type, @PathVariable("id") Long id, @PathVariable("taskId") Long taskId) {
+        DevelopmentItemType itemType = DevelopmentItemType.from(type);
+        permissionService.requireWrite(itemType);
+        return ResponseResult.success(service.deleteTask(itemType, id, taskId));
     }
 }

@@ -20,6 +20,10 @@ public final class AiDelegationRoutePolicy {
                 && !tokenProvider.isDshDelegationToken(token)) {
             return false;
         }
+        if (path.startsWith("/integration/ai/v1/")
+                && !tokenProvider.isDshDelegationToken(token)) {
+            return false;
+        }
 
         if ("POST".equalsIgnoreCase(method) && "/ai/context/inspect".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "ai:context:read");
@@ -57,11 +61,25 @@ public final class AiDelegationRoutePolicy {
         if ("GET".equalsIgnoreCase(method) && "/integration/dsh/v1/people".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
         }
+        if ("GET".equalsIgnoreCase(method) && "/integration/ai/v1/capabilities".equals(path)) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
+        }
+        if ("POST".equalsIgnoreCase(method) && "/integration/ai/v1/query".equals(path)) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
+        }
+        if ("GET".equalsIgnoreCase(method)
+                && path.matches("/integration/ai/v1/context/[^/]+/[^/]+")) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
+        }
         if ("POST".equalsIgnoreCase(method) && "/integration/dsh/v1/commands/preview".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:command:preview");
         }
         if ("POST".equalsIgnoreCase(method)
                 && path.matches("/integration/dsh/v1/operations/[^/]+/execute")) {
+            return tokenProvider.hasAiDelegationScope(token, "pms:command:execute");
+        }
+        if ("POST".equalsIgnoreCase(method)
+                && "/integration/ai/v1/operations/execute".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:command:execute");
         }
         return false;

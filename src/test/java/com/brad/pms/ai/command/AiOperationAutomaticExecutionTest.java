@@ -1,0 +1,151 @@
+package com.brad.pms.ai.command;
+
+import com.brad.pms.ai.contract.PmsAgentContractRegistry;
+import com.brad.pms.entity.AiOperationDO;
+import com.brad.pms.mapper.AiOperationMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.dao.DuplicateKeyException;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class AiOperationAutomaticExecutionTest {
+
+    @Test
+    void reservesTheIdempotencyKeyAndReturnsTheStoredResultOnRetry() throws Exception {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsCommandRegistry registry = mock(PmsCommandRegistry.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        PmsCommand command = mock(PmsCommand.class);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        CommandResult expected = new CommandResult(
+                "operation-1", "SUCCEEDED", "项目已创建", Map.of("projectId", 7L), List.of("project-list"));
+        CommandPreview proposal = new CommandPreview(
+                null, CommandName.PROJECT_CREATE, Instant.now().plusSeconds(600),
+                "v1", List.of(), List.of(Map.of("entity", "project")), List.of("project-list"));
+        AiOperationDO stored = succeededOperation(objectMapper, expected);
+        stored.setCommandName(CommandName.PROJECT_CREATE.code());
+        stored.setSourceClient("pms-cli");
+        stored.setContextId("global:pms");
+        stored.setContextVersion("v1");
+        stored.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "测试项目")));
+        when(mapper.selectByUserIdAndIdempotencyKeyForUpdate(7L, "idem-1"))
+                .thenReturn(null, stored);
+        when(registry.require(CommandName.PROJECT_CREATE)).thenReturn(command);
+        when(command.preview(any())).thenReturn(proposal);
+        when(command.execute(any())).thenReturn(expected);
+        AtomicReference<String> insertedStatus = new AtomicReference<>();
+        doAnswer(invocation -> {
+            insertedStatus.set(invocation.getArgument(0, AiOperationDO.class).getStatus());
+            return 1;
+        }).when(mapper).insert(any(AiOperationDO.class));
+
+        AiOperationService service = new AiOperationService(mapper, registry, objectMapper, contractRegistry);
+        CommandPreviewRequest request = new CommandPreviewRequest(
+                CommandName.PROJECT_CREATE, Map.of("name", "测试项目"), "global:pms", "v1");
+
+        CommandResult first = service.executeAutomatically(7L, request, "idem-1", "pms-cli", "request-1");
+        CommandResult retry = service.executeAutomatically(7L, request, "idem-1", "pms-cli", "request-2");
+
+        assertThat(first).isEqualTo(expected);
+        assertThat(retry.operationId()).isEqualTo(expected.operationId());
+        assertThat(retry.status()).isEqualTo(expected.status());
+        assertThat(retry.message()).isEqualTo(expected.message());
+        assertThat(retry.refreshScopes()).containsExactlyElementsOf(expected.refreshScopes());
+        assertThat(retry.data()).containsEntry("projectId", 7);
+        verify(command, times(1)).execute(any(AiOperationDO.class));
+        var captor = org.mockito.ArgumentCaptor.forClass(AiOperationDO.class);
+        verify(mapper).insert(captor.capture());
+        assertThat(insertedStatus).hasValue("AUTOMATIC_RUNNING");
+        assertThat(captor.getValue().getExecutionMode()).isEqualTo("AUTOMATIC");
+        assertThat(captor.getValue().getSourceClient()).isEqualTo("pms-cli");
+        assertThat(captor.getValue().getRequestId()).isEqualTo("request-1");
+        assertThat(captor.getValue().getIdempotencyKey()).isEqualTo("idem-1");
+    }
+
+    @Test
+    void rejectsReusingAnIdempotencyKeyForADifferentRequest() throws Exception {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsCommandRegistry registry = mock(PmsCommandRegistry.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        CommandResult result = new CommandResult(
+                "operation-1", "SUCCEEDED", "项目已创建", Map.of("projectId", 7L), List.of("project-list"));
+        AiOperationDO existing = succeededOperation(objectMapper, result);
+        existing.setCommandName(CommandName.PROJECT_CREATE.code());
+        existing.setSourceClient("pms-cli");
+        existing.setContextId("global:pms");
+        existing.setContextVersion("v1");
+        existing.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "原项目")));
+        when(mapper.selectByUserIdAndIdempotencyKeyForUpdate(7L, "idem-reused")).thenReturn(existing);
+
+        AiOperationService service = new AiOperationService(mapper, registry, objectMapper, contractRegistry);
+        CommandPreviewRequest request = new CommandPreviewRequest(
+                CommandName.PROJECT_CREATE, Map.of("name", "另一个项目"), "global:pms", "v1");
+
+        assertThatThrownBy(() -> service.executeAutomatically(
+                7L, request, "idem-reused", "pms-cli", "request-2"))
+                .isInstanceOf(com.brad.pms.common.exception.BusinessException.class)
+                .hasMessageContaining("其他操作");
+    }
+
+    @Test
+    void returnsTheWinningResultWhenTheIdempotencyInsertRaces() throws Exception {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsCommandRegistry registry = mock(PmsCommandRegistry.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        PmsCommand command = mock(PmsCommand.class);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        CommandResult expected = new CommandResult(
+                "operation-winner", "SUCCEEDED", "项目已创建", Map.of("projectId", 7L), List.of("project-list"));
+        CommandPreview proposal = new CommandPreview(
+                null, CommandName.PROJECT_CREATE, Instant.now().plusSeconds(600),
+                "v1", List.of(), List.of(Map.of("entity", "project")), List.of("project-list"));
+        AiOperationDO winner = succeededOperation(objectMapper, expected);
+        winner.setCommandName(CommandName.PROJECT_CREATE.code());
+        winner.setSourceClient("pms-cli");
+        winner.setContextId("global:pms");
+        winner.setContextVersion("v1");
+        winner.setArgumentsJson(objectMapper.writeValueAsString(Map.of("name", "测试项目")));
+
+        when(mapper.selectByUserIdAndIdempotencyKeyForUpdate(7L, "idem-race"))
+                .thenReturn(null, winner);
+        when(registry.require(CommandName.PROJECT_CREATE)).thenReturn(command);
+        when(command.preview(any())).thenReturn(proposal);
+        doAnswer(invocation -> {
+            throw new DuplicateKeyException("duplicate idempotency key");
+        }).when(mapper).insert(any(AiOperationDO.class));
+
+        AiOperationService service = new AiOperationService(mapper, registry, objectMapper, contractRegistry);
+        CommandPreviewRequest request = new CommandPreviewRequest(
+                CommandName.PROJECT_CREATE, Map.of("name", "测试项目"), "global:pms", "v1");
+
+        CommandResult result = service.executeAutomatically(7L, request, "idem-race", "pms-cli", "request-race");
+
+        assertThat(result.operationId()).isEqualTo(expected.operationId());
+        assertThat(result.status()).isEqualTo(expected.status());
+        assertThat(result.message()).isEqualTo(expected.message());
+        assertThat(result.data()).containsEntry("projectId", 7);
+        assertThat(result.refreshScopes()).containsExactlyElementsOf(expected.refreshScopes());
+        verify(command, times(0)).execute(any(AiOperationDO.class));
+    }
+
+    private AiOperationDO succeededOperation(ObjectMapper objectMapper, CommandResult result) throws Exception {
+        AiOperationDO operation = new AiOperationDO();
+        operation.setStatus("SUCCEEDED");
+        operation.setResultJson(objectMapper.writeValueAsString(result));
+        return operation;
+    }
+}

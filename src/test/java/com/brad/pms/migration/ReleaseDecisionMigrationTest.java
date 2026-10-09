@@ -31,4 +31,28 @@ class ReleaseDecisionMigrationTest {
         assertThat(sql).containsIgnoringCase("emergency_contact");
         assertThat(sql).containsIgnoringCase("UNIQUE KEY");
     }
+
+    @Test
+    void simplifiesReleaseBaselineToHandoverOwnerAndNotes() throws Exception {
+        String sql = Files.readString(
+                Path.of("src/main/resources/db/migration/V69__simplify_release_handover.sql"),
+                StandardCharsets.UTF_8);
+
+        assertThat(sql).containsIgnoringCase("ADD COLUMN handover_owner_id BIGINT");
+        assertThat(sql).containsIgnoringCase("FOREIGN KEY (handover_owner_id) REFERENCES sys_user (id)");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN release_version");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN release_window_start");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN release_window_end");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN release_type");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN package_ready");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN config_confirmed");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN rollback_ready");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN monitoring_confirmed");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN on_call_confirmed");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN decision_result");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN decision_note");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN observation_items");
+        assertThat(sql).containsIgnoringCase("DROP COLUMN emergency_contact");
+        assertThat(sql).containsIgnoringCase("idx_node_release_baseline_handover_owner");
+    }
 }

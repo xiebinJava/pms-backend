@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 /**
@@ -64,6 +65,7 @@ public class NodeService {
     private WorkflowComponentBindingService workflowComponentBindingService;
     private NodeCustomFieldService nodeCustomFieldService;
     private ProjectFollowerMapper followerMapper;
+    private WorkflowNodeCompletionPolicy completionPolicy = new WorkflowNodeCompletionPolicy();
 
     @Autowired
     public void setNotificationService(@Lazy NotificationService notificationService) {
@@ -88,6 +90,11 @@ public class NodeService {
     @Autowired
     public void setFollowerMapper(ProjectFollowerMapper followerMapper) {
         this.followerMapper = followerMapper;
+    }
+
+    @Autowired(required = false)
+    public void setCompletionPolicy(WorkflowNodeCompletionPolicy completionPolicy) {
+        if (completionPolicy != null) this.completionPolicy = completionPolicy;
     }
 
     @Transactional
@@ -131,6 +138,24 @@ public class NodeService {
     }
 
     /**
+     * Repairs legacy active projects that have no current node. Older demo data could leave every
+     * node in NOT_STARTED even though the project itself was open, which made the completion action
+     * correctly disappear because there was no IN_PROGRESS node to complete.
+     */
+    static ProjectNodeDO findNodeToActivate(ProjectDO project, List<ProjectNodeDO> nodes) {
+        if (!com.brad.pms.security.ProjectPermissionPolicy.isProjectOpen(project)
+                || nodes == null
+                || nodes.stream().anyMatch(node -> java.util.Objects.equals(node.getStatus(), NodeStatus.IN_PROGRESS.getCode()))) {
+            return null;
+        }
+        return nodes.stream()
+                .filter(node -> java.util.Objects.equals(node.getStatus(), NodeStatus.NOT_STARTED.getCode()))
+                .min(Comparator.comparing(ProjectNodeDO::getSort, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(ProjectNodeDO::getId, Comparator.nullsLast(Long::compareTo)))
+                .orElse(null);
+    }
+
+    /**
      * 首节点默认项目创建人；后续节点默认项目经理。
      * 只填充空负责人，或跟着上一任项目经理走；已完成/已终止节点和人工指定的负责人不覆盖。
      */
@@ -171,6 +196,13 @@ public class NodeService {
         List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
                         .eq(ProjectNodeDO::getProjectId, projectId)
                         .orderByAsc(ProjectNodeDO::getSort));
+        ProjectNodeDO nodeToActivate = findNodeToActivate(project, nodes);
+        if (nodeToActivate != null) {
+            nodeToActivate.setStatus(NodeStatus.IN_PROGRESS.getCode());
+            if (nodeMapper.updateById(nodeToActivate) != 1) {
+                throw BusinessException.conflict("节点状态已被其他人修改，请刷新后重试");
+            }
+        }
         WorkflowTemplateDefinition definition = resolveProjectDefinition(project);
         if (workflowComponentBindingService != null && definition != null) {
             definition = workflowComponentBindingService.applyTopicBinding(project, definition, nodes);
@@ -260,14 +292,12 @@ public class NodeService {
     public List<ProjectNodeDTO> complete(Long projectId, Long nodeId) {
         ProjectDO project = permissionService.requireProject(projectId);
         ProjectNodeDO node = permissionService.requireCompletableNode(projectId, nodeId);
+        completionPolicy.validateOwnerAndSchedule(node.getOwnerId(), node.getStartDate(), node.getEndDate());
         WorkflowNodeDefinition definition = resolveNodeDefinition(project, node);
         if (definition != null && definition.projectBasicInfo()) {
             validateKickoffProfile(projectId, node, definition);
         } else if (definition != null && hasRequiredVisibleProjectBinding(definition)) {
             validateRequiredProjectBindings(projectId, definition);
-        }
-        if (node.getOwnerId() == null) {
-            throw BusinessException.error("请先分配节点负责人");
         }
         Long unfinished = taskMapper.selectCount(new LambdaQueryWrapper<ProjectTaskDO>()
                 .eq(ProjectTaskDO::getProjectId, projectId)

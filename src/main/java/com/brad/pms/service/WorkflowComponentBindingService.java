@@ -34,7 +34,7 @@ public class WorkflowComponentBindingService {
                                                         Collection<ProjectNodeDO> projectNodes) {
         if (project == null || definition == null || project.getId() == null) return definition;
         List<ProjectNodeDevelopmentTopicDO> topics = loadTopicRoots(List.of(project.getId()));
-        String configuredNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey();
+        String configuredNodeKey = configuredTopicNodeKey(project.getWorkflowTemplateVersionId());
         return overlay(project.getId(), definition, projectNodes, topics, configuredNodeKey);
     }
 
@@ -64,13 +64,13 @@ public class WorkflowComponentBindingService {
         Map<Long, List<ProjectNodeDO>> nodesByProject = (projectNodes == null ? List.<ProjectNodeDO>of() : projectNodes)
                 .stream().filter(node -> node.getProjectId() != null)
                 .collect(Collectors.groupingBy(ProjectNodeDO::getProjectId));
-        String configuredNodeKey = workflowTemplateService.resolveTopicSourceProjectNodeKey();
         Map<Long, WorkflowTemplateDefinition> effective = new HashMap<>();
         for (Map.Entry<Long, Long> projectEntry : versionIdsByProjectId.entrySet()) {
             Long projectId = projectEntry.getKey();
             if (projectId == null) continue;
             WorkflowTemplateDefinition definition = definitions == null ? null
                     : definitions.get(projectEntry.getValue());
+            String configuredNodeKey = configuredTopicNodeKeyForBatch(projectEntry.getValue(), definition);
             effective.put(projectId, overlay(projectId, definition,
                     nodesByProject.getOrDefault(projectId, List.of()),
                     topicsByProject.getOrDefault(projectId, List.of()), configuredNodeKey));
@@ -79,12 +79,32 @@ public class WorkflowComponentBindingService {
     }
 
     public boolean topicCreationAllowed(ProjectNodeDO node) {
+        return topicCreationAllowed(node, null);
+    }
+
+    public boolean topicCreationAllowed(ProjectNodeDO node, Long workflowTemplateVersionId) {
         return node != null
-                && Objects.equals(node.getNodeKey(), workflowTemplateService.resolveTopicSourceProjectNodeKey());
+                && Objects.equals(node.getNodeKey(), configuredTopicNodeKey(workflowTemplateVersionId));
+    }
+
+    private String configuredTopicNodeKey(Long workflowTemplateVersionId) {
+        return workflowTemplateVersionId == null
+                ? workflowTemplateService.resolveTopicSourceProjectNodeKey()
+                : workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(workflowTemplateVersionId);
+    }
+
+    private String configuredTopicNodeKeyForBatch(Long workflowTemplateVersionId,
+                                                   WorkflowTemplateDefinition definition) {
+        if (workflowTemplateVersionId == null) {
+            return workflowTemplateService.resolveTopicSourceProjectNodeKey();
+        }
+        return definition == null
+                ? workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(workflowTemplateVersionId)
+                : workflowTemplateService.resolveTopicSourceProjectNodeKeyForRuntime(definition);
     }
 
     /**
-     * Adds the story-splitting runtime component to the node selected by the pinned topic snapshot.
+     * Adds the story-list runtime component to the node selected by the pinned topic snapshot.
      * The component is derived at read time and the immutable template definition is never mutated.
      */
     public WorkflowTemplateDefinition applyStoryBinding(WorkflowTemplateDefinition definition,
@@ -94,8 +114,9 @@ public class WorkflowComponentBindingService {
         boolean changed = false;
         for (WorkflowNodeDefinition node : definition.nodes()) {
             if (Objects.equals(node.key(), pinnedTopicNodeKey)
-                    && !node.runtimeComponents().contains(WorkflowComponentKey.STORY_SPLIT)) {
-                effectiveNodes.add(withComponent(node, WorkflowComponentKey.STORY_SPLIT));
+                    && !node.runtimeComponents().contains(WorkflowComponentKey.STORY_SPLIT)
+                    && !node.runtimeComponents().contains(WorkflowComponentKey.STORY_LIST)) {
+                effectiveNodes.add(withComponent(node, WorkflowComponentKey.STORY_LIST));
                 changed = true;
             } else {
                 effectiveNodes.add(node);
@@ -163,6 +184,7 @@ public class WorkflowComponentBindingService {
             contentOrder.add("component:" + componentKey);
         }
         return new WorkflowNodeDefinition(node.key(), node.name(), node.description(), node.deliverable(), node.roles(),
-                components, node.fields(), node.projectBasicInfo(), node.projectBasicInfoFields(), contentOrder);
+                components, node.fields(), node.projectBasicInfo(), node.projectBasicInfoFields(), contentOrder,
+                node.componentConfigs());
     }
 }

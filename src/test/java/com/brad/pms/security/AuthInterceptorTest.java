@@ -92,6 +92,24 @@ class AuthInterceptorTest {
         assertThat(allowed).isFalse();
     }
 
+    @Test
+    void delegationTokenInAuthorizationHeaderStillUsesIntegrationRoutePolicy() throws Exception {
+        when(tokenProvider.isAiDelegationToken("dsh-token")).thenReturn(true);
+        when(tokenProvider.parseAiDelegationToken("dsh-token")).thenReturn(new LoginUser(7L, "alex", "张伟"));
+        when(tokenProvider.isDshDelegationToken("dsh-token")).thenReturn(true);
+        when(tokenProvider.hasAiDelegationScope("dsh-token", "pms:query:read")).thenReturn(false);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integration/ai/v1/query");
+        request.setContextPath("/api");
+        request.addHeader("Authorization", "Bearer dsh-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        Method method = TestController.class.getDeclaredMethod("secured");
+        HandlerMethod handler = new HandlerMethod(new TestController(), method);
+
+        assertThat(interceptor.preHandle(request, response, handler)).isFalse();
+        assertThat(response.getStatus()).isEqualTo(403);
+    }
+
     private MockHttpServletResponse invoke(String methodName, String authorization) throws Exception {
         Method method = TestController.class.getDeclaredMethod(methodName);
         HandlerMethod handler = new HandlerMethod(new TestController(), method);

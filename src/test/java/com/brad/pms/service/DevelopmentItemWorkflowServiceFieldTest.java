@@ -2,7 +2,12 @@ package com.brad.pms.service;
 
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.entity.DevelopmentItemWorkflowNodeDO;
+import com.brad.pms.entity.ProjectDO;
+import com.brad.pms.entity.ProjectNodeDO;
+import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
+import com.brad.pms.entity.RequirementDO;
 import com.brad.pms.entity.UserDO;
+import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.mapper.DevelopmentItemTaskMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowMapper;
 import com.brad.pms.mapper.DevelopmentItemWorkflowNodeMapper;
@@ -10,12 +15,14 @@ import com.brad.pms.mapper.ProjectNodeDevelopmentStoryMapper;
 import com.brad.pms.mapper.ProjectNodeDevelopmentTopicMapper;
 import com.brad.pms.mapper.ProjectNodeIterationPlanMapper;
 import com.brad.pms.mapper.ProjectNodeMapper;
+import com.brad.pms.mapper.RequirementMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -24,16 +31,44 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 class DevelopmentItemWorkflowServiceFieldTest {
+    @Test void nodeDtoResolvesReviewersOutsideOwnersAndAssignees() {
+        var node = new DevelopmentItemWorkflowNodeDO(); node.setNodeKey("review"); node.setOwnerId(1L);
+        node.setFieldValuesJson("{\"__components\":{\"topic-design-review\":{\"productReviewerIds\":[42]}}}");
+        var definition = new WorkflowNodeDefinition("review", "方案设计与评审", "", "", "", List.of("topic-design-review"), List.of(), false, List.of());
+        var user = new UserDO(); user.setId(42L); user.setNameZh("评审人");
+        DevelopmentItemWorkflowNodeDTO dto = ReflectionTestUtils.invokeMethod(service, "toNodeDTO", node, List.of(),
+                Map.of(42L,user), new WorkflowTemplateDefinition(1,List.of(definition)));
+        assertThat(dto.getReviewerNames()).containsEntry(42L,"评审人");
+    }
+    @Test
+    void designReviewStateIsSavedOnlyWhenBoundAndPreservesResearchData() {
+        var mapper = new ObjectMapper();
+        var definition = new WorkflowNodeDefinition("review", "方案设计与评审", "", "", "",
+                List.of("topic-design-review"), List.of(), false, List.of());
+        Map<String, JsonNode> incoming = Map.of("__components", mapper.valueToTree(Map.of(
+                "topic-design-review", Map.of("productPlanUrl", "https://example.com/plan"),
+                "topic-research", Map.of("goal", "不应覆盖"))));
+        Map<String, JsonNode> saved = ReflectionTestUtils.invokeMethod(service, "preserveComponentValues", Map.of(),
+                "{\"__components\":{\"topic-research\":{\"goal\":\"旧调研\"}}}", incoming, definition);
+        assertThat(saved.get("__components").path("topic-design-review").path("productPlanUrl").asText()).isEqualTo("https://example.com/plan");
+        assertThat(saved.get("__components").path("topic-research").path("goal").asText()).isEqualTo("旧调研");
+    }
     private final WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
+    private final RequirementMapper requirementMapper = mock(RequirementMapper.class);
+    private final ProjectNodeDevelopmentTopicMapper topicMapper = mock(ProjectNodeDevelopmentTopicMapper.class);
+    private final ProjectNodeDevelopmentStoryMapper storyMapper = mock(ProjectNodeDevelopmentStoryMapper.class);
+    private final ProjectNodeMapper projectNodeMapper = mock(ProjectNodeMapper.class);
+    private final ProjectPermissionService permissionService = mock(ProjectPermissionService.class);
     private final DevelopmentItemWorkflowService service = new DevelopmentItemWorkflowService(
             mock(DevelopmentItemWorkflowMapper.class), mock(DevelopmentItemWorkflowNodeMapper.class),
-            mock(DevelopmentItemTaskMapper.class), mock(ProjectNodeDevelopmentTopicMapper.class),
-            mock(ProjectNodeDevelopmentStoryMapper.class), mock(ProjectNodeMapper.class),
+            mock(DevelopmentItemTaskMapper.class), topicMapper,
+            storyMapper, requirementMapper, projectNodeMapper,
             mock(ProjectNodeIterationPlanMapper.class), mock(WorkflowTemplateVersionMapper.class),
-            mock(ProjectPermissionService.class), mock(UserService.class), workflowTemplateService,
+            permissionService, mock(UserService.class), workflowTemplateService,
             mock(WorkflowComponentBindingService.class), mock(ProjectMemberAssignmentService.class), new ObjectMapper());
 
     @Test
@@ -61,4 +96,154 @@ class DevelopmentItemWorkflowServiceFieldTest {
         assertThat(result.getFieldValues()).containsEntry("researchSummary",
                 new ObjectMapper().getNodeFactory().textNode("已记录调研结论"));
     }
+
+    @Test
+    void requiredRequirementBindingsReadFromTheRequirementRecord() {
+        RequirementDO requirement = new RequirementDO();
+        requirement.setId(7L);
+        requirement.setTitle("需求标题");
+        requirement.setDescription(null);
+        requirement.setPriority(1);
+        requirement.setOwnerId(9L);
+        requirement.setStatus("IN_PROGRESS");
+        requirement.setDeleted(false);
+        when(requirementMapper.selectById(requirement.getId())).thenReturn(requirement);
+
+        WorkflowFieldDefinition description = new WorkflowFieldDefinition(
+                "description", "需求描述", WorkflowFieldType.TEXTAREA, true, List.of(), true,
+                "requirement.description", true);
+        WorkflowFieldDefinition owner = new WorkflowFieldDefinition(
+                "owner", "需求负责人", WorkflowFieldType.PERSON, true, List.of(), true,
+                "requirement.owner", false);
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("intake", "需求录入", "", "", "",
+                List.of(), List.of(description, owner), false, List.of(), List.of("fields"));
+
+        Object context = ReflectionTestUtils.invokeMethod(
+                service, "loadContext", DevelopmentItemType.REQUIREMENT, 7L);
+        List<String> missing = ReflectionTestUtils.invokeMethod(
+                service, "missingRequiredBoundFields", context, definition);
+
+        assertThat(missing).containsExactly("需求描述");
+    }
+
+    @Test
+    void topicProjectBindingReadsTheAssociatedProjectName() {
+        ProjectDO project = new ProjectDO();
+        project.setId(78L);
+        project.setName("项目 A");
+        ProjectNodeDevelopmentTopicDO topic = new ProjectNodeDevelopmentTopicDO();
+        topic.setId(7L);
+        topic.setTitle("专题一");
+        topic.setProjectId(78L);
+        topic.setNodeId(88L);
+        topic.setOwnerId(9L);
+        topic.setDeleted(false);
+        ProjectNodeDO sourceNode = new ProjectNodeDO();
+        sourceNode.setId(88L);
+        sourceNode.setProjectId(78L);
+        when(topicMapper.selectById(7L)).thenReturn(topic);
+        when(storyMapper.selectList(any())).thenReturn(List.of());
+        when(projectNodeMapper.selectById(88L)).thenReturn(sourceNode);
+        when(permissionService.requireProjectReadable(78L)).thenReturn(project);
+
+        Object context = ReflectionTestUtils.invokeMethod(service, "loadContext", DevelopmentItemType.TOPIC, 7L);
+        Object value = ReflectionTestUtils.invokeMethod(service, "boundFieldValue", context, "topic.project");
+
+        assertThat(value).isEqualTo("项目 A");
+    }
+
+    @Test
+    void savesEditableRequirementBindingsFromNodeFields() {
+        RequirementDO requirement = new RequirementDO();
+        requirement.setId(7L);
+        requirement.setTitle("旧标题");
+        requirement.setDescription("旧描述");
+        requirement.setPriority(1);
+        requirement.setOwnerId(9L);
+        requirement.setStatus("ACTIVE");
+        requirement.setDeleted(false);
+        when(requirementMapper.selectById(7L)).thenReturn(requirement);
+        when(requirementMapper.selectByIdForUpdate(7L)).thenReturn(requirement);
+        when(requirementMapper.updateById(requirement)).thenReturn(1);
+
+        WorkflowFieldDefinition title = new WorkflowFieldDefinition(
+                "title", "需求名称", WorkflowFieldType.TEXT, true, List.of(), true,
+                "requirement.title", false);
+        WorkflowFieldDefinition description = new WorkflowFieldDefinition(
+                "description", "需求描述", WorkflowFieldType.TEXTAREA, true, List.of(), true,
+                "requirement.description", true);
+        WorkflowFieldDefinition priority = new WorkflowFieldDefinition(
+                "priority", "需求优先级", WorkflowFieldType.NUMBER, true, List.of(), true,
+                "requirement.priority", false);
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("intake", "需求录入", "", "", "",
+                List.of(), List.of(title, description, priority), false, List.of(), List.of("fields"));
+
+        Object context = ReflectionTestUtils.invokeMethod(
+                service, "loadContext", DevelopmentItemType.REQUIREMENT, 7L);
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, JsonNode> values = Map.of(
+                "title", mapper.valueToTree("新标题"),
+                "description", mapper.valueToTree("新描述"),
+                "priority", mapper.valueToTree(3));
+
+        ReflectionTestUtils.invokeMethod(service, "syncEditableRequirementBindings", context, definition, values);
+
+        assertThat(requirement.getTitle()).isEqualTo("新标题");
+        assertThat(requirement.getDescription()).isEqualTo("新描述");
+        assertThat(requirement.getPriority()).isEqualTo(3);
+    }
+
+    @Test
+    void keepsRuntimeComponentStateWhenSavingTemplateFields() {
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, JsonNode> values = Map.of(
+                "researchSummary", mapper.valueToTree("新的调研结论"));
+
+        Map<String, JsonNode> merged = ReflectionTestUtils.invokeMethod(
+                service, "preserveComponentValues", values,
+                "{\"__components\":{\"requirement-receiving-analysis\":{\"decision\":\"PASS\"}}}");
+
+        assertThat(merged).containsKey("researchSummary");
+        assertThat(merged.get("__components").path("requirement-receiving-analysis").path("decision").asText())
+                .isEqualTo("PASS");
+    }
+
+    @Test
+    void acceptsTopicResearchStateOnlyWhenTheWorkbenchIsBound() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition("research", "需求调研", "", "", "",
+                List.of(), List.of(), false, List.of(), List.of("component:topic-research"), Map.of());
+        Map<String, JsonNode> incoming = Map.of("__components", mapper.valueToTree(Map.of(
+                "topic-research", Map.of("needed", "YES", "goal", "比较竞品", "report", "分析报告"),
+                "requirement-node-workbench", Map.of("background", "禁止跨类型保存"))));
+        Map<String, JsonNode> merged = ReflectionTestUtils.invokeMethod(service, "preserveComponentValues",
+                Map.of(), "{}", incoming, definition);
+        assertThat(merged.get("__components")).isNotNull();
+        assertThat(merged.get("__components").path("topic-research").path("goal").asText()).isEqualTo("比较竞品");
+        assertThat(merged.get("__components").has("requirement-node-workbench")).isFalse();
+    }
+
+    @Test
+    void acceptsClarificationWorkbenchStateWhenNodeUsesTheWorkbenchComponent() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition(
+                "clarify", "需求澄清", "", "", "", List.of(), List.of(), false, List.of(),
+                List.of("component:requirement-node-workbench"), Map.of());
+        Map<String, JsonNode> values = Map.of();
+        Map<String, JsonNode> incoming = Map.of("__components", mapper.valueToTree(Map.of(
+                "requirement-node-workbench", Map.of(
+                        "background", "补充背景",
+                        "acceptanceCriteria", "可验证"))));
+
+        Map<String, JsonNode> merged = ReflectionTestUtils.invokeMethod(
+                service, "preserveComponentValues", values,
+                "{\"__components\":{\"requirement-receiving-analysis\":{\"decision\":\"PASS\"}}}",
+                incoming, definition);
+
+        assertThat(merged.get("__components").path("requirement-receiving-analysis").path("decision").asText())
+                .isEqualTo("PASS");
+        assertThat(merged.get("__components").path("requirement-node-workbench").path("background").asText())
+                .isEqualTo("补充背景");
+    }
+
 }

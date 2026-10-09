@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class DevelopmentItemWorkflowDetailDTO {
@@ -29,14 +30,24 @@ public class DevelopmentItemWorkflowDetailDTO {
     private String blocker;
     private String latestBuildVersion;
     private String testStatus;
+    private Long iterationPlanId;
     private String iterationPlanName;
+    /** All direct requirements that execute through this development item. */
+    private List<SourceRequirementSummaryDTO> sourceRequirements;
+    /** @deprecated Use sourceRequirements; retained for older clients. */
+    private SourceRequirementSummaryDTO sourceRequirement;
+    private RequirementExecutionTargetDTO executionTarget;
+    private List<RequirementExecutionTargetHistoryDTO> executionTargetHistory;
 
+    /** Display names for people confirmed inside node workbenches (e.g. developers/testers). */
+    private Map<Long, String> workbenchPeople;
     private Boolean workflowConfigured;
     private String workflowStatus;
     private Integer workflowProgress;
     private Long workflowId;
     private Long templateVersionId;
     private Integer templateVersionNo;
+    private String terminalStatus;
     private Integer completedNodeCount;
     private Integer totalNodeCount;
     private List<DevelopmentItemWorkflowNodeDTO> nodes;

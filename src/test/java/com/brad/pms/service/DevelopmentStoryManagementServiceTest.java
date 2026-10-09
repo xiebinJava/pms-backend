@@ -18,9 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DevelopmentStoryManagementServiceTest {
+    @Mock IterationPlanSystemService iterationPlanSystemService;
 
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
     @Mock DevelopmentTopicManagementService topicManagementService;
@@ -39,6 +42,9 @@ class DevelopmentStoryManagementServiceTest {
     @Mock UserService userService;
     @Mock ProjectMemberAssignmentService assignmentService;
     @InjectMocks DevelopmentStoryManagementService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void configureSystemPolicy() { service.setIterationPlanSystemService(iterationPlanSystemService); }
 
     @Test
     void createsIndependentStoryWithCompanyWideOwnerValidation() {
@@ -71,6 +77,7 @@ class DevelopmentStoryManagementServiceTest {
         ProjectNodeDevelopmentStoryDO story = story(30L, 10L, 1L, 11L, 88L);
         ProjectNodeDevelopmentTopicDO oldTopic = topic(10L, 1L, 11L);
         DevelopmentItemWorkflowDO workflow = workflow(300L, 1L, 11L);
+        when(storyMapper.selectById(30L)).thenReturn(story);
         when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
         when(topicManagementService.requireWritableTopic(10L)).thenReturn(oldTopic);
         when(workflowMapper.selectForUpdate("STORY", 30L)).thenReturn(workflow);
@@ -102,6 +109,7 @@ class DevelopmentStoryManagementServiceTest {
         ProjectNodeDevelopmentTopicDO oldTopic = topic(10L, 1L, 11L);
         ProjectNodeDevelopmentTopicDO targetTopic = topic(20L, 2L, 22L);
         DevelopmentItemWorkflowDO workflow = workflow(300L, 1L, 11L);
+        when(storyMapper.selectById(30L)).thenReturn(story);
         when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
         when(topicManagementService.requireWritableTopic(10L)).thenReturn(oldTopic);
         when(topicManagementService.requireWritableTopic(20L)).thenReturn(targetTopic);
@@ -126,8 +134,27 @@ class DevelopmentStoryManagementServiceTest {
     }
 
     @Test
+    void locksParentTopicsInIdOrderBeforeStoryToAvoidWorkflowDeadlocks() {
+        ProjectNodeDevelopmentStoryDO story = story(30L, 20L, null, null, null);
+        when(storyMapper.selectById(30L)).thenReturn(story);
+        when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
+        when(topicManagementService.requireWritableTopic(10L)).thenReturn(topic(10L, null, null));
+        when(topicManagementService.requireWritableTopic(20L)).thenReturn(topic(20L, null, null));
+        when(developmentItemWorkflowService.resolveTopicStoryMountNodeId(10L)).thenReturn(84L);
+        when(storyMapper.updateById(story)).thenReturn(1);
+        when(developmentItemWorkflowService.createIfDefaultExists(DevelopmentItemType.STORY, 30L, null, null))
+                .thenReturn(workflow(300L, null, null));
+        service.update(30L, command("改绑独立专题", 10L, null));
+        var order = inOrder(topicManagementService, storyMapper);
+        order.verify(topicManagementService).requireWritableTopic(10L);
+        order.verify(topicManagementService).requireWritableTopic(20L);
+        order.verify(storyMapper).selectByIdForUpdate(30L);
+    }
+
+    @Test
     void changingOwnerOnTheSameContextReplacesTheStableAssignment() {
         ProjectNodeDevelopmentStoryDO story = story(30L, null, null, null, 88L);
+        when(storyMapper.selectById(30L)).thenReturn(story);
         when(storyMapper.selectByIdForUpdate(30L)).thenReturn(story);
         when(developmentItemWorkflowService.createIfDefaultExists(
                 DevelopmentItemType.STORY, 30L, null, null)).thenReturn(workflow(300L, null, null));
@@ -149,6 +176,7 @@ class DevelopmentStoryManagementServiceTest {
         story.setProgress(20);
         when(topicManagementService.requireReadableTopic(10L)).thenReturn(topic);
         when(storyMapper.selectByTopicId(10L)).thenReturn(List.of(story));
+        when(developmentItemWorkflowService.storyTestingSummaries(anyList())).thenReturn(Map.of());
         UserDO historical = new UserDO();
         historical.setId(88L);
         historical.setNameZh("历史账号");
@@ -164,6 +192,23 @@ class DevelopmentStoryManagementServiceTest {
             assertThat(dto.getProgress()).isEqualTo(100);
         });
         verify(userService).listByIdsIncludingDeleted(List.of(88L));
+    }
+
+    @Test
+    void aggregatesEachStoryTestingStateIntoTheTopicStoryList() {
+        ProjectNodeDevelopmentTopicDO topic = topic(10L, 1L, 11L);
+        ProjectNodeDevelopmentStoryDO story = story(30L, 1L, 11L, 10L, 88L);
+        when(topicManagementService.requireReadableTopic(10L)).thenReturn(topic);
+        when(storyMapper.selectByTopicId(10L)).thenReturn(List.of(story));
+        when(developmentItemWorkflowService.storyTestingSummaries(anyList())).thenReturn(Map.of(
+                30L, new DevelopmentItemWorkflowService.StoryTestingSummary("1.2.3", "FAILED")));
+
+        List<DevelopmentTopicStoryDTO> result = service.listByTopic(10L);
+
+        assertThat(result).singleElement().satisfies(dto -> {
+            assertThat(dto.getBuildVersion()).isEqualTo("1.2.3");
+            assertThat(dto.getTestStatus()).isEqualTo("FAILED");
+        });
     }
 
     private static DevelopmentStorySaveCmd command(String title, Long topicId, Long ownerId) {

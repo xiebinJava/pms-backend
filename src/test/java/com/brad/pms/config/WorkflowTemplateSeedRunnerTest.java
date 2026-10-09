@@ -5,6 +5,7 @@ import com.brad.pms.mapper.ProjectMapper;
 import com.brad.pms.mapper.ProjectTypeMapper;
 import com.brad.pms.mapper.WorkflowTemplateMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
+import com.brad.pms.workflow.BuiltInWorkflowTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +13,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -31,11 +34,61 @@ class WorkflowTemplateSeedRunnerTest {
     @Mock WorkflowTemplateVersionMapper versionMapper;
     @Mock ProjectMapper projectMapper;
     @Mock ObjectMapper objectMapper;
+    @Mock WorkflowDefaultTemplateCatalog defaultTemplateCatalog;
     @InjectMocks WorkflowTemplateSeedRunner runner;
 
     @Test
-    void createsTopicAndStoryProcessTypesAsTemplateOnlyTypes() throws Exception {
+    void allocatesNewVersionWithoutOverwritingDraftOrExistingDefault() throws Exception {
+        ProjectTypeDO general = type(1L, "general", true);
+        when(projectTypeMapper.selectOne(any())).thenReturn(general, type(2L, "topic-management", false),
+                type(3L, "story-management", false), type(4L, "requirement-management", false));
+        var template = new com.brad.pms.entity.WorkflowTemplateDO();
+        template.setId(10L);
+        template.setProjectTypeId(1L);
+        template.setLatestVersionNo(7);
+        when(templateMapper.selectOne(any())).thenReturn(template);
+        var draft = new com.brad.pms.entity.WorkflowTemplateVersionDO();
+        draft.setVersionNo(7);
+        draft.setStatus("DRAFT");
+        when(versionMapper.selectOne(any())).thenReturn(null, draft);
+        when(defaultTemplateCatalog.find(any())).thenReturn(Optional.empty());
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        runner.run();
+        var captor = ArgumentCaptor.forClass(com.brad.pms.entity.WorkflowTemplateVersionDO.class);
+        verify(versionMapper).insert(captor.capture());
+        assertThat(captor.getValue().getVersionNo()).isEqualTo(8);
+        assertThat(general.getDefaultTemplateVersionId()).isEqualTo(99L);
+        verify(versionMapper, never()).updateById(any(com.brad.pms.entity.WorkflowTemplateVersionDO.class));
+        verify(projectTypeMapper, never()).updateById(any(ProjectTypeDO.class));
+    }
+
+    @Test
+    void preservesPublishedVersionAndDefaultOnRepeatedStartup() throws Exception {
+        when(projectTypeMapper.selectOne(any())).thenReturn(type(1L, "general", true),
+                type(2L, "topic-management", false), type(3L, "story-management", false),
+                type(4L, "requirement-management", false), type(1L, "general", true),
+                type(2L, "topic-management", false), type(3L, "story-management", false),
+                type(4L, "requirement-management", false));
+        var template = new com.brad.pms.entity.WorkflowTemplateDO();
+        template.setId(10L);
+        template.setProjectTypeId(1L);
+        when(templateMapper.selectOne(any())).thenReturn(template);
+        var published = new com.brad.pms.entity.WorkflowTemplateVersionDO();
+        published.setId(99L);
+        published.setVersionNo(5);
+        when(versionMapper.selectOne(any())).thenReturn(published);
+        when(defaultTemplateCatalog.find(any())).thenReturn(Optional.empty());
+        runner.run();
+        runner.run();
+        verify(versionMapper, never()).insert(any(com.brad.pms.entity.WorkflowTemplateVersionDO.class));
+        verify(versionMapper, never()).updateById(any(com.brad.pms.entity.WorkflowTemplateVersionDO.class));
+        verify(projectTypeMapper, never()).updateById(any(ProjectTypeDO.class));
+    }
+
+    @Test
+    void createsDevelopmentProcessTypesAsTemplateOnlyTypes() throws Exception {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(defaultTemplateCatalog.find(any())).thenReturn(Optional.empty());
         runner.run();
 
         ArgumentCaptor<ProjectTypeDO> captor = ArgumentCaptor.forClass(ProjectTypeDO.class);
@@ -43,7 +96,7 @@ class WorkflowTemplateSeedRunnerTest {
         List<ProjectTypeDO> insertedTypes = captor.getAllValues();
 
         assertThat(insertedTypes).extracting(ProjectTypeDO::getCode)
-                .contains("general", "topic-management", "story-management");
+                .contains("general", "topic-management", "story-management", "requirement-management");
         assertThat(insertedTypes.stream()
                 .filter(type -> !"general".equals(type.getCode()))
                 .map(this::creationEnabledUnchecked))
@@ -55,23 +108,58 @@ class WorkflowTemplateSeedRunnerTest {
         ProjectTypeDO general = type(1L, "general", true);
         ProjectTypeDO topic = type(2L, "topic-management", false);
         ProjectTypeDO story = type(3L, "story-management", false);
-        when(projectTypeMapper.selectOne(any())).thenReturn(general, topic, story);
+        ProjectTypeDO requirement = type(4L, "requirement-management", false);
+        when(projectTypeMapper.selectOne(any())).thenReturn(general, topic, story, requirement);
         when(templateMapper.selectOne(any())).thenReturn(null);
         when(versionMapper.selectOne(any())).thenReturn(null);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(defaultTemplateCatalog.find(any())).thenReturn(Optional.empty());
 
         runner.run();
 
-        verify(projectTypeMapper, times(3)).selectOne(any());
+        verify(projectTypeMapper, times(4)).selectOne(any());
         verify(projectTypeMapper, never()).insert(any(ProjectTypeDO.class));
+    }
+
+    @Test
+    void loadsSourceDefaultsForDevelopmentTypesWhenFilesExist() throws Exception {
+        ProjectTypeDO general = typeWithoutDefault(1L, "general", true);
+        ProjectTypeDO topic = typeWithoutDefault(2L, "topic-management", false);
+        ProjectTypeDO story = typeWithoutDefault(3L, "story-management", false);
+        ProjectTypeDO requirement = typeWithoutDefault(4L, "requirement-management", false);
+        when(projectTypeMapper.selectOne(any())).thenReturn(general, topic, story, requirement);
+        when(templateMapper.selectOne(any())).thenReturn(null);
+        when(versionMapper.selectOne(any())).thenReturn(null);
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(defaultTemplateCatalog.find("general")).thenReturn(Optional.empty());
+        when(defaultTemplateCatalog.find("topic-management")).thenReturn(Optional.of(sourceFile("topic-management")));
+        when(defaultTemplateCatalog.find("story-management")).thenReturn(Optional.of(sourceFile("story-management")));
+        when(defaultTemplateCatalog.find("requirement-management")).thenReturn(Optional.empty());
+
+        runner.run();
+
+        verify(templateMapper, times(3)).insert(any(com.brad.pms.entity.WorkflowTemplateDO.class));
+        verify(projectTypeMapper, times(3)).updateById(any(ProjectTypeDO.class));
+    }
+
+    private WorkflowDefaultTemplateFile sourceFile(String processTypeCode) {
+        return new WorkflowDefaultTemplateFile(processTypeCode, processTypeCode + "-default",
+                processTypeCode, "测试默认模板", 1, BuiltInWorkflowTemplate.compatibilityDefinition());
     }
 
     private ProjectTypeDO type(Long id, String code, boolean creationEnabled) throws Exception {
         ProjectTypeDO type = new ProjectTypeDO();
         type.setId(id);
+        type.setStatus(1);
         type.setCode(code);
         setCreationEnabled(type, creationEnabled);
         type.setDefaultTemplateVersionId(99L);
+        return type;
+    }
+
+    private ProjectTypeDO typeWithoutDefault(Long id, String code, boolean creationEnabled) throws Exception {
+        ProjectTypeDO type = type(id, code, creationEnabled);
+        type.setDefaultTemplateVersionId(null);
         return type;
     }
 

@@ -9,7 +9,7 @@ backend:
   replicaCount: 1
   image:
     repository: pms-backend
-    tag: "1.0.0"
+    tag: "1.0.8"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -49,7 +49,7 @@ frontend:
   replicaCount: 1
   image:
     repository: pms-front
-    tag: "1.0.0"
+    tag: "1.0.8"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP

@@ -15,6 +15,7 @@ tags:
   - name: 组织与权限
   - name: 导入与审计
   - name: 反馈
+  - name: 研发管理
   - name: 健康检查
 paths:
   /auth/providers:
@@ -867,10 +868,110 @@ paths:
       - $ref: '#/components/parameters/ProjectId'
     get:
       tags: [任务与节点]
-      summary: 获取当前项目已确认的迭代计划
+      summary: 获取当前项目可选迭代，包含同系统的独立迭代
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [任务与节点]
+      summary: 创建项目迭代并从关联需求继承系统
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeIterationPlanInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectId}/iteration-system:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [任务与节点]
+      summary: 解析项目关联需求的唯一所属系统
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /iteration-plans:
+    post:
+      tags: [任务与节点]
+      summary: 创建不绑定项目的迭代，必须选择所属系统
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeIterationPlanInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /iteration-plans/options:
+    get:
+      tags: [任务与节点]
+      summary: 查询故事可选的同系统迭代
+      parameters:
+        - { name: storyId, in: query, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /iteration-plans/page:
+    post:
+      tags: [任务与节点]
+      summary: 分页查询迭代计划
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IterationPlanPageRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /iteration-plans/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [任务与节点]
+      summary: 查询迭代计划详情
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [任务与节点]
+      summary: 编辑迭代，校验所属系统与系统版本
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeIterationPlanInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [任务与节点]
+      summary: 删除未被故事或任务使用的迭代计划
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /iteration-plans/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [任务与节点]
+      summary: 更新迭代计划状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IterationPlanStatusUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BusinessError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /projects/{projectId}/nodes/{nodeId}/release:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -1020,6 +1121,136 @@ paths:
       summary: 删除动态
       responses:
         '200': { $ref: '#/components/responses/Success' }
+  /development/system-versions/systems/page:
+    post:
+      tags: [研发管理]
+      summary: 分页查询系统档案
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /development/system-versions/systems:
+    post:
+      tags: [研发管理]
+      summary: 创建系统档案
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /development/system-versions/systems/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [研发管理]
+      summary: 更新系统档案
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /development/system-versions/systems/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [研发管理]
+      summary: 变更系统启停状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /development/system-versions/page:
+    post:
+      tags: [研发管理]
+      summary: 分页查询系统版本
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /development/system-versions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [研发管理]
+      summary: 查询系统版本详情
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [研发管理]
+      summary: 更新系统版本
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [研发管理]
+      summary: 删除未被迭代计划使用的系统版本
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /development/system-versions/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [研发管理]
+      summary: 变更系统版本状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /development/system-versions/{id}/history:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [研发管理]
+      summary: 查询系统版本变更历史
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /feedback/tickets:
     get:
       tags: [反馈]
@@ -1833,11 +2064,16 @@ components:
       type: object
       properties:
         id: { type: integer, format: int64 }
+        systemId: { type: integer, format: int64, nullable: true, description: 从关联需求自动继承，无来源时手动选择；新迭代必须明确系统 }
+        systemVersionId: { type: integer, format: int64, nullable: true, description: 关联的系统版本；清空绑定时传 null }
+        systemVersionNo: { type: string, nullable: true }
+        systemVersionName: { type: string, nullable: true }
+        systemName: { type: string, nullable: true }
         name: { type: string, maxLength: 200 }
         ownerId: { type: integer, format: int64, nullable: true }
         ownerName: { type: string, nullable: true }
         goal: { type: string, nullable: true, maxLength: 500 }
-        status: { type: string, enum: [PLANNED, IN_PROGRESS, DONE] }
+        status: { type: string, enum: [PLANNED, IN_PROGRESS, DONE, PAUSED] }
         startDate: { type: string, format: date, nullable: true }
         dueDate: { type: string, format: date, nullable: true }
         sort: { type: integer }
@@ -1867,44 +2103,36 @@ components:
           items: { $ref: '#/components/schemas/NodeIterationPlan' }
         resources: { type: array }
         risks: { type: array }
+    IterationPlanPageRequest:
+      type: object
+      properties:
+        keyword: { type: string, description: 可搜索迭代计划、项目、版本号、版本名和系统名 }
+        projectId: { type: integer, format: int64, nullable: true }
+        systemVersionId: { type: integer, format: int64, nullable: true }
+        status: { type: string, nullable: true }
+        currPage: { type: integer, minimum: 1, default: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    IterationPlanStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [PLANNED, IN_PROGRESS, DONE, PAUSED] }
     NodeReleaseUpdateRequest:
       type: object
       properties:
         version: { type: integer, minimum: 0, nullable: true, description: 已读取的发布交接版本；版本冲突返回 409 }
-        releaseVersion: { type: string, maxLength: 120 }
-        releaseWindowStart: { type: string, format: date-time, nullable: true }
-        releaseWindowEnd: { type: string, format: date-time, nullable: true }
-        releaseType: { type: string, enum: [FULL, GRAY, HOTFIX] }
-        packageReady: { type: boolean }
-        configConfirmed: { type: boolean }
-        rollbackReady: { type: boolean }
-        monitoringConfirmed: { type: boolean }
-        onCallConfirmed: { type: boolean }
-        decisionResult: { type: string, enum: [PENDING, APPROVED, DEFERRED, CANCELLED] }
-        decisionNote: { type: string, maxLength: 2000 }
+        handoverOwnerId: { type: integer, format: int64, nullable: true }
         handoverNotes: { type: string, maxLength: 2000 }
-        observationItems: { type: string, maxLength: 2000 }
-        emergencyContact: { type: string, maxLength: 500 }
     NodeReleaseResponse:
       type: object
       properties:
         projectId: { type: integer, format: int64 }
         nodeId: { type: integer, format: int64 }
         version: { type: integer, minimum: 0, nullable: true }
-        releaseVersion: { type: string, nullable: true }
-        releaseWindowStart: { type: string, format: date-time, nullable: true }
-        releaseWindowEnd: { type: string, format: date-time, nullable: true }
-        releaseType: { type: string, enum: [FULL, GRAY, HOTFIX] }
-        packageReady: { type: boolean }
-        configConfirmed: { type: boolean }
-        rollbackReady: { type: boolean }
-        monitoringConfirmed: { type: boolean }
-        onCallConfirmed: { type: boolean }
-        decisionResult: { type: string, enum: [PENDING, APPROVED, DEFERRED, CANCELLED] }
-        decisionNote: { type: string, nullable: true }
+        handoverOwnerId: { type: integer, format: int64, nullable: true }
+        handoverOwnerName: { type: string, nullable: true }
+        handoverOwnerUsername: { type: string, nullable: true }
         handoverNotes: { type: string, nullable: true }
-        observationItems: { type: string, nullable: true }
-        emergencyContact: { type: string, nullable: true }
         canEdit: { type: boolean }
     NodeValueReviewUpdateRequest:
       type: object

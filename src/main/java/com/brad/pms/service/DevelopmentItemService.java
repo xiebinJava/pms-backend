@@ -4,9 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.common.page.PageResult;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.DevelopmentItemPageQry;
+import com.brad.pms.dto.request.RequirementPageQry;
 import com.brad.pms.dto.response.DevelopmentStoryListDTO;
 import com.brad.pms.dto.response.DevelopmentTopicListDTO;
 import com.brad.pms.dto.response.ProjectDTO;
+import com.brad.pms.dto.response.RequirementListDTO;
+import com.brad.pms.dto.response.SourceRequirementSummaryDTO;
 import com.brad.pms.entity.ProjectDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeDevelopmentStoryDO;
@@ -56,6 +59,8 @@ public class DevelopmentItemService {
     private final ProjectNodeIterationPlanMapper iterationPlanMapper;
     private final UserService userService;
     private final WorkflowTemplateService workflowTemplateService;
+    private final RequirementManagementService requirementManagementService;
+    private final RequirementExecutionTargetReadService requirementTargetReadService;
 
     public PageResult<DevelopmentTopicListDTO> pageTopics(DevelopmentItemPageQry qry) {
         DevelopmentItemPageQry query = qry == null ? new DevelopmentItemPageQry() : qry;
@@ -66,9 +71,13 @@ public class DevelopmentItemService {
                 .collect(Collectors.groupingBy(ProjectNodeDevelopmentStoryDO::getTopicId));
         Map<Long, FlowSummary> workflowSummaries = workflowSummaries(DevelopmentItemType.TOPIC,
                 context.topics().stream().map(ProjectNodeDevelopmentTopicDO::getId).toList());
+        Map<Long, List<SourceRequirementSummaryDTO>> sourceRequirements = safeSourceRequirements(
+                requirementTargetReadService.findDirectSourcesForTargets(
+                        com.brad.pms.common.enums.RequirementExecutionTargetType.TOPIC,
+                        context.topics().stream().map(ProjectNodeDevelopmentTopicDO::getId).toList()));
         List<DevelopmentTopicListDTO> items = context.topics().stream()
                 .map(topic -> toTopic(topic, storiesByTopic.getOrDefault(topic.getId(), List.of()), context,
-                        workflowSummaries.get(topic.getId())))
+                        workflowSummaries.get(topic.getId()), sourceRequirements.getOrDefault(topic.getId(), List.of())))
                 .filter(item -> matchesTopic(item, query))
                 .sorted(topicComparator(context))
                 .toList();
@@ -81,12 +90,21 @@ public class DevelopmentItemService {
 
         Map<Long, FlowSummary> workflowSummaries = workflowSummaries(DevelopmentItemType.STORY,
                 context.stories().stream().map(ProjectNodeDevelopmentStoryDO::getId).toList());
+        Map<Long, List<SourceRequirementSummaryDTO>> sourceRequirements = safeSourceRequirements(
+                requirementTargetReadService.findDirectSourcesForTargets(
+                        com.brad.pms.common.enums.RequirementExecutionTargetType.STORY,
+                        context.stories().stream().map(ProjectNodeDevelopmentStoryDO::getId).toList()));
         List<DevelopmentStoryListDTO> items = context.stories().stream()
-                .map(story -> toStory(story, context, workflowSummaries.get(story.getId())))
+                .map(story -> toStory(story, context, workflowSummaries.get(story.getId()),
+                        sourceRequirements.getOrDefault(story.getId(), List.of())))
                 .filter(item -> matchesStory(item, query))
                 .sorted(storyComparator(context))
                 .toList();
         return page(items, query);
+    }
+
+    public PageResult<RequirementListDTO> pageRequirements(RequirementPageQry qry) {
+        return requirementManagementService.page(qry);
     }
 
     private QueryContext loadContext(Long projectId, boolean deletedTopicScope) {
@@ -186,7 +204,8 @@ public class DevelopmentItemService {
     private DevelopmentTopicListDTO toTopic(ProjectNodeDevelopmentTopicDO topic,
                                              List<ProjectNodeDevelopmentStoryDO> stories,
                                              QueryContext context,
-                                             FlowSummary workflowSummary) {
+                                             FlowSummary workflowSummary,
+                                             List<SourceRequirementSummaryDTO> sourceRequirements) {
         ProjectDTO project = context.projects().get(topic.getProjectId());
         ProjectNodeDO node = context.nodes().get(topic.getNodeId());
         DevelopmentTopicListDTO dto = new DevelopmentTopicListDTO();
@@ -212,10 +231,14 @@ public class DevelopmentItemService {
         dto.setTestStatus(topic.getTestStatus());
         dto.setBlocker(stories.stream().filter(story -> "BLOCKED".equals(story.getStatus()))
                 .map(ProjectNodeDevelopmentStoryDO::getBlocker).filter(StringUtils::hasText).findFirst().orElse(null));
+        dto.setSourceRequirements(sourceRequirements);
+        dto.setSourceRequirement(firstSourceRequirement(sourceRequirements));
         return dto;
     }
 
-    private DevelopmentStoryListDTO toStory(ProjectNodeDevelopmentStoryDO story, QueryContext context, FlowSummary workflowSummary) {
+    private DevelopmentStoryListDTO toStory(ProjectNodeDevelopmentStoryDO story, QueryContext context,
+                                            FlowSummary workflowSummary,
+                                            List<SourceRequirementSummaryDTO> sourceRequirements) {
         ProjectDTO project = context.projects().get(story.getProjectId());
         ProjectNodeDO node = context.nodes().get(story.getNodeId());
         ProjectNodeDevelopmentTopicDO topic = context.topics().stream()
@@ -246,6 +269,8 @@ public class DevelopmentItemService {
         dto.setStartDate(story.getStartDate());
         dto.setDueDate(story.getDueDate());
         dto.setBlocker(story.getBlocker());
+        dto.setSourceRequirements(sourceRequirements);
+        dto.setSourceRequirement(firstSourceRequirement(sourceRequirements));
         return dto;
     }
 
@@ -356,6 +381,16 @@ public class DevelopmentItemService {
         int from = Math.min((page - 1) * pageSize, items.size());
         int to = Math.min(from + pageSize, items.size());
         return PageResult.of(items.size(), page, pageSize, items.subList(from, to));
+    }
+
+    private Map<Long, List<SourceRequirementSummaryDTO>> safeSourceRequirements(
+            Map<Long, List<SourceRequirementSummaryDTO>> summaries) {
+        return summaries == null ? Map.of() : summaries;
+    }
+
+    private SourceRequirementSummaryDTO firstSourceRequirement(
+            List<SourceRequirementSummaryDTO> sourceRequirements) {
+        return sourceRequirements == null || sourceRequirements.isEmpty() ? null : sourceRequirements.get(0);
     }
 
     private <T> PageResult<T> emptyPage(DevelopmentItemPageQry query) {

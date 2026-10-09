@@ -8,4 +8,5 @@ import java.util.List;
 public class DevelopmentWorkflowTemplateOptionsDTO {
     private List<WorkflowTemplateSummaryDTO> topicTemplates;
     private List<WorkflowTemplateSummaryDTO> storyTemplates;
+    private List<WorkflowTemplateSummaryDTO> requirementTemplates;
 }

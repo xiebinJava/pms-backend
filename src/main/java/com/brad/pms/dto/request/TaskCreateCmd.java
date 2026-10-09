@@ -12,6 +12,8 @@ public class TaskCreateCmd {
 
     private Long nodeId;
 
+    private Long iterationPlanId;
+
     private Long parentId;
 
     @NotBlank(message = "任务标题不能为空")

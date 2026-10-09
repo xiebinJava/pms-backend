@@ -8,6 +8,7 @@ import com.brad.pms.dto.response.ProjectTypeDTO;
 import com.brad.pms.dto.response.WorkflowProjectNodeOptionDTO;
 import com.brad.pms.dto.response.WorkflowTemplateDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
+import com.brad.pms.dto.response.WorkflowSystemDefaultDTO;
 import com.brad.pms.security.PermissionCode;
 import com.brad.pms.security.RequirePermission;
 import com.brad.pms.service.WorkflowTemplateService;
@@ -30,6 +31,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminWorkflowConfigController {
     private final WorkflowTemplateService workflowTemplateService;
+
+    @GetMapping("/system-default/availability")
+    @RequirePermission(PermissionCode.WORKFLOW_READ)
+    public ResponseResult<Boolean> systemDefaultAvailability() {
+        return ResponseResult.success(workflowTemplateService.isSystemDefaultWriteAvailable());
+    }
 
     @GetMapping("/project-types")
     @RequirePermission(PermissionCode.WORKFLOW_READ)
@@ -60,6 +67,12 @@ public class AdminWorkflowConfigController {
     public ResponseResult<ProjectTypeDTO> setDefault(@PathVariable Long id,
                                                        @Valid @RequestBody WorkflowTemplateDefaultCmd cmd) {
         return ResponseResult.success(workflowTemplateService.setDefaultTemplate(id, cmd.getTemplateVersionId()));
+    }
+
+    @PostMapping("/project-types/{id}/default-template/system-default")
+    @RequirePermission(PermissionCode.WORKFLOW_WRITE)
+    public ResponseResult<WorkflowSystemDefaultDTO> solidifySystemDefault(@PathVariable Long id) {
+        return ResponseResult.success(workflowTemplateService.solidifyDefaultTemplate(id));
     }
 
     @GetMapping("/templates")

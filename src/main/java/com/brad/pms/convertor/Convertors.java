@@ -115,6 +115,7 @@ public final class Convertors {
         dto.setVersion(do_.getVersion());
         dto.setProjectId(do_.getProjectId());
         dto.setNodeId(do_.getNodeId());
+        dto.setIterationPlanId(do_.getIterationPlanId());
         dto.setParentId(do_.getParentId());
         dto.setTitle(do_.getTitle());
         dto.setDescription(do_.getDescription());

@@ -58,6 +58,8 @@ class NodePlanResourceRiskServiceTest {
     @Mock MemberService memberService;
     @Mock ProjectPermissionService permissionService;
     @Mock UserService userService;
+    @Mock SystemVersionReferenceService systemVersionReferenceService;
+    @Mock IterationPlanSystemService iterationPlanSystemService;
     @Mock OperationLogService operationLogService;
     @InjectMocks NodePlanResourceRiskService service;
 
@@ -110,6 +112,24 @@ class NodePlanResourceRiskServiceTest {
     }
 
     @Test
+    void acceptsPausedIterationPlanStatusWhenSavingDraft() {
+        ProjectNodeDO node = node("plan");
+        when(permissionService.requireManageableNode(1L, 10L, "保存计划、资源与风险基线")).thenReturn(node);
+        when(baselineMapper.selectOne(any())).thenReturn(null);
+        when(baselineMapper.insert(any(ProjectNodePlanBaselineDO.class))).thenReturn(1);
+        when(baselineMapper.updateById(any(ProjectNodePlanBaselineDO.class))).thenReturn(1);
+        when(resourceMapper.insert(any(ProjectNodeResourceDO.class))).thenReturn(1);
+        when(riskMapper.insert(any(ProjectNodeRiskDO.class))).thenReturn(1);
+
+        NodePlanResourceRiskUpdateCmd cmd = updateCommand();
+        cmd.getIterationPlans().get(0).setStatus("PAUSED");
+
+        service.saveDraft(1L, 10L, cmd);
+
+        verify(iterationPlanMapper).insert(any(ProjectNodeIterationPlanDO.class));
+    }
+
+    @Test
     void rejectsConfirmationWithoutACompleteBaseline() {
         ProjectNodeDO node = node("plan");
         when(permissionService.requireManageableNode(1L, 10L, "确认计划、资源与风险基线")).thenReturn(node);
@@ -133,6 +153,18 @@ class NodePlanResourceRiskServiceTest {
         assertThatThrownBy(() -> service.confirm(1L, 10L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("已确认");
+        verify(baselineMapper, never()).updateById(any(ProjectNodePlanBaselineDO.class));
+    }
+
+    @Test
+    void rejectsConfirmationWhenAnIterationHasNoSystem() {
+        when(permissionService.requireManageableNode(1L, 10L, "确认计划、资源与风险基线")).thenReturn(node("plan"));
+        when(baselineMapper.selectOne(any())).thenReturn(baseline());
+        ProjectNodeIterationPlanDO plan = iterationPlan();
+        plan.setSystemId(null);
+        when(iterationPlanMapper.selectList(any())).thenReturn(List.of(plan));
+        assertThatThrownBy(() -> service.confirm(1L, 10L))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("所属系统");
         verify(baselineMapper, never()).updateById(any(ProjectNodePlanBaselineDO.class));
     }
 
@@ -315,6 +347,7 @@ class NodePlanResourceRiskServiceTest {
         item.setProjectId(1L);
         item.setNodeId(10L);
         item.setName("第一迭代");
+        item.setSystemId(101L);
         item.setOwnerId(21L);
         item.setStartDate(LocalDate.of(2026, 9, 1));
         item.setDueDate(LocalDate.of(2026, 9, 14));

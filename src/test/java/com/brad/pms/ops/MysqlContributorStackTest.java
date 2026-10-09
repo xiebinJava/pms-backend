@@ -41,7 +41,7 @@ class MysqlContributorStackTest {
         assertThat(compose).contains("healthcheck:");
         assertThat(compose).contains("mysqladmin ping");
         assertThat(compose).doesNotContain("oceanbase/oceanbase");
-        assertThat(compose).doesNotContain("pms-backend");
+        assertThat(compose).doesNotContain("\n  backend:", "\n  frontend:");
         assertThat(compose).doesNotContain("pms-front");
         assertThat(compose).doesNotContain("MYSQL_DATABASE: brad_pms");
         assertThat(compose).doesNotContain("MYSQL_DB:-brad_pms");

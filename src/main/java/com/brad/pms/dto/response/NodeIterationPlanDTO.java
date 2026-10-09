@@ -8,6 +8,11 @@ import java.time.LocalDate;
 public class NodeIterationPlanDTO {
 
     private Long id;
+    private Long systemId;
+    private Long systemVersionId;
+    private String systemVersionNo;
+    private String systemVersionName;
+    private String systemName;
     private String name;
     private Long ownerId;
     private String ownerName;

@@ -59,8 +59,13 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         String header = request.getHeader("Authorization");
         String delegationToken = request.getHeader("X-PMS-AI-Delegation");
-        boolean aiDelegation = delegationToken != null && !delegationToken.isBlank();
-        String tokenHeader = aiDelegation ? BEARER_PREFIX + delegationToken : header;
+        String bearerToken = header != null && header.startsWith(BEARER_PREFIX)
+                ? header.substring(BEARER_PREFIX.length()) : null;
+        boolean explicitDelegation = delegationToken != null && !delegationToken.isBlank();
+        boolean bearerDelegation = !explicitDelegation
+                && bearerToken != null && tokenProvider.isAiDelegationToken(bearerToken);
+        boolean aiDelegation = explicitDelegation || bearerDelegation;
+        String tokenHeader = explicitDelegation ? BEARER_PREFIX + delegationToken : header;
         if (tokenHeader != null && tokenHeader.startsWith(BEARER_PREFIX)) {
             try {
                 String token = tokenHeader.substring(BEARER_PREFIX.length());

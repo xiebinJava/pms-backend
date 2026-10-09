@@ -17,6 +17,8 @@ public class ProjectTaskDO {
 
     private Long nodeId;
 
+    private Long iterationPlanId;
+
     private Long parentId;
 
     private String title;

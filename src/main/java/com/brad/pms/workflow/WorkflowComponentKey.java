@@ -1,6 +1,8 @@
 package com.brad.pms.workflow;
 
 public final class WorkflowComponentKey {
+    public static final String TOPIC_RESEARCH = "topic-research";
+    public static final String TOPIC_DESIGN_REVIEW = "topic-design-review";
     public static final String PROJECT_BASIC_INFO = "project-basic-info";
     public static final String REQUIREMENT_SCOPE = "requirement-scope";
     public static final String SOLUTION_DESIGN = "solution-design";
@@ -12,8 +14,18 @@ public final class WorkflowComponentKey {
     public static final String KNOWLEDGE_STANDARD = "knowledge-standard";
     /** Configurable workbench for creating and maintaining stories within a topic workflow. */
     public static final String STORY_LIST = "story-list";
+    /** Configurable workbench for selecting one execution target for a requirement. */
+    public static final String REQUIREMENT_EXECUTION = "requirement-execution";
+    /** Configurable requirement intake and value-analysis component. */
+    public static final String REQUIREMENT_RECEIVING_ANALYSIS = "requirement-receiving-analysis";
+    /** Configurable workbench generated from the selected requirement workflow node. */
+    public static final String REQUIREMENT_NODE_WORKBENCH = "requirement-node-workbench";
     /** Runtime-only component generated on the configured topic workflow mount node. */
     public static final String STORY_SPLIT = "story-split";
+    /** Configurable structured workbench for a story workflow node. */
+    public static final String STORY_NODE_WORKBENCH = "story-node-workbench";
+    /** Configurable structured testing record for the story testing node. */
+    public static final String STORY_TESTING = "story-testing";
 
     private WorkflowComponentKey() { }
 }

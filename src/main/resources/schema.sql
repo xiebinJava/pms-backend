@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS project_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     project_id  BIGINT       NOT NULL,
     node_id     BIGINT,
+    iteration_plan_id BIGINT,
     parent_id   BIGINT,
     title       VARCHAR(200) NOT NULL,
     description VARCHAR(2000),
@@ -221,8 +222,8 @@ CREATE TABLE IF NOT EXISTS project_node_acceptance_item (
 
 CREATE TABLE IF NOT EXISTS project_node_acceptance_defect (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
-    project_id  BIGINT       NOT NULL,
-    node_id     BIGINT       NOT NULL,
+    project_id  BIGINT       NULL,
+    node_id     BIGINT       NULL,
     source_defect_id BIGINT,
     defect_key  VARCHAR(64)  NOT NULL,
     title       VARCHAR(300) NOT NULL,
@@ -254,6 +255,7 @@ CREATE TABLE IF NOT EXISTS project_node_iteration_plan (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     project_id  BIGINT       NOT NULL,
     node_id     BIGINT       NOT NULL,
+    system_version_id BIGINT,
     name        VARCHAR(200) NOT NULL,
     owner_id    BIGINT,
     goal        VARCHAR(500),
@@ -265,7 +267,8 @@ CREATE TABLE IF NOT EXISTS project_node_iteration_plan (
     created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_node_iteration_plan_node (project_id, node_id, sort),
-    INDEX idx_node_iteration_plan_owner (project_id, owner_id)
+    INDEX idx_node_iteration_plan_owner (project_id, owner_id),
+    INDEX idx_node_iteration_plan_system_version (system_version_id)
 );
 
 CREATE TABLE IF NOT EXISTS project_node_development_topic (
@@ -314,26 +317,16 @@ CREATE TABLE IF NOT EXISTS project_node_release_baseline (
     id                    BIGINT AUTO_INCREMENT PRIMARY KEY,
     project_id            BIGINT       NOT NULL,
     node_id               BIGINT       NOT NULL,
-    release_version       VARCHAR(120),
-    release_window_start  TIMESTAMP NULL,
-    release_window_end    TIMESTAMP NULL,
-    release_type          VARCHAR(32)  NOT NULL DEFAULT 'GRAY',
-    package_ready         BOOLEAN      NOT NULL DEFAULT FALSE,
-    config_confirmed      BOOLEAN      NOT NULL DEFAULT FALSE,
-    rollback_ready        BOOLEAN      NOT NULL DEFAULT FALSE,
-    monitoring_confirmed  BOOLEAN      NOT NULL DEFAULT FALSE,
-    on_call_confirmed     BOOLEAN      NOT NULL DEFAULT FALSE,
-    decision_result       VARCHAR(32)  NOT NULL DEFAULT 'PENDING',
-    decision_note         VARCHAR(2000),
+    handover_owner_id     BIGINT,
     handover_notes        VARCHAR(2000),
-    observation_items     VARCHAR(2000),
-    emergency_contact     VARCHAR(500),
     version               INT          NOT NULL DEFAULT 0,
     created_by            BIGINT,
     created_at            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_at            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_node_release_baseline_project_node (project_id, node_id),
-    INDEX idx_node_release_baseline_node (node_id)
+    INDEX idx_node_release_baseline_node (node_id),
+    INDEX idx_node_release_baseline_handover_owner (handover_owner_id),
+    CONSTRAINT fk_node_release_handover_owner FOREIGN KEY (handover_owner_id) REFERENCES sys_user (id)
 );
 
 CREATE TABLE IF NOT EXISTS project_node_value_review (
@@ -402,6 +395,7 @@ CREATE TABLE IF NOT EXISTS project_node_knowledge_action (
 CREATE INDEX idx_task_project ON project_task (project_id);
 CREATE INDEX idx_task_node ON project_task (project_id, node_id);
 CREATE INDEX idx_task_status ON project_task (project_id, status);
+CREATE INDEX idx_task_iteration_plan ON project_task (project_id, iteration_plan_id, parent_id, sort);
 CREATE INDEX idx_member_project ON project_member (project_id);
 CREATE INDEX idx_follower_project ON project_follower (project_id);
 CREATE INDEX idx_milestone_project ON project_milestone (project_id);

@@ -14,4 +14,14 @@ class PermissionCodeTest {
         assertThat(PermissionCode.isSatisfiedBy(PermissionCode.PROJECT_COMMENT_WRITE, PermissionCode.PROJECT_WRITE)).isFalse();
         assertThat(PermissionCode.isSatisfiedBy(PermissionCode.AUDIT_READ, PermissionCode.PROJECT_READ)).isFalse();
     }
+
+    @Test
+    void systemVersionManagementIncludesWriteAndReadAccess() {
+        assertThat(PermissionCode.isSatisfiedBy(PermissionCode.SYSTEM_VERSION_READ,
+                PermissionCode.SYSTEM_VERSION_WRITE)).isTrue();
+        assertThat(PermissionCode.isSatisfiedBy(PermissionCode.SYSTEM_VERSION_READ,
+                PermissionCode.SYSTEM_VERSION_MANAGE)).isTrue();
+        assertThat(PermissionCode.isSatisfiedBy(PermissionCode.SYSTEM_VERSION_WRITE,
+                PermissionCode.SYSTEM_VERSION_MANAGE)).isTrue();
+    }
 }

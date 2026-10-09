@@ -1,0 +1,13 @@
+# Explicit local-only override. Prepare the host directory for UID 10001 first.
+# Use with docker-compose.example.yml and --env-file .env.mysql.local.
+services:
+  backend:
+    # Match the host source directory group (macOS defaults to staff/GID 20).
+    group_add:
+      - "${PMS_WORKFLOW_DEFAULTS_GID:-20}"
+    environment:
+      PMS_DEPLOYMENT_ENV: development
+      PMS_WORKFLOW_DEFAULT_WRITE_ENABLED: "true"
+      PMS_WORKFLOW_DEFAULTS_DIR: /workflow-defaults
+    volumes:
+      - ./src/main/resources/workflow-defaults:/workflow-defaults

@@ -169,7 +169,10 @@ public class ProjectMemberAssignmentService {
         ensureMember(projectId, userId);
     }
 
-    private void ensureMember(Long projectId, Long userId) {
+    /** Adds an active account to the project as a member when a workbench confirms them. */
+    @Transactional
+    public void ensureMember(Long projectId, Long userId) {
+        if (projectId == null || userId == null) return;
         MemberService.EnsureMemberResult ensured = memberService.ensureMemberForAssignment(projectId, userId);
         if (ensured.inserted()) autoManagedMapper.insertIgnore(projectId, userId);
     }

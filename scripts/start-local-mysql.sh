@@ -8,12 +8,12 @@ JAR_PATH="${PMS_JAR_PATH:-}"
 if [[ -z "$JAR_PATH" ]]; then
   # Prefer the current application artifact. A plain lexicographic `ls | head`
   # can silently select an older version when multiple jars remain in target/.
-  JAR_PATH="$PROJECT_DIR/target/pms-backend-1.0.7.jar"
+  JAR_PATH="$PROJECT_DIR/target/pms-backend-1.0.8.jar"
   if [[ ! -f "$JAR_PATH" ]]; then
     JAR_PATH="$(ls -1t "$PROJECT_DIR"/target/pms-backend-*.jar 2>/dev/null | head -n 1 || true)"
   fi
 fi
-JAR_PATH="${JAR_PATH:-$PROJECT_DIR/target/pms-backend-1.0.7.jar}"
+JAR_PATH="${JAR_PATH:-$PROJECT_DIR/target/pms-backend-1.0.8.jar}"
 RUN_DIR="${PMS_RUN_DIR:-$PROJECT_DIR/.run}"
 PID_FILE="$RUN_DIR/pms-backend.pid"
 LOG_FILE="$RUN_DIR/pms-backend.log"

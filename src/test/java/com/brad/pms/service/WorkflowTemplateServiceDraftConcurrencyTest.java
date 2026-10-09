@@ -40,6 +40,7 @@ class WorkflowTemplateServiceDraftConcurrencyTest {
     @BeforeEach
     void initMybatisLambdaCaches() {
         Configuration configuration = new Configuration();
+        configuration.setMapUnderscoreToCamelCase(true);
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "workflow-draft-concurrency-test");
         TableInfoHelper.initTableInfo(assistant, ProjectTypeDO.class);
         TableInfoHelper.initTableInfo(assistant, WorkflowTemplateDO.class);

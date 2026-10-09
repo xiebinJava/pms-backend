@@ -1,0 +1,149 @@
+{
+  "processTypeCode" : "story-management",
+  "templateCode" : "wf-5f5496d0ab8d46c29f5ff737bdf26e79",
+  "name" : "故事管理流程",
+  "description" : null,
+  "versionNo" : 1,
+  "definition" : {
+    "schemaVersion" : 2,
+    "nodes" : [ {
+      "key" : "custom-node",
+      "name" : "故事写卡",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-node-workbench" ],
+      "componentConfigs" : {
+        "story-node-workbench" : {
+          "nodeKey" : "custom-node",
+          "nodeName" : "故事写卡",
+          "variant" : "writing",
+          "purpose" : "确认故事目标、范围和验收标准，形成可开发的卡片。",
+          "activities" : [ "确认故事目标与范围", "明确验收标准", "确认负责人与排期" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-2",
+      "name" : "迭代计划会",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-node-workbench" ],
+      "componentConfigs" : {
+        "story-node-workbench" : {
+          "nodeKey" : "custom-node-2",
+          "nodeName" : "迭代计划会",
+          "variant" : "iteration",
+          "purpose" : "把故事排入迭代并记录计划结论。",
+          "activities" : [ "确认迭代计划", "记录会议结论", "确认依赖与风险" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-3",
+      "name" : "开发中",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-node-workbench" ],
+      "componentConfigs" : {
+        "story-node-workbench" : {
+          "nodeKey" : "custom-node-3",
+          "nodeName" : "开发中",
+          "variant" : "development",
+          "purpose" : "记录实现方案和自测结果，跟踪开发进展。",
+          "activities" : [ "确认实现方案", "完成开发并自测", "更新进度与阻塞" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-4",
+      "name" : "测试中",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-testing" ],
+      "componentConfigs" : {
+        "story-testing" : {
+          "testingResultsEnabled" : true
+        }
+      }
+    }, {
+      "key" : "custom-node-5",
+      "name" : "验收中",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-node-workbench" ],
+      "componentConfigs" : {
+        "story-node-workbench" : {
+          "nodeKey" : "custom-node-5",
+          "nodeName" : "验收中",
+          "variant" : "acceptance",
+          "purpose" : "依据验收标准确认交付结果并记录验收结论。",
+          "activities" : [ "核对验收标准", "确认业务结果", "记录验收结论" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-6",
+      "name" : "待发布",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-node-workbench" ],
+      "componentConfigs" : {
+        "story-node-workbench" : {
+          "nodeKey" : "custom-node-6",
+          "nodeName" : "待发布",
+          "variant" : "release",
+          "purpose" : "确认发布版本和范围，完成发布前准备。",
+          "activities" : [ "确认发布版本与范围", "完成发布前检查", "记录发布说明" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-7",
+      "name" : "已上线",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:story-node-workbench" ],
+      "componentConfigs" : {
+        "story-node-workbench" : {
+          "nodeKey" : "custom-node-7",
+          "nodeName" : "已上线",
+          "variant" : "launch",
+          "purpose" : "确认上线结果，记录线上验证与复盘。",
+          "activities" : [ "确认上线时间", "完成线上验证", "记录复盘与后续" ]
+        }
+      }
+    } ],
+    "sourceProjectNodeKey" : null,
+    "sourceTopicNodeKey" : "custom-node-3"
+  }
+}

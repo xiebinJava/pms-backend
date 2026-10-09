@@ -18,20 +18,8 @@ public class ProjectNodeReleaseBaselineDO {
     private Long id;
     private Long projectId;
     private Long nodeId;
-    private String releaseVersion;
-    private LocalDateTime releaseWindowStart;
-    private LocalDateTime releaseWindowEnd;
-    private String releaseType;
-    private Boolean packageReady;
-    private Boolean configConfirmed;
-    private Boolean rollbackReady;
-    private Boolean monitoringConfirmed;
-    private Boolean onCallConfirmed;
-    private String decisionResult;
-    private String decisionNote;
+    private Long handoverOwnerId;
     private String handoverNotes;
-    private String observationItems;
-    private String emergencyContact;
 
     @Version
     private Integer version;

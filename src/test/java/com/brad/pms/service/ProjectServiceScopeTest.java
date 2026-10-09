@@ -52,6 +52,7 @@ class ProjectServiceScopeTest {
     @Mock DataScopeResolver dataScopeResolver;
     @Mock OrgUnitMapper orgUnitMapper;
     @Mock OperationLogService operationLogService;
+    @Mock RequirementExecutionTargetReadService requirementTargetReadService;
     @Mock WorkflowTemplateService workflowTemplateService;
 
     @InjectMocks ProjectService projectService;

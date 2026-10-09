@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TopicStoryNodeAssociationTest {
+    @Mock IterationPlanOptionsService iterationPlanOptionsService;
+    @Mock IterationPlanSystemService iterationPlanSystemService;
 
     @Mock ProjectNodeDevelopmentStoryMapper storyMapper;
     @Mock DevelopmentTopicManagementService topicManagementService;

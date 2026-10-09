@@ -16,6 +16,9 @@ public class AiOperationDO {
 
     private String commandName;
     private Long userId;
+    private String sourceClient;
+    private String requestId;
+    private String executionMode;
     private String contextId;
     private String contextVersion;
     private String contractId;

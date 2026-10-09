@@ -9,6 +9,9 @@ import com.brad.pms.mapper.ProjectTypeMapper;
 import com.brad.pms.mapper.WorkflowTemplateMapper;
 import com.brad.pms.mapper.WorkflowTemplateVersionMapper;
 import com.brad.pms.workflow.BuiltInWorkflowTemplate;
+import com.brad.pms.workflow.WorkflowTemplateDefinition;
+import com.brad.pms.workflow.WorkflowTemplateDefinitionNormalizer;
+import com.brad.pms.workflow.WorkflowTemplateDefinitionValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -29,28 +32,64 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
     private final WorkflowTemplateVersionMapper versionMapper;
     private final ProjectMapper projectMapper;
     private final ObjectMapper objectMapper;
+    private final WorkflowDefaultTemplateCatalog defaultTemplateCatalog;
 
     @Override
     @Transactional
     public void run(String... args) {
         ProjectTypeDO general = ensureProjectType(
                 "general", "项目管理", "适用于普通项目的默认流程类型", 0, true);
-        ensureProjectType(
+        ProjectTypeDO topic = ensureProjectType(
                 "topic-management", "专题管理", "用于配置专题管理流程模板", 10, false);
-        ensureProjectType(
+        ProjectTypeDO story = ensureProjectType(
                 "story-management", "故事管理", "用于配置故事管理流程模板", 20, false);
+        ProjectTypeDO requirement = ensureProjectType(
+                "requirement-management", "需求管理", "用于配置需求管理流程模板", 30, false);
+
+        WorkflowDefaultTemplateFile projectDefault = defaultTemplateCatalog.find("general")
+                .orElseGet(this::compatibilityDefault);
+        WorkflowTemplateVersionDO projectPublished = ensureDefaultTemplate(general, projectDefault);
+        projectMapper.bindMissingWorkflowConfiguration(general.getId(), projectPublished.getId());
+
+        ensureSourceDefault(topic);
+        ensureSourceDefault(story);
+        ensureSourceDefault(requirement);
+    }
+
+    private void ensureSourceDefault(ProjectTypeDO type) {
+        if (type == null) return;
+        defaultTemplateCatalog.find(type.getCode())
+                .ifPresent(file -> ensureDefaultTemplate(type, file));
+    }
+
+    private WorkflowTemplateVersionDO ensureDefaultTemplate(ProjectTypeDO type,
+                                                             WorkflowDefaultTemplateFile file) {
+        if (!type.getCode().equals(file.processTypeCode())) {
+            throw new IllegalStateException("系统默认流程模板类型不匹配: " + file.processTypeCode());
+        }
+        WorkflowTemplateDefinition definition;
+        try {
+            definition = WorkflowTemplateDefinitionNormalizer.normalizeForProcessType(
+                    type.getCode(), WorkflowTemplateDefinitionValidator.validate(file.definition()));
+            definition = WorkflowTemplateDefinitionValidator.validateForPublish(type.getCode(), definition);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("系统默认流程模板定义无效: " + file.processTypeCode(), e);
+        }
 
         WorkflowTemplateDO template = templateMapper.selectOne(new LambdaQueryWrapper<WorkflowTemplateDO>()
-                .eq(WorkflowTemplateDO::getCode, "current-process"));
+                .eq(WorkflowTemplateDO::getCode, file.templateCode()));
         if (template == null) {
             template = new WorkflowTemplateDO();
-            template.setCode("current-process");
-            template.setProjectTypeId(general.getId());
-            template.setName("当前项目流程");
-            template.setDescription("兼容现有项目的九阶段顺序流程");
+            template.setCode(file.templateCode());
+            template.setProjectTypeId(type.getId());
+            template.setName(file.name());
+            template.setDescription(file.description());
             template.setLatestVersionNo(0);
             template.setDeleted(false);
             templateMapper.insert(template);
+        }
+        if (!java.util.Objects.equals(type.getId(), template.getProjectTypeId())) {
+            throw new IllegalStateException("系统默认流程模板所属类型不匹配: " + file.templateCode());
         }
 
         WorkflowTemplateVersionDO published = versionMapper.selectOne(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
@@ -59,22 +98,31 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
                 .orderByDesc(WorkflowTemplateVersionDO::getVersionNo)
                 .last("LIMIT 1"));
         if (published == null) {
+            if (file.versionNo() == null || file.versionNo() < 1) {
+                throw new IllegalStateException("系统默认流程模板版本号无效: " + file.templateCode());
+            }
+            WorkflowTemplateVersionDO latest = versionMapper.selectOne(new LambdaQueryWrapper<WorkflowTemplateVersionDO>()
+                    .eq(WorkflowTemplateVersionDO::getTemplateId, template.getId())
+                    .orderByDesc(WorkflowTemplateVersionDO::getVersionNo).last("LIMIT 1"));
+            int nextVersion = Math.max(file.versionNo(),
+                    Math.max(template.getLatestVersionNo() == null ? 0 : template.getLatestVersionNo(),
+                            latest == null || latest.getVersionNo() == null ? 0 : latest.getVersionNo()) + 1);
             published = new WorkflowTemplateVersionDO();
             published.setTemplateId(template.getId());
-            published.setVersionNo(1);
+            published.setVersionNo(nextVersion);
             published.setStatus("PUBLISHED");
-            published.setDefinitionJson(serializeCompatibilityDefinition());
+            published.setDefinitionJson(serialize(definition));
             published.setPublishedAt(LocalDateTime.now());
             versionMapper.insert(published);
-            template.setLatestVersionNo(Math.max(template.getLatestVersionNo() == null ? 0 : template.getLatestVersionNo(), 1));
+            template.setLatestVersionNo(nextVersion);
             templateMapper.updateById(template);
         }
 
-        if (general.getDefaultTemplateVersionId() == null) {
-            general.setDefaultTemplateVersionId(published.getId());
-            projectTypeMapper.updateById(general);
+        if (type.getDefaultTemplateVersionId() == null) {
+            type.setDefaultTemplateVersionId(published.getId());
+            projectTypeMapper.updateById(type);
         }
-        projectMapper.bindMissingWorkflowConfiguration(general.getId(), published.getId());
+        return published;
     }
 
     private ProjectTypeDO ensureProjectType(String code, String name, String description,
@@ -112,11 +160,16 @@ public class WorkflowTemplateSeedRunner implements CommandLineRunner {
         return type;
     }
 
-    private String serializeCompatibilityDefinition() {
+    private WorkflowDefaultTemplateFile compatibilityDefault() {
+        return new WorkflowDefaultTemplateFile("general", "current-process", "当前项目流程",
+                "兼容现有项目的九阶段顺序流程", 1, BuiltInWorkflowTemplate.compatibilityDefinition());
+    }
+
+    private String serialize(WorkflowTemplateDefinition definition) {
         try {
-            return objectMapper.writeValueAsString(BuiltInWorkflowTemplate.compatibilityDefinition());
+            return objectMapper.writeValueAsString(definition);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("无法序列化默认流程模板", e);
+            throw new IllegalStateException("系统默认流程模板无法序列化", e);
         }
     }
 }

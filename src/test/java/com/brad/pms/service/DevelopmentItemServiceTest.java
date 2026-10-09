@@ -51,6 +51,7 @@ class DevelopmentItemServiceTest {
     @Mock DevelopmentItemWorkflowMapper workflowMapper;
     @Mock DevelopmentItemWorkflowNodeMapper workflowNodeMapper;
     @Mock WorkflowTemplateService workflowTemplateService;
+    @Mock RequirementExecutionTargetReadService requirementTargetReadService;
 
     @InjectMocks DevelopmentItemService service;
 

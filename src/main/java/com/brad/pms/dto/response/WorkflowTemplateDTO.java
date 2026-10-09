@@ -20,4 +20,5 @@ public class WorkflowTemplateDTO {
     private Integer publishedVersionNo;
     private WorkflowTemplateDefinition definition;
     private List<String> fixedBlocks;
+    private List<String> autoBoundTemplateNames = List.of();
 }

@@ -7,7 +7,6 @@ on:
         description: Image version to publish without a leading v
         required: true
         type: string
-        default: 1.0.0
       verify_anonymous:
         description: Verify anonymous GHCR access after a manual publish
         required: false

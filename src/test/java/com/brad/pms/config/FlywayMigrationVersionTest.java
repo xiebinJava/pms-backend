@@ -81,4 +81,13 @@ class FlywayMigrationVersionTest {
                 "WORKFLOW_NODE_OWNER",
                 "TASK_ASSIGNEE");
     }
+
+    @Test
+    void requirementReceivingMigrationAddsNullableWorkflowTerminalStatus() throws IOException {
+        Path migration = Path.of("src/main/resources/db/migration/V61__requirement_receiving_analysis.sql");
+        assertThat(Files.exists(migration)).isTrue();
+        assertThat(Files.readString(migration)).contains(
+                "ALTER TABLE pms_development_item_workflow",
+                "ADD COLUMN terminal_status VARCHAR(32) NULL");
+    }
 }

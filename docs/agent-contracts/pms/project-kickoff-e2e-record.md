@@ -27,7 +27,7 @@
    ```bash
    cd pms-backend
    set -a && source .env.mysql.local && set +a
-   java -jar target/pms-backend-1.0.7.jar --spring.profiles.active=mysql --spring.flyway.validate-on-migrate=false
+   java -jar target/pms-backend-1.0.8.jar --spring.profiles.active=mysql --spring.flyway.validate-on-migrate=false
    ```
 
 3. 运行 live E2E（缺少 env 时该 spec 自动跳过，不影响默认测试套件）：

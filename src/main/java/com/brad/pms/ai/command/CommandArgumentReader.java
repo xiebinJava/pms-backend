@@ -31,6 +31,12 @@ public final class CommandArgumentReader {
         throw BusinessException.error("参数 " + key + " 必须是整数");
     }
 
+    public static Integer requiredInteger(Map<String, Object> arguments, String key) {
+        Integer value = optionalInteger(arguments, key, null);
+        if (value == null) throw BusinessException.error("参数 " + key + " 必须是整数");
+        return value;
+    }
+
     public static String requiredText(Map<String, Object> arguments, String key) {
         Object raw = arguments.get(key);
         if (!(raw instanceof String value) || value.isBlank()) {

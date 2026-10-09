@@ -50,6 +50,10 @@ public class FollowerService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
+        // Validate the complete selection before changing any relations. This
+        // keeps stale cached person-picker values from reaching the FK and
+        // returns the normal business error instead of a database 500.
+        selected.forEach(userService::requireActiveUser);
         List<ProjectFollowerDO> existing = followerMapper.selectList(new LambdaQueryWrapper<ProjectFollowerDO>()
                 .eq(ProjectFollowerDO::getProjectId, projectId)
                 .orderByAsc(ProjectFollowerDO::getId));

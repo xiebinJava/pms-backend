@@ -9,8 +9,8 @@
 自行构建并加载到集群：
 
 ```bash
-docker build -t pms-backend:1.0.0 .
-docker build -t pms-front:1.0.0 ../pms-front
+docker build -t pms-backend:1.0.8 .
+docker build -t pms-front:1.0.8 ../pms-front
 ```
 
 ## 安装

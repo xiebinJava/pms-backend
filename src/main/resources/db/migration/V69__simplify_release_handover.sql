@@ -1,0 +1,17 @@
+ALTER TABLE project_node_release_baseline
+    ADD COLUMN handover_owner_id BIGINT NULL AFTER node_id,
+    ADD CONSTRAINT fk_node_release_handover_owner FOREIGN KEY (handover_owner_id) REFERENCES sys_user (id),
+    DROP COLUMN release_version,
+    DROP COLUMN release_window_start,
+    DROP COLUMN release_window_end,
+    DROP COLUMN release_type,
+    DROP COLUMN package_ready,
+    DROP COLUMN config_confirmed,
+    DROP COLUMN rollback_ready,
+    DROP COLUMN monitoring_confirmed,
+    DROP COLUMN on_call_confirmed,
+    DROP COLUMN decision_result,
+    DROP COLUMN decision_note,
+    DROP COLUMN observation_items,
+    DROP COLUMN emergency_contact,
+    ADD INDEX idx_node_release_baseline_handover_owner (handover_owner_id);

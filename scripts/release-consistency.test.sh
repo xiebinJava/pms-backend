@@ -23,7 +23,30 @@ latest_migration="$({ find "$BACKEND_DIR/src/main/resources/db/migration" -maxde
   | sed -nE 's/^V([0-9]+)__.*\.sql$/\1/p' \
   | sort -n \
   | tail -n 1)"
-[[ "$latest_migration" == "49" ]] || fail "expected current migration baseline V1–V49, found V${latest_migration:-unknown}"
+[[ "$latest_migration" == "69" ]] || fail "expected current migration baseline V1–V69, found V${latest_migration:-unknown}"
+
+integration_workflow="$BACKEND_DIR/.github/workflows/integration.yml"
+[[ -f "$integration_workflow" ]] || fail "integration workflow does not exist: $integration_workflow"
+grep -F -- "default: release" "$integration_workflow" >/dev/null \
+  || fail "integration workflow must default to the frontend release branch"
+grep -F -- 'ref: ${{ inputs.frontend_ref || '\''release'\'' }}' "$integration_workflow" >/dev/null \
+  || fail "integration workflow must check out the frontend release branch by default"
+grep -E -- '^[[:space:]]+E2E_BASE_URL: http://127\.0\.0\.1:5173$' "$integration_workflow" >/dev/null \
+  || fail "integration workflow must pass the live E2E base URL variable expected by browser smoke tests"
+grep -F -- 'PMS_E2E_BASE_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \
+  || fail "integration workflow must pass the frontend base URL variable expected by Playwright"
+grep -F -- 'PMS_PROJECT_LIST_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \
+  || fail "integration workflow must pass the frontend base URL variable expected by project-list and task browser tests"
+for browser_command in \
+  'pnpm exec playwright test tests/e2e/auth-and-project.spec.ts tests/e2e/manual-record.spec.ts tests/e2e/task-overdue-reschedule.spec.ts' \
+  'pnpm exec playwright test --config tests/e2e/playwright.enterprise-board.config.mjs' \
+  'pnpm exec playwright test --config tests/e2e/playwright.project-list.config.mjs' \
+  'pnpm exec playwright test --config tests/workflows/playwright.config.mjs' \
+  'pnpm exec playwright test --config tests/workflows/solution-design-autosave.config.mjs' \
+  'pnpm exec playwright test --config tests/workflows/story-workbench.config.mjs'; do
+  grep -F -- "$browser_command" "$integration_workflow" >/dev/null \
+    || fail "integration workflow is missing the dedicated browser command: $browser_command"
+done
 
 health_controller="$BACKEND_DIR/src/main/java/com/brad/pms/controller/HealthController.java"
 health_baseline="$(sed -nE 's/.*LATEST_MIGRATION_VERSION = ([0-9]+);.*/\1/p' "$health_controller" | head -n 1)"
@@ -50,4 +73,4 @@ for route in \
   grep -F -- "$route" "$openapi" >/dev/null || fail "feedback route missing from OpenAPI contract: $route"
 done
 
-echo "Release consistency checks passed: migration=V1–V49, readiness=aligned, READMEs=current, feedback routes=documented"
+echo "Release consistency checks passed: migration=V1–V69, readiness=aligned, READMEs=current, feedback routes=documented"

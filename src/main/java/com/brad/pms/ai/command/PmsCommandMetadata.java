@@ -2,6 +2,9 @@ package com.brad.pms.ai.command;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import com.brad.pms.workflow.WorkflowComponentKey;
 
 /** Central metadata for the commands currently implemented by PMS. */
 public final class PmsCommandMetadata {
@@ -12,12 +15,67 @@ public final class PmsCommandMetadata {
     public static String domainScope(CommandName name) {
         return switch (name) {
             case BATCH_WRITE -> "pms:command:preview";
+            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
+                 REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
+                 REQUIREMENT_EXECUTION_TARGET_UNLINK -> "pms:requirement:write";
             case FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE,
                  PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE -> "pms:project:write";
             case NODE_COMPLETE, NODE_ROLLBACK -> "pms:workflow:write";
             case NODE_FIELD_UPDATE, NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> "pms:workflow:write";
+            case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK, STORY_CREATE, STORY_UPDATE,
+                 STORY_TOPIC_LINK -> "pms:development:write";
+            case DEVELOPMENT_ITEM_NODE_OWNER_UPDATE, DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
+                 DEVELOPMENT_ITEM_NODE_FIELD_UPDATE, DEVELOPMENT_ITEM_NODE_COMPLETE -> "pms:workflow:write";
+            case DEVELOPMENT_ITEM_TASK_CREATE -> "pms:development:write";
+            case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE, ITERATION_PLAN_STORY_ADD,
+                 ITERATION_PLAN_STORY_REMOVE -> "pms:iteration:write";
             case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> "pms:task:write";
         };
+    }
+
+    /** Resource domains exposed by the command to the dynamic capability catalog. */
+    public static List<String> resourceTypes(CommandName name) {
+        return switch (name) {
+            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
+                 REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
+                 REQUIREMENT_EXECUTION_TARGET_UNLINK -> List.of("requirement");
+            case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK -> List.of("topic");
+            case STORY_CREATE, STORY_UPDATE, STORY_TOPIC_LINK -> List.of("story");
+            case DEVELOPMENT_ITEM_NODE_OWNER_UPDATE, DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
+                 DEVELOPMENT_ITEM_NODE_FIELD_UPDATE, DEVELOPMENT_ITEM_NODE_COMPLETE,
+                 DEVELOPMENT_ITEM_TASK_CREATE -> List.of("topic", "story", "requirement");
+            case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
+                 ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> List.of("iteration_plan");
+            case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> List.of("task");
+            case NODE_COMPLETE, NODE_FIELD_UPDATE, NODE_ROLLBACK,
+                 NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> List.of("project_node");
+            case PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE,
+                 FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE, BATCH_WRITE -> List.of("project");
+        };
+    }
+
+    /**
+     * Returns the resource domains a configured runtime component can operate on.
+     *
+     * The process type is deliberately not part of this mapping. A template may
+     * be attached to a newly-created process type, while its runtime component
+     * keys still identify the business surface and the command registry remains
+     * the source of the available actions.
+     */
+    public static Set<String> workflowComponentDomains(String componentKey) {
+        return switch (componentKey) {
+            case WorkflowComponentKey.DEVELOPMENT_CONTROL -> Set.of(
+                    "project_node", "topic", "story", "requirement", "task");
+            case WorkflowComponentKey.STORY_LIST, WorkflowComponentKey.STORY_SPLIT -> Set.of("story");
+            case WorkflowComponentKey.REQUIREMENT_EXECUTION -> Set.of("requirement");
+            default -> Set.of();
+        };
+    }
+
+    /** A workflow component action is discovered from the command registry. */
+    public static boolean isWorkflowComponentAction(CommandName name) {
+        return resourceTypes(name).stream().anyMatch(Set.of(
+                "project_node", "topic", "story", "requirement", "task")::contains);
     }
 
     public static PmsCommandDescriptor descriptor(CommandName name) {
@@ -34,6 +92,31 @@ public final class PmsCommandMetadata {
                     true,
                     true,
                     List.of("project-detail", "project-list", "project-dashboard", "task-board"));
+            case REQUIREMENT_CREATE -> descriptor(name, "创建需求并初始化需求流程", "high", List.of(
+                    Map.entry("title", Map.of("type", "string", "required", true)),
+                    Map.entry("description", Map.of("type", "string")),
+                    Map.entry("priority", Map.of("type", "integer", "enum", List.of(0, 1, 2, 3))),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("templateVersionId", Map.of("type", "integer"))));
+            case REQUIREMENT_UPDATE -> descriptor(name, "更新需求基本信息", "high", List.of(
+                    Map.entry("requirementId", Map.of("type", "integer", "required", true)),
+                    Map.entry("version", Map.of("type", "integer", "required", true)),
+                    Map.entry("title", Map.of("type", "string", "required", true)),
+                    Map.entry("description", Map.of("type", "string")),
+                    Map.entry("priority", Map.of("type", "integer", "enum", List.of(0, 1, 2, 3))),
+                    Map.entry("ownerId", Map.of("type", "integer"))));
+            case REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE -> descriptor(name,
+                    name == CommandName.REQUIREMENT_EXECUTION_TARGET_LINK ? "关联需求执行对象" : "更换需求执行对象",
+                    "high", List.of(
+                    Map.entry("requirementId", Map.of("type", "integer", "required", true)),
+                    Map.entry("requirementVersion", Map.of("type", "integer", "required", true)),
+                    Map.entry("targetType", Map.of("type", "string", "enum", List.of("PROJECT", "TOPIC", "STORY"), "required", true)),
+                    Map.entry("targetId", Map.of("type", "integer", "required", true)),
+                    Map.entry("reason", Map.of("type", "string"))));
+            case REQUIREMENT_EXECUTION_TARGET_UNLINK -> descriptor(name, "解除需求执行对象关联", "high", List.of(
+                    Map.entry("requirementId", Map.of("type", "integer", "required", true)),
+                    Map.entry("requirementVersion", Map.of("type", "integer", "required", true)),
+                    Map.entry("reason", Map.of("type", "string"))));
             case FOLLOWER_ADD -> descriptor(name, "为项目添加关注人", "medium", List.of(
                     Map.entry("projectId", Map.of("type", "integer", "required", true)),
                     Map.entry("userId", Map.of("type", "integer", "required", true))));
@@ -139,6 +222,108 @@ public final class PmsCommandMetadata {
                     true,
                     true,
                     List.of("project-detail", "project-list", "project-dashboard"));
+            case TOPIC_CREATE -> descriptor(name, "创建专题，可选择关联进行中的项目", "high", List.of(
+                    Map.entry("title", Map.of("type", "string", "required", true)),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("projectId", Map.of("type", "integer")),
+                    Map.entry("templateVersionId", Map.of("type", "integer"))));
+            case TOPIC_UPDATE -> descriptor(name, "更新专题名称、负责人或关联项目", "high", List.of(
+                    Map.entry("topicId", Map.of("type", "integer", "required", true)),
+                    Map.entry("title", Map.of("type", "string", "required", true)),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("projectId", Map.of("type", "integer"))));
+            case TOPIC_PROJECT_LINK -> descriptor(name, "绑定或解除专题与项目的关联", "high", List.of(
+                    Map.entry("topicId", Map.of("type", "integer", "required", true)),
+                    Map.entry("projectId", Map.of("type", "integer"))));
+            case STORY_CREATE -> descriptor(name, "创建故事，可选择关联专题", "high", List.of(
+                    Map.entry("title", Map.of("type", "string", "required", true)),
+                    Map.entry("topicId", Map.of("type", "integer")),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("templateVersionId", Map.of("type", "integer")),
+                    Map.entry("status", Map.of("type", "string")),
+                    Map.entry("progress", Map.of("type", "integer")),
+                    Map.entry("storyPoints", Map.of("type", "integer")),
+                    Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("dueDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("blocker", Map.of("type", "string")),
+                    Map.entry("sort", Map.of("type", "integer"))));
+            case STORY_UPDATE -> descriptor(name, "更新故事基本信息及专题关联", "high", List.of(
+                    Map.entry("storyId", Map.of("type", "integer", "required", true)),
+                    Map.entry("title", Map.of("type", "string", "required", true)),
+                    Map.entry("topicId", Map.of("type", "integer")),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("status", Map.of("type", "string")),
+                    Map.entry("progress", Map.of("type", "integer")),
+                    Map.entry("storyPoints", Map.of("type", "integer")),
+                    Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("dueDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("blocker", Map.of("type", "string")),
+                    Map.entry("sort", Map.of("type", "integer"))));
+            case STORY_TOPIC_LINK -> descriptor(name, "绑定或解除故事与专题的关联", "high", List.of(
+                    Map.entry("storyId", Map.of("type", "integer", "required", true)),
+                    Map.entry("topicId", Map.of("type", "integer"))));
+            case DEVELOPMENT_ITEM_NODE_OWNER_UPDATE -> descriptor(name, "更新研发事项流程节点负责人", "high", List.of(
+                    Map.entry("itemType", Map.of("type", "string", "enum", List.of("TOPIC", "STORY", "REQUIREMENT"), "required", true)),
+                    Map.entry("itemId", Map.of("type", "integer", "required", true)),
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("version", Map.of("type", "integer", "required", true))));
+            case DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE -> descriptor(name, "更新研发事项流程节点排期", "medium", List.of(
+                    Map.entry("itemType", Map.of("type", "string", "required", true)),
+                    Map.entry("itemId", Map.of("type", "integer", "required", true)),
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                    Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("endDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("version", Map.of("type", "integer", "required", true))));
+            case DEVELOPMENT_ITEM_NODE_FIELD_UPDATE -> descriptor(name, "更新研发事项流程节点动态字段", "medium", List.of(
+                    Map.entry("itemType", Map.of("type", "string", "required", true)),
+                    Map.entry("itemId", Map.of("type", "integer", "required", true)),
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                    Map.entry("fieldValues", Map.of("type", "object", "required", true)),
+                    Map.entry("version", Map.of("type", "integer", "required", true))));
+            case DEVELOPMENT_ITEM_NODE_COMPLETE -> descriptor(name, "完成研发事项流程节点并推进流程", "high", List.of(
+                    Map.entry("itemType", Map.of("type", "string", "required", true)),
+                    Map.entry("itemId", Map.of("type", "integer", "required", true)),
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true))));
+            case DEVELOPMENT_ITEM_TASK_CREATE -> descriptor(name, "在研发事项流程节点创建任务或子任务", "medium", List.of(
+                    Map.entry("itemType", Map.of("type", "string", "required", true)),
+                    Map.entry("itemId", Map.of("type", "integer", "required", true)),
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                    Map.entry("parentId", Map.of("type", "integer")),
+                    Map.entry("title", Map.of("type", "string", "required", true)),
+                    Map.entry("description", Map.of("type", "string")),
+                    Map.entry("status", Map.of("type", "integer", "enum", List.of(0, 1, 2))),
+                    Map.entry("priority", Map.of("type", "integer", "enum", List.of(0, 1, 2))),
+                    Map.entry("assigneeId", Map.of("type", "integer")),
+                    Map.entry("dueDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("sort", Map.of("type", "integer"))));
+            case ITERATION_PLAN_CREATE -> descriptor(name, "在项目节点下创建没有独立流程的迭代计划", "high", List.of(
+                    Map.entry("projectId", Map.of("type", "integer", "required", true)),
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                    Map.entry("name", Map.of("type", "string", "required", true)),
+                    Map.entry("systemId", Map.of("type", "integer", "description", "无需求系统来源时选择所属系统")),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("goal", Map.of("type", "string")),
+                    Map.entry("status", Map.of("type", "string")),
+                     Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("dueDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("sort", Map.of("type", "integer")),
+                     Map.entry("systemVersionId", Map.of("type", "integer"))));
+            case ITERATION_PLAN_UPDATE -> descriptor(name, "更新迭代计划基本信息", "high", List.of(
+                    Map.entry("iterationPlanId", Map.of("type", "integer", "required", true)),
+                    Map.entry("name", Map.of("type", "string", "required", true)),
+                    Map.entry("systemId", Map.of("type", "integer")),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("goal", Map.of("type", "string")),
+                    Map.entry("status", Map.of("type", "string")),
+                     Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("dueDate", Map.of("type", "string", "format", "date")),
+                     Map.entry("sort", Map.of("type", "integer")),
+                     Map.entry("systemVersionId", Map.of("type", "integer"))));
+            case ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> descriptor(name,
+                    name == CommandName.ITERATION_PLAN_STORY_ADD ? "将故事加入迭代计划" : "将故事移出迭代计划", "medium", List.of(
+                    Map.entry("iterationPlanId", Map.of("type", "integer", "required", true)),
+                    Map.entry("storyId", Map.of("type", "integer", "required", true))));
             case TASK_CREATE -> new PmsCommandDescriptor(
                     name,
                     "在指定项目节点创建任务",
@@ -200,9 +385,20 @@ public final class PmsCommandMetadata {
                                                    List<Map.Entry<String, Map<String, Object>>> parameters) {
         Map<String, Object> schema = new java.util.LinkedHashMap<>();
         parameters.forEach(entry -> schema.put(entry.getKey(), entry.getValue()));
+        List<String> refreshScopes = new java.util.ArrayList<>(List.of(
+                "project-detail", "project-list", "project-dashboard", "task-board"));
+        switch (name) {
+            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
+                 REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
+                 REQUIREMENT_EXECUTION_TARGET_UNLINK -> refreshScopes.add("requirement-list");
+            case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK,
+                 STORY_CREATE, STORY_UPDATE, STORY_TOPIC_LINK -> refreshScopes.add("development-list");
+            case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
+                 ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> refreshScopes.add("iteration-plan");
+            default -> { }
+        }
         return new PmsCommandDescriptor(name, description, "write", risk, true,
                 List.of(domainScope(name), "pms:command:preview", "pms:command:execute"),
-                schema, true, true,
-                List.of("project-detail", "project-list", "project-dashboard", "task-board"));
+                schema, true, true, refreshScopes);
     }
 }

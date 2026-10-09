@@ -1,0 +1,201 @@
+{
+  "processTypeCode" : "requirement-management",
+  "templateCode" : "wf-68a77dae0aeb4ed99c72de27b0a361fe",
+  "name" : "需求管理流程",
+  "description" : null,
+  "versionNo" : 1,
+  "definition" : {
+    "schemaVersion" : 2,
+    "nodes" : [ {
+      "key" : "stage-1",
+      "name" : "需求录入",
+      "description" : "确定外部来源：客户、行业分析、展览、友商、杂志等\n确定内部来源：销售、市场、研发、交付、服务\n完成需求背景、目标、问题、以及业务相关信息的内容输入\n完成前期的沟通，确保需求是合理且完整",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ {
+        "key" : "requirement-title",
+        "label" : "需求名称",
+        "type" : "TEXT",
+        "required" : true,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.title",
+        "fullWidth" : false
+      }, {
+        "key" : "requirement-priority",
+        "label" : "需求优先级",
+        "type" : "SINGLE_SELECT",
+        "required" : true,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.priority",
+        "fullWidth" : false
+      }, {
+        "key" : "requirement-description",
+        "label" : "需求描述",
+        "type" : "TEXTAREA",
+        "required" : true,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.description",
+        "fullWidth" : true
+      }, {
+        "key" : "requirement-owner",
+        "label" : "需求负责人",
+        "type" : "PERSON",
+        "required" : false,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.owner",
+        "fullWidth" : false
+      }, {
+        "key" : "requirement-business-line",
+        "label" : "业务线",
+        "type" : "SINGLE_SELECT",
+        "required" : true,
+        "options" : [ ],
+        "visible" : true,
+        "binding" : "requirement.businessLine",
+        "fullWidth" : false
+      } ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "fields" ],
+      "componentConfigs" : null
+    }, {
+      "key" : "custom-node",
+      "name" : "需求接收",
+      "description" : "需求过滤：解释、过滤、检视，去掉低价值或无效需求\n需求分析：分类（功能/非功能）、排序（优先级）、价值（可实现性、ROI、战略契合度）",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-receiving-analysis" ],
+      "componentConfigs" : {
+        "requirement-receiving-analysis" : {
+          "showFilter" : true,
+          "showAnalysis" : true,
+          "showDecision" : true,
+          "requireCategory" : true,
+          "showFeasibilityScore" : true,
+          "requireFeasibilityScore" : true,
+          "showRoiScore" : true,
+          "requireRoiScore" : true,
+          "showStrategicFitScore" : true,
+          "requireStrategicFitScore" : true,
+          "requireAnalysisConclusion" : true,
+          "allowReject" : true
+        }
+      }
+    }, {
+      "key" : "custom-node-2",
+      "name" : "需求澄清",
+      "description" : "与需求提出方共同澄清需求，确保需求价值得到双方认可。\n完成需求的规格（项目、专题、故事）定义与排序（优先级）",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-2",
+          "nodeName" : "需求澄清",
+          "purpose" : "补充背景、目标、边界和验收标准，形成可执行的需求说明。",
+          "activities" : [ "补充需求背景与目标", "明确范围边界和约束", "确认验收标准", "记录澄清结论" ],
+          "systemField" : {
+            "visibleWhenCategory" : "FUNCTIONAL",
+            "required" : false
+          }
+        }
+      }
+    }, {
+      "key" : "custom-node-3",
+      "name" : "需求整合",
+      "description" : "对需求进行整理、合并。\n明确整合后的需求的规格大小（项目、专题、故事）和最终优先级",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-3",
+          "nodeName" : "需求整合",
+          "purpose" : "合并重复需求，梳理关联关系，形成统一需求基线。",
+          "activities" : [ "选择整合需求", "处理冲突和依赖关系", "确认需求规格", "确认整合结果" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-4",
+      "name" : "需求排期",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-4",
+          "nodeName" : "需求排期",
+          "purpose" : "确认目标对象和计划时间，形成可执行的交付安排。",
+          "activities" : [ "确认需求优先级", "选择目标对象", "安排计划时间", "确认依赖与风险" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-5",
+      "name" : "需求开发",
+      "description" : "",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-execution" ],
+      "componentConfigs" : null
+    }, {
+      "key" : "custom-node-6",
+      "name" : "需求验收",
+      "description" : "需求验证（需求与实现一致性检查）\n客户验证（试点、Beta测试、客户反馈）\n内部验证（测试、QA验证）",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ "component:requirement-node-workbench" ],
+      "componentConfigs" : {
+        "requirement-node-workbench" : {
+          "nodeKey" : "custom-node-6",
+          "nodeName" : "需求验收",
+          "purpose" : "依据验收标准确认交付结果，处理遗留问题并给出结论。",
+          "activities" : [ "检查验收标准", "查看测试结果", "确认业务结果", "记录遗留问题" ]
+        }
+      }
+    }, {
+      "key" : "custom-node-7",
+      "name" : "需求上线",
+      "description" : "制定上线计划，关联实际上线版本\n组织上线前的最终检查和环境准备\n上线后监控系统运行状态",
+      "deliverable" : "",
+      "roles" : "",
+      "components" : null,
+      "fields" : [ ],
+      "projectBasicInfo" : false,
+      "projectBasicInfoFields" : null,
+      "contentOrder" : [ ],
+      "componentConfigs" : null
+    } ],
+    "sourceProjectNodeKey" : null,
+    "sourceTopicNodeKey" : null
+  }
+}

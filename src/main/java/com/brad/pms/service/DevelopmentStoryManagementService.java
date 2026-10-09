@@ -19,11 +19,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class DevelopmentStoryManagementService {
+    private IterationPlanSystemService iterationPlanSystemService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setIterationPlanSystemService(IterationPlanSystemService service) {
+        this.iterationPlanSystemService = service;
+    }
 
     private static final String NOT_STARTED = "NOT_STARTED";
     private static final String IN_PROGRESS = "IN_PROGRESS";
@@ -66,12 +73,28 @@ public class DevelopmentStoryManagementService {
     public void update(Long id, DevelopmentStorySaveCmd cmd) {
         if (id == null) throw BusinessException.notFound("故事不存在");
         validate(cmd);
+        ProjectNodeDevelopmentStoryDO observed = storyMapper.selectById(id);
+        if (observed == null) throw BusinessException.notFound("故事不存在");
+        Long observedTopicId = observed.getTopicId();
+        Long observedProjectId = observed.getProjectId();
+        Long observedNodeId = observed.getNodeId();
+        // All entry points lock parent topics before a story; use a stable order for rebinds.
+        var topicIds = new java.util.TreeSet<Long>();
+        if (observedTopicId != null) topicIds.add(observedTopicId);
+        if (cmd.getTopicId() != null) topicIds.add(cmd.getTopicId());
+        Map<Long, ProjectNodeDevelopmentTopicDO> lockedTopics = new java.util.HashMap<>();
+        for (Long topicId : topicIds) lockedTopics.put(topicId, topicManagementService.requireWritableTopic(topicId));
         ProjectNodeDevelopmentStoryDO story = storyMapper.selectByIdForUpdate(id);
         if (story == null) throw BusinessException.notFound("故事不存在");
+        if (!Objects.equals(observedTopicId, story.getTopicId())
+                || !Objects.equals(observedProjectId, story.getProjectId())
+                || !Objects.equals(observedNodeId, story.getNodeId())) {
+            throw BusinessException.conflict("故事所属范围已被其他人修改，请刷新后重试");
+        }
         ProjectNodeDevelopmentTopicDO oldTopic = story.getTopicId() == null ? null
-                : topicManagementService.requireWritableTopic(story.getTopicId());
+                : lockedTopics.get(story.getTopicId());
         ProjectNodeDevelopmentTopicDO targetTopic = cmd.getTopicId() == null ? null
-                : topicManagementService.requireWritableTopic(cmd.getTopicId());
+                : lockedTopics.get(cmd.getTopicId());
         if (cmd.getOwnerId() != null) userService.requireActiveUser(cmd.getOwnerId());
 
         Long sourceProjectId = story.getProjectId();
@@ -86,7 +109,7 @@ public class DevelopmentStoryManagementService {
         if (workflow != null) taskMapper.selectByWorkflowIdsForUpdate(List.of(workflow.getId()));
 
         apply(story, cmd, targetTopic, story.getSort() == null ? 0 : story.getSort(), targetTopicWorkflowNodeId);
-        if (contextChanged) story.setIterationPlanId(null);
+        if (contextChanged) iterationPlanSystemService.validateStoryScope(story);
         if (storyMapper.updateById(story) != 1) throw BusinessException.conflict("故事已被其他人修改，请刷新后重试");
 
         if (workflow != null && contextChanged) {
@@ -110,8 +133,20 @@ public class DevelopmentStoryManagementService {
     public List<DevelopmentTopicStoryDTO> listByTopic(Long topicId) {
         ProjectNodeDevelopmentTopicDO topic = topicManagementService.requireReadableTopic(topicId);
         List<ProjectNodeDevelopmentStoryDO> stories = storyMapper.selectByTopicId(topic.getId());
-        return (stories == null ? List.<ProjectNodeDevelopmentStoryDO>of() : stories).stream()
-                .map(this::toDTO).toList();
+        List<ProjectNodeDevelopmentStoryDO> list = stories == null ? List.of() : stories;
+        Map<Long, DevelopmentItemWorkflowService.StoryTestingSummary> summaries = developmentItemWorkflowService
+                .storyTestingSummaries(list.stream().map(ProjectNodeDevelopmentStoryDO::getId).toList());
+        return list.stream()
+                .map(story -> toDTO(story, summaries.get(story.getId()))).toList();
+    }
+
+    /** Domain-owned lookup used by partial command adapters without exposing mapper rules. */
+    public ProjectNodeDevelopmentStoryDO requireWritableStory(Long id) {
+        if (id == null) throw BusinessException.notFound("故事不存在");
+        ProjectNodeDevelopmentStoryDO story = storyMapper.selectById(id);
+        if (story == null) throw BusinessException.notFound("故事不存在");
+        if (story.getTopicId() != null) topicManagementService.requireWritableTopic(story.getTopicId());
+        return story;
     }
 
     private void replaceOwner(ProjectNodeDevelopmentStoryDO story, Long oldUserId, Long newUserId) {
@@ -163,7 +198,8 @@ public class DevelopmentStoryManagementService {
         story.setSort(cmd.getSort() == null ? defaultSort : cmd.getSort());
     }
 
-    private DevelopmentTopicStoryDTO toDTO(ProjectNodeDevelopmentStoryDO story) {
+    private DevelopmentTopicStoryDTO toDTO(ProjectNodeDevelopmentStoryDO story,
+                                           DevelopmentItemWorkflowService.StoryTestingSummary summary) {
         DevelopmentTopicStoryDTO dto = new DevelopmentTopicStoryDTO();
         dto.setId(story.getId());
         dto.setTitle(story.getTitle());
@@ -179,6 +215,10 @@ public class DevelopmentStoryManagementService {
         dto.setDueDate(story.getDueDate());
         dto.setBlocker(story.getBlocker());
         dto.setSort(story.getSort());
+        if (summary != null) {
+            dto.setBuildVersion(summary.buildVersion());
+            dto.setTestStatus(summary.testStatus());
+        }
         return dto;
     }
 

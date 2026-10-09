@@ -249,6 +249,17 @@ public class AuthService {
         return refresh(refreshToken, null, null);
     }
 
+    /** Issues a normal PMS session for a user who has just approved the local CLI PKCE flow. */
+    @Transactional
+    public LoginResponse issueCliSession(Long userId) {
+        if (userId == null) throw BusinessException.unauthorized("CLI 授权用户不可用");
+        UserDO user = userMapper.selectById(userId);
+        if (user == null || !UserStatus.ACTIVE.name().equals(user.getStatus())) {
+            throw BusinessException.unauthorized("账号不可用");
+        }
+        return establishSession(user, user.getUsername(), "CLI_LOGIN_SUCCESS", null, "pms-cli", false);
+    }
+
     @Transactional(noRollbackFor = BusinessException.class)
     public LoginResponse refresh(String refreshToken, String ip, String userAgent) {
         if (refreshToken == null || refreshToken.isBlank()) {
@@ -282,6 +293,15 @@ public class AuthService {
     public void revokeSession(Long userId, Long sessionId, String reason) {
         if (userId != null && sessionId != null) {
             authSessionMapper.revokeById(sessionId, userId, reason == null ? "REVOKED" : reason);
+        }
+    }
+
+    @Transactional
+    public void revokeRefreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) return;
+        AuthSessionDO session = authSessionMapper.findByRefreshTokenHash(sha256(refreshToken));
+        if (session != null && session.getUserId() != null) {
+            authSessionMapper.revokeById(session.getId(), session.getUserId(), "CLI_LOGOUT");
         }
     }
 

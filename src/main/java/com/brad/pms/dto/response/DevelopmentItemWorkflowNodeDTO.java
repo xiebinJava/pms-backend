@@ -20,12 +20,18 @@ public class DevelopmentItemWorkflowNodeDTO {
     private Integer status;
     private Long ownerId;
     private String ownerName;
+    /** Display labels resolved server-side for saved topic reviewers. */
+    private Map<Long, String> reviewerNames;
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer version;
     private List<WorkflowFieldDefinition> fields;
     private Map<String, JsonNode> fieldValues;
+    /** Values resolved from the owning requirement/project record for bound template fields. */
+    private Map<String, JsonNode> boundFieldValues;
     /** Runtime components after applying the item's pinned workflow bindings. */
     private List<String> runtimeComponents;
+    /** Runtime component configuration copied from the pinned workflow template. */
+    private Map<String, JsonNode> componentConfigs;
     private List<DevelopmentItemTaskDTO> tasks;
 }

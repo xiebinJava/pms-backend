@@ -11,6 +11,10 @@ public class TaskUpdateCmd {
     @NotNull(message = "任务版本不能为空，请刷新后重试")
     private Integer version;
 
+    private Long iterationPlanId;
+
+    private Boolean clearIterationPlan = false;
+
     private String title;
 
     private String description;

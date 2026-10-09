@@ -11,6 +11,7 @@ FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --only-upgrade libssl3 openssl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --create-home pms \
     && mkdir -p /var/lib/pms/uploads \
