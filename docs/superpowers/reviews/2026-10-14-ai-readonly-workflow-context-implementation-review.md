@@ -274,3 +274,32 @@
 ### 遗留观察
 
 - Story 内容行已按 canReadReference 过滤（可读才保留）；行级字段仍按真实值展示，尚不裁剪 prompt 语义（供 Task 9 模型评估）。
+
+## Task 9 评审：真实只读、模型验收与最终发布门槛
+
+C 提交：b36e5e2 test/docs: record readonly context delivery evidence；B 提交：ae6c651 docs: record task 9 delivery state。
+
+### 已完成
+
+- Step 1 安全 gate：tests/e2e/support/readonlyContextSession.ts —— requireReadonlyContextCase 只接受显式
+  环境变量（缺失→场景"未运行"；非法/超安全范围整数→拒绝；不取搜索首条；不创建/清理资源），
+  assertContextReceipt 复检 type/id/selectedNodeId/selectedComponentKey。gate 单元测试 6 项全绿。
+- Step 4 最终回归：B 227 项安全集合 + 隔离集成重跑 + openapi 校验；C 94 项 unit/contract 全绿，
+  typecheck/build:cli 通过。
+- Step 6 交付证据：C b36e5e2 提交 readonlyContextSession + e2e 报告；B 已有 readonly-context-e2e-record.md。
+
+### 明确未运行（缺环境，不是通过）
+
+- Step 2 真实只读 API 验收：需要 PMS_E2E_READONLY=true、PMS_E2E_TOKEN 与四类显式 ID，当前会话无此配置。
+- Step 3 页面/模型核验：需要新编译后端（当前运行实例是旧 build）与外部工作台模型，均不在本会话能力内。
+- Step 5 feature 启用：readonlyWorkflowContext/focusedWorkflowContext 保持 false —— 交付记录明确说明
+  尚未具备发布门槛，杜绝"先开启才能验收"循环。
+
+### 遗留清单（用户侧动作即可解锁）
+
+1. 重启 Spring（用最新 target/classes），env：DOCKER_HOST=unix:///Users/fs/.colima/fsclaw/docker.sock、
+   TESTCONTAINERS_* 参照 Task 6（本地 MySQL 用 docker compose 起的桥接不需要容器）。
+2. `PMS_E2E_READONLY=true PMS_E2E_TOKEN=... PROJECT_SR_ID=... REQUIREMENT_SR_ID=... TOPIC_SR_ID=... STORY_SR_ID=...
+   pnpm run verify:real-pms:readonly` 逐项核验显式 fixture。
+3. 模型工作台做一次只读解释（当前节点/历史差异/负责人/成果存在性），依据 SKILL.md 的只读规则。
+4. 全部通过后再打开两个 feature 并做 capability 回归。
