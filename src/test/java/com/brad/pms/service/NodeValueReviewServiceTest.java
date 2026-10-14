@@ -11,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -79,6 +80,25 @@ class NodeValueReviewServiceTest {
         node.setNodeKey(key);
         node.setStatus(1);
         return node;
+    }
+
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotTreatsSavedZeroVersionAsPersisted() {
+        ProjectNodeValueReviewDO root = baseline("PENDING_REVIEW");
+        root.setVersion(0);
+        org.mockito.Mockito.doNothing().when(permissionService).requireNodeComponentForContext(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("value-review"),
+                org.mockito.ArgumentMatchers.any());
+        when(reviewMapper.selectOne(any())).thenReturn(root);
+        org.mockito.Mockito.lenient().when(permissionService.requireProjectReadable(1L)).thenReturn(
+                new com.brad.pms.entity.ProjectDO());
+        org.mockito.Mockito.lenient().when(permissionService.requireNode(1L, 10L)).thenReturn(
+                node("value"));
+        var snapshot = service.getReadSnapshot(1L, 10L);
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(true, 0));
     }
 
     private ProjectNodeValueReviewDO baseline(String resultStatus) {

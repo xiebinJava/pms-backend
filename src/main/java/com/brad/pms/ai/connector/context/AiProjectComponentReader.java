@@ -30,6 +30,13 @@ public class AiProjectComponentReader {
 
     private final ObjectMapper objectMapper;
     private final NodeRequirementScopeService requirementScopeService;
+    private final com.brad.pms.service.NodeSolutionDesignService solutionDesignService;
+    private final com.brad.pms.service.NodePlanResourceRiskService planResourceRiskService;
+    private final com.brad.pms.service.NodeDevelopmentControlService developmentControlService;
+    private final com.brad.pms.service.NodeAcceptanceService acceptanceService;
+    private final com.brad.pms.service.NodeReleaseService releaseService;
+    private final com.brad.pms.service.NodeValueReviewService valueReviewService;
+    private final com.brad.pms.service.NodeKnowledgeStandardService knowledgeStandardService;
 
     public List<AiWorkflowContextDTO.Component> read(ProjectDTO project, ProjectNodeDTO node,
                                                      String componentKey) {
@@ -76,9 +83,41 @@ public class AiProjectComponentReader {
                         objectMapper.valueToTree(projectBasicInfo(project)), "LOADED", versions, null);
             }
             case "requirement-scope" -> readRequirementScope(node, config, fields);
+            case "solution-design" -> readWorkbenchSnapshot(node, "solution-design", config, fields,
+                    solutionDesignService.getReadSnapshot(node.getProjectId(), node.getId()));
+            case "plan-resource-risk" -> readWorkbenchSnapshot(node, "plan-resource-risk", config, fields,
+                    planResourceRiskService.getReadSnapshot(node.getProjectId(), node.getId()));
+            case "development-control" -> readWorkbenchSnapshot(node, "development-control", config, fields,
+                    developmentControlService.getReadSnapshot(node.getProjectId(), node.getId()));
+            case "business-acceptance" -> readWorkbenchSnapshot(node, "business-acceptance", config, fields,
+                    acceptanceService.getReadSnapshot(node.getProjectId(), node.getId()));
+            case "release-handover" -> readWorkbenchSnapshot(node, "release-handover", config, fields,
+                    releaseService.getReadSnapshot(node.getProjectId(), node.getId()));
+            case "value-review" -> readWorkbenchSnapshot(node, "value-review", config, fields,
+                    valueReviewService.getReadSnapshot(node.getProjectId(), node.getId()));
+            case "knowledge-standard" -> readWorkbenchSnapshot(node, "knowledge-standard", config, fields,
+                    knowledgeStandardService.getReadSnapshot(node.getProjectId(), node.getId()));
             default -> new AiWorkflowContextDTO.Component(key, key, fields, List.of(),
                     config, null, "UNSUPPORTED", null, null);
         };
+    }
+
+    /** Generic mapping for the single-baseline workbench snapshots. */
+    private AiWorkflowContextDTO.Component readWorkbenchSnapshot(ProjectNodeDTO node, String componentKey,
+            JsonNode config, List<AiWorkflowContextDTO.Field> fields, WorkbenchReadSnapshot<?> snapshot) {
+        Integer version;
+        if (!snapshot.hasPersistedContent() || snapshot.parts().get("content") == null
+                || snapshot.parts().get("content").version() == null) {
+            version = null;
+        } else {
+            version = snapshot.parts().get("content").version();
+        }
+        boolean persisted = snapshot.hasPersistedContent();
+        JsonNode content = persisted ? stripUiFlags(objectMapper.valueToTree(snapshot.display())) : null;
+        java.util.Map<String, Integer> versions = new java.util.HashMap<>();
+        versions.put("content", version);
+        return new AiWorkflowContextDTO.Component(componentKey, componentKey, fields, List.of(),
+                config, content, persisted ? "LOADED" : "EMPTY", versions, null);
     }
 
     private AiWorkflowContextDTO.Component readRequirementScope(ProjectNodeDTO node, JsonNode config,
@@ -105,6 +144,8 @@ public class AiProjectComponentReader {
     private JsonNode stripUiFlags(JsonNode content) {
         if (content instanceof ObjectNode objectNode) {
             objectNode.remove("canEdit");
+            objectNode.remove("topicCreationAllowed");
+            objectNode.remove("projectBasicInfo");
             if (objectNode.has("requirements") && objectNode.get("requirements").isArray()) {
                 for (JsonNode requirement : objectNode.get("requirements")) {
                     if (requirement instanceof ObjectNode requirementNode) {

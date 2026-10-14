@@ -11,6 +11,8 @@ import com.brad.pms.dto.request.NodeIterationPlanCmd;
 import com.brad.pms.dto.request.NodeResourceCmd;
 import com.brad.pms.dto.request.NodeRiskCmd;
 import com.brad.pms.dto.response.NodePlanResourceRiskDTO;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.dto.response.NodeResourceDTO;
 import com.brad.pms.dto.response.NodeRiskDTO;
 import com.brad.pms.dto.response.NodeIterationPlanDTO;
@@ -69,6 +71,21 @@ public class NodePlanResourceRiskService {
     private final SystemMapper systemMapper;
     private final OperationLogService operationLogService;
 
+    /** Pure facts for AI context: persistence judged by real records, never display defaults. */
+    public WorkbenchReadSnapshot<NodePlanResourceRiskDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, "plan-resource-risk",
+                "仅配置了对应工作台组件的节点支持该工作台");
+        ProjectNodePlanBaselineDO root = findBaseline(projectId, nodeId);
+        NodePlanResourceRiskDTO display = toDTO(node, root);
+        boolean persisted = root != null;
+        Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("content", root == null || root.getVersion() == null
+                ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, root.getVersion()));
+        return new WorkbenchReadSnapshot<>(display, persisted, parts);
+    }
     public NodePlanResourceRiskDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = requirePlanNode(permissionService.requireNode(projectId, nodeId));

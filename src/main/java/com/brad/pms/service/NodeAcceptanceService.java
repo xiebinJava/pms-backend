@@ -9,6 +9,9 @@ import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.NodeAcceptanceItemCmd;
 import com.brad.pms.dto.request.NodeAcceptanceUpdateCmd;
 import com.brad.pms.dto.response.NodeAcceptanceDTO;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
+import java.util.Map;
 import com.brad.pms.dto.response.NodeAcceptanceDefectDTO;
 import com.brad.pms.dto.response.NodeAcceptanceItemDTO;
 import com.brad.pms.entity.ProjectNodeAcceptanceBaselineDO;
@@ -56,6 +59,22 @@ public class NodeAcceptanceService {
     private final UserService userService;
     private final OperationLogService operationLogService;
 
+    /** Pure facts for AI context: persistence judged by real records, never display defaults. */
+    public WorkbenchReadSnapshot<NodeAcceptanceDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, "business-acceptance",
+                "仅配置了对应工作台组件的节点支持该工作台");
+        ProjectNodeAcceptanceBaselineDO root = findBaseline(projectId, nodeId);
+        NodeAcceptanceDTO display = toDTO(node, root);
+        boolean hasChildren = display.getItems() != null && !display.getItems().isEmpty();
+        boolean persisted = root != null || hasChildren;
+        Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("content", root == null || root.getVersion() == null
+                ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, root.getVersion()));
+        return new WorkbenchReadSnapshot<>(display, persisted, parts);
+    }
     public NodeAcceptanceDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = requireAcceptanceNode(permissionService.requireNode(projectId, nodeId));

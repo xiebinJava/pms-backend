@@ -9,6 +9,8 @@ import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.convertor.Convertors;
 import com.brad.pms.dto.request.NodeReleaseUpdateCmd;
 import com.brad.pms.dto.response.NodeReleaseDTO;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeReleaseBaselineDO;
 import com.brad.pms.entity.UserDO;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -32,6 +35,21 @@ public class NodeReleaseService {
     private final OperationLogService operationLogService;
     private final UserService userService;
 
+    /** Pure facts for AI context: persistence judged by real records, never display defaults. */
+    public WorkbenchReadSnapshot<NodeReleaseDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, "release-handover",
+                "仅配置了对应工作台组件的节点支持该工作台");
+        ProjectNodeReleaseBaselineDO root = findBaseline(projectId, nodeId);
+        NodeReleaseDTO display = toDTO(node, root);
+        boolean persisted = root != null;
+        Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("content", root == null || root.getVersion() == null
+                ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, root.getVersion()));
+        return new WorkbenchReadSnapshot<>(display, persisted, parts);
+    }
     public NodeReleaseDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = requireReleaseNode(permissionService.requireNode(projectId, nodeId));

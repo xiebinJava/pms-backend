@@ -291,6 +291,23 @@ class NodePlanResourceRiskServiceTest {
         return node;
     }
 
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotTreatsSavedZeroVersionAsPersisted() {
+        ProjectNodePlanBaselineDO root = baseline();
+        root.setVersion(0);
+        when(baselineMapper.selectOne(any())).thenReturn(root);
+        when(permissionService.requireProjectReadable(1L)).thenReturn(null);
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node("plan"));
+        org.mockito.Mockito.doNothing().when(permissionService).requireNodeComponentForContext(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("plan-resource-risk"),
+                org.mockito.ArgumentMatchers.any());
+        var snapshot = service.getReadSnapshot(1L, 10L);
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(true, 0));
+    }
+
     private ProjectNodePlanBaselineDO baseline() {
         ProjectNodePlanBaselineDO baseline = new ProjectNodePlanBaselineDO();
         baseline.setId(100L);

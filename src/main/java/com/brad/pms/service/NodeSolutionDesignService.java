@@ -13,6 +13,8 @@ import com.brad.pms.dto.response.NodeRequirementBaselineSummaryDTO;
 import com.brad.pms.dto.response.NodeRequirementScopeDTO;
 import com.brad.pms.dto.response.NodeSolutionDecisionDTO;
 import com.brad.pms.dto.response.NodeSolutionDesignDTO;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.dto.response.NodeSolutionPackageDTO;
 import com.brad.pms.dto.response.NodeSolutionReviewDTO;
 import com.brad.pms.entity.ProjectNodeDO;
@@ -32,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -50,6 +53,34 @@ public class NodeSolutionDesignService {
     private final ProjectPermissionService permissionService;
     private final NodeRequirementScopeService requirementScopeService;
     private final OperationLogService operationLogService;
+
+    /** Pure facts for AI context: exist + version per root/part record, never display defaults. */
+    public WorkbenchReadSnapshot<NodeSolutionDesignDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, WorkflowComponentKey.SOLUTION_DESIGN,
+                "仅配置了方案设计与评审组件的节点支持该工作台");
+        ProjectNodeSolutionPackageDO pkg = findPackage(projectId, nodeId);
+        ProjectNodeSolutionDecisionDO decision = findDecision(projectId, nodeId);
+        ProjectNodeSolutionReviewDO productReview = findReview(projectId, nodeId, "BUSINESS_PRODUCT");
+        ProjectNodeSolutionReviewDO technicalReview = findReview(projectId, nodeId, "TECHNICAL");
+        ProjectNodeSolutionReviewDO testReview = findReview(projectId, nodeId, "TEST_RELEASE");
+        NodeSolutionDesignDTO display = toDTO(projectId, nodeId, node);
+        Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("package", persisted(pkg == null ? null : pkg.getVersion()));
+        parts.put("decision", persisted(decision == null ? null : decision.getVersion()));
+        parts.put("review:BUSINESS_PRODUCT", persisted(productReview == null ? null : productReview.getVersion()));
+        parts.put("review:TECHNICAL", persisted(technicalReview == null ? null : technicalReview.getVersion()));
+        parts.put("review:TEST_RELEASE", persisted(testReview == null ? null : testReview.getVersion()));
+        boolean persistedContent = pkg != null || decision != null
+                || productReview != null || technicalReview != null || testReview != null;
+        return new WorkbenchReadSnapshot<>(display, persistedContent, parts);
+    }
+
+    private static PersistedContentVersion persisted(Integer version) {
+        return version == null ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, version);
+    }
 
     public NodeSolutionDesignDTO get(Long projectId, Long nodeId) {
         ProjectNodeDO node = requireDesignNode(permissionService.requireNode(projectId, nodeId));

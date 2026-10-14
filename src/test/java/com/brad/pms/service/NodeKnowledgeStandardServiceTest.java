@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -79,5 +80,22 @@ class NodeKnowledgeStandardServiceTest {
         node.setNodeKey(key);
         node.setStatus(1);
         return node;
+    }
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotTreatsSavedZeroVersionAsPersisted() {
+        ProjectNodeKnowledgeBaselineDO root = new ProjectNodeKnowledgeBaselineDO();
+        root.setVersion(0);
+        when(baselineMapper.selectOne(any())).thenReturn(root);
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node("knowledge"));
+        when(assetMapper.selectList(any())).thenReturn(java.util.List.of());
+        when(actionMapper.selectList(any())).thenReturn(java.util.List.of());
+        org.mockito.Mockito.doNothing().when(permissionService).requireNodeComponentForContext(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("knowledge-standard"),
+                org.mockito.ArgumentMatchers.any());
+        var snapshot = service.getReadSnapshot(1L, 10L);
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(true, 0));
     }
 }

@@ -12,6 +12,8 @@ import com.brad.pms.dto.request.NodeDevelopmentControlUpdateCmd;
 import com.brad.pms.dto.request.NodeDevelopmentStoryCmd;
 import com.brad.pms.dto.request.NodeDevelopmentTopicCmd;
 import com.brad.pms.dto.response.NodeDevelopmentControlDTO;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.dto.response.NodeDevelopmentStoryDTO;
 import com.brad.pms.dto.response.NodeDevelopmentSummaryDTO;
 import com.brad.pms.dto.response.NodeDevelopmentTopicDTO;
@@ -62,6 +64,22 @@ public class NodeDevelopmentControlService {
     private final IterationPlanOptionsService iterationPlanOptionsService;
     private final IterationPlanSystemService iterationPlanSystemService;
 
+    /** Pure facts for AI context: persistence judged by real records, never display defaults. */
+    public WorkbenchReadSnapshot<NodeDevelopmentControlDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, "development-control",
+                "仅配置了对应工作台组件的节点支持该工作台");
+        ProjectNodeDevelopmentBaselineDO root = findBaseline(projectId, nodeId);
+        NodeDevelopmentControlDTO display = toDTO(node, root);
+        boolean hasChildren = display.getTopics() != null && !display.getTopics().isEmpty();
+        boolean persisted = root != null || hasChildren;
+        Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("content", root == null || root.getVersion() == null
+                ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, root.getVersion()));
+        return new WorkbenchReadSnapshot<>(display, persisted, parts);
+    }
     public NodeDevelopmentControlDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = requireDevelopNode(permissionService.requireNode(projectId, nodeId));

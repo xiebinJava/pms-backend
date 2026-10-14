@@ -8,6 +8,9 @@ import com.brad.pms.common.enums.NodeStatus;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.request.NodeValueReviewUpdateCmd;
 import com.brad.pms.dto.response.NodeValueReviewDTO;
+import java.util.Map;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeValueReviewDO;
 import com.brad.pms.mapper.ProjectNodeValueReviewMapper;
@@ -32,6 +35,21 @@ public class NodeValueReviewService {
     private final ProjectPermissionService permissionService;
     private final OperationLogService operationLogService;
 
+    /** Pure facts for AI context: persistence judged by real records, never display defaults. */
+    public WorkbenchReadSnapshot<NodeValueReviewDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, "value-review",
+                "仅配置了对应工作台组件的节点支持该工作台");
+        ProjectNodeValueReviewDO root = findReview(projectId, nodeId);
+        NodeValueReviewDTO display = toDTO(node, root);
+        boolean persisted = root != null;
+        Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("content", root == null || root.getVersion() == null
+                ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, root.getVersion()));
+        return new WorkbenchReadSnapshot<>(display, persisted, parts);
+    }
     public NodeValueReviewDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = requireReviewNode(permissionService.requireNode(projectId, nodeId));

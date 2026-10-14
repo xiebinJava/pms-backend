@@ -522,4 +522,33 @@ class NodeSolutionDesignServiceTest {
         cmd.setConditions(conditions);
         return cmd;
     }
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotExposesSeparatedPackageDecisionAndReviewParts() {
+        ProjectNodeDO node = node("solution-design");
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        org.mockito.Mockito.doNothing().when(permissionService).requireNodeComponentForContext(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("solution-design"),
+                org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.lenient().when(permissionService.requireProjectReadable(1L)).thenReturn(
+                new com.brad.pms.entity.ProjectDO());
+        ProjectNodeSolutionPackageDO pkg = new ProjectNodeSolutionPackageDO();
+        pkg.setVersion(0);
+        when(packageMapper.selectOne(any())).thenReturn(pkg);
+        when(decisionMapper.selectOne(any())).thenReturn(null);
+        when(reviewMapper.selectList(any())).thenReturn(java.util.List.of());
+
+        var snapshot = service.getReadSnapshot(1L, 10L);
+
+        assertThat(snapshot.parts()).containsEntry("package",
+                new com.brad.pms.dto.response.PersistedContentVersion(true, 0));
+        assertThat(snapshot.parts()).containsEntry("decision",
+                com.brad.pms.dto.response.PersistedContentVersion.absent());
+        assertThat(snapshot.parts().keySet()).containsExactlyInAnyOrder("package", "decision",
+                "review:BUSINESS_PRODUCT", "review:TECHNICAL", "review:TEST_RELEASE");
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        verify(permissionService, org.mockito.Mockito.never()).requireNodeComponent(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
 }

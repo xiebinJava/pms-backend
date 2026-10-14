@@ -125,6 +125,27 @@ class NodeReleaseServiceTest {
         return node;
     }
 
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotTreatsSavedZeroVersionAsPersisted() {
+        ProjectNodeReleaseBaselineDO root = completeBaseline();
+        root.setVersion(0);
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node("release"));
+        org.mockito.Mockito.doNothing().when(permissionService).requireNodeComponentForContext(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("release-handover"),
+                org.mockito.ArgumentMatchers.any());
+        when(baselineMapper.selectOne(any())).thenReturn(root);
+
+        var snapshot = service.getReadSnapshot(1L, 10L);
+
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(true, 0));
+        verify(permissionService, org.mockito.Mockito.never())
+                .requireNodeComponent(org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
     private ProjectNodeReleaseBaselineDO completeBaseline() {
         ProjectNodeReleaseBaselineDO baseline = new ProjectNodeReleaseBaselineDO();
         baseline.setProjectId(1L);

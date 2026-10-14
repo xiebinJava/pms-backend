@@ -261,6 +261,27 @@ class NodeAcceptanceServiceTest {
         return requirement;
     }
 
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotTreatsSavedZeroVersionAsPersisted() {
+        ProjectNodeAcceptanceBaselineDO root = baseline();
+        root.setVersion(0);
+        when(baselineMapper.selectOne(any())).thenReturn(root);
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node("business-acceptance"));
+        when(itemMapper.selectList(any())).thenReturn(java.util.List.of());
+        when(defectMapper.selectList(any())).thenReturn(java.util.List.of());
+        org.mockito.Mockito.doNothing().when(permissionService).requireNodeComponentForContext(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("business-acceptance"),
+                org.mockito.ArgumentMatchers.any());
+
+        var snapshot = service.getReadSnapshot(1L, 10L);
+
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(true, 0));
+    }
+
     private ProjectNodeAcceptanceBaselineDO baseline() {
         ProjectNodeAcceptanceBaselineDO baseline = new ProjectNodeAcceptanceBaselineDO();
         baseline.setId(100L);

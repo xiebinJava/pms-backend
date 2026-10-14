@@ -564,4 +564,42 @@ class NodeDevelopmentControlServiceTest {
         return story;
     }
 
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotCountsTopicsEvenWithoutBaseline() {
+        ProjectNodeDevelopmentTopicDO topic = new ProjectNodeDevelopmentTopicDO();
+        topic.setId(90L);
+        topic.setProjectId(1L);
+        topic.setNodeId(10L);
+        topic.setOwnerId(3L);
+        topic.setDeleted(false);
+        when(topicMapper.selectList(any())).thenReturn(java.util.List.of(topic));
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node("develop"));
+        org.mockito.Mockito.doNothing().when(permissionService).requireNodeComponentForContext(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("development-control"),
+                org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.lenient().when(permissionService.requireProjectReadable(1L)).thenReturn(null);
+        org.mockito.Mockito.lenient().when(baselineMapper.selectOne(any())).thenReturn(null);
+        org.mockito.Mockito.lenient().when(userService.listByIdsIncludingDeleted(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(java.util.List.of());
+        when(storyMapper.selectList(any())).thenReturn(java.util.List.of());
+
+        var snapshot = service.getReadSnapshot(1L, 10L);
+
+        // R04: 无基线不等于无内容——有专题即 LOADED。
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.hasPersistedContent())
+                .isTrue();
+    }
+
+    private long topicCount(com.brad.pms.dto.response.WorkbenchReadSnapshot<?> snapshot) {
+        return ((com.brad.pms.dto.response.NodeDevelopmentControlDTO) snapshot.display())
+                .getTopics() == null ? 0 : ((com.brad.pms.dto.response.NodeDevelopmentControlDTO) snapshot.display())
+                .getTopics().size();
+    }
+
+    private boolean rootExists(com.brad.pms.dto.response.WorkbenchReadSnapshot<?> snapshot) {
+        return snapshot.parts().get("content") != null
+                && ((com.brad.pms.dto.response.PersistedContentVersion) snapshot.parts().get("content")).persisted();
+    }
 }

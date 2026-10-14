@@ -30,6 +30,10 @@ public class AiDevelopmentComponentReader {
 
     private final AiContextReferenceProjector referenceProjector;
     private final AiContextReadPolicy targetReferencePolicy;
+    private final com.brad.pms.service.DevelopmentStoryManagementService storyService;
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper =
+            new com.fasterxml.jackson.databind.ObjectMapper()
+                    .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
     public List<AiWorkflowContextDTO.Component> read(DevelopmentItemType itemType,
                                                      DevelopmentItemWorkflowDetailDTO item,
@@ -62,6 +66,9 @@ public class AiDevelopmentComponentReader {
             return itemType == DevelopmentItemType.REQUIREMENT
                     ? readExecutionTarget(item, entityVersion, fields)
                     : unsupported(key, config, fields, unknownComponents);
+        }
+        if ("story-list".equals(key)) {
+            return readStoryList(item, node, fields, unknownComponents);
         }
         if (!JSON_COMPONENTS.contains(key)) {
             return unsupported(key, config, fields, unknownComponents);
@@ -114,6 +121,57 @@ public class AiDevelopmentComponentReader {
     }
 
 
+
+    /**
+     * Story facts come from the real story rows (never the parent node's version):
+     * versions.node covers only the saved testing JSON; stories carry no entity version.
+     */
+    private AiWorkflowContextDTO.Component readStoryList(DevelopmentItemWorkflowDetailDTO item,
+            DevelopmentItemWorkflowNodeDTO node, List<AiWorkflowContextDTO.Field> fields,
+            List<String> unknownComponents) {
+        Long topicId = item.getTopicId();
+        Long mountNode = item.getTopicWorkflowNodeId();
+        if (topicId == null || mountNode == null || !Objects.equals(mountNode, node.getId())) {
+            unknownComponents.add("story-list");
+            return new AiWorkflowContextDTO.Component("story-list", "story-list", fields, List.of(),
+                    null, null, "UNSUPPORTED", null, null);
+        }
+        List<Map<String, Object>> stories = new ArrayList<>();
+        for (var story : storyService.listByTopic(topicId)) {
+            if (story == null || story.getId() == null) continue;
+            if (!Objects.equals(story.getTopicWorkflowNodeId(), node.getId())) continue;
+            if (!targetReferencePolicy.canReadReference("story", story.getId())) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            put(row, "id", story.getId());
+            put(row, "title", story.getTitle());
+            put(row, "status", story.getStatus());
+            put(row, "ownerName", story.getOwnerName());
+            put(row, "progress", story.getProgress());
+            stories.add(row);
+        }
+        com.fasterxml.jackson.databind.JsonNode testingState = node.getFieldValues() == null ? null
+                : node.getFieldValues().get("__components");
+        testingState = testingState == null ? null : testingState.get(
+                com.brad.pms.workflow.WorkflowComponentKey.STORY_TESTING);
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("stories", stories);
+        attachTestingContent(content, testingState);
+        java.util.Map<String, Integer> versions = new java.util.HashMap<>();
+        versions.put("node", node.getVersion());
+        versions.put("stories", null);
+        String contentState = stories.isEmpty() && testingState == null ? "EMPTY" : "LOADED";
+        return new AiWorkflowContextDTO.Component("story-list", "story-list", fields, List.of(),
+                null, mapper.valueToTree(content), contentState, versions, null);
+    }
+
+    private void attachTestingContent(Map<String, Object> content,
+                                      com.fasterxml.jackson.databind.JsonNode testingState) {
+        if (testingState == null || testingState.isNull()) {
+            content.put("testingResults", null);
+        } else {
+            content.put("testingResults", mapper.valueToTree(testingState));
+        }
+    }
     private AiWorkflowContextDTO.Component unsupported(String key, com.fasterxml.jackson.databind.JsonNode config,
                                                        List<AiWorkflowContextDTO.Field> fields,
                                                        List<String> unknownComponents) {

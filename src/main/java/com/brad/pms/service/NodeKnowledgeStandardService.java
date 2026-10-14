@@ -13,6 +13,8 @@ import com.brad.pms.dto.request.NodeKnowledgeStandardUpdateCmd;
 import com.brad.pms.dto.response.NodeKnowledgeActionDTO;
 import com.brad.pms.dto.response.NodeKnowledgeAssetDTO;
 import com.brad.pms.dto.response.NodeKnowledgeStandardDTO;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeKnowledgeActionDO;
 import com.brad.pms.entity.ProjectNodeKnowledgeAssetDO;
@@ -53,6 +55,23 @@ public class NodeKnowledgeStandardService {
     private final UserService userService;
     private final OperationLogService operationLogService;
 
+    /** Pure facts for AI context: persistence judged by real records, never display defaults. */
+    public WorkbenchReadSnapshot<NodeKnowledgeStandardDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, "knowledge-standard",
+                "仅配置了对应工作台组件的节点支持该工作台");
+        ProjectNodeKnowledgeBaselineDO root = findBaseline(projectId, nodeId);
+        NodeKnowledgeStandardDTO display = toDTO(node, root);
+        boolean hasChildren = (display.getAssets() != null && !display.getAssets().isEmpty())
+                || (display.getActions() != null && !display.getActions().isEmpty());
+        boolean persisted = root != null || hasChildren;
+        Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("content", root == null || root.getVersion() == null
+                ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, root.getVersion()));
+        return new WorkbenchReadSnapshot<>(display, persisted, parts);
+    }
     public NodeKnowledgeStandardDTO get(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = requireKnowledgeNode(permissionService.requireNode(projectId, nodeId));

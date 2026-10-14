@@ -28,9 +28,12 @@ class AiDevelopmentComponentReaderTest {
 
     private final AiContextReadPolicy policy = mock(AiContextReadPolicy.class);
 
+    private final com.brad.pms.service.DevelopmentStoryManagementService storyService =
+            mock(com.brad.pms.service.DevelopmentStoryManagementService.class);
+
     private AiDevelopmentComponentReader reader(AiContextReferenceProjector projector,
                                                 AiContextReadPolicy policy) {
-        return new AiDevelopmentComponentReader(projector, policy);
+        return new AiDevelopmentComponentReader(projector, policy, storyService);
     }
 
     private DevelopmentItemWorkflowNodeDTO node(String json, Integer version) {
@@ -158,6 +161,35 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.contentState()).isEqualTo("EMPTY");
             assertThat(component.versions()).containsEntry("entity", 5);
         });
+    }
+
+
+    @Test
+    void storyListReadsRealStoryRowsAndKeepsNullListVersion() {
+        when(policy.canReadReference(org.mockito.ArgumentMatchers.eq("story"), any())).thenReturn(true);
+        when(storyService.listByTopic(15L)).thenReturn(List.of());
+        DevelopmentItemWorkflowDetailDTO item = new DevelopmentItemWorkflowDetailDTO();
+        item.setItemType("TOPIC");
+        item.setId(15L);
+        item.setTopicId(15L);
+        item.setTopicWorkflowNodeId(101L);
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(101L);
+        node.setVersion(7);
+        node.setRuntimeComponents(List.of("story-list"));
+        AiDevelopmentComponentReader realReader = reader(new AiContextReferenceProjector(policy), policy);
+        List<String> unknown = new ArrayList<>();
+
+        List<AiWorkflowContextDTO.Component> components = realReader.read(
+                com.brad.pms.workflow.DevelopmentItemType.TOPIC, item, node, null, "story-list", unknown);
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.key()).isEqualTo("story-list");
+            assertThat(component.contentState()).isEqualTo("EMPTY");
+            assertThat(component.versions()).containsEntry("node", 7);
+            assertThat(component.versions()).containsEntry("stories", null);
+        });
+        assertThat(unknown).isEmpty();
     }
 
     @Test

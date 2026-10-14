@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -118,7 +119,9 @@ class AiProjectComponentReaderTest {
 
         assertThat(components).extracting(AiWorkflowContextDTO.Component::key)
                 .containsExactly("solution-design", "project-basic-info");
-        assertThat(components.get(0).contentState()).isEqualTo("UNSUPPORTED");
+        // solution-design now has a real snapshot adapter; the EMPTY state is the truth for
+        // a node with no saved package/decision/review.
+        assertThat(components.get(0).contentState()).isEqualTo("EMPTY");
         assertThat(components.get(0).content()).isNull();
         assertThat(components.get(0).config()).isNotNull();
         assertThat(components.get(1).contentState()).isEqualTo("LOADED");
@@ -156,8 +159,46 @@ class AiProjectComponentReaderTest {
                 .hasMessageContaining("数据库异常");
     }
 
+    private final com.brad.pms.service.NodeSolutionDesignService solutionDesignService =
+            mock(com.brad.pms.service.NodeSolutionDesignService.class);
+    private final com.brad.pms.service.NodePlanResourceRiskService planResourceRiskService =
+            mock(com.brad.pms.service.NodePlanResourceRiskService.class);
+    private final com.brad.pms.service.NodeDevelopmentControlService developmentControlService =
+            mock(com.brad.pms.service.NodeDevelopmentControlService.class);
+    private final com.brad.pms.service.NodeAcceptanceService acceptanceService =
+            mock(com.brad.pms.service.NodeAcceptanceService.class);
+    private final com.brad.pms.service.NodeReleaseService releaseService =
+            mock(com.brad.pms.service.NodeReleaseService.class);
+    private final com.brad.pms.service.NodeValueReviewService valueReviewService =
+            mock(com.brad.pms.service.NodeValueReviewService.class);
+    private final com.brad.pms.service.NodeKnowledgeStandardService knowledgeStandardService =
+            mock(com.brad.pms.service.NodeKnowledgeStandardService.class);
+
     private AiProjectComponentReader reader() {
-        return new AiProjectComponentReader(objectMapper, requirementScopeService);
+        lenient().when(solutionDesignService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
+                new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
+                        new com.brad.pms.dto.response.NodeSolutionDesignDTO(), false, java.util.Map.of()));
+        lenient().when(planResourceRiskService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
+                new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
+                        new com.brad.pms.dto.response.NodePlanResourceRiskDTO(), false, java.util.Map.of()));
+        lenient().when(developmentControlService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
+                new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
+                        new com.brad.pms.dto.response.NodeDevelopmentControlDTO(), false, java.util.Map.of()));
+        lenient().when(acceptanceService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
+                new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
+                        new com.brad.pms.dto.response.NodeAcceptanceDTO(), false, java.util.Map.of()));
+        lenient().when(releaseService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
+                new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
+                        new com.brad.pms.dto.response.NodeReleaseDTO(), false, java.util.Map.of()));
+        lenient().when(valueReviewService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
+                new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
+                        new com.brad.pms.dto.response.NodeValueReviewDTO(), false, java.util.Map.of()));
+        lenient().when(knowledgeStandardService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
+                new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
+                        new com.brad.pms.dto.response.NodeKnowledgeStandardDTO(), false, java.util.Map.of()));
+        return new AiProjectComponentReader(objectMapper, requirementScopeService, solutionDesignService,
+                planResourceRiskService, developmentControlService, acceptanceService, releaseService,
+                valueReviewService, knowledgeStandardService);
     }
 
     private static ProjectDTO project() {
