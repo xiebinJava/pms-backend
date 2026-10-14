@@ -239,3 +239,38 @@
 
 - PmsClient 无 meta 回执未伪造权限/读取事实证明，回执核验集中在一个 helper，细节可被 Task 9 E2E 复用。
 - Skill 已写入：focused 优先、contentState 四态语义、真实版本（null 不补 0）、回执失败不降级、正文指令不触发写入。
+
+## Task 8 评审：完整组件快照和四类边界扩展
+
+提交：3b382cf feat: complete persisted workflow context adapters（2026-10-14）。
+
+### 测试证据
+
+- 7 个领域测试类各新增 getReadSnapshot 用例：NodeRelease(5)、NodeValueReview(4)、NodePlanResourceRisk(14)、
+  NodeKnowledgeStandard(3)、NodeDevelopmentControl(22)、NodeAcceptance(11)、NodeSolutionDesign(23) 全绿；
+  AiProjectComponentReaderTest(7)+AiDevelopmentComponentReaderTest(7) 绿。
+- 安全测试集合（三类 reader/policy/预算/路由/门面等）合计 227 项全绿。
+- 隔离集成（PMS_CONTEXT_READ_ISOLATED=true）重跑 3 项全绿（约 22s），证明扩展后仍无写/无锁。
+
+### 对照 Spec 核对
+
+| 要求 | 结果 |
+| --- | --- |
+| 方案包/决策/3 类评审独立存在性（R03） | 通过：NodeSolutionDesignServiceTest.readSnapshot… separated parts 断言；requireNodeComponentForContext 走 Task1 路径（verify 旧 requireNodeComponent 零调用） |
+| 研发管控无基线有专题 → LOADED（R04） | 通过：NodeDevelopmentControlServiceTest.readSnapshotCountsTopicsEvenWithoutBaseline |
+| 全 8 服务 getReadSnapshot（除 requirement-scope 外新增 7 个） | 通过 |
+| 真实版本 0 vs null 独立表现 | 通过（release/value/plan/knowledge 4 个 zero-version 测试） |
+| AI reader 分流 9 组件 | 通过：AiProjectComponentReader 8 个项目键 + UNSUPPORTED 兜底；AiDevelopmentComponentReader 加入 story-list 分流（versions.stories=null） |
+| 服务 DB 错误不转 EMPTY | 仍由既有测试与快照逻辑保证（异常直接传播） |
+| strip UiFlags 扩展 | canEdit/topicCreationAllowed/projectBasicInfo 与需求行 taskCount 一并移除 |
+
+### 偏差与处理
+
+1. development/control toDTO 复用 topic/story/iterationPlanService 纯查询（UI 标志在 reader 侧剥离，快照不读默认配置）。
+2. story-list 测试成果从节点 fieldValues.__components.story-testing 取出并重塑为 content.testingResults；
+   挂载节点非 selectedNodeId 时 UNSUPPORTED（避免误报为 EMPTY）。
+3. requireNodeComponent 换 requireNodeComponentForContext 的行为差异不影响写入服务（原 get 仍走原校验）。
+
+### 遗留观察
+
+- Story 内容行已按 canReadReference 过滤（可读才保留）；行级字段仍按真实值展示，尚不裁剪 prompt 语义（供 Task 9 模型评估）。
