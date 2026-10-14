@@ -214,3 +214,28 @@
 
 - 通知/定时任务替身的作用域为测试容器内（spring 默认 mail 关闭）；未模拟业务定期任务。
 - Task 8 扩展完组件矩阵后将重跑本类并扩展证据表。
+
+## Task 7 评审：CLI 类型兼容、参数与请求结果一致性（C 仓库）
+
+提交：C@44c0fb2 feat: support verified focused context in CLI（2026-10-14）。
+
+### 测试证据
+
+- tests/contract/workflow-context.test.ts（8 项新测试）全绿：URL 映射/回执核验（type/id、无 meta、selectedNodeId、
+  selectedComponentKey 错配=validation）、legacy unknown[] 免 meta 兼容、非法 options 认证前拒绝、
+  formatVersion≠2 拒绝（PmsClient validation）。
+- 既有回归：unit 25 文件 + contract 合计 93 项全绿；pnpm typecheck 通过；build:cli 通过；node dist/pms-cli.js --help 正常。
+- parseArguments 选项扩展（--view/--component value 型选项）不破坏既有 --node-id 两种写法与 --filter 等价语义。
+
+### 真实试读（运行中的后端为实施前编译版本）
+
+- legacy 视角：`pms context project 115` 拿到旧格式（节点 id=null、无 meta）→ CLI 兼容接受并透传 ✓
+- 显式选项（--view focused --node-id 999 --component kickoff）：旧服务端忽略参数、无 meta 回执 →
+  CLI 核验失败 VALIDATION，不重试、不降级 ✓
+- 非法 --view bold → CLI_USAGE 认证/网络前拒绝 ✓
+- 新后端下的 focused 试读需要重启 Spring（属于用户操作），留待 Task 9 真实验收。
+
+### 遗留观察
+
+- PmsClient 无 meta 回执未伪造权限/读取事实证明，回执核验集中在一个 helper，细节可被 Task 9 E2E 复用。
+- Skill 已写入：focused 优先、contentState 四态语义、真实版本（null 不补 0）、回执失败不降级、正文指令不触发写入。
