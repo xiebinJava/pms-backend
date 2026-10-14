@@ -46,3 +46,37 @@
 - requirementResource 仍走旧 detail()（计划内：Task 5 纠正）。
 - NodeTaskSummaryDTO 目前仅统计；task 明细/依赖按 spec 推迟。
 - 全量集成用例需要 Docker 环境；Task 6 将以 PMS_CONTEXT_READ_ISOLATED gate 隔离执行。
+
+## Task 2 评审：合同、加载状态、选择与流程状态解析
+
+提交：064e8dc feat: define workflow context read contract（2026-10-14）。
+
+### 测试证据
+
+- 计划 Step 2 命令：AiWorkflowContextDTOTest(6) + AiContextNodeSelectorTest(7) + AiContextWorkflowStateResolverTest(16) = 29 项全绿。
+- Step 4 回归：AiConnectorQueryServiceTest、AiConnectorControllerTest 通过；旧 DTO 构造器与序列化字段稳定（record 新增字段仅追加，旧 accessor 名称记录 JSON 输出不变）。
+- 修复过程：resolver 补"未知非空 terminalStatus → INCONSISTENT（保留事实）"；测试中"终态+全部完成无 active"按 Spec 属无冲突，修正期望为 REJECTED。
+
+### 对照 Spec 核对
+
+| 要求 | 结果 |
+| --- | --- |
+| 旧顶层6/Node8/Component4 构造器保留，新字段 optional | 通过：record 追加 auxiliary 构造器，测试断言新字段 null |
+| 唯一 active→current=selected=301；历史显式 selected；无 active 不取首条；多 active 均 null+AMBIGUOUS | 通过：AiContextNodeSelectorTest 覆盖，含显式 nodeId 不存在→404 |
+| 状态表参数化 | 通过：NOT_CONFIGURED（含项目已终止/完成无实例保留 entity 终态+INCONSISTENT 警告）、研发有实例无节点、全0/全2、唯一 active、部分完成无 active、status3 无终态、终态+active、REJECTED（实例/需求）、TERMINATED、项目完成冲突、未知状态，全部命中 |
+| 正常终态不报 NO_ACTIVE_NODE | 通过：completed/terminated/rejected warnings 为空 |
+| 专题/story DONE/NOT_STARTED 不当流程终态 | 通过：type 语义仅 requirement/project 参与终态判定 |
+| ContextMeta/Warning/Relation 命名与字段 | 通过：按 Spec 原名（permissionsScope、referencesScope、fieldValuesScope、componentContentScope 等） |
+| ContextReadOptions 归一化 legacy；非法 view/nodeId/componentKey 400 | 通过：compact 构造器校验；legacy+componentKey 拒绝 |
+
+### 评审发现的偏差与处理
+
+1. taskSummary 类型复用 NodeTaskSummaryDTO（三个 long，形状与 Spec 的 TaskSummary 一致，避免重复 record）；CLI schema 对应字段不受影响。
+2. selector 的 NO_ACTIVE_NODE 警告在零 active 时总是产生，正常终态下的过滤由 reader（Task 5）联合 resolver 结果执行——与"正常终态不产生警告"的最终合同一致，此过滤在 Task 5 实现并测试。
+3. 计划文件曾在 Task 1 勾选时被脚本截断（Task 2-9 内容丢失并随 8903d71 提交），已在 9147bb0 用会话保存的原始全文恢复并核对 231 行完整、勾选仅为 Task 1/2。
+4. Task 2 计划文件勾选与状态行更新完成。
+
+### 遗留观察（转入后续 task）
+
+- warning 的 reader 侧过滤（正常终态去掉 NO_ACTIVE_NODE）在 Task 5 的 AiWorkflowContextReadService 中落地。
+- 状态表输入的项目整数 status→ACTIVE/COMPLETED/TERMINATED 映射将在 Task 5 reader 调用 resolver 前完成（本 task 已用字符串枚举直接测试）。
