@@ -303,3 +303,23 @@ C 提交：b36e5e2 test/docs: record readonly context delivery evidence；B 提�
    pnpm run verify:real-pms:readonly` 逐项核验显式 fixture。
 3. 模型工作台做一次只读解释（当前节点/历史差异/负责人/成果存在性），依据 SKILL.md 的只读规则。
 4. 全部通过后再打开两个 feature 并做 capability 回归。
+
+## 二次评审修复记录（2026-10-14 下午）
+
+用户深度 review 提出 6 个问题（3×P1 + 3×P2），核实后全部属实并逐项修复。
+
+| 问题 | 核实结果 | 修复方式 | 测试证据 |
+| --- | --- | --- | --- |
+| P1-1 门面缺主对象 READ | 属实：context() 直进 reader，detailForContext 不校验 requirement:read | AiWorkflowContextReadService 注入 AiContextReadPolicy，normalize 后立即 requireRead(type)（requirement→REQUIREMENT_READ、其余→PROJECT_READ），拒绝发生在任何 reader 之前 | AiWorkflowContextReadServiceTest.mainObjectModuleReadIsEnforcedBeforeAnyRuns（policy 拒绝→reader 零调用 verify） |
+| P1-2 引用投影未贯穿 fieldValues | 属实：projectFieldValues 无生产调用；项目 legacy 直接复制原始 fieldValues；研发 legacy 合并 boundFieldValues 也未投影 | 项目 reader 与研发 reader（含 bound 合并路径、focused selected 路径）全部改为 referenceProjector.projectFieldValues 输出 | AiProjectContextReaderTest 新增 2 个用例：legacy 保留原始（含 __components）→ focused 去除 __components + 引用键（topicId/executionTarget stub 投影）；AiDevelopmentContextReaderTest 补 passthrough stub |
+| P1-3 项目 focused 泄 __components | 属实：focused 选中节点直接复制完整 fieldValues | 项目 focused 分支（选中节点）额外 remove("__components")（与研发 focused 一致） | 同上 legacy/focused 对比断言 |
+| P2-4 resource() 无事务 | 属实：/resources 直调 queryService.resource 无事务边界 | AiConnectorQueryService.resource 加 @Transactional(readOnly=true, isolation=REPEATABLE_READ) | 代码级修复；隔离集成测试覆盖同一事务门面语义 |
+| P2-5 solution-design 版本映射不完整 | 属实：reader 只读 parts.content → package/decision/review:* 版本丢失 | readWorkbenchSnapshot 改为遍历全部 parts 逐键输出真实版本（persisted→真实版本、absent→null），不再只看 content | AiProjectComponentReaderTest.solutionDesignVersionsCarryEveryPersistedPart…（package=0、TEST_RELEASE=2、decision=null 全部断言） |
+| P2-6 CLI 原始 ZodError 泄漏 | 属实：legacy/v2 envelope parse 失败抛原始 ZodError | parseWorkflowContextEnvelope / ensureWorkflowContextV2Parsing 统一包装为 PmsClientError(kind=validation)，保留首个 issue 消息 | workflow-context.test 新增 2 个用例（legacy envelope 结构不合法、meta.view 非法 → kind=validation） |
+
+### 修复后验证
+
+- B：安全测试集合 199 项全绿 + 隔离 MySQL 集成重跑 3 项全绿。
+- C：unit/contract 96 项全绿（含新 2 个）、typecheck 通过。
+- 提交：B d58287b、C 23a708f。
+- feature 开关保持 false：真实 API / 权限 / 隔离 DB / 模型验收仍需按计划完成后才能打开。
