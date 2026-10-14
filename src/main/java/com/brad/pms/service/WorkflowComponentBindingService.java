@@ -38,6 +38,17 @@ public class WorkflowComponentBindingService {
         return overlay(project.getId(), definition, projectNodes, topics, configuredNodeKey);
     }
 
+    /**
+     * Context-only overlay for legacy projects (no pinned template version): derives the runtime
+     * component only from nodes that actually host topics and never resolves the current default.
+     */
+    public WorkflowTemplateDefinition applyLegacyTopicBinding(Long projectId, WorkflowTemplateDefinition definition,
+                                                              Collection<ProjectNodeDO> projectNodes) {
+        if (projectId == null || definition == null) return definition;
+        List<ProjectNodeDevelopmentTopicDO> topics = loadTopicRoots(List.of(projectId));
+        return overlay(projectId, definition, projectNodes, topics, null);
+    }
+
     /** Applies the same overlay to a whole project snapshot with one historical-topic lookup. */
     public Map<Long, WorkflowTemplateDefinition> applyTopicBindings(Collection<ProjectDO> projects,
                                                                     Map<Long, WorkflowTemplateDefinition> definitions,
@@ -143,10 +154,12 @@ public class WorkflowComponentBindingService {
             Map<Long, String> nodeKeysById = projectNodes.stream()
                     .filter(node -> node.getId() != null && Objects.equals(node.getProjectId(), projectId))
                     .collect(Collectors.toMap(ProjectNodeDO::getId, ProjectNodeDO::getNodeKey, (left, right) -> left));
-            for (ProjectNodeDO node : projectNodes) {
-                if (Objects.equals(node.getProjectId(), projectId)
-                        && Objects.equals(node.getNodeKey(), configuredNodeKey)) {
-                    hostKeys.add(node.getNodeKey());
+            if (configuredNodeKey != null) {
+                for (ProjectNodeDO node : projectNodes) {
+                    if (Objects.equals(node.getProjectId(), projectId)
+                            && Objects.equals(node.getNodeKey(), configuredNodeKey)) {
+                        hostKeys.add(node.getNodeKey());
+                    }
                 }
             }
             if (topics != null) {

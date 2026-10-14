@@ -35,6 +35,8 @@ public class ProjectNodeDTO {
     private List<WorkflowFieldDefinition> fields;
     private Boolean projectBasicInfo;
     private List<WorkflowProjectFieldDefinition> projectBasicInfoFields;
+    /** Runtime component configuration copied from the pinned workflow template (context reads). */
+    private Map<String, JsonNode> componentConfigs;
     private Map<String, JsonNode> fieldValues;
     private Map<String, Integer> fieldValueVersions;
     private Map<String, List<WorkflowFieldAttachmentDTO>> fieldAttachments;

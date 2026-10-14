@@ -220,6 +220,45 @@ public class NodeService {
                 definitionsByNodeKey.get(node.getNodeKey()))).collect(Collectors.toList());
     }
 
+    /**
+     * Side-effect-free node assembly for AI context reads: no default owner backfill,
+     * no node activation, no member writes, and legacy projects keep their actual mounts.
+     */
+    public List<ProjectNodeDTO> listReadOnly(Long projectId) {
+        ProjectDO project = permissionService.requireProject(projectId);
+        List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
+                .eq(ProjectNodeDO::getProjectId, projectId)
+                .orderByAsc(ProjectNodeDO::getSort));
+        WorkflowTemplateDefinition definition = resolveReadOnlyDefinition(project, nodes);
+        return toReadOnlyDTOs(project, nodes, definition);
+    }
+
+    /** Strictly-pinned definition with legacy projects keeping only their actual historical mounts. */
+    private WorkflowTemplateDefinition resolveReadOnlyDefinition(ProjectDO project, List<ProjectNodeDO> nodes) {
+        if (workflowTemplateService == null) return BuiltInWorkflowTemplate.compatibilityDefinition();
+        WorkflowTemplateDefinition definition =
+                workflowTemplateService.getDefinitionForContext(project.getWorkflowTemplateVersionId());
+        if (workflowComponentBindingService == null) return definition;
+        return project.getWorkflowTemplateVersionId() == null
+                ? workflowComponentBindingService.applyLegacyTopicBinding(project.getId(), definition, nodes)
+                : workflowComponentBindingService.applyTopicBinding(project, definition, nodes);
+    }
+
+    private List<ProjectNodeDTO> toReadOnlyDTOs(ProjectDO project, List<ProjectNodeDO> nodes,
+                                                WorkflowTemplateDefinition definition) {
+        java.util.Map<String, WorkflowNodeDefinition> definitionsByNodeKey = definition == null ? java.util.Map.of()
+                : definition.nodes().stream().collect(Collectors.toMap(WorkflowNodeDefinition::key, item -> item,
+                        (left, right) -> left));
+        java.util.Map<Long, UserDO> owners = userService.listByIds(nodes.stream()
+                        .map(ProjectNodeDO::getOwnerId)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList()))
+                .stream().collect(Collectors.toMap(UserDO::getId, user -> user));
+        return nodes.stream().map(node -> toDTO(node, owners.get(node.getOwnerId()), project,
+                definitionsByNodeKey.get(node.getNodeKey()))).collect(Collectors.toList());
+    }
+
     @Transactional
     public ProjectNodeDTO updateOwner(Long projectId, Long nodeId, NodeOwnerUpdateCmd cmd) {
         ProjectDO project = permissionService.requireProjectManageable(projectId, "分配节点负责人");
@@ -513,6 +552,7 @@ public class NodeService {
             dto.setFields(definition.fields());
             dto.setProjectBasicInfo(definition.projectBasicInfo());
             dto.setProjectBasicInfoFields(definition.projectBasicInfoFields());
+            dto.setComponentConfigs(definition.componentConfigs());
         }
         if (nodeCustomFieldService != null && definition != null) {
             var values = nodeCustomFieldService.getValuesForNode(project.getId(), node.getId(), definition);

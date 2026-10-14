@@ -7,8 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 @Data
-public class DevelopmentItemWorkflowDetailDTO {
-    private String itemType;
+public class DevelopmentItemWorkflowDetailDTO {    private String itemType;
     private Long id;
     private String title;
     private Long projectId;
@@ -51,4 +50,8 @@ public class DevelopmentItemWorkflowDetailDTO {
     private Integer completedNodeCount;
     private Integer totalNodeCount;
     private List<DevelopmentItemWorkflowNodeDTO> nodes;
+    /** Pinned workflow instance version, distinct from the template version number. */
+    private Integer workflowVersion;
+    /** Flat task totals per workflow node, including subtasks and surviving children of deleted parents. */
+    private Map<Long, NodeTaskSummaryDTO> nodeTaskSummaries;
 }

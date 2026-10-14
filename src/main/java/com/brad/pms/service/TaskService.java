@@ -16,6 +16,7 @@ import com.brad.pms.dto.request.TaskMoveCmd;
 import com.brad.pms.dto.request.TaskUpdateCmd;
 import com.brad.pms.dto.response.ProjectCommentDTO;
 import com.brad.pms.dto.response.ProjectTaskDTO;
+import com.brad.pms.dto.response.NodeTaskSummaryDTO;
 import com.brad.pms.dto.response.TaskDetailDTO;
 import com.brad.pms.dto.response.TaskScheduleHistoryDTO;
 import com.brad.pms.entity.ProjectCommentDO;
@@ -64,6 +65,25 @@ public class TaskService {
     private final OperationLogService operationLogService;
     private final MemberService memberService;
     private final IterationPlanSystemService iterationPlanSystemService;
+
+    /**
+     * Flat task statistics for one node's AI context read: every non-deleted parent/child row
+     * counts once, DONE tasks are "done", and everything else stays incomplete.
+     */
+    public NodeTaskSummaryDTO summarizeByNode(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        permissionService.requireNode(projectId, nodeId);
+        List<ProjectTaskDO> tasks = taskMapper.selectList(new LambdaQueryWrapper<ProjectTaskDO>()
+                .eq(ProjectTaskDO::getProjectId, projectId)
+                .eq(ProjectTaskDO::getNodeId, nodeId));
+        long total = 0;
+        long done = 0;
+        for (ProjectTaskDO task : tasks) {
+            total++;
+            if (Objects.equals(task.getStatus(), TaskStatus.DONE.getCode())) done++;
+        }
+        return new NodeTaskSummaryDTO(total, done, total - done);
+    }
 
     public List<ProjectTaskDTO> listByProject(Long projectId, Long nodeId) {
         LocalDate today = currentDate();

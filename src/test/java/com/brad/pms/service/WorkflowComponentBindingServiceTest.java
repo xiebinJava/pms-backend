@@ -20,6 +20,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -152,6 +154,49 @@ class WorkflowComponentBindingServiceTest {
         WorkflowTemplateDefinition effective = new WorkflowComponentBindingService(
                 workflowTemplateService, topicMapper).applyStoryBinding(stored, "story-host");
         assertThat(effective.nodes().get(0).runtimeComponents()).containsExactly(WorkflowComponentKey.STORY_LIST);
+    }
+
+    @Test
+    void overlaysTheLegacyProjectOnlyThroughItsActualHistoricalMounts() {
+        ProjectDO project = project(1L);
+        project.setWorkflowTemplateVersionId(null);
+        ProjectNodeDO historical = node(11L, 1L, "old-topic-host");
+        ProjectNodeDO configuredByCurrentDefault = node(10L, 1L, "new-topic-host");
+        ProjectNodeDevelopmentTopicDO actualTopic = topic(20L, 11L, false);
+        WorkflowTemplateDefinition stored = new WorkflowTemplateDefinition(1, List.of(
+                nodeDefinition("new-topic-host", List.of()),
+                nodeDefinition("old-topic-host", List.of())));
+        when(topicMapper.selectList(any())).thenReturn(List.of(actualTopic));
+        WorkflowComponentBindingService service = new WorkflowComponentBindingService(workflowTemplateService, topicMapper);
+
+        WorkflowTemplateDefinition effective = service.applyLegacyTopicBinding(
+                1L, stored, List.of(configuredByCurrentDefault, historical));
+
+        assertThat(components(effective, "old-topic-host")).contains(WorkflowComponentKey.DEVELOPMENT_CONTROL);
+        assertThat(components(effective, "new-topic-host")).doesNotContain(WorkflowComponentKey.DEVELOPMENT_CONTROL);
+        assertThat(components(stored, "old-topic-host")).doesNotContain(WorkflowComponentKey.DEVELOPMENT_CONTROL);
+        verify(workflowTemplateService, never()).resolveTopicSourceProjectNodeKey();
+        verify(workflowTemplateService, never()).resolveTopicSourceProjectNodeKeyForRuntime(any(Long.class));
+    }
+
+    @Test
+    void legacyOverlayStaysReadOnlyWhenTheDefaultMountTemplateChangesLater() {
+        ProjectDO project = project(1L);
+        project.setWorkflowTemplateVersionId(null);
+        ProjectNodeDO historical = node(11L, 1L, "old-topic-host");
+        WorkflowTemplateDefinition stored = new WorkflowTemplateDefinition(1, List.of(
+                nodeDefinition("old-topic-host", List.of())));
+        ProjectNodeDevelopmentTopicDO actualTopic = topic(20L, 11L, false);
+        when(topicMapper.selectList(any())).thenReturn(List.of(actualTopic));
+        WorkflowComponentBindingService service = new WorkflowComponentBindingService(workflowTemplateService, topicMapper);
+
+        WorkflowTemplateDefinition beforeDefaultChanges = service.applyLegacyTopicBinding(1L, stored, List.of(historical));
+        WorkflowTemplateDefinition afterDefaultChanges = service.applyLegacyTopicBinding(1L, stored, List.of(historical));
+
+        assertThat(components(beforeDefaultChanges, "old-topic-host"))
+                .containsExactly(WorkflowComponentKey.DEVELOPMENT_CONTROL);
+        assertThat(components(afterDefaultChanges, "old-topic-host"))
+                .containsExactly(WorkflowComponentKey.DEVELOPMENT_CONTROL);
     }
 
     private WorkflowTemplateDefinition apply(ProjectDO project, WorkflowTemplateDefinition definition,

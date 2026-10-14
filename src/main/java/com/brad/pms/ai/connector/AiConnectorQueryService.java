@@ -287,7 +287,7 @@ public class AiConnectorQueryService {
     private AiResourceDetailDTO developmentItemResource(String resourceType, Long resourceId) {
         DevelopmentItemType itemType = "topic".equals(resourceType)
                 ? DevelopmentItemType.TOPIC : DevelopmentItemType.STORY;
-        DevelopmentItemWorkflowDetailDTO item = workflowService.detail(itemType, resourceId);
+        DevelopmentItemWorkflowDetailDTO item = workflowService.detailIfInitialized(itemType, resourceId);
         Map<String, Object> details = new LinkedHashMap<>();
         put(details, "id", item.getId());
         put(details, "title", item.getTitle());
@@ -316,7 +316,7 @@ public class AiConnectorQueryService {
             case "requirement" -> DevelopmentItemType.REQUIREMENT;
             default -> throw BusinessException.error("不支持的研发事项类型: " + resourceType);
         };
-        DevelopmentItemWorkflowDetailDTO detail = workflowService.detail(itemType, resourceId);
+        DevelopmentItemWorkflowDetailDTO detail = workflowService.detailIfInitialized(itemType, resourceId);
         List<DevelopmentItemWorkflowNodeDTO> sourceNodes = safe(detail.getNodes());
         List<AiWorkflowContextDTO.Node> nodes = new ArrayList<>();
         for (int position = 0; position < sourceNodes.size(); position++) {

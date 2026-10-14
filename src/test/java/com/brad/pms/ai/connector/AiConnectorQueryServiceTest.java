@@ -9,6 +9,7 @@ import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.RequirementListDTO;
 import com.brad.pms.integration.ai.api.AiQueryRequest;
 import com.brad.pms.integration.ai.api.AiQueryResultDTO;
+import com.brad.pms.integration.ai.api.AiResourceDetailDTO;
 import com.brad.pms.service.DevelopmentItemService;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.service.IterationPlanService;
@@ -18,12 +19,14 @@ import com.brad.pms.service.WorkflowTemplateService;
 import com.brad.pms.ai.query.AiTaskQueryService;
 import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
+import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Mockito;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,6 +35,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -133,6 +138,47 @@ class AiConnectorQueryServiceTest {
 
     private WorkflowNodeDefinition projectNode(String key, String name) {
         return new WorkflowNodeDefinition(key, name, null, null, null, List.of(), List.of(), false, List.of());
+    }
+
+    @Test
+    void topicAndStoryResourcesReadThroughThePureEntryWithoutInitializingWorkflows() {
+        com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO topic = new com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO();
+        topic.setId(7L);
+        topic.setTitle("订单流程专题");
+        topic.setProjectId(78L);
+        topic.setWorkflowConfigured(true);
+        when(workflowService.detailIfInitialized(DevelopmentItemType.TOPIC, 7L)).thenReturn(topic);
+
+        AiResourceDetailDTO resource = service().resource("topic", 7L);
+
+        assertThat(resource.resourceType()).isEqualTo("topic");
+        assertThat(resource.resourceId()).isEqualTo(7L);
+        assertThat(resource.details()).containsEntry("title", "订单流程专题");
+        verify(workflowService, never()).detail(any(), any());
+    }
+
+    @Test
+    void storyContextUsesThePureDetailEntryToo() {
+        com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO story = new com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO();
+        story.setId(9L);
+        story.setTitle("故事");
+        story.setWorkflowConfigured(true);
+        com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO node = new com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO();
+        node.setId(21L);
+        node.setNodeKey("design");
+        node.setName("设计");
+        node.setStatus(1);
+        node.setVersion(2);
+        story.setNodes(List.of(node));
+        when(workflowService.detailIfInitialized(DevelopmentItemType.STORY, 9L)).thenReturn(story);
+        when(commandRegistry.list()).thenReturn(java.util.Set.of());
+
+        AiWorkflowContextDTO context = service().context("story", 9L);
+
+        assertThat(context.resourceType()).isEqualTo("story");
+        assertThat(context.currentNode()).isNotNull();
+        assertThat(context.currentNode().id()).isEqualTo(21L);
+        verify(workflowService, never()).detail(any(), any());
     }
 
     private AiConnectorQueryService service() {

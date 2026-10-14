@@ -23,6 +23,7 @@ import com.brad.pms.workflow.WorkflowNodeDefinition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Collection;
 import java.util.HashMap;
@@ -173,6 +174,48 @@ public class ProjectPermissionService {
                 .filter(node -> node.runtimeComponents().contains(componentKey))
                 .map(WorkflowNodeDefinition::key).collect(java.util.stream.Collectors.toSet());
         return nodes.stream().filter(node -> nodeKeys.contains(node.getNodeKey())).findFirst().orElse(null);
+    }
+
+    /** Context-only component check: strictly pinned definition, actual historical mounts, no default resolution. */
+    public void requireNodeComponentForContext(ProjectNodeDO node, String componentKey, String message) {
+        if (node == null) throw BusinessException.error(message);
+        ProjectDO project = requireProjectReadable(node.getProjectId());
+        WorkflowNodeDefinition definition = contextNodeDefinition(project, node.getNodeKey(), List.of(node));
+        if (definition == null || !definition.runtimeComponents().contains(componentKey)) {
+            throw BusinessException.error(message);
+        }
+    }
+
+    /** Context-only upstream lookup with the same strictly-pinned/actual-historical mount rules. */
+    public ProjectNodeDO findNodeWithComponentForContext(Long projectId, String componentKey) {
+        ProjectDO project = requireProjectReadable(projectId);
+        java.util.List<ProjectNodeDO> nodes = nodeMapper.selectList(new LambdaQueryWrapper<ProjectNodeDO>()
+                .eq(ProjectNodeDO::getProjectId, projectId));
+        com.brad.pms.workflow.WorkflowTemplateDefinition definition = strictDefinition(project, nodes);
+        if (definition == null) return null;
+        Set<String> nodeKeys = definition.nodes().stream()
+                .filter(node -> node.runtimeComponents().contains(componentKey))
+                .map(WorkflowNodeDefinition::key).collect(java.util.stream.Collectors.toSet());
+        return nodes.stream().filter(node -> nodeKeys.contains(node.getNodeKey())).findFirst().orElse(null);
+    }
+
+    private com.brad.pms.workflow.WorkflowTemplateDefinition strictDefinition(ProjectDO project,
+            java.util.List<ProjectNodeDO> nodes) {
+        com.brad.pms.workflow.WorkflowTemplateDefinition definition =
+                workflowTemplateService.getDefinitionForContext(project.getWorkflowTemplateVersionId());
+        if (workflowComponentBindingService == null) return definition;
+        if (project.getWorkflowTemplateVersionId() == null) {
+            return workflowComponentBindingService.applyLegacyTopicBinding(project.getId(), definition, nodes);
+        }
+        return workflowComponentBindingService.applyTopicBinding(project, definition, nodes);
+    }
+
+    private WorkflowNodeDefinition contextNodeDefinition(ProjectDO project, String nodeKey,
+            java.util.List<ProjectNodeDO> nodes) {
+        com.brad.pms.workflow.WorkflowTemplateDefinition definition = strictDefinition(project, nodes);
+        if (definition == null) return null;
+        return definition.nodes().stream()
+                .filter(candidate -> Objects.equals(candidate.key(), nodeKey)).findFirst().orElse(null);
     }
 
     /** Requires an open project and an unlocked node for a designated reviewer action. */

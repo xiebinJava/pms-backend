@@ -662,6 +662,26 @@ public class WorkflowTemplateService {
         return normalizeDefinition(version, parse(version.getDefinitionJson()));
     }
 
+    /**
+     * Strictly-pinned template read for context: a null version keeps the built-in compatibility
+     * definition, while missing or broken pinned versions are binding conflicts (409) — never a
+     * fallback to the current default template.
+     */
+    public WorkflowTemplateDefinition getDefinitionForContext(Long versionId) {
+        if (versionId == null) return BuiltInWorkflowTemplate.compatibilityDefinition();
+        WorkflowTemplateVersionDO version = versionMapper.selectById(versionId);
+        if (version == null) throw BusinessException.conflict("流程模板绑定不存在或已损坏");
+        try {
+            return normalizeDefinition(version,
+                    WorkflowTemplateDefinitionValidator.validate(
+                            objectMapper.readValue(version.getDefinitionJson(), WorkflowTemplateDefinition.class)));
+        } catch (JsonProcessingException | IllegalArgumentException exception) {
+            throw BusinessException.conflict("流程模板绑定已损坏");
+        } catch (DataIntegrityViolationException exception) {
+            throw exception;
+        }
+    }
+
     /** Returns the persisted version number for a pinned workflow binding. */
     public Integer getVersionNo(Long versionId) {
         if (versionId == null) return null;

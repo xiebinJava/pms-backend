@@ -13,6 +13,7 @@ import com.brad.pms.dto.request.DevelopmentItemTaskSaveCmd;
 import com.brad.pms.dto.response.DevelopmentItemTaskDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
+import com.brad.pms.dto.response.NodeTaskSummaryDTO;
 import com.brad.pms.dto.response.RequirementExecutionTargetDTO;
 import com.brad.pms.dto.response.SourceRequirementSummaryDTO;
 import com.brad.pms.entity.DevelopmentItemTaskDO;
@@ -286,6 +287,24 @@ public class DevelopmentItemWorkflowService {
                 itemType, itemId, context.project() == null ? null : context.project().getId(),
                 context.sourceNode() == null ? null : context.sourceNode().getId());
         return toDetail(context, workflow);
+    }
+
+    /**
+     * Pure-read item detail for AI context: never creates a workflow, never resolves the
+     * current default template, and rejects mismatched or broken pinned bindings.
+     */
+    public DevelopmentItemWorkflowDetailDTO detailIfInitialized(DevelopmentItemType itemType, Long itemId) {
+        ItemContext context = loadContext(itemType, itemId);
+        DevelopmentItemWorkflowDO workflow = workflowMapper.selectByItem(itemType.name(), itemId);
+        if (workflow != null
+                && (!Objects.equals(workflow.getProjectId(), context.project() == null ? null : context.project().getId())
+                        || !Objects.equals(workflow.getSourceNodeId(),
+                                context.sourceNode() == null ? null : context.sourceNode().getId()))) {
+            throw BusinessException.notFound("研发事项流程不存在");
+        }
+        if (workflow == null) return toDetail(context, null, null);
+        return toDetail(context, workflow,
+                workflowTemplateService.getDefinitionForContext(workflow.getTemplateVersionId()));
     }
 
     @Transactional
@@ -728,6 +747,11 @@ public class DevelopmentItemWorkflowService {
     }
 
     private DevelopmentItemWorkflowDetailDTO toDetail(ItemContext context, DevelopmentItemWorkflowDO workflow) {
+        return toDetail(context, workflow, null);
+    }
+
+    private DevelopmentItemWorkflowDetailDTO toDetail(ItemContext context, DevelopmentItemWorkflowDO workflow,
+                                                      WorkflowTemplateDefinition strictDefinition) {
         DevelopmentItemWorkflowDetailDTO dto = new DevelopmentItemWorkflowDetailDTO();
         dto.setItemType(context.itemType().name().toLowerCase());
         dto.setId(context.itemId());
@@ -781,12 +805,15 @@ public class DevelopmentItemWorkflowService {
             dto.setCompletedNodeCount(0);
             dto.setTotalNodeCount(0);
             dto.setNodes(List.of());
+            dto.setWorkflowVersion(null);
+            dto.setNodeTaskSummaries(Map.of());
             return dto;
         }
         dto.setWorkflowConfigured(true);
         dto.setWorkflowId(workflow.getId());
         dto.setTemplateVersionId(workflow.getTemplateVersionId());
         dto.setTerminalStatus(workflow.getTerminalStatus());
+        dto.setWorkflowVersion(workflow.getVersion());
         WorkflowTemplateVersionDO templateVersion = templateVersionMapper.selectById(workflow.getTemplateVersionId());
         dto.setTemplateVersionNo(templateVersion == null ? null : templateVersion.getVersionNo());
 
@@ -812,7 +839,17 @@ public class DevelopmentItemWorkflowService {
         dto.setWorkbenchPeople(workbenchPeople);
         Map<Long, List<DevelopmentItemTaskDO>> tasksByNode = tasks.stream()
                 .collect(Collectors.groupingBy(DevelopmentItemTaskDO::getNodeId));
-        WorkflowTemplateDefinition effectiveDefinition = workflowTemplateService.getDefinition(workflow.getTemplateVersionId());
+        WorkflowTemplateDefinition effectiveDefinition = strictDefinition != null
+                ? strictDefinition : workflowTemplateService.getDefinition(workflow.getTemplateVersionId());
+        if (strictDefinition != null) {
+            java.util.Set<String> definitionKeys = effectiveDefinition.nodes().stream()
+                    .map(WorkflowNodeDefinition::key).collect(Collectors.toSet());
+            for (DevelopmentItemWorkflowNodeDO node : nodes) {
+                if (!StringUtils.hasText(node.getNodeKey()) || !definitionKeys.contains(node.getNodeKey())) {
+                    throw BusinessException.conflict("研发事项流程绑定已损坏，无法读取流程上下文");
+                }
+            }
+        }
         if (context.itemType() == DevelopmentItemType.TOPIC) {
             effectiveDefinition = workflowComponentBindingService.applyStoryBinding(
                     effectiveDefinition, workflow.getStoryMountNodeKey());
@@ -830,8 +867,27 @@ public class DevelopmentItemWorkflowService {
         dto.setWorkflowStatus("REJECTED".equals(workflow.getTerminalStatus()) ? "REJECTED"
                 : total > 0 && completed == total ? "COMPLETED"
                 : nodes.stream().anyMatch(node -> Objects.equals(node.getStatus(), NODE_ACTIVE)) ? "IN_PROGRESS" : "NOT_STARTED");
+        dto.setNodeTaskSummaries(nodeTaskSummaries(tasks));
         dto.setNodes(nodeDTOs);
         return dto;
+    }
+
+    /** Flat totals per node: every non-deleted parent/child row counts once, DONE=2 marks done. */
+    private Map<Long, NodeTaskSummaryDTO> nodeTaskSummaries(List<DevelopmentItemTaskDO> tasks) {
+        Map<Long, NodeTaskSummaryDTO> summaries = new LinkedHashMap<>();
+        Map<Long, long[]> counters = new LinkedHashMap<>();
+        for (DevelopmentItemTaskDO task : tasks) {
+            if (task == null || task.getNodeId() == null || Boolean.TRUE.equals(task.getDeleted())) continue;
+            long[] counter = counters.computeIfAbsent(task.getNodeId(), key -> new long[3]);
+            counter[0]++;
+            if (Objects.equals(task.getStatus(), TASK_DONE)) counter[1]++;
+            else counter[2]++;
+        }
+        for (Map.Entry<Long, long[]> entry : counters.entrySet()) {
+            summaries.put(entry.getKey(), new NodeTaskSummaryDTO(entry.getValue()[0],
+                    entry.getValue()[1], entry.getValue()[2]));
+        }
+        return summaries;
     }
 
     private DevelopmentItemWorkflowNodeDTO toNodeDTO(

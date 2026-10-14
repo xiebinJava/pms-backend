@@ -124,6 +124,36 @@ public class RequirementManagementService {
         return toDTO(requirement, workflowSummary(requirement.getId()));
     }
 
+    /**
+     * Pure context read: the real object plus a summary derived only from the actual pinned
+     * instance. A missing, broken, or unrelated current default template never blocks the read.
+     */
+    public RequirementListDTO detailForContext(Long id) {
+        RequirementDO requirement = requirementMapper.selectById(id);
+        if (requirement == null || Boolean.TRUE.equals(requirement.getDeleted())) throw BusinessException.notFound("需求不存在");
+        return toDTO(requirement, actualWorkflowSummary(requirement.getId()));
+    }
+
+    /** Instance-only flow summary: never consults the current default template. */
+    private FlowSummary actualWorkflowSummary(Long requirementId) {
+        if (requirementId == null) return new FlowSummary(false, "NOT_CONFIGURED", 0);
+        DevelopmentItemWorkflowDO workflow = workflowMapper.selectByItem(
+                DevelopmentItemType.REQUIREMENT.name(), requirementId);
+        if (workflow == null) return new FlowSummary(false, "NOT_CONFIGURED", 0);
+        List<DevelopmentItemWorkflowNodeDO> nodes = workflowNodeMapper.selectList(
+                new LambdaQueryWrapper<DevelopmentItemWorkflowNodeDO>()
+                        .eq(DevelopmentItemWorkflowNodeDO::getWorkflowId, workflow.getId()));
+        int total = nodes == null ? 0 : nodes.size();
+        int completed = nodes == null ? 0 : (int) nodes.stream()
+                .filter(node -> Objects.equals(node.getStatus(), 2)).count();
+        String status = "REJECTED".equals(workflow.getTerminalStatus()) ? "REJECTED"
+                : total > 0 && completed == total ? "COMPLETED"
+                : nodes != null && nodes.stream().anyMatch(node -> Objects.equals(node.getStatus(), 1))
+                        ? "IN_PROGRESS" : "NOT_STARTED";
+        int progress = total == 0 ? 0 : (int) Math.round(completed * 100.0 / total);
+        return new FlowSummary(true, status, progress);
+    }
+
     public PageResult<RequirementListDTO> page(RequirementPageQry qry) {
         RequirementPageQry query = qry == null ? new RequirementPageQry() : qry;
         boolean includeDeleted = Boolean.TRUE.equals(query.getDeleted());
