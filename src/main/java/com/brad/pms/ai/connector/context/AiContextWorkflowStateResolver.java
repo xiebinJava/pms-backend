@@ -12,6 +12,7 @@ import java.util.Set;
  * Pure workflow status resolution per the design status table: entity facts never overwrite
  * inconsistent node facts, warnings declare problems instead of repairing them.
  */
+@org.springframework.stereotype.Component
 public final class AiContextWorkflowStateResolver {
 
     private static final String WARNING_INCONSISTENT = "INCONSISTENT_WORKFLOW_STATE";

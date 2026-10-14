@@ -13,6 +13,7 @@ import java.util.Set;
  * explicitly-or-default selected node without any persistence access. Explicit node ids that
  * do not belong to the node list are rejected as 404.
  */
+@org.springframework.stereotype.Component
 public final class AiContextNodeSelector {
 
     private static final String WARNING_NO_ACTIVE_NODE = "NO_ACTIVE_NODE";
