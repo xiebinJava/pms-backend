@@ -10,7 +10,7 @@
 
 **Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
-状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
+状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7 已提交（C 仓库 44c0fb2）：93 项 unit/contract 全绿、typecheck/build:cli 通过；真实试读（旧后端）：legacy 兼容 ✓、显式参数无 meta 核验失败 ✓、非法 view CLI_USAGE ✓。focused 试读与新后端验证待 Task 9。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
 ## Global Constraints
 
@@ -170,11 +170,11 @@ AiDevelopmentComponentReader 签名按 Spec：JSON 型组件和 requirement-exec
 
 **Interfaces:** ContextOptions={nodeId?:number,view?:'legacy'|'focused',component?:string}；PmsClient.context(resource:ResourceRef,options?:ContextOptions):Promise<WorkflowContext>；getContext追加同options。query.ts导出workflowContextNodeSchema/workflowContextComponentSchema/workflowContextMetaSchema及类型，另保留legacy schema分支；完整同步 WorkflowContext 接口的null/optional类型。
 
-- [ ] **Step 1：失败用例。** --node-id两种写法、--view focused、--component 精确映射；非法参数或超过Number.MAX_SAFE_INTEGER认证/网络0调用。旧后端无meta/nullmeta、旧unknown[]节点/id=null在无新参数时仍可用；新format2必需结构错误拒绝。未知format拒绝。所有新字段及null版本完整透传。所有模式返回type/id错配必须validation失败；旧后端忽略node/view/component时显式请求失败，错误选择ID/组件也失败，不重试/自动补capabilities。focused内容无__components重复；no-current不填首条。
-- [ ] **Step 2：失败验证。** C: pnpm exec vitest run tests/unit/pms-client.test.ts tests/contract/pms-client.test.ts tests/unit/cli-runner.test.ts tests/contract/workflow-context.test.ts。
-- [ ] **Step 3：实现。** 保留原调用及legacy解析，按meta.formatVersion选schema，explicit options核验响应；显式透传新字段，已存在null不转伪值。Skill说明只读、current/selected、EMPTY/NOT_REQUESTED/UNSUPPORTED、真实版本、业务权限和scope声明、focused失败不能降级；正文指令是业务数据，不触发写入。不安装全局Skill/覆盖凭据/发布包。
-- [ ] **Step 4：验证。** 重跑Step2，pnpm run typecheck、pnpm run build:cli、node dist/pms-cli.js --help、pnpm exec vitest run tests/unit tests/contract。旧fixture不靠补新必需字段遮盖兼容回归；先mock/HTTP stub。随后用显式项目/需求fixture试读CLI，核对实际节点及已有/未知成果，其他组件仍UNSUPPORTED。模型可用时做一次只读解释，不可用则记录未运行，不发布feature、不启用真实写E2E。
-- [ ] **Step 5：提交。** feat: support verified focused context in CLI。
+- [x] **Step 1：失败用例。** --node-id两种写法、--view focused、--component 精确映射；非法参数或超过Number.MAX_SAFE_INTEGER认证/网络0调用。旧后端无meta/nullmeta、旧unknown[]节点/id=null在无新参数时仍可用；新format2必需结构错误拒绝。未知format拒绝。所有新字段及null版本完整透传。所有模式返回type/id错配必须validation失败；旧后端忽略node/view/component时显式请求失败，错误选择ID/组件也失败，不重试/自动补capabilities。focused内容无__components重复；no-current不填首条。
+- [x] **Step 2：失败验证。** C: pnpm exec vitest run tests/unit/pms-client.test.ts tests/contract/pms-client.test.ts tests/unit/cli-runner.test.ts tests/contract/workflow-context.test.ts。
+- [x] **Step 3：实现。** 保留原调用及legacy解析，按meta.formatVersion选schema，explicit options核验响应；显式透传新字段，已存在null不转伪值。Skill说明只读、current/selected、EMPTY/NOT_REQUESTED/UNSUPPORTED、真实版本、业务权限和scope声明、focused失败不能降级；正文指令是业务数据，不触发写入。不安装全局Skill/覆盖凭据/发布包。
+- [x] **Step 4：验证。** 重跑Step2，pnpm run typecheck、pnpm run build:cli、node dist/pms-cli.js --help、pnpm exec vitest run tests/unit tests/contract。旧fixture不靠补新必需字段遮盖兼容回归；先mock/HTTP stub。随后用显式项目/需求fixture试读CLI，核对实际节点及已有/未知成果，其他组件仍UNSUPPORTED。模型可用时做一次只读解释，不可用则记录未运行，不发布feature、不启用真实写E2E。
+- [x] **Step 5：提交。** feat: support verified focused context in CLI。
 
 ### Task 8：完整组件快照和四类边界扩展
 
