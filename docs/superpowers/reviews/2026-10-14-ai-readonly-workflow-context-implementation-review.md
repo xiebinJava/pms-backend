@@ -114,3 +114,37 @@
 
 - 其余 7 个领域服务的 getReadSnapshot 属 Task 8；AiProjectComponentReader 当前对未知组件返回 UNSUPPORTED（占位由 Task 8 替换）。
 - referenced 内容的权限投影在 Task 4/5 接入。
+
+## Task 4 评审：主对象 READ 与全响应引用投影
+
+提交：f7764a3 feat: filter references across AI read responses（2026-10-14）。
+
+### 测试证据
+
+- AiContextReadPolicyTest(12) + AiContextReferenceProjectorTest(8) 全绿；
+  回归 RequirementExecutionTargetReadServiceTest(6)、DevelopmentItemPermissionServiceTest(2) 通过。
+- 红灯阶段两测试类缺失符号编译失败（预期）；实现期间修复 idValue 对 JsonNode TextNode 的解析（toString 带引号导致引用未被识别）。
+
+### 对照 Spec 核对
+
+| 要求 | 结果 |
+| --- | --- |
+| requireRead：身份（无 UserContext 拒绝）+ requirement→REQUIREMENT_READ、其余→PROJECT_READ；write 不继承 read | 通过：未认证 403、requirement 且仅有 project:read 403、write 场景即无 read 权限 403 |
+| canReadReference：模块 READ 先查，type ∈ {project,requirement,topic,story,iteration_plan}；未知类型不猜 | 通过：模块拒绝时连存在性查询都不做（verify mapper 零调用） |
+| DB 异常传播，仅 403/404 事实可省略 | 通过：mapper 抛 IllegalStateException 原样传播 |
+| executionTarget 不可读 → 整项省略（无 targetId/navigationId/title 残留）；可读不变 | 通过 |
+| sourceRequirements 逐项过滤、旧 sourceRequirement 不可读省略、过滤后无计数泄漏 | 通过 |
+| legacy __components 未知组件不得旁路（整项移除）；已知组件内 topicId/baseTopicId/projectId(/targetId) 不可读移除 | 通过 |
+| 普通正文（人名/工单数字）不改写；bound 标量（owner id）保留 | 通过 |
+| project 范围明细 (scopeItems/requirements=NodeRequirementDTO) 不误套需求模块权限 | 通过：projectResourceDetails 对 project 类型不把这些键当 RequirementsRefs |
+| 输入不修改、调用局部无跨请求缓存 | 通过：projected 为新 map/树；same-input 两次调用=mapper 两次（无单例缓存） |
+
+### 偏差与处理
+
+1. topic/story/iteration_plan 引用归属通过其 projectId 的 canReadProject（选择器语义：父项目可读才可见）复核。
+2. projector 中 KNOWN_COMPONENTS 清单先用 8 项项目工作台键之外的 6 项研发键；8 个项目组件（如 solution-design）的键在 Task 8 扩展。
+3. relations 的装配与裁剪由 Task 5 reader 调 canReadReference 完成，projector 不重复承担。
+
+### 遗留观察
+
+- R01 的实际接线（get/details 路径替换）在 Task 5 完成后才会改变外部行为。
