@@ -80,3 +80,37 @@
 
 - warning 的 reader 侧过滤（正常终态去掉 NO_ACTIVE_NODE）在 Task 5 的 AiWorkflowContextReadService 中落地。
 - 状态表输入的项目整数 status→ACTIVE/COMPLETED/TERMINATED 映射将在 Task 5 reader 调用 resolver 前完成（本 task 已用字符串枚举直接测试）。
+
+## Task 3 评审：持久化快照基础与第一批项目组件
+
+提交：90d2dc1 feat: expose persisted workbench read snapshots（2026-10-14）。
+
+### 测试证据
+
+- AiProjectComponentReaderTest(7) + NodeRequirementScopeServiceTest(11，含 3 个新快照用例) 全绿；
+  红灯阶段证明：getReadSnapshot 未实现时编译失败（预期红灯）。
+
+### 对照 Spec 核对
+
+| 要求 | 结果 |
+| --- | --- |
+| PersistedContentVersion/WorkbenchReadSnapshot 精确形状 | 通过：record (persisted, version)/(display, hasPersistedContent, parts)，无 ensure/save 行为 |
+| 未保存 EMPTY/content=null/versions.content=null；version=0 → LOADED/0 | 通过：baselineVersion 0 保持真实值，测试断言 PersistedContentVersion(true,0) |
+| 子内容存在但无根记录 → LOADED（R04 前移） | 通过：requirementMapper 有行且 baseline=null → hasPersistedContent=true、content 版本 absent(false,null) |
+| requireNodeComponentForContext（Task 1 严格规则） | 通过：snapshot 校验走 ForContext；verify 从未调用旧 requireNodeComponent |
+| 服务 DB 错误不得转为 EMPTY | 通过：reader 抛 BusinessException("数据库异常") 原样传播 |
+| 20,000 字符/多行中文/emoji 原样保留 | 通过：requirement 描述 1200 段重复中文 + ✅🚀 完整出现在 content 字符串中 |
+| project-basic-info 白名单 + entityVersion | 通过：content 仅白名单键（无 createdByAvatar/workflowTemplateVersionId），versions.content=项目真实 version |
+| componentKey 精确；null 全组件；非附着组件 404 | 通过；未支持组件 UNSUPPORTED + config 可读 |
+| 领域快照不直接读 mapper（复用既有纯查询） | 通过：getReadSnapshot 复用 findBaseline/toDTO，无新 mapper 依赖 |
+
+###偏差与处理
+
+1. content 中剥离了 canEdit 与需求行的 taskCount/completedTaskCount（展示聚合/UI 标志），正文事实原样保留。
+2. 生产 ObjectMapper 由 Boot 自动注册 JavaTimeModule；测试 mapper 手动注册以对齐序列化行为。
+3. versions 值允许 null（内容已保存但版本未知），使用 HashMap 构造，避免 Map.of 拒绝 null。
+
+### 遗留观察
+
+- 其余 7 个领域服务的 getReadSnapshot 属 Task 8；AiProjectComponentReader 当前对未知组件返回 UNSUPPORTED（占位由 Task 8 替换）。
+- referenced 内容的权限投影在 Task 4/5 接入。
