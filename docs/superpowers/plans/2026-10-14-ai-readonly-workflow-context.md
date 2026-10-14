@@ -10,7 +10,7 @@
 
 **Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
-状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
+状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
 ## Global Constraints
 
@@ -112,11 +112,11 @@ Node.fieldValuesState 的枚举为 LOADED/NOT_REQUESTED/UNAVAILABLE；ContextMet
 
 **Interfaces:** requireRead/canReadReference 与三种 projector 方法完全按 Spec 第 7 节。输入为已读取的白名单/字段/组件 JSON，不修改领域 DTO。关联授权使用已有权限及纯读 mapper/服务，不调用会初始化的 detail；iteration_plan 用既有归属策略。
 
-- [ ] **Step 1：失败用例。** requirement:write 无 read 拒绝；需求可读/执行目标不可读时同时检查 relations、resourceDetails、get.details 的 targetId/navigationId/title 被省略；项目可读/来源需求不可读时省略 sourceRequirements 及旧单个 sourceRequirement。绑定字段和组件已知引用同样过滤；legacy __components 未知组件 raw content 不得旁路。普通用户正文包含名字/数字保持不变；项目 NodeRequirementDTO 不误判成独立需求。缓存不得跨用户；关联仅403/404省略，DB错误传播；过滤后不能保留过滤前统计。
-- [ ] **Step 2：失败验证。** B: mvn -Dtest=AiContextReadPolicyTest,AiContextReferenceProjectorTest test。
-- [ ] **Step 3：实现。** 每个结构化引用按已知 schema/type 投影，关联先检查模块 READ，再查存在/归属；重复权限结果用调用局部 map，不作为单例字段。schema 未知组件不输出内容；不对普通正文做字符串清洗。不改变普通页面的历史 UNAVAILABLE 语义，只处理 AI 输出。不改变普通页面的历史 UNAVAILABLE 语义，只处理 AI 输出。
-- [ ] **Step 4：验证。** 重跑 Step 2 和 RequirementExecutionTargetReadServiceTest、DevelopmentItemPermissionServiceTest。核对当前 get/context 所有系统生成引用路径纳入，不把来源字段漏在旧别名中。
-- [ ] **Step 5：提交。** feat: filter references across AI read responses。
+- [x] **Step 1：失败用例。** requirement:write 无 read 拒绝；需求可读/执行目标不可读时同时检查 relations、resourceDetails、get.details 的 targetId/navigationId/title 被省略；项目可读/来源需求不可读时省略 sourceRequirements 及旧单个 sourceRequirement。绑定字段和组件已知引用同样过滤；legacy __components 未知组件 raw content 不得旁路。普通用户正文包含名字/数字保持不变；项目 NodeRequirementDTO 不误判成独立需求。缓存不得跨用户；关联仅403/404省略，DB错误传播；过滤后不能保留过滤前统计。
+- [x] **Step 2：失败验证。** B: mvn -Dtest=AiContextReadPolicyTest,AiContextReferenceProjectorTest test。
+- [x] **Step 3：实现。** 每个结构化引用按已知 schema/type 投影，关联先检查模块 READ，再查存在/归属；重复权限结果用调用局部 map，不作为单例字段。schema 未知组件不输出内容；不对普通正文做字符串清洗。不改变普通页面的历史 UNAVAILABLE 语义，只处理 AI 输出。不改变普通页面的历史 UNAVAILABLE 语义，只处理 AI 输出。
+- [x] **Step 4：验证。** 重跑 Step 2 和 RequirementExecutionTargetReadServiceTest、DevelopmentItemPermissionServiceTest。核对当前 get/context 所有系统生成引用路径纳入，不把来源字段漏在旧别名中。
+- [x] **Step 5：提交。** feat: filter references across AI read responses。
 
 ### Task 5：项目/需求纵向切片、HTTP 门面、聚焦投影与预算
 
