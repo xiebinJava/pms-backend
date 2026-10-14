@@ -10,7 +10,7 @@
 
 **Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
-状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7 已提交（C 仓库 44c0fb2）：93 项 unit/contract 全绿、typecheck/build:cli 通过；真实试读（旧后端）：legacy 兼容 ✓、显式参数无 meta 核验失败 ✓、非法 view CLI_USAGE ✓。focused 试读与新后端验证待 Task 9。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
+状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7 已提交（C 仓库 44c0fb2）：93 项 unit/contract 全绿、typecheck/build:cli 通过；真实试读（旧后端）：legacy 兼容 ✓、显式参数无 meta 核验失败 ✓、非法 view CLI_USAGE ✓。focused 试读与新后端验证待 Task 9。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。Task 7（C 44c0fb2）与 Task 8 已提交：9 项组件、研发 JSON/执行绑定/故事列表分流就绪；安全测试 227 项全绿；隔离集成重跑 3 项全绿。Task 9 未执行。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
 ## Global Constraints
 
@@ -190,11 +190,11 @@ AiDevelopmentComponentReader 签名按 Spec：JSON 型组件和 requirement-exec
 
 研发 story-list/story-split 消费现有 DevelopmentStoryManagementService.listByTopic(Long):List<DevelopmentTopicStoryDTO>，按实际 topicWorkflowNodeId 精确筛选。node.version只代表JSON测试成果，故事列表无实体版本，versions.stories=null，不能覆盖成node.version。
 
-- [ ] **Step 1：失败用例。** 参数化9项组件与 requirement/topic/story 三类。方案包/决策/3类评审分别不存在→null、真实0→0、存在未知版本→UNKNOWN_VERSION；即使reviewerId/status相同也靠记录存在性区分。混合保存只返回真实parts。研发管控无baseline有topic/story应LOADED、versions.content=null；上游summary/可选迭代列表不算保存。旧project默认变更、专题storyMountNodeKey、历史节点、多active/终态矩阵、权限及全部平面任务统计正确。
-- [ ] **Step 2：失败验证。** B: mvn -Dtest=AiProjectComponentReaderTest,AiDevelopmentContextReaderTest,AiDevelopmentComponentReaderTest,AiContextReferenceProjectorTest,DevelopmentStoryManagementServiceTest,NodeSolutionDesignServiceTest,NodePlanResourceRiskServiceTest,NodeDevelopmentControlServiceTest,NodeAcceptanceServiceTest,NodeReleaseServiceTest,NodeValueReviewServiceTest,NodeKnowledgeStandardServiceTest test。新增 storyListExistsWithoutJson、storyListUsesSelectedMountNode、storyListVersionIsNotParentVersion、savedTestingWithoutStoriesIsLoaded、emptyStoryListIsEmpty、storyListReadNeverInitializesChildWorkflow，且可见行统计不包含过滤前数量。
-- [ ] **Step 3：实现扩展。** 在领域服务查询同批记录生成display/parts/hasPersistedContent，旧get保持；清除AI content的未保存默认包/决策/评审，保留合法0版本。快照自身/递归上游使用 Task1 的 requireNodeComponentForContext/findNodeWithComponentForContext 和 getReadSnapshot.parts；不得从默认DTO推断上游已保存，不计算依赖最新默认模板的UI按钮/候选项。为复用转换增加内部context读取分支，原get/写服务默认分支不变。引用投影扩到新增组件，filtered统计按可见内容重算；测试断言上游不存在/null版本和默认挂载变更不会使校验漂移。
-- [ ] **Step 4：验证。** 重跑Step2和Task6隔离命令，四类context/resource × legacy/focused × 默认/历史/单组件 × 合法/异常fixture全矩阵；必须全部9组件及研发复合组件纳入无写证据。失败修复后再进入最终验收；feature仍false。
-- [ ] **Step 5：提交。** feat: complete persisted workflow context adapters。
+- [x] **Step 1：失败用例。** 参数化9项组件与 requirement/topic/story 三类。方案包/决策/3类评审分别不存在→null、真实0→0、存在未知版本→UNKNOWN_VERSION；即使reviewerId/status相同也靠记录存在性区分。混合保存只返回真实parts。研发管控无baseline有topic/story应LOADED、versions.content=null；上游summary/可选迭代列表不算保存。旧project默认变更、专题storyMountNodeKey、历史节点、多active/终态矩阵、权限及全部平面任务统计正确。
+- [x] **Step 2：失败验证。** B: mvn -Dtest=AiProjectComponentReaderTest,AiDevelopmentContextReaderTest,AiDevelopmentComponentReaderTest,AiContextReferenceProjectorTest,DevelopmentStoryManagementServiceTest,NodeSolutionDesignServiceTest,NodePlanResourceRiskServiceTest,NodeDevelopmentControlServiceTest,NodeAcceptanceServiceTest,NodeReleaseServiceTest,NodeValueReviewServiceTest,NodeKnowledgeStandardServiceTest test。新增 storyListExistsWithoutJson、storyListUsesSelectedMountNode、storyListVersionIsNotParentVersion、savedTestingWithoutStoriesIsLoaded、emptyStoryListIsEmpty、storyListReadNeverInitializesChildWorkflow，且可见行统计不包含过滤前数量。
+- [x] **Step 3：实现扩展。** 在领域服务查询同批记录生成display/parts/hasPersistedContent，旧get保持；清除AI content的未保存默认包/决策/评审，保留合法0版本。快照自身/递归上游使用 Task1 的 requireNodeComponentForContext/findNodeWithComponentForContext 和 getReadSnapshot.parts；不得从默认DTO推断上游已保存，不计算依赖最新默认模板的UI按钮/候选项。为复用转换增加内部context读取分支，原get/写服务默认分支不变。引用投影扩到新增组件，filtered统计按可见内容重算；测试断言上游不存在/null版本和默认挂载变更不会使校验漂移。
+- [x] **Step 4：验证。** 重跑Step2和Task6隔离命令，四类context/resource × legacy/focused × 默认/历史/单组件 × 合法/异常fixture全矩阵；必须全部9组件及研发复合组件纳入无写证据。失败修复后再进入最终验收；feature仍false。
+- [x] **Step 5：提交。** feat: complete persisted workflow context adapters。
 
 ### Task 9：真实只读、模型验收与最终发布门槛
 
