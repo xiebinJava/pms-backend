@@ -10,7 +10,7 @@
 
 **Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
-状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
+状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
 ## Global Constraints
 
@@ -152,11 +152,11 @@ AiDevelopmentComponentReader 签名按 Spec：JSON 型组件和 requirement-exec
 
 **Interfaces:** tracker.start()/stop() 返回目标线程 Write/Lock 记录；MyBatis 捕获 update/query，DataSource wrapper 捕获 JDBC prepareStatement/createStatement/execute/executeBatch，不能只靠 Executor.update。fixture helper 只接受当前测试容器数据源；禁止任意用户连接 URL。禁止日志输出凭据。
 
-- [ ] **Step 1：建立测试隔离。** 类级 @EnabledIfEnvironmentVariable(named="PMS_CONTEXT_READ_ISOLATED",matches="true")；关闭时不初始化 Spring。自己的 MySQL 8.4 Testcontainer，@ActiveProfiles("test")，@DynamicPropertySource 覆盖 datasource url/user/password/driver-class-name=com.mysql.cj.jdbc.Driver；核对 Flyway、SQL init未单独指向其他库；启动迁移结束后创建fixture。通知/定时任务替身只在测试生效。
-- [ ] **Step 2：建立 fixture 和断言。** 正常 fixture 经业务服务；异常无 owner/active 项目、默认存在无实例事项、多个 active、断裂引用等在容器内 helper 建立，跟踪前提交。运行经代理 context/四类 resource 已支持路径，证明无写/锁、无通知/成员/审计/preview/execute，并比较业务表状态。先证明项目基础信息/需求范围及需求JSON，扩展矩阵在 Task8。用测试探针的 JDBC写/batch/锁读验证 tracker能捕获；探针不放入业务纯读调用。
-- [ ] **Step 3：验证 RR。** 不给整个测试套外层 @Transactional；先提交fixture。读事务实际SELECT后屏障，再由另线程独立写事务提交；两个相关业务值前者均旧、后续新请求均新；各线程设置并清理 UserContext，超时失败，不能 deadlock 卡住。核对 Spring代理、实际事务只读/isolation及连接URL；排除只由 MyBatis cache造成“旧值”的假证明。
-- [ ] **Step 4：运行。** B: PMS_CONTEXT_READ_ISOLATED=true mvn -Dtest=AiWorkflowContextReadOnlyIntegrationTest test。必须用例实际执行、无skip、退出0，且容器归属及报告明确；Docker/环境失败单列，feature继续false。关闭flag再验证 class skipped且无容器/连接。
-- [ ] **Step 5：记录并提交。** test: prove readonly context slice in isolated MySQL；证据只含版本/状态/SQL分类，无敏感正文和Token。首次证明后才扩展，不启用feature。
+- [x] **Step 1：建立测试隔离。** 类级 @EnabledIfEnvironmentVariable(named="PMS_CONTEXT_READ_ISOLATED",matches="true")；关闭时不初始化 Spring。自己的 MySQL 8.4 Testcontainer，@ActiveProfiles("test")，@DynamicPropertySource 覆盖 datasource url/user/password/driver-class-name=com.mysql.cj.jdbc.Driver；核对 Flyway、SQL init未单独指向其他库；启动迁移结束后创建fixture。通知/定时任务替身只在测试生效。
+- [x] **Step 2：建立 fixture 和断言。** 正常 fixture 经业务服务；异常无 owner/active 项目、默认存在无实例事项、多个 active、断裂引用等在容器内 helper 建立，跟踪前提交。运行经代理 context/四类 resource 已支持路径，证明无写/锁、无通知/成员/审计/preview/execute，并比较业务表状态。先证明项目基础信息/需求范围及需求JSON，扩展矩阵在 Task8。用测试探针的 JDBC写/batch/锁读验证 tracker能捕获；探针不放入业务纯读调用。
+- [x] **Step 3：验证 RR。** 不给整个测试套外层 @Transactional；先提交fixture。读事务实际SELECT后屏障，再由另线程独立写事务提交；两个相关业务值前者均旧、后续新请求均新；各线程设置并清理 UserContext，超时失败，不能 deadlock 卡住。核对 Spring代理、实际事务只读/isolation及连接URL；排除只由 MyBatis cache造成“旧值”的假证明。
+- [x] **Step 4：运行。** B: PMS_CONTEXT_READ_ISOLATED=true mvn -Dtest=AiWorkflowContextReadOnlyIntegrationTest test。必须用例实际执行、无skip、退出0，且容器归属及报告明确；Docker/环境失败单列，feature继续false。关闭flag再验证 class skipped且无容器/连接。
+- [x] **Step 5：记录并提交。** test: prove readonly context slice in isolated MySQL；证据只含版本/状态/SQL分类，无敏感正文和Token。首次证明后才扩展，不启用feature。
 
 ### Task 7：CLI 类型兼容、参数与请求结果一致性
 
