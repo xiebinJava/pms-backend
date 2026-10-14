@@ -11,6 +11,8 @@ import com.brad.pms.dto.request.NodeScopeItemCmd;
 import com.brad.pms.dto.response.NodeRequirementDTO;
 import com.brad.pms.dto.response.NodeRequirementScopeDTO;
 import com.brad.pms.dto.response.NodeScopeItemDTO;
+import com.brad.pms.dto.response.PersistedContentVersion;
+import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.entity.ProjectNodeBaselineDO;
 import com.brad.pms.entity.ProjectNodeDO;
 import com.brad.pms.entity.ProjectNodeRequirementDO;
@@ -57,6 +59,27 @@ public class NodeRequirementScopeService {
         permissionService.requireProjectReadable(projectId);
         ProjectNodeDO node = requireRequirementNode(projectId, nodeId);
         return toDTO(node, findBaseline(projectId, nodeId));
+    }
+
+    /**
+     * Side-effect-free facts for the AI readonly context: strict pinned/legacy component
+     * validation plus a single read of the baseline and its child rows. Persistence is
+     * judged by real records (draft version 0 counts), never by DTO display defaults.
+     */
+    public WorkbenchReadSnapshot<NodeRequirementScopeDTO> getReadSnapshot(Long projectId, Long nodeId) {
+        permissionService.requireProjectReadable(projectId);
+        ProjectNodeDO node = permissionService.requireNode(projectId, nodeId);
+        permissionService.requireNodeComponentForContext(node, WorkflowComponentKey.REQUIREMENT_SCOPE,
+                "仅配置了需求范围组件的节点支持需求工作台");
+        ProjectNodeBaselineDO baseline = findBaseline(projectId, nodeId);
+        NodeRequirementScopeDTO display = toDTO(node, baseline);
+        boolean persisted = baseline != null
+                || (display.getScopeItems() != null && !display.getScopeItems().isEmpty())
+                || (display.getRequirements() != null && !display.getRequirements().isEmpty());
+        Map<String, PersistedContentVersion> parts = Map.of("content", baseline == null
+                ? PersistedContentVersion.absent()
+                : new PersistedContentVersion(true, baseline.getVersion()));
+        return new WorkbenchReadSnapshot<>(display, persisted, parts);
     }
 
     @Transactional

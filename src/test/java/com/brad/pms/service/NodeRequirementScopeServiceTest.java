@@ -331,4 +331,67 @@ class NodeRequirementScopeServiceTest {
         baseline.setStatus(0);
         return baseline;
     }
+
+    private ProjectNodeBaselineDO baselineZero() {
+        ProjectNodeBaselineDO baseline = baseline();
+        baseline.setVersion(0);
+        return baseline;
+    }
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotReportsEmptyWithoutAnyPersistedRecord() {
+        ProjectNodeDO node = requirementNode();
+        when(permissionService.requireProjectReadable(1L)).thenReturn(project());
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        when(baselineMapper.selectOne(any())).thenReturn(null);
+        when(scopeItemMapper.selectList(any())).thenReturn(List.of());
+        when(requirementMapper.selectList(any())).thenReturn(List.of());
+
+        var snapshot = service.getReadSnapshot(1L, 10L);
+
+        assertThat(snapshot.hasPersistedContent()).isFalse();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(false, null));
+        assertThat(snapshot.display().getVersion()).isNull();
+        verify(permissionService).requireNodeComponentForContext(
+                node, com.brad.pms.workflow.WorkflowComponentKey.REQUIREMENT_SCOPE,
+                "仅配置了需求范围组件的节点支持需求工作台");
+        verify(permissionService, never()).requireNodeComponent(any(), any(), any());
+    }
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotTreatsASavedDraftVersionZeroAsPersistedWithRealVersion() {
+        ProjectNodeDO node = requirementNode();
+        when(permissionService.requireProjectReadable(1L)).thenReturn(project());
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        when(baselineMapper.selectOne(any())).thenReturn(baselineZero());
+        when(scopeItemMapper.selectList(any())).thenReturn(List.of());
+        when(requirementMapper.selectList(any())).thenReturn(List.of());
+
+        var snapshot = service.getReadSnapshot(1L, 10L);
+
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(true, 0));
+    }
+
+    @org.junit.jupiter.api.Test
+    void readSnapshotCountsChildScopeRowsEvenWithoutABaseline() {
+        ProjectNodeDO node = requirementNode();
+        when(permissionService.requireProjectReadable(1L)).thenReturn(project());
+        when(permissionService.requireNode(1L, 10L)).thenReturn(node);
+        when(baselineMapper.selectOne(any())).thenReturn(null);
+        ProjectNodeRequirementDO requirement = new ProjectNodeRequirementDO();
+        requirement.setCode("REQ-001");
+        requirement.setName("统一订单状态");
+        requirement.setAcceptanceCriteria("状态变更可追踪");
+        when(scopeItemMapper.selectList(any())).thenReturn(List.of());
+        when(requirementMapper.selectList(any())).thenReturn(List.of(requirement));
+
+        var snapshot = service.getReadSnapshot(1L, 10L);
+
+        assertThat(snapshot.hasPersistedContent()).isTrue();
+        assertThat(snapshot.parts()).containsEntry("content",
+                new com.brad.pms.dto.response.PersistedContentVersion(false, null));
+    }
 }
