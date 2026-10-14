@@ -188,3 +188,29 @@
 
 - 新留：story-list/split 组件仍 UNSUPPORTED（Task 8 接真实故事表）；relations 的 topic/story 部分在 Task 8 扩展。
 - 需要 Task 6 的隔离 DB 证明：RR 隔离、无写足迹（annotation 不作为证据）、真实 MySQL 驱动覆盖。
+
+## Task 6 评审：隔离数据库纯读与 RR 证明
+
+提交：293283a test: prove readonly context slice in isolated MySQL（2026-10-14）。
+
+### 测试证据
+
+- gate 开（PMS_CONTEXT_READ_ISOLATED=true）：3 项用例实际执行全绿（Tests run 3, Skipped 0），见
+  docs/agent-contracts/pms/readonly-context-e2e-record.md；gate 关：Tests run 3, Skipped 3，无容器启动。
+- Tracker 覆盖：MyBatis Executor.update 拦截器（具名类保住 @Intercepts）+ JDBC DataSource
+  动态代理（prepareStatement/prepareCall/createStatement + execute/executeBatch）。
+- RR 验证：读事务屏障 SELECT → 外线程 UPDATE 提交 → 窗口内读到旧值（RR），新请求读到新值；
+  该断言与"无写"窗口断言分离。
+
+### 关键发现与处理
+
+1. Spring 默认 DataSource 已包入追踪代理（BeanPostProcessor），fixture bean 从同一包装源构造。
+2. 需求 create 阶段即创建研发工作流（业务事实），把"无实例乐观断言"改为"窗口内行数不变"。
+3. 本机 docker 由 colima 挂载在 /Users fs socket —— 需 DOCKER_HOST/TESTCONTAINERS_HOST_OVERRIDE
+   两个环境变量；这属于连接配置，不是隔离放宽（容器仍由测试创建/迁移/销毁）。
+4. 测试类 gate 使用 @EnabledIfEnvironmentVariable(PMS_CONTEXT_READ_ISOLATED=true)，普通 CI 不跑该类。
+
+### 遗留观察
+
+- 通知/定时任务替身的作用域为测试容器内（spring 默认 mail 关闭）；未模拟业务定期任务。
+- Task 8 扩展完组件矩阵后将重跑本类并扩展证据表。
