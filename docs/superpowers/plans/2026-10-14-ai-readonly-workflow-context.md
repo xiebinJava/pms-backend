@@ -10,7 +10,7 @@
 
 **Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
-状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
+状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
 ## Global Constraints
 
@@ -97,11 +97,11 @@ Node.fieldValuesState 的枚举为 LOADED/NOT_REQUESTED/UNAVAILABLE；ContextMet
 
 **Interfaces:** 产生 Spec 的通用快照与 NodeRequirementScopeService.getReadSnapshot 返回 WorkbenchReadSnapshot<NodeRequirementScopeDTO>；componentReader.read(ProjectDTO,ProjectNodeDTO,String)。第一切片支持 project-basic-info/requirement-scope，其余组件在 Task 8 前明确 UNSUPPORTED，不能发布 feature。
 
-- [ ] **Step 1：失败用例。** 未保存基线 EMPTY/content=null/versions.content=null；保存且 version=0 为 LOADED/0；存在但版本未知为 null+UNKNOWN_VERSION。只读取 selected/指定组件；附着但尚未支持的组件 UNSUPPORTED；服务 DB 错误不能转 EMPTY；已保存超过20,000字符多行中文/emoji 原样返回。旧 get 的默认显示保持。
-- [ ] **Step 2：失败验证。** B: mvn -Dtest=AiProjectComponentReaderTest,NodeRequirementScopeServiceTest test。
-- [ ] **Step 3：实现快照与适配。** 领域服务从同批根/子记录得到真实存在性、DTO和版本，不让 AI reader 直接读 mapper，也不重复 get 后另查版本；快照组件校验采用 Task1 的 requireNodeComponentForContext。project-basic-info 只取自身白名单。componentKey 精确筛选；领域读取处于门面事务。
-- [ ] **Step 4：验证。** 重跑 Step 2，校验没有新增生产依赖/业务写路径。
-- [ ] **Step 5：提交。** feat: expose persisted workbench read snapshots。
+- [x] **Step 1：失败用例。** 未保存基线 EMPTY/content=null/versions.content=null；保存且 version=0 为 LOADED/0；存在但版本未知为 null+UNKNOWN_VERSION。只读取 selected/指定组件；附着但尚未支持的组件 UNSUPPORTED；服务 DB 错误不能转 EMPTY；已保存超过20,000字符多行中文/emoji 原样返回。旧 get 的默认显示保持。
+- [x] **Step 2：失败验证。** B: mvn -Dtest=AiProjectComponentReaderTest,NodeRequirementScopeServiceTest test。
+- [x] **Step 3：实现快照与适配。** 领域服务从同批根/子记录得到真实存在性、DTO和版本，不让 AI reader 直接读 mapper，也不重复 get 后另查版本；快照组件校验采用 Task1 的 requireNodeComponentForContext。project-basic-info 只取自身白名单。componentKey 精确筛选；领域读取处于门面事务。
+- [x] **Step 4：验证。** 重跑 Step 2，校验没有新增生产依赖/业务写路径。
+- [x] **Step 5：提交。** feat: expose persisted workbench read snapshots。
 
 ### Task 4：主对象 READ 与全响应引用投影
 
