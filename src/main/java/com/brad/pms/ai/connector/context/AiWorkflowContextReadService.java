@@ -20,12 +20,15 @@ public class AiWorkflowContextReadService {
     private final AiProjectContextReader projectReader;
     private final AiDevelopmentContextReader developmentReader;
     private final AiContextResponseBudget budget;
+    private final AiContextReadPolicy contextReadPolicy;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AiWorkflowContextDTO context(String resourceType, Long resourceId, ContextReadOptions options) {
         ContextReadOptions safeOptions = options == null ? ContextReadOptions.legacy() : options;
         if (resourceId == null) throw BusinessException.notFound("资源不存在");
         String type = normalize(resourceType);
+        // 主对象模块 READ：requirement→REQUIREMENT_READ，其余→PROJECT_READ；查询范围不等于模块读取权限。
+        contextReadPolicy.requireRead(type);
         AiWorkflowContextDTO context = switch (type) {
             case "project" -> projectReader.read(resourceId, safeOptions);
             case "requirement", "topic", "story" -> developmentReader.read(

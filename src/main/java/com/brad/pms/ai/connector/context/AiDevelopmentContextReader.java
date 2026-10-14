@@ -65,7 +65,7 @@ public class AiDevelopmentContextReader {
                             options.componentKey(), unknownComponents)
                     : placeholderComponents(node);
 
-            Map<String, Object> fieldValues = fieldsFor(node, isSelected, focused);
+            Map<String, Object> fieldValues = fieldsFor(node, isSelected, focused, resourceType, itemId);
             String fieldValuesState = !isSelected ? (focused ? "NOT_REQUESTED" : "LOADED") : "LOADED";
 
             contractNodes.add(new AiWorkflowContextDTO.Node(
@@ -111,7 +111,7 @@ public class AiDevelopmentContextReader {
                             detail.getVersion(), options.componentKey(), unknownComponents)
                     : placeholderComponents(node);
 
-            Map<String, Object> fieldValues = fieldsFor(node, isSelected, focused);
+            Map<String, Object> fieldValues = fieldsFor(node, isSelected, focused, resourceType, itemId);
             String fieldValuesState = !isSelected ? (focused ? "NOT_REQUESTED" : "LOADED") : "LOADED";
 
             contractNodes.add(new AiWorkflowContextDTO.Node(
@@ -179,7 +179,7 @@ public class AiDevelopmentContextReader {
     }
 
     private Map<String, Object> fieldsFor(DevelopmentItemWorkflowNodeDTO node, boolean isSelected,
-                                          boolean focused) {
+                                          boolean focused, String resourceType, Long resourceId) {
         Map<String, Object> fieldValues;
         if (!isSelected) {
             fieldValues = Map.of();
@@ -187,12 +187,12 @@ public class AiDevelopmentContextReader {
             Map<String, Object> selectedValues = new LinkedHashMap<>();
             selectedValues.putAll(node.getFieldValues() == null ? Map.of() : node.getFieldValues());
             selectedValues.remove("__components");
-            fieldValues = selectedValues;
+            fieldValues = referenceProjector.projectFieldValues(resourceType, resourceId, selectedValues);
         } else {
             Map<String, Object> merged = new LinkedHashMap<>();
             merged.putAll(node.getFieldValues() == null ? Map.of() : node.getFieldValues());
             merged.putAll(node.getBoundFieldValues() == null ? Map.of() : node.getBoundFieldValues());
-            fieldValues = merged;
+            fieldValues = referenceProjector.projectFieldValues(resourceType, resourceId, merged);
         }
         return fieldValues;
     }

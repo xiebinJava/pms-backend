@@ -105,17 +105,15 @@ public class AiProjectComponentReader {
     /** Generic mapping for the single-baseline workbench snapshots. */
     private AiWorkflowContextDTO.Component readWorkbenchSnapshot(ProjectNodeDTO node, String componentKey,
             JsonNode config, List<AiWorkflowContextDTO.Field> fields, WorkbenchReadSnapshot<?> snapshot) {
-        Integer version;
-        if (!snapshot.hasPersistedContent() || snapshot.parts().get("content") == null
-                || snapshot.parts().get("content").version() == null) {
-            version = null;
-        } else {
-            version = snapshot.parts().get("content").version();
-        }
         boolean persisted = snapshot.hasPersistedContent();
         JsonNode content = persisted ? stripUiFlags(objectMapper.valueToTree(snapshot.display())) : null;
-        java.util.Map<String, Integer> versions = new java.util.HashMap<>();
-        versions.put("content", version);
+        // 每一个持久化 part 的真实版本都要出现在 versions 中（solution-design 的
+        // package/decision/review:* 属于同一组件，缺一部分不能让 saved part 丢失版本事实）。
+        java.util.Map<String, Integer> versions = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, PersistedContentVersion> part : snapshot.parts().entrySet()) {
+            versions.put(part.getKey(), part.getValue() == null ? null : part.getValue().version());
+        }
+        if (!versions.containsKey("content")) versions.put("content", null);
         return new AiWorkflowContextDTO.Component(componentKey, componentKey, fields, List.of(),
                 config, content, persisted ? "LOADED" : "EMPTY", versions, null);
     }

@@ -1,6 +1,7 @@
 package com.brad.pms.ai.connector.context;
 
 import com.brad.pms.dto.response.NodePermissionsDTO;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.brad.pms.dto.response.NodeRequirementScopeDTO;
 import com.brad.pms.dto.response.PersistedContentVersion;
 import com.brad.pms.dto.response.ProjectDTO;
@@ -84,6 +85,8 @@ class AiProjectContextReaderTest {
 
     @Test
     void actualNodesDrivePositionCurrentAndSelectedFacts() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         when(projectService.detail(7L)).thenReturn(project());
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(
                 node(301L, "kickoff", 0, 0), node(299L, "design", 1, 1)));
@@ -125,6 +128,8 @@ class AiProjectContextReaderTest {
 
     @Test
     void legacyKeepsRealFieldValuesWhileFocusedStripsUnselectedNodes() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         when(projectService.detail(7L)).thenReturn(project());
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(
                 node(301L, "kickoff", 0, 0), node(299L, "design", 1, 1)));
@@ -176,6 +181,8 @@ class AiProjectContextReaderTest {
 
     @Test
     void componentsWithoutContentOnlyExistOnTheSelectedNode() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         when(projectService.detail(7L)).thenReturn(project());
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(
                 node(301L, "kickoff", 0, 1), node(299L, "design", 1, 0)));
@@ -203,6 +210,8 @@ class AiProjectContextReaderTest {
 
     @Test
     void unresolvedLegacyNodeConfigurationWarnsInsteadOfFabricatingValues() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         when(projectService.detail(7L)).thenReturn(project());
         ProjectNodeDTO unknown = node(301L, "mystery-node", 0, 1);
         unknown.setProjectBasicInfo(null);
@@ -253,5 +262,74 @@ class AiProjectContextReaderTest {
         });
         assertThat(context.meta().referencesScope()).isEqualTo("readable-only");
         assertThat(context.meta().permissionsScope()).isEqualTo("business-user");
+    }
+
+    @Test
+    void focusedProjectDropsComponentJsonWhileLegacyPassesThroughProjection() {
+        when(projectService.detail(7L)).thenReturn(project());
+        ProjectNodeDTO node = node(301L, "kickoff", 0, 1);
+        node.setFieldValues(java.util.Map.of(
+                "kickoff.summary",
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode("项目从订单域开始"),
+                "__components",
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode()
+                        .put("solution-design", "原始组件正文")));
+        when(nodeService.listReadOnly(7L)).thenReturn(List.of(node));
+        when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
+        when(componentReader.read(any(), any(), any())).thenReturn(List.of());
+        lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(allowedActionsRegistry.projectActions()).thenReturn(List.of());
+
+        var legacy = reader().read(7L, ContextReadOptions.legacy());
+        assertThat(legacy.workflow().nodes().get(0).fieldValues()).containsKey("__components");
+
+        var focused = reader().read(7L, new ContextReadOptions("focused", 301L, null));
+        assertThat(focused.workflow().nodes().get(0).fieldValues()).doesNotContainKey("__components");
+        assertThat(focused.workflow().nodes().get(0).fieldValues()).containsKey("kickoff.summary");
+    }
+
+    @Test
+    void unboundReferencesInFieldValuesAreProjectedAway() {
+        when(projectService.detail(7L)).thenReturn(project());
+        when(nodeService.listReadOnly(7L)).thenReturn(List.of(
+                node(301L, "kickoff", 0, 1)));
+        when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
+        when(componentReader.read(any(), any(), any())).thenReturn(List.of());
+        lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        when(referenceProjector.projectFieldValues(any(), any(), any())).thenAnswer(invocation -> {
+            Map<String, Object> values = new java.util.LinkedHashMap<>(
+                    (Map<String, Object>) invocation.getArgument(2));
+            values.remove("__components");
+            values.remove("executionTarget");
+            values.remove("topicId");
+            return values;
+        });
+        lenient().when(allowedActionsRegistry.projectActions()).thenReturn(List.of());
+        ProjectNodeDTO node = node(301L, "kickoff", 0, 1);
+        java.util.Map<String, JsonNode> refValues = new java.util.LinkedHashMap<>();
+        refValues.put("kickoff.summary",
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode("真实值"));
+        java.util.Map<String, com.fasterxml.jackson.databind.JsonNode> targetObject =
+                new java.util.LinkedHashMap<>();
+        targetObject.put("targetId",
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.numberNode(9));
+        refValues.put("executionTarget",
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().setAll(targetObject));
+        refValues.put("topicId",
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode("9"));
+        node.setFieldValues(refValues);
+        when(nodeService.listReadOnly(7L)).thenReturn(List.of(node));
+
+        var focused = reader().read(7L, new ContextReadOptions("focused", 301L, null));
+
+        Map<String, Object> projected = focused.workflow().nodes().get(0).fieldValues();
+        assertThat(projected).doesNotContainKeys("__components", "executionTarget", "topicId");
+        assertThat(projected).containsKey("kickoff.summary");
     }
 }

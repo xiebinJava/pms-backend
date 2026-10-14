@@ -84,8 +84,11 @@ public class AiProjectContextReader {
                 fieldValueVersions = null;
                 fieldValuesState = "UNAVAILABLE";
             } else {
-                fieldValues = node.getFieldValues() == null ? Map.of()
+                Map<String, Object> original = node.getFieldValues() == null ? Map.of()
                         : new LinkedHashMap<>(node.getFieldValues());
+                // 项目 focused 也不携带组件原始 JSON（去重，正文仅来自 selected component 内容）。
+                if (focused) original.remove("__components");
+                fieldValues = referenceProjector.projectFieldValues("project", projectId, original);
                 fieldValueVersions = node.getFieldValueVersions();
                 fieldValuesState = "LOADED";
             }

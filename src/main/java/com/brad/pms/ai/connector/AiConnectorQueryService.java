@@ -100,6 +100,8 @@ public class AiConnectorQueryService {
         return workflowContextReadService.context(type, resourceId, options);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true,
+            isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public AiResourceDetailDTO resource(String resourceType, Long resourceId) {
         String type = normalizeResourceType(resourceType);
         if (resourceId == null) throw BusinessException.notFound("资源不存在");

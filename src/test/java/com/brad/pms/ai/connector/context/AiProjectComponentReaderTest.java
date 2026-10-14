@@ -223,4 +223,31 @@ class AiProjectComponentReaderTest {
         node.setComponents(components);
         return node;
     }
+
+    @Test
+    void solutionDesignVersionsCarryEveryPersistedPartMaybeIncludingNullValues() {
+        AiProjectComponentReader reader = reader();
+        ProjectNodeDTO node = node(List.of("solution-design"));
+        com.brad.pms.dto.response.NodeSolutionDesignDTO display = new com.brad.pms.dto.response.NodeSolutionDesignDTO();
+        display.setNodeId(301L);
+        java.util.Map<String, PersistedContentVersion> parts = new java.util.LinkedHashMap<>();
+        parts.put("package", new PersistedContentVersion(true, 0));
+        parts.put("decision", PersistedContentVersion.absent());
+        parts.put("review:BUSINESS_PRODUCT", PersistedContentVersion.absent());
+        parts.put("review:TECHNICAL", PersistedContentVersion.absent());
+        parts.put("review:TEST_RELEASE", new PersistedContentVersion(true, 2));
+        when(solutionDesignService.getReadSnapshot(7L, 301L)).thenReturn(new WorkbenchReadSnapshot<>(
+                display, true, parts));
+
+        List<AiWorkflowContextDTO.Component> components = reader.read(project(), node, "solution-design");
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.contentState()).isEqualTo("LOADED");
+            assertThat(component.versions()).containsKeys("package", "decision",
+                    "review:BUSINESS_PRODUCT", "review:TECHNICAL", "review:TEST_RELEASE", "content");
+            assertThat(component.versions().get("package")).isZero();
+            assertThat(component.versions().get("review:TEST_RELEASE")).isEqualTo(2);
+            assertThat(component.versions().get("decision")).isNull();
+        });
+    }
 }

@@ -1,6 +1,7 @@
 package com.brad.pms.ai.connector.context;
 
 import com.brad.pms.common.exception.BusinessException;
+import org.junit.jupiter.api.BeforeEach;
 import java.util.List;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class AiWorkflowContextReadServiceTest {
     @Mock AiContextResponseBudget budget;
 
     private AiWorkflowContextReadService service() {
-        return new AiWorkflowContextReadService(projectReader, developmentReader, budget);
+        return new AiWorkflowContextReadService(projectReader, developmentReader, budget, requireReadPolicy);
     }
 
     @Test
@@ -57,6 +58,25 @@ class AiWorkflowContextReadServiceTest {
                 8L, ContextReadOptions.legacy());
         verify(developmentReader).read(com.brad.pms.workflow.DevelopmentItemType.STORY,
                 9L, ContextReadOptions.legacy());
+    }
+
+    @org.mockito.Mock com.brad.pms.ai.connector.context.AiContextReadPolicy requireReadPolicy;
+
+    @BeforeEach
+    void allowAllReadsByDefault() {
+        org.mockito.Mockito.lenient().doAnswer(invocation -> null).when(requireReadPolicy)
+                .requireRead(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void mainObjectModuleReadIsEnforcedBeforeAnyReaderRuns() {
+        org.mockito.Mockito.doThrow(new BusinessException("无权读取该类型对象"))
+                .when(requireReadPolicy).requireRead("requirement");
+        assertThatThrownBy(() -> service().context("requirement", 23L, ContextReadOptions.legacy()))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("无权读取");
+        verify(developmentReader, never()).read(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
     }
 
     @Test

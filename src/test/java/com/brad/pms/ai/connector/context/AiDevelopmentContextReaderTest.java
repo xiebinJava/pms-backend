@@ -75,6 +75,8 @@ class AiDevelopmentContextReaderTest {
 
     @Test
     void requirementContextKeepsRealVersionsAndSelectedFacts() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
         when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
                 .thenReturn(configured());
@@ -103,6 +105,8 @@ class AiDevelopmentContextReaderTest {
 
     @Test
     void unconfiguredRequirementStaysUnconfiguredOnTheContract() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         DevelopmentItemWorkflowDetailDTO unconfigured = new DevelopmentItemWorkflowDetailDTO();
         unconfigured.setItemType("REQUIREMENT");
         unconfigured.setId(23L);
@@ -126,6 +130,8 @@ class AiDevelopmentContextReaderTest {
 
     @Test
     void focusedReplacesHistoricalValuesWithNotRequestedAndStripsComponentsDuplicate() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
         when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
                 .thenReturn(configured());
