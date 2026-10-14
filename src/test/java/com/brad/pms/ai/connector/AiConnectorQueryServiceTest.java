@@ -140,6 +140,8 @@ class AiConnectorQueryServiceTest {
         topic.setProjectId(78L);
         topic.setWorkflowConfigured(true);
         when(workflowService.detailIfInitialized(DevelopmentItemType.TOPIC, 7L)).thenReturn(topic);
+        when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
 
         AiResourceDetailDTO resource = service().resource("topic", 7L);
 

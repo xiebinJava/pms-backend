@@ -304,6 +304,7 @@ public class AiDevelopmentContextReader {
             com.brad.pms.dto.response.RequirementExecutionTargetDTO target) {
         Map<String, Object> map = new LinkedHashMap<>();
         put(map, "targetType", target.getTargetType() == null ? null : target.getTargetType().name());
+        put(map, "targetId", target.getTargetId());
         put(map, "title", target.getTitle());
         put(map, "code", target.getCode());
         put(map, "status", target.getStatus());

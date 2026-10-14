@@ -26,9 +26,13 @@ public class AiContextReferenceProjector {
     /** Component state keys that represent system-resolved object references. */
     private static final List<String> COMPONENT_REFERENCE_KEYS =
             List.of("topicId", "baseTopicId", "projectId", "targetId", "navigationId", "iterationPlanId");
+    /** Project workbench keys + research components; unknown keys inside legacy JSON are dropped. */
     private static final List<String> KNOWN_COMPONENTS = List.of(
             "requirement-receiving-analysis", "requirement-node-workbench", "topic-research",
-            "topic-design-review", "story-node-workbench", "story-testing");
+            "topic-design-review", "story-node-workbench", "story-testing",
+            "project-basic-info", "requirement-scope", "solution-design", "plan-resource-risk",
+            "development-control", "business-acceptance", "release-handover", "value-review",
+            "knowledge-standard");
 
     private final AiContextReadPolicy policy;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -36,13 +40,19 @@ public class AiContextReferenceProjector {
     public Map<String, Object> projectResourceDetails(String resourceType, Long resourceId,
                                                       Map<String, Object> details) {
         Map<String, Object> out = new java.util.LinkedHashMap<>();
+        Map<String, Boolean> groupOk = parentGroupReadability(resourceType, details);
         for (Map.Entry<String, Object> entry : details.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
             switch (key) {
                 case "executionTarget" -> {
-                    Map<String, Object> target = asMap(value);
-                    if (target == null || !executionTargetReadable(target)) continue;
+                    // DTO and Map payloads are both legitimate; unreadable targets are dropped whole.
+                    Long targetId = executionTargetId(value);
+                    String targetType = executionTargetType(value);
+                    if (targetId == null || targetType == null
+                            || !policy.canReadReference(targetType, targetId)) {
+                        continue;
+                    }
                     out.put(key, value);
                 }
                 case "sourceRequirements" -> out.put(key, filterRequirementList(value));
@@ -53,11 +63,61 @@ public class AiContextReferenceProjector {
                     }
                     out.put(key, value);
                 }
-                default -> out.put(key, value);
+                default -> {
+                    // Parent references carried by topic/story details form an id+label key group
+                    // (projectId/projectCode/projectName...); whole group shares one verdict.
+                    String group = parentGroupIdKey(resourceType, key);
+                    if (group == null) group = parentLabelKey(resourceType, key);
+                    if (group == null) {
+                        out.put(key, value);
+                        continue;
+                    }
+                    if (!Boolean.TRUE.equals(groupOk.get(group))) continue;
+                    out.put(key, value);
+                }
             }
         }
         return out;
     }
+
+    /**
+     * Evaluates each parent-reference group once per call by locating its id key
+     * (projectId/topicId/iterationPlanId) in the details and checking module READ + existence.
+     */
+    private Map<String, Boolean> parentGroupReadability(String resourceType, Map<String, Object> details) {
+        Map<String, Boolean> groupOk = new java.util.HashMap<>();
+        for (Map.Entry<String, Object> entry : details.entrySet()) {
+            String key = entry.getKey();
+            String group = parentGroupIdKey(resourceType, key);
+            if (group == null || groupOk.containsKey(group)) continue;
+            Long id = idValue(entry.getValue());
+            groupOk.put(group, id != null && policy.canReadReference(group, id));
+        }
+        return groupOk;
+    }
+
+
+    /** Id keys group by themselves; label keys follow their group's verdict. */
+    private String parentLabelKey(String resourceType, String key) {
+        if (!"topic".equals(resourceType) && !"story".equals(resourceType)) return null;
+        return switch (key) {
+            case "projectCode", "projectName" -> "project";
+            case "topicTitle" -> "topic";
+            case "iterationPlanName" -> "iteration_plan";
+            default -> null;
+        };
+    }
+
+    private String parentGroupIdKey(String resourceType, String key) {
+        if (!"topic".equals(resourceType) && !"story".equals(resourceType)) return null;
+        return switch (key) {
+            case "projectId" -> "project";
+            case "topicId" -> "topic";
+            case "iterationPlanId" -> "iteration_plan";
+            default -> null;
+        };
+    }
+
 
     public Map<String, Object> projectFieldValues(String resourceType, Long resourceId,
                                                   Map<String, Object> fieldValues) {
@@ -93,6 +153,11 @@ public class AiContextReferenceProjector {
     }
 
     private Object projectComponents(Object componentsValue) {
+        // Actual AI payloads carry `__components` as a Jackson ObjectNode (Map<String,JsonNode>
+        // in the DTO), so both real representations are filtered here.
+        if (componentsValue instanceof com.fasterxml.jackson.databind.JsonNode node) {
+            return projectComponentsNode(node);
+        }
         Map<String, Object> components = asMap(componentsValue);
         if (components == null) return componentsValue;
         Map<String, Object> out = new java.util.LinkedHashMap<>();
@@ -105,16 +170,52 @@ public class AiContextReferenceProjector {
                 continue;
             }
             Map<String, Object> copy = new java.util.LinkedHashMap<>(state);
-            for (String referenceKey : COMPONENT_REFERENCE_KEYS) {
-                Long referenceId = idValue(copy.get(referenceKey));
-                if (referenceId == null) continue;
-                if (!policy.canReadReference(componentReferenceType(componentKey, referenceKey), referenceId)) {
-                    copy.remove(referenceKey);
-                }
-            }
+            stripComponentReferences(componentKey, copy);
             out.put(componentKey, copy);
         }
         return out;
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode projectComponentsNode(
+            com.fasterxml.jackson.databind.JsonNode node) {
+        if (node instanceof ObjectNode objectNode) {
+            ObjectNode out = objectMapper.createObjectNode();
+            var fieldIterator = objectNode.fields();
+            while (fieldIterator.hasNext()) {
+                var field = fieldIterator.next();
+                String componentKey = field.getKey();
+                if (!KNOWN_COMPONENTS.contains(componentKey)) continue;
+                if (field.getValue() instanceof ObjectNode state) {
+                    ObjectNode copy = state.deepCopy();
+                    stripComponentReferencesAsNodes(componentKey, copy);
+                    out.set(componentKey, copy);
+                } else {
+                    out.set(componentKey, field.getValue().deepCopy());
+                }
+            }
+            return out;
+        }
+        return node.deepCopy();
+    }
+
+    private void stripComponentReferences(String componentKey, Map<String, Object> copy) {
+        for (String referenceKey : COMPONENT_REFERENCE_KEYS) {
+            Long referenceId = idValue(copy.get(referenceKey));
+            if (referenceId == null) continue;
+            if (!policy.canReadReference(componentReferenceType(componentKey, referenceKey), referenceId)) {
+                copy.remove(referenceKey);
+            }
+        }
+    }
+
+    private void stripComponentReferencesAsNodes(String componentKey, ObjectNode state) {
+        for (String referenceKey : COMPONENT_REFERENCE_KEYS) {
+            Long referenceId = idValue(state.get(referenceKey));
+            if (referenceId == null) continue;
+            if (!policy.canReadReference(componentReferenceType(componentKey, referenceKey), referenceId)) {
+                state.remove(referenceKey);
+            }
+        }
     }
 
     /** Component schemas decide reference types; unrelated ids in user text are never guessed. */
@@ -126,6 +227,25 @@ public class AiContextReferenceProjector {
             case "iterationPlanId" -> "iteration_plan";
             default -> null;
         };
+    }
+
+
+    private Long executionTargetId(Object value) {
+        if (value instanceof com.brad.pms.dto.response.RequirementExecutionTargetDTO target) {
+            return target.getTargetId();
+        }
+        Map<String, Object> map = asMap(value);
+        return map == null ? null : idValue(map.get("targetId"));
+    }
+
+    private String executionTargetType(Object value) {
+        if (value instanceof com.brad.pms.dto.response.RequirementExecutionTargetDTO target) {
+            return target.getTargetType() == null
+                    ? null : target.getTargetType().name().toLowerCase(Locale.ROOT).replace('-', '_');
+        }
+        Map<String, Object> map = asMap(value);
+        if (map == null || map.get("targetType") == null) return null;
+        return map.get("targetType").toString().trim().toLowerCase(Locale.ROOT).replace('-', '_');
     }
 
     private Object filterRequirementList(Object value) {

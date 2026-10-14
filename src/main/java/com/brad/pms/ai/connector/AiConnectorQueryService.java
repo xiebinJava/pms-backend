@@ -268,7 +268,9 @@ public class AiConnectorQueryService {
         put(details, "endDate", project.getEndDate());
         put(details, "currentNodeKey", project.getCurrentNodeKey());
         put(details, "currentNodeName", project.getCurrentNodeName());
-        return new AiResourceDetailDTO("project", project.getId(), project.getVersion(), details);
+        Map<String, Object> projected = referenceProjector.projectResourceDetails(
+                "project", project.getId(), details);
+        return new AiResourceDetailDTO("project", project.getId(), project.getVersion(), projected);
     }
 
     private AiResourceDetailDTO requirementResource(Long requirementId) {
@@ -315,7 +317,9 @@ public class AiConnectorQueryService {
         put(details, "workflowStatus", item.getWorkflowStatus());
         put(details, "templateVersionId", item.getTemplateVersionId());
         put(details, "templateVersionNo", item.getTemplateVersionNo());
-        return new AiResourceDetailDTO(resourceType, item.getId(), null, details);
+        Map<String, Object> projected = referenceProjector.projectResourceDetails(
+                resourceType, item.getId(), details);
+        return new AiResourceDetailDTO(resourceType, item.getId(), null, projected);
     }
 
     private AiWorkflowContextDTO developmentItemContext(String resourceType, Long resourceId) {

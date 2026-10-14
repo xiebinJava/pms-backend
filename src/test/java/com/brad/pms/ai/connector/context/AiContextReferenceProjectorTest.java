@@ -221,4 +221,131 @@ class AiContextReferenceProjectorTest {
         project.setDeleted(false);
         return project;
     }
+
+    @Test
+    void realObjectNodeComponentsAreFilteredExactlyLikeMapFixtures() throws Exception {
+        when(authorizationService.has("project:read")).thenReturn(true);
+        com.brad.pms.entity.ProjectDO project = new com.brad.pms.entity.ProjectDO();
+        project.setId(7L);
+        project.setDeleted(false);
+        when(projectMapper.selectIncludingDeleted(7L)).thenReturn(project);
+        when(projectPermissionService.canReadProject(project)).thenReturn(false);
+        // 真实 DTO 形态：fieldValues 的 __components 为 ObjectNode（Map<String,JsonNode> 的 value）。
+        com.fasterxml.jackson.databind.node.ObjectNode components =
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        com.fasterxml.jackson.databind.node.ObjectNode unknown =
+                components.putObject("unknown-workbench");
+        unknown.put("topicId", "9");
+        unknown.put("payload", "原始内容");
+        com.fasterxml.jackson.databind.node.ObjectNode workbench =
+                components.putObject("story-node-workbench");
+        workbench.put("title", "我的故事");
+        workbench.put("topicId", "9");
+        workbench.put("baseTopicId", "9");
+        workbench.put("projectId", "7");
+        workbench.put("descriptionAndAcceptance", "正文 123 不清洗");
+        Map<String, Object> fieldValues = new LinkedHashMap<>();
+        fieldValues.put("__components", components);
+        Map<String, Object> expectedInput = Map.copyOf(fieldValues);
+
+        Map<String, Object> projected = projector.projectFieldValues("story", 8L, fieldValues);
+
+        JsonNode projectedComponents = (JsonNode) projected.get("__components");
+        assertThat(projectedComponents.isObject()).isTrue();
+        assertThat(projectedComponents.has("unknown-workbench")).isFalse();
+        JsonNode filteredWorkbench = projectedComponents.get("story-node-workbench");
+        assertThat(filteredWorkbench.has("title")).isTrue();
+        assertThat(filteredWorkbench.get("descriptionAndAcceptance").asText()).isEqualTo("正文 123 不清洗");
+        assertThat(filteredWorkbench.has("topicId")).isFalse();
+        assertThat(filteredWorkbench.has("baseTopicId")).isFalse();
+        assertThat(filteredWorkbench.has("projectId")).isFalse();
+        // 输入不被修改。
+        assertThat(components.has("unknown-workbench")).isTrue();
+        assertThat(fieldValues).isEqualTo(expectedInput);
+    }
+
+    @Test
+    void topicStoryResourceDetailsProjectParentReferencesDirectly() throws Exception {
+        when(authorizationService.has("project:read")).thenReturn(true);
+        // project 7 readable; topic 90 unreadable; iteration 404 missing.
+        com.brad.pms.entity.ProjectDO readableProject = new com.brad.pms.entity.ProjectDO();
+        readableProject.setId(7L);
+        readableProject.setDeleted(false);
+        when(projectMapper.selectIncludingDeleted(7L)).thenReturn(readableProject);
+        when(projectPermissionService.canReadProject(readableProject)).thenReturn(true);
+        com.brad.pms.entity.ProjectNodeDevelopmentTopicDO topic =
+                new com.brad.pms.entity.ProjectNodeDevelopmentTopicDO();
+        topic.setId(90L);
+        topic.setProjectId(2L);
+        topic.setDeleted(false);
+        when(topicMapper.selectById(90L)).thenReturn(topic);
+        when(projectMapper.selectById(2L)).thenReturn(null);
+        when(iterationPlanMapper.selectById(404L)).thenReturn(null);
+
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("title", "跨端故事");
+        details.put("projectId", 7L);
+        details.put("projectCode", "PRJ-7");
+        details.put("projectName", "可读项目");
+        details.put("topicId", 90L);
+        details.put("topicTitle", "不可读专题");
+        details.put("iterationPlanId", 404L);
+        details.put("iterationPlanName", "缺失迭代");
+        details.put("developmentStatus", "IN_PROGRESS");
+
+        Map<String, Object> projected =
+                projector.projectResourceDetails("story", 8L, details);
+
+        assertThat(projected).containsEntry("projectId", 7L);
+        assertThat(projected).containsEntry("projectName", "可读项目");
+        assertThat(projected).doesNotContainKeys("topicId", "topicTitle",
+                "iterationPlanId", "iterationPlanName");
+        // topic 资源类型的详情同样按 projectId 组投影。
+        details.remove("topicId");
+        details.remove("topicTitle");
+        details.remove("iterationPlanId");
+        details.remove("iterationPlanName");
+        Map<String, Object> topicProjection =
+                projector.projectResourceDetails("topic", 90L, details);
+        assertThat(topicProjection).containsKeys("projectId", "projectCode");
+        org.mockito.Mockito.verify(requirementMapper, org.mockito.Mockito.never()).selectById(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void readableExecutionTargetDtoSurvivesAndUnreadableIsDropped() {
+        when(authorizationService.has("project:read")).thenReturn(true);
+        com.brad.pms.entity.ProjectDO readableProject = new com.brad.pms.entity.ProjectDO();
+        readableProject.setId(7L);
+        readableProject.setDeleted(false);
+        when(projectMapper.selectIncludingDeleted(7L)).thenReturn(readableProject);
+        when(projectPermissionService.canReadProject(readableProject)).thenReturn(true);
+        com.brad.pms.dto.response.RequirementExecutionTargetDTO readableTarget =
+                new com.brad.pms.dto.response.RequirementExecutionTargetDTO();
+        readableTarget.setTargetType(com.brad.pms.common.enums.RequirementExecutionTargetType.PROJECT);
+        readableTarget.setTargetId(7L);
+        readableTarget.setTitle("可读项目");
+        Map<String, Object> readableDetails = new LinkedHashMap<>();
+        readableDetails.put("executionTarget", readableTarget);
+
+        Map<String, Object> projectedReadable =
+                projector.projectResourceDetails("requirement", 23L, readableDetails);
+
+        assertThat(projectedReadable).containsKey("executionTarget");
+
+        com.brad.pms.entity.ProjectDO deletedProject = new com.brad.pms.entity.ProjectDO();
+        deletedProject.setId(8L);
+        deletedProject.setDeleted(true);
+        when(projectMapper.selectIncludingDeleted(8L)).thenReturn(deletedProject);
+        com.brad.pms.dto.response.RequirementExecutionTargetDTO deletedTarget =
+                new com.brad.pms.dto.response.RequirementExecutionTargetDTO();
+        deletedTarget.setTargetType(com.brad.pms.common.enums.RequirementExecutionTargetType.PROJECT);
+        deletedTarget.setTargetId(8L);
+        Map<String, Object> unreadableDetails = new LinkedHashMap<>();
+        unreadableDetails.put("executionTarget", deletedTarget);
+
+        Map<String, Object> projectedUnreadable =
+                projector.projectResourceDetails("requirement", 23L, unreadableDetails);
+
+        assertThat(projectedUnreadable).doesNotContainKey("executionTarget");
+    }
 }
