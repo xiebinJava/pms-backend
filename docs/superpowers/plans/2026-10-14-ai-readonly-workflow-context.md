@@ -10,7 +10,7 @@
 
 **Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
-状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7 已提交（C 仓库 44c0fb2）：93 项 unit/contract 全绿、typecheck/build:cli 通过；真实试读（旧后端）：legacy 兼容 ✓、显式参数无 meta 核验失败 ✓、非法 view CLI_USAGE ✓。focused 试读与新后端验证待 Task 9。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。Task 7（C 44c0fb2）与 Task 8 已提交：9 项组件、研发 JSON/执行绑定/故事列表分流就绪；安全测试 227 项全绿；隔离集成重跑 3 项全绿。Task 9 未执行。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
+状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7 已提交（C 仓库 44c0fb2）：93 项 unit/contract 全绿、typecheck/build:cli 通过；真实试读（旧后端）：legacy 兼容 ✓、显式参数无 meta 核验失败 ✓、非法 view CLI_USAGE ✓。focused 试读与新后端验证待 Task 9。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。Task 7（C 44c0fb2）与 Task 8 已提交：9 项组件、研发 JSON/执行绑定/故事列表分流就绪；安全测试 227 项全绿；隔离集成重跑 3 项全绿。Task 9 部分完成：Step 4 最终回归（B 227 项安全集合 + C 94 项 unit/contract + typecheck/build）与 Step 6 交付证据提交已完成（C b36e5e2）；Step 1 安全helper/gate测试已提交，Step 2 真实只读 API 验收、Step 3 页面/模型核验、Step 5 feature 启用未运行（缺真实 token/模型环境，两个 feature 保持 false，交付记录说明尚未具备发布门槛）。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
 ## Global Constraints
 
@@ -210,9 +210,9 @@ AiDevelopmentComponentReader 签名按 Spec：JSON 型组件和 requirement-exec
 - [ ] **Step 1：安全gate测试。** flag关闭、缺认证、非法/缺ID时目标context网络0调用；显式配置四类正常/历史/单组件，不调用preview/execute、初始化或清理。E2E不仅比ID，结合fixture清单断言node/version/body/state，gate单元测试复用新helper，不借用原写E2E helper。
 - [ ] **Step 2：真实只读API验收。** 配齐显式四类ID和已知fixture清单，C: pnpm run verify:real-pms:readonly。所有目标场景实际执行且通过；不要求prototype阶段feature=true，以免形成“先开启才能验收”的循环。记录requestId/提交版本/状态，不输出Token或受限正文。缺场景标未运行，API失败非通过。
 - [ ] **Step 3：页面和模型核验。** 页面只比正常已初始化对象；异常DB证据来自Task6/8。使用仅query scope的委托身份或仅模块READ的测试账号，不能把普通CLI session误称天然只读。外部工作台只读解释四类的当前节点/历史差异、负责人/日期、成果存在性、未知信息。fixture事实逐项通过，不编造未读内容或阻塞原因；无模型标未运行，不以API E2E顶替。
-- [ ] **Step 4：最终回归。** B重跑Tasks1—6及8实际安全测试集合、隔离DB、OpenAPI、diff；C重跑unit/contract/typecheck/build/diff。全量B先核对profile/隔离连接，否则不启动；报告明确实际执行/失败/skip，检查所有Spec条目有证据。
+- [x] **Step 4：最终回归。** B重跑Tasks1—6及8实际安全测试集合、隔离DB、OpenAPI、diff；C重跑unit/contract/typecheck/build/diff。全量B先核对profile/隔离连接，否则不启动；报告明确实际执行/失败/skip，检查所有Spec条目有证据。
 - [ ] **Step 5：最后启用feature。** 仅Step1—4完整通过后，readonlyWorkflowContext=true与focusedWorkflowContext=true，回归capability测试，真实只读查询目录验证两键；任一必须验收缺失则保留false，交付记录说明尚未具备发布门槛。
-- [ ] **Step 6：提交交付证据。** B/C分别提交 test/docs；未经后续授权不推送/发布/安装。任务文档记录B/C版本和未完成项。
+- [x] **Step 6：提交交付证据。** B/C分别提交 test/docs；未经后续授权不推送/发布/安装。任务文档记录B/C版本和未完成项。
 
 ## 验收映射
 
