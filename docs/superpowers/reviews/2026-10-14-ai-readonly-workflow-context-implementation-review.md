@@ -148,3 +148,43 @@
 ### 遗留观察
 
 - R01 的实际接线（get/details 路径替换）在 Task 5 完成后才会改变外部行为。
+
+## Task 5 评审：项目/需求纵向切片、HTTP 门面、聚焦投影与预算
+
+提交：aabccc3 feat: add focused readonly workflow context slice（2026-10-14）。
+
+### 测试证据
+
+- Step 2 集合：AiProjectContextReaderTest(6)+AiDevelopmentContextReaderTest(3)+AiDevelopmentComponentReaderTest(6)
+  +AiWorkflowContextReadServiceTest(4)+AiContextResponseBudgetTest(4)+QueryService(6)+Capability(1)+Controller(2)
+  +RoutePolicy(5)+DynamicWorkflowCapability(1)=58 项全绿；./scripts/validate-openapi.sh 通过；git diff --check 干净。
+- 回归适配：AiConnectorQueryService 上下文改走纯读门面，原有模板拼装测试改为门面委托断言；
+  DynamicWorkflowCapabilityTest 用新的三依赖构造器并通过 readService 契约断言。
+
+### 对照 Spec 核对
+
+| 要求 | 结果 |
+| --- | --- |
+| 实际节点 2/1/0 及历史选择；project reader 全用真实节点 | 通过：positions/current/id 全部真实 |
+| 真实 entity/workflow/template/node 版本分开 | 通过：context.version=当前节点版本；entityVersion=需求实体版本；meta.workflowInstanceVersion=实例版本；templateVersionId/No 保留 |
+| legacy 保留 __components/真实 fieldValues；focused 去重、历史 NOT_REQUESTED | 通过：双视图对比断言 |
+| focus component 筛选唯一正文来源 | 通过：selected 仅由 componentReader 装配，非 selected NOT_REQUESTED |
+| 执行目标 R01：不可读 → LOADED+content={}（不伪称未绑定、无 id/类型/名称），可读 → 事实无 id | 通过：AiDevelopmentComponentReaderTest 4 场景（含 entityVersion 与 node.version 不同） |
+| 预算 524288 边界（422+CONTEXT_TOO_LARGE，多字节 UTF-8） | 通过；legacy 永不预算 |
+| 门面 REPEATABLE_READ readOnly 事务 + options 归一化 | 通过（@Transactional 注解；注解≠无写证明，Task 6 验证） |
+| 委托路由补 GET resources 四类（不放宽）| 通过：iteration_plan/DELETE 被拒 |
+| 两个 feature 默认 false | 通过：capabilities wire 包含两键 false |
+| 需求流程摘要纠正（R07） | 通过：requirement context 走 detailForContext；无实例 NOT_CONFIGURED |
+
+### 已执行的关键实现决策
+
+- AiWorkflowContextDTO.record 上下文 meta 由 AiContextMetaFactory 统一装配（clock 注入，测试注入 fixed Clock）。
+- 项目字段投影为白名单（去掉 code/projectLevel 等），projectResource 通过 ProjectService.detail 取显示名。
+- allowedActions 改在 AiContextAllowedActions（registry 驱动，与旧行为一致）；component.actions 非选择节点 NOT_REQUESTED 占位。
+- 需求节点 fieldValues/bound 合并沿用旧 legacy 语义；componentReader 内部对 story/requirement workbench JSON 做引用投影。
+- 旧 QueryService 的 context 拼装私有方法保留未删（不再被调用）；资源型 get 已接 requireRead + 引用投影。
+
+### 遗留观察（转入 Task 6/8）
+
+- 新留：story-list/split 组件仍 UNSUPPORTED（Task 8 接真实故事表）；relations 的 topic/story 部分在 Task 8 扩展。
+- 需要 Task 6 的隔离 DB 证明：RR 隔离、无写足迹（annotation 不作为证据）、真实 MySQL 驱动覆盖。
