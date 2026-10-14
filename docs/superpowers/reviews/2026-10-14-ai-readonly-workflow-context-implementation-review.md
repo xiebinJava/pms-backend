@@ -323,3 +323,18 @@ C 提交：b36e5e2 test/docs: record readonly context delivery evidence；B 提�
 - C：unit/contract 96 项全绿（含新 2 个）、typecheck 通过。
 - 提交：B d58287b、C 23a708f。
 - feature 开关保持 false：真实 API / 权限 / 隔离 DB / 模型验收仍需按计划完成后才能打开。
+
+## 三次评审修复记录（2026-10-14 晚）
+
+用户指出引用投影未闭环的三个问题，核实全部属实并修复（B 提交 5e6248f）。
+
+| 问题 | 核实 | 修复 | 测试 |
+| --- | --- | --- | --- |
+| P1 真实 JsonNode __components 未过滤 | 属实：DTO fieldValues 是 Map<String,JsonNode>，__components 为 ObjectNode；projectComponents 只接 Map → asMap null → 原样返回 | projectComponents 检测 JsonNode → projectComponentsNode：ObjectNode deepCopy 后仅保留 known components（研发6+项目9=15 键），按引用键查 canReadReference 后移除；unknown 组件整项省略；原节点不修改 | realObjectNodeComponentsAreFilteredExactlyLikeMapFixtures（真实 ObjectNode fixture：unknown 净除、workbench 内 topicId/baseTopicId/projectId 全移除、正文原样、输入不变） |
+| P1 topic/story 资源详情与父引用未投影 | 属实：developmentItemResource 直接返回 projectId/projectCode/projectName/topicId/topicTitle/iterationPlanId/Name；development context resourceDetails 同；projector 无这些键 | projector 新增 parent-reference 组投影（仅 topic/story 角色）：id 键分组判定（projectId/topicId/iterationPlanId），label 键（Code/Name/Title）跟随组的裁定，组不可读则整组省略；developmentItemResource 与 projectResource 末尾接入同一投影 | topicStoryResourceDetailsProjectParentReferencesDirectly（project 可读→ projectId/Code/Name 保留；topic 不可读→ topicId/Title 省；iteration 缺失→ id/Name 省；topic 类型详情同样生效） |
+| P2 可读 executionTarget DTO 被误丢 | 属实：requirement resource 的 executionTarget 是 DTO（asMap=null→continue）；development executionTargetMap 又没有 targetId | projector executionTarget 支持 DTO（读 targetType/targetId），可读保留、不可读整项省略；executionTargetMap 加入 targetId | readableExecutionTargetDtoSurvivesAndUnreadableIsDropped（可读→保留；已删除项目→整项省略） |
+
+### 验证
+
+- referenceProjector 11 项全绿；resource/reader 相关 62 项全绿；隔离集成重跑 3 项全绿（21s）。
+- 南支付 feature flags 仍保持 false，等真实 API/模型验收完成。
