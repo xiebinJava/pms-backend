@@ -19,6 +19,7 @@ import com.brad.pms.service.WorkflowTemplateService;
 import com.brad.pms.ai.query.AiTaskQueryService;
 import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
+import com.brad.pms.ai.connector.context.ContextReadOptions;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinition;
@@ -116,28 +117,19 @@ class AiConnectorQueryServiceTest {
     }
 
     @Test
-    void projectContextPreservesTemplateNodePositions() {
-        ProjectDTO project = new ProjectDTO();
-        project.setId(78L);
-        project.setVersion(3);
-        project.setWorkflowTemplateVersionId(88L);
-        project.setCurrentNodeKey("delivery");
-        project.setCurrentNodeName("交付");
-        when(projectService.detail(78L)).thenReturn(project);
-        when(workflowTemplateService.getDefinition(88L)).thenReturn(new WorkflowTemplateDefinition(2, List.of(
-                projectNode("intake", "接收"), projectNode("delivery", "交付"))));
-        when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
+    void projectContextDelegatesToThePureReadService() {
+        AiWorkflowContextDTO context = new AiWorkflowContextDTO("project", 78L, 3, null,
+                new AiWorkflowContextDTO.Workflow(88L, 4, List.of()),
+                List.of(), 3, null, null, null);
+        when(readService.context("project", 78L, ContextReadOptions.legacy())).thenReturn(context);
+        when(readService.context("project", 78L,
+                new ContextReadOptions("focused", 301L, null))).thenReturn(context);
 
-        AiWorkflowContextDTO context = service().context("project", 78L);
-
-        assertThat(context.workflow().nodes()).extracting(AiWorkflowContextDTO.Node::position)
-                .containsExactly(0, 1);
-        assertThat(context.workflow().nodes()).extracting(AiWorkflowContextDTO.Node::status)
-                .containsExactly(0, 1);
-    }
-
-    private WorkflowNodeDefinition projectNode(String key, String name) {
-        return new WorkflowNodeDefinition(key, name, null, null, null, List.of(), List.of(), false, List.of());
+        assertThat(service().context("project", 78L, ContextReadOptions.legacy()).resourceType())
+                .isEqualTo("project");
+        assertThat(service().context("project", 78L,
+                new ContextReadOptions("focused", 301L, null)).resourceId()).isEqualTo(78L);
+        verify(readService).context("project", 78L, ContextReadOptions.legacy());
     }
 
     @Test
@@ -158,32 +150,23 @@ class AiConnectorQueryServiceTest {
     }
 
     @Test
-    void storyContextUsesThePureDetailEntryToo() {
-        com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO story = new com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO();
-        story.setId(9L);
-        story.setTitle("故事");
-        story.setWorkflowConfigured(true);
-        com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO node = new com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO();
-        node.setId(21L);
-        node.setNodeKey("design");
-        node.setName("设计");
-        node.setStatus(1);
-        node.setVersion(2);
-        story.setNodes(List.of(node));
-        when(workflowService.detailIfInitialized(DevelopmentItemType.STORY, 9L)).thenReturn(story);
-        when(commandRegistry.list()).thenReturn(java.util.Set.of());
+    void storyContextDelegatesToThePureReadServiceWithoutLegacyDetail() {
+        when(readService.context("story", 9L, ContextReadOptions.legacy())).thenReturn(
+                new AiWorkflowContextDTO("story", 9L, 2, null, null, List.of(), null, null, null, null));
 
-        AiWorkflowContextDTO context = service().context("story", 9L);
-
-        assertThat(context.resourceType()).isEqualTo("story");
-        assertThat(context.currentNode()).isNotNull();
-        assertThat(context.currentNode().id()).isEqualTo(21L);
+        assertThat(service().context("story", 9L).resourceType()).isEqualTo("story");
+        verify(readService).context("story", 9L, ContextReadOptions.legacy());
         verify(workflowService, never()).detail(any(), any());
     }
+
+    @Mock com.brad.pms.ai.connector.context.AiWorkflowContextReadService readService;
+    @Mock com.brad.pms.ai.connector.context.AiContextReadPolicy contextReadPolicy;
+    @Mock com.brad.pms.ai.connector.context.AiContextReferenceProjector referenceProjector;
 
     private AiConnectorQueryService service() {
         return new AiConnectorQueryService(projectService, developmentItemService,
                 iterationPlanService, taskQueryService, workflowService, commandRegistry,
-                requirementManagementService, workflowTemplateService);
+                requirementManagementService, workflowTemplateService, readService,
+                contextReadPolicy, referenceProjector);
     }
 }

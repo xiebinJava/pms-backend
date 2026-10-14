@@ -97,7 +97,9 @@ class AiConnectorCapabilityServiceTest {
                 .satisfies(component -> assertThat(component.actions()).contains("topic.create"));
         assertThat(result.viewer().id()).isEqualTo(7L);
         String wire = new ObjectMapper().writeValueAsString(result);
-        assertThat(wire).contains("\"features\":{\"resourceGet\":true}");
+        assertThat(wire).contains("\"resourceGet\":true");
+        assertThat(wire).contains("\"readonlyWorkflowContext\":false");
+        assertThat(wire).contains("\"focusedWorkflowContext\":false");
     }
 
     private static PmsCommand command(CommandName name) {

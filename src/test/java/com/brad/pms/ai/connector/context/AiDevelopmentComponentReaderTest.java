@@ -1,0 +1,173 @@
+package com.brad.pms.ai.connector.context;
+
+import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
+import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
+import com.brad.pms.dto.response.RequirementExecutionTargetDTO;
+import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
+import com.brad.pms.workflow.DevelopmentItemType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+/** Development components split by their real sources: workbench JSON or execution binding. */
+@ExtendWith(MockitoExtension.class)
+class AiDevelopmentComponentReaderTest {
+
+    private final AiContextReadPolicy policy = mock(AiContextReadPolicy.class);
+
+    private AiDevelopmentComponentReader reader(AiContextReferenceProjector projector,
+                                                AiContextReadPolicy policy) {
+        return new AiDevelopmentComponentReader(projector, policy);
+    }
+
+    private DevelopmentItemWorkflowNodeDTO node(String json, Integer version) {
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(101L);
+        node.setNodeKey("analysis");
+        node.setVersion(version);
+        node.setRuntimeComponents(List.of("requirement-receiving-analysis", "requirement-execution",
+                "story-list", "unknown-component"));
+        var mapper = JsonMapper.builder().build();
+        com.fasterxml.jackson.databind.node.ObjectNode components = mapper.createObjectNode();
+        if (json != null) components.set("requirement-receiving-analysis",
+                mapper.valueToTree(Map.<String, Object>of("conclusion", "可行", "topicId", "9")));
+        node.setFieldValues(json == null ? null : Map.<String, com.fasterxml.jackson.databind.JsonNode>of(
+                "__components", components));
+        return node;
+    }
+
+    private DevelopmentItemWorkflowDetailDTO item(RequirementExecutionTargetDTO target) {
+        DevelopmentItemWorkflowDetailDTO item = new DevelopmentItemWorkflowDetailDTO();
+        item.setItemType("REQUIREMENT");
+        item.setId(23L);
+        item.setExecutionTarget(target);
+        return item;
+    }
+
+    private void requireTopicDenied() {
+        when(policy.canReadReference(org.mockito.ArgumentMatchers.eq("topic"), any()))
+                .thenReturn(false);
+    }
+
+    @Test
+    void savedJsonIsProjectedThroughReferenceFilteringAndCarriesTheNodeVersion() {
+        requireTopicDenied();
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        AiDevelopmentComponentReader reader = reader(real, policy);
+        List<String> unknown = new ArrayList<>();
+
+        List<AiWorkflowContextDTO.Component> components = reader.read(DevelopmentItemType.REQUIREMENT,
+                item(null), node("{\"saved\":true}", 4), 5, "requirement-receiving-analysis", unknown);
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.key()).isEqualTo("requirement-receiving-analysis");
+            assertThat(component.contentState()).isEqualTo("LOADED");
+            assertThat(component.versions()).containsEntry("node", 4);
+            assertThat(component.content().get("conclusion").asText()).isEqualTo("可行");
+            assertThat(component.content().has("topicId")).isFalse();
+        });
+        assertThat(unknown).isEmpty();
+    }
+
+    @Test
+    void missingJsonIsEmptyWithoutLosingTheNodeVersion() {
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        AiDevelopmentComponentReader reader = reader(real, policy);
+        List<String> unknown = new ArrayList<>();
+
+        List<AiWorkflowContextDTO.Component> components = reader.read(DevelopmentItemType.REQUIREMENT,
+                item(null), node(null, 4), 5, null, unknown);
+
+        java.util.Map<String, AiWorkflowContextDTO.Component> byKey = new java.util.HashMap<>();
+        components.forEach(component -> byKey.put(component.key(), component));
+        assertThat(byKey.get("requirement-receiving-analysis").contentState()).isEqualTo("EMPTY");
+        assertThat(byKey.get("requirement-receiving-analysis").content()).isNull();
+        assertThat(byKey.get("requirement-receiving-analysis").versions()).containsEntry("node", 4);
+        assertThat(byKey.get("story-list").contentState()).isEqualTo("UNSUPPORTED");
+        assertThat(byKey.get("unknown-component").contentState()).isEqualTo("UNSUPPORTED");
+        assertThat(unknown).contains("story-list", "unknown-component");
+    }
+
+    @Test
+    void executionTargetReadsWithTheEntityVersionAndNeverExposesTargetIds() {
+        when(policy.canReadReference(org.mockito.ArgumentMatchers.eq("project"), any())).thenReturn(true);
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        AiDevelopmentComponentReader reader = reader(real, policy);
+        List<String> unknown = new ArrayList<>();
+        RequirementExecutionTargetDTO target = new RequirementExecutionTargetDTO();
+        target.setTargetType(com.brad.pms.common.enums.RequirementExecutionTargetType.PROJECT);
+        target.setTargetId(7L);
+        target.setTitle("订单项目");
+        target.setStatus("ACTIVE");
+
+        List<AiWorkflowContextDTO.Component> components = reader.read(DevelopmentItemType.REQUIREMENT,
+                item(target), node(null, 4), 5, "requirement-execution", unknown);
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.contentState()).isEqualTo("LOADED");
+            assertThat(component.versions()).containsEntry("entity", 5);
+            assertThat(component.content().get("title").asText()).isEqualTo("订单项目");
+            assertThat(component.content().has("targetId")).isFalse();
+            assertThat(component.content().has("targetType")).isFalse();
+        });
+    }
+
+    @Test
+    void aBoundButUnreadableExecutionTargetStaysLoadedWithEmptyContent() {
+        when(policy.canReadReference(org.mockito.ArgumentMatchers.eq("project"), any())).thenReturn(false);
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        AiDevelopmentComponentReader reader = reader(real, policy);
+        List<String> unknown = new ArrayList<>();
+        RequirementExecutionTargetDTO target = new RequirementExecutionTargetDTO();
+        target.setTargetType(com.brad.pms.common.enums.RequirementExecutionTargetType.PROJECT);
+        target.setTargetId(7L);
+        target.setTitle("不可读项目");
+
+        List<AiWorkflowContextDTO.Component> components = reader.read(DevelopmentItemType.REQUIREMENT,
+                item(target), node(null, 4), 5, "requirement-execution", unknown);
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.contentState()).isEqualTo("LOADED");
+            assertThat(component.content().isEmpty()).isTrue();
+        });
+    }
+
+    @Test
+    void withoutAnyBindingTheExecutionComponentReportsEmpty() {
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        AiDevelopmentComponentReader reader = reader(real, policy);
+        List<String> unknown = new ArrayList<>();
+
+        List<AiWorkflowContextDTO.Component> components = reader.read(DevelopmentItemType.REQUIREMENT,
+                item(null), node(null, 4), 5, "requirement-execution", unknown);
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.contentState()).isEqualTo("EMPTY");
+            assertThat(component.versions()).containsEntry("entity", 5);
+        });
+    }
+
+    @Test
+    void aComponentKeyOutsideTheAttachedSetIsRejectedAsNotFound() {
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        AiDevelopmentComponentReader reader = reader(real, policy);
+        List<String> unknown = new ArrayList<>();
+
+        assertThatThrownBy(() -> reader.read(DevelopmentItemType.REQUIREMENT, item(null),
+                node(null, 4), 5, "release-handover", unknown))
+                .isInstanceOf(com.brad.pms.common.exception.BusinessException.class);
+    }
+}

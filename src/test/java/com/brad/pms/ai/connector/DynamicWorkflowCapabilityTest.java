@@ -4,6 +4,7 @@ import com.brad.pms.ai.query.AiTaskQueryService;
 import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
+import com.brad.pms.ai.connector.context.ContextReadOptions;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.service.DevelopmentItemService;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,28 +41,18 @@ class DynamicWorkflowCapabilityTest {
     @Mock WorkflowTemplateService workflowTemplateService;
 
     @Test
-    void contextUsesTheBoundWorkflowSnapshotAndItsRuntimeComponents() {
-        DevelopmentItemWorkflowDetailDTO detail = new DevelopmentItemWorkflowDetailDTO();
-        detail.setItemType("TOPIC");
-        detail.setId(7L);
-        detail.setTitle("订单中心");
-        detail.setTemplateVersionId(88L);
-        detail.setTemplateVersionNo(2);
-        detail.setWorkflowConfigured(true);
-        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
-        node.setId(701L);
-        node.setNodeKey("topic-review");
-        node.setName("专题评审");
-        node.setSort(1);
-        node.setStatus(1);
-        node.setVersion(9);
-        node.setRuntimeComponents(List.of("story-list", "custom-review"));
-        node.setFields(List.of(new WorkflowFieldDefinition(
-                "decision", "评审结论", WorkflowFieldType.TEXTAREA, true, List.of(), true,
-                "topic-review.decision", true)));
-        node.setFieldValues(Map.of("decision", JsonNodeFactory.instance.textNode("继续")));
-        detail.setNodes(List.of(node));
-        when(workflowService.detail(DevelopmentItemType.TOPIC, 7L)).thenReturn(detail);
+    void contextDelegatesWithNormalizedTypeAndPreservesTheWorkflowSnapshot() {
+        AiWorkflowContextDTO contract = new AiWorkflowContextDTO("topic", 7L, 9,
+                new AiWorkflowContextDTO.CurrentNode(701L, "topic-review", "专题评审"),
+                new AiWorkflowContextDTO.Workflow(88L, 2, List.of(
+                        new AiWorkflowContextDTO.Node(701L, "topic-review", "专题评审", 0, 1,
+                                List.of(new AiWorkflowContextDTO.Component("story-list", "story-list",
+                                        List.of(), List.of()),
+                                        new AiWorkflowContextDTO.Component("custom-review", "custom-review",
+                                                List.of(), List.of())),
+                                List.of(), Map.of("decision", "继续")))),
+                List.of(), null, null, null, null);
+        when(readService.context("topic", 7L, ContextReadOptions.legacy())).thenReturn(contract);
 
         AiWorkflowContextDTO context = service().context("topic", 7L);
 
@@ -71,15 +63,19 @@ class DynamicWorkflowCapabilityTest {
         assertThat(context.workflow().nodes()).singleElement().satisfies(item -> {
             assertThat(item.components()).extracting(AiWorkflowContextDTO.Component::key)
                     .containsExactly("story-list", "custom-review");
-            assertThat(item.fields()).extracting(AiWorkflowContextDTO.Field::key)
-                    .containsExactly("decision");
             assertThat(item.fieldValues()).containsEntry("decision", "继续");
         });
+        verify(readService).context("topic", 7L, ContextReadOptions.legacy());
     }
+
+    @org.mockito.Mock com.brad.pms.ai.connector.context.AiWorkflowContextReadService readService;
+    @org.mockito.Mock com.brad.pms.ai.connector.context.AiContextReadPolicy contextReadPolicy;
+    @org.mockito.Mock com.brad.pms.ai.connector.context.AiContextReferenceProjector referenceProjector;
 
     private AiConnectorQueryService service() {
         return new AiConnectorQueryService(projectService, developmentItemService,
                 iterationPlanService, taskQueryService, workflowService, commandRegistry,
-                requirementManagementService, workflowTemplateService);
+                requirementManagementService, workflowTemplateService, readService,
+                contextReadPolicy, referenceProjector);
     }
 }

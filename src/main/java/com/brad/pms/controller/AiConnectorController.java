@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 
@@ -66,9 +67,14 @@ public class AiConnectorController {
     }
 
     @GetMapping("/context/{resourceType}/{resourceId}")
-    public ResponseResult<AiWorkflowContextDTO> context(@PathVariable String resourceType,
-                                                        @PathVariable Long resourceId) {
-        return ResponseResult.success(queryService.context(resourceType, resourceId));
+    public ResponseResult<AiWorkflowContextDTO> context(
+            @PathVariable String resourceType,
+            @PathVariable Long resourceId,
+            @RequestParam(required = false) Long nodeId,
+            @RequestParam(required = false) String view,
+            @RequestParam(required = false) String componentKey) {
+        return ResponseResult.success(queryService.context(resourceType, resourceId,
+                new com.brad.pms.ai.connector.context.ContextReadOptions(view, nodeId, componentKey)));
     }
 
     @PostMapping("/operations/preview")

@@ -18,6 +18,42 @@ tags:
   - name: 研发管理
   - name: 健康检查
 paths:
+  /integration/ai/v1/context/{resourceType}/{resourceId}:
+    get:
+      tags: [研发管理]
+      summary: AI 只读流程上下文（缺省 legacy，focused 需显式请求）
+      parameters:
+        - name: resourceType
+          in: path
+          required: true
+          schema: { type: string, enum: [project, requirement, topic, story] }
+        - name: resourceId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: nodeId
+          in: query
+          required: false
+          schema: { type: integer, format: int64, minimum: 1, description: 显式选择的实际流程节点 }
+        - name: view
+          in: query
+          required: false
+          schema: { type: string, enum: [legacy, focused] }
+        - name: componentKey
+          in: query
+          required: false
+          schema: { type: string, description: 仅 focused 模式允许的精确组件键 }
+      responses:
+        '200':
+          description: 流程上下文（meta.formatVersion=2 为纯读合同）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponse' }
+        '422':
+          description: 聚焦读取超出 512KiB 数据预算（CONTEXT_TOO_LARGE）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
   /auth/providers:
     get:
       tags: [认证]

@@ -71,7 +71,9 @@ public class AiConnectorCapabilityService {
                 "v1",
                 resources,
                 List.copyOf(scopes),
-                Map.of("resourceGet", true),
+                Map.ofEntries(Map.entry("resourceGet", true),
+                        Map.entry("readonlyWorkflowContext", false),
+                        Map.entry("focusedWorkflowContext", false)),
                 workflowTypes(),
                 viewer(),
                 LocalDate.now(BUSINESS_ZONE).toString());

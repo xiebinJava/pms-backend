@@ -7,6 +7,7 @@ import com.brad.pms.ai.command.CommandName;
 import com.brad.pms.ai.command.PmsCommandDescriptor;
 import com.brad.pms.ai.command.PmsCommandMetadata;
 import com.brad.pms.ai.command.PmsCommandRegistry;
+import com.brad.pms.ai.connector.context.ContextReadOptions;
 import com.brad.pms.common.enums.RequirementExecutionTargetType;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.common.page.PageResult;
@@ -67,6 +68,9 @@ public class AiConnectorQueryService {
     private final PmsCommandRegistry commandRegistry;
     private final RequirementManagementService requirementManagementService;
     private final WorkflowTemplateService workflowTemplateService;
+    private final com.brad.pms.ai.connector.context.AiWorkflowContextReadService workflowContextReadService;
+    private final com.brad.pms.ai.connector.context.AiContextReadPolicy contextReadPolicy;
+    private final com.brad.pms.ai.connector.context.AiContextReferenceProjector referenceProjector;
 
     public AiQueryResultDTO query(AiQueryRequest request) {
         String resourceType = normalizeResourceType(request == null ? null : request.resourceType());
@@ -87,18 +91,19 @@ public class AiConnectorQueryService {
     }
 
     public AiWorkflowContextDTO context(String resourceType, Long resourceId) {
+        return context(resourceType, resourceId, ContextReadOptions.legacy());
+    }
+
+    public AiWorkflowContextDTO context(String resourceType, Long resourceId, ContextReadOptions options) {
         String type = normalizeResourceType(resourceType);
         if (resourceId == null) throw BusinessException.notFound("资源不存在");
-        return switch (type) {
-            case "project" -> projectContext(resourceId);
-            case "topic", "story", "requirement" -> developmentItemContext(type, resourceId);
-            default -> throw BusinessException.error("不支持的流程上下文资源类型: " + type);
-        };
+        return workflowContextReadService.context(type, resourceId, options);
     }
 
     public AiResourceDetailDTO resource(String resourceType, Long resourceId) {
         String type = normalizeResourceType(resourceType);
         if (resourceId == null) throw BusinessException.notFound("资源不存在");
+        contextReadPolicy.requireRead(type);
         return switch (type) {
             case "project" -> projectResource(resourceId);
             case "requirement" -> requirementResource(resourceId);
@@ -265,7 +270,7 @@ public class AiConnectorQueryService {
     }
 
     private AiResourceDetailDTO requirementResource(Long requirementId) {
-        RequirementListDTO requirement = requirementManagementService.detail(requirementId);
+        RequirementListDTO requirement = requirementManagementService.detailForContext(requirementId);
         Map<String, Object> details = new LinkedHashMap<>();
         put(details, "id", requirement.getId());
         put(details, "title", requirement.getTitle());
@@ -281,7 +286,9 @@ public class AiConnectorQueryService {
         put(details, "workflowStatus", requirement.getWorkflowStatus());
         put(details, "workflowProgress", requirement.getWorkflowProgress());
         put(details, "executionTarget", requirement.getExecutionTarget());
-        return new AiResourceDetailDTO("requirement", requirement.getId(), requirement.getVersion(), details);
+        Map<String, Object> projected = referenceProjector.projectResourceDetails(
+                "requirement", requirement.getId(), details);
+        return new AiResourceDetailDTO("requirement", requirement.getId(), requirement.getVersion(), projected);
     }
 
     private AiResourceDetailDTO developmentItemResource(String resourceType, Long resourceId) {
