@@ -15,7 +15,7 @@ public final class PmsCommandMetadata {
     public static String domainScope(CommandName name) {
         return switch (name) {
             case BATCH_WRITE -> "pms:command:preview";
-            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
+            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE, REQUIREMENT_ANALYSIS_SAVE,
                  REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
                  REQUIREMENT_EXECUTION_TARGET_UNLINK -> "pms:requirement:write";
             case FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE,
@@ -36,7 +36,7 @@ public final class PmsCommandMetadata {
     /** Resource domains exposed by the command to the dynamic capability catalog. */
     public static List<String> resourceTypes(CommandName name) {
         return switch (name) {
-            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
+            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE, REQUIREMENT_ANALYSIS_SAVE,
                  REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
                  REQUIREMENT_EXECUTION_TARGET_UNLINK -> List.of("requirement");
             case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK -> List.of("topic");
@@ -105,6 +105,22 @@ public final class PmsCommandMetadata {
                     Map.entry("description", Map.of("type", "string")),
                     Map.entry("priority", Map.of("type", "integer", "enum", List.of(0, 1, 2, 3))),
                     Map.entry("ownerId", Map.of("type", "integer"))));
+            case REQUIREMENT_ANALYSIS_SAVE -> new PmsCommandDescriptor(
+                    name,
+                    "保存需求接收与分析成果",
+                    "write",
+                    "high",
+                    true,
+                    List.of("pms:requirement:write", "pms:command:preview", "pms:command:execute"),
+                    Map.of(
+                            "requirementId", Map.of("type", "integer", "required", true),
+                            "nodeId", Map.of("type", "integer", "required", true),
+                            "version", Map.of("type", "integer", "required", true),
+                            "patch", Map.of("type", "object", "required", true,
+                                    "description", "需求接收与分析组件成果字段；仅传需要更新的字段")),
+                    true,
+                    true,
+                    List.of("requirement-detail"));
             case REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE -> descriptor(name,
                     name == CommandName.REQUIREMENT_EXECUTION_TARGET_LINK ? "关联需求执行对象" : "更换需求执行对象",
                     "high", List.of(
@@ -388,7 +404,7 @@ public final class PmsCommandMetadata {
         List<String> refreshScopes = new java.util.ArrayList<>(List.of(
                 "project-detail", "project-list", "project-dashboard", "task-board"));
         switch (name) {
-            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE,
+            case REQUIREMENT_CREATE, REQUIREMENT_UPDATE, REQUIREMENT_ANALYSIS_SAVE,
                  REQUIREMENT_EXECUTION_TARGET_LINK, REQUIREMENT_EXECUTION_TARGET_CHANGE,
                  REQUIREMENT_EXECUTION_TARGET_UNLINK -> refreshScopes.add("requirement-list");
             case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK,

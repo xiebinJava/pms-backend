@@ -8,6 +8,7 @@ public enum CommandName {
     BATCH_WRITE("batch.write"),
     REQUIREMENT_CREATE("requirement.create"),
     REQUIREMENT_UPDATE("requirement.update"),
+    REQUIREMENT_ANALYSIS_SAVE("requirement.analysis.save"),
     REQUIREMENT_EXECUTION_TARGET_LINK("requirement.execution-target.link"),
     REQUIREMENT_EXECUTION_TARGET_CHANGE("requirement.execution-target.change"),
     REQUIREMENT_EXECUTION_TARGET_UNLINK("requirement.execution-target.unlink"),

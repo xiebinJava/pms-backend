@@ -22,6 +22,7 @@ import com.brad.pms.dto.response.SystemListDTO;
 import com.brad.pms.dto.response.SystemVersionDetailDTO;
 import com.brad.pms.dto.response.SystemVersionHistoryDTO;
 import com.brad.pms.dto.response.SystemVersionListDTO;
+import com.brad.pms.dto.response.SystemVersionRelatedItemsDTO;
 import com.brad.pms.entity.SystemDO;
 import com.brad.pms.entity.SystemVersionDO;
 import com.brad.pms.entity.SystemVersionHistoryDO;
@@ -62,6 +63,7 @@ public class SystemVersionManagementService {
     private final UserService userService;
     private final AuthorizationService authorizationService;
     private final OperationLogService operationLogService;
+    private final SystemVersionRelatedItemService relatedItemService;
 
     public PageResult<SystemListDTO> pageSystems(SystemPageQry qry) {
         authorizationService.require(PermissionCode.SYSTEM_VERSION_READ);
@@ -455,6 +457,7 @@ public class SystemVersionManagementService {
         dto.setCreatedByName(Convertors.userDisplayName(users.get(version.getCreatedBy())));
         dto.setCreatedAt(version.getCreatedAt());
         dto.setUpdatedAt(version.getUpdatedAt());
+        dto.setRelatedItems(relatedItemService == null ? new SystemVersionRelatedItemsDTO() : relatedItemService.load(version.getId()));
         return dto;
     }
 

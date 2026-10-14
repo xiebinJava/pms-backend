@@ -19,6 +19,7 @@ import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -36,7 +37,7 @@ class AiConnectorCapabilityServiceTest {
     }
 
     @Test
-    void publishesOnlyTheCommandsAvailableToTheCurrentDelegatedScope() {
+    void publishesOnlyTheCommandsAvailableToTheCurrentDelegatedScope() throws Exception {
         UserContext.set(new LoginUser(7L, "alex", "张伟"));
         WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
         UserService userService = mock(UserService.class);
@@ -62,7 +63,7 @@ class AiConnectorCapabilityServiceTest {
         when(workflowTemplateService.getDefinition(99L)).thenReturn(new WorkflowTemplateDefinition(2, List.of(
                 new WorkflowNodeDefinition("custom-node", "自定义节点", null, null, null,
                         List.of("development-control"), List.of(), false, List.of()))));
-        when(workflowTemplateService.listProjectTypes()).thenReturn(List.of(topicType, customType));
+        when(workflowTemplateService.listProjectCreationTypes()).thenReturn(List.of(topicType, customType));
         when(workflowTemplateService.listTemplates(null, true)).thenReturn(List.of(topic, custom));
         UserDO viewer = new UserDO();
         viewer.setId(7L);
@@ -84,6 +85,8 @@ class AiConnectorCapabilityServiceTest {
         assertThat(result.workflowTypes()).hasSize(2);
         assertThat(result.workflowTypes()).extracting(AiCapabilityDTO.WorkflowTypeCapability::processType)
                 .containsExactly("topic-management", "custom-management");
+        assertThat(result.workflowTypes()).extracting(AiCapabilityDTO.WorkflowTypeCapability::projectTypeId)
+                .containsExactly(2L, 9L);
         assertThat(result.workflowTypes().get(0).templates()).singleElement().satisfies(version -> {
             assertThat(version.templateVersionId()).isEqualTo(88L);
             assertThat(version.versionNo()).isEqualTo(2);
@@ -93,6 +96,8 @@ class AiConnectorCapabilityServiceTest {
         assertThat(customNode.components()).singleElement()
                 .satisfies(component -> assertThat(component.actions()).contains("topic.create"));
         assertThat(result.viewer().id()).isEqualTo(7L);
+        String wire = new ObjectMapper().writeValueAsString(result);
+        assertThat(wire).contains("\"features\":{\"resourceGet\":true}");
     }
 
     private static PmsCommand command(CommandName name) {

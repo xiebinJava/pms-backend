@@ -9,6 +9,8 @@ import com.brad.pms.service.DevelopmentItemService;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.service.IterationPlanService;
 import com.brad.pms.service.ProjectService;
+import com.brad.pms.service.RequirementManagementService;
+import com.brad.pms.service.WorkflowTemplateService;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowFieldType;
@@ -33,6 +35,8 @@ class DynamicWorkflowCapabilityTest {
     @Mock AiTaskQueryService taskQueryService;
     @Mock DevelopmentItemWorkflowService workflowService;
     @Mock PmsCommandRegistry commandRegistry;
+    @Mock RequirementManagementService requirementManagementService;
+    @Mock WorkflowTemplateService workflowTemplateService;
 
     @Test
     void contextUsesTheBoundWorkflowSnapshotAndItsRuntimeComponents() {
@@ -49,6 +53,7 @@ class DynamicWorkflowCapabilityTest {
         node.setName("专题评审");
         node.setSort(1);
         node.setStatus(1);
+        node.setVersion(9);
         node.setRuntimeComponents(List.of("story-list", "custom-review"));
         node.setFields(List.of(new WorkflowFieldDefinition(
                 "decision", "评审结论", WorkflowFieldType.TEXTAREA, true, List.of(), true,
@@ -61,6 +66,7 @@ class DynamicWorkflowCapabilityTest {
 
         assertThat(context.workflow().templateVersionId()).isEqualTo(88L);
         assertThat(context.workflow().templateVersionNo()).isEqualTo(2);
+        assertThat(context.version()).isEqualTo(9);
         assertThat(context.currentNode().key()).isEqualTo("topic-review");
         assertThat(context.workflow().nodes()).singleElement().satisfies(item -> {
             assertThat(item.components()).extracting(AiWorkflowContextDTO.Component::key)
@@ -73,6 +79,7 @@ class DynamicWorkflowCapabilityTest {
 
     private AiConnectorQueryService service() {
         return new AiConnectorQueryService(projectService, developmentItemService,
-                iterationPlanService, taskQueryService, workflowService, commandRegistry);
+                iterationPlanService, taskQueryService, workflowService, commandRegistry,
+                requirementManagementService, workflowTemplateService);
     }
 }

@@ -13,8 +13,13 @@ import com.brad.pms.service.DevelopmentItemService;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.service.IterationPlanService;
 import com.brad.pms.service.ProjectService;
+import com.brad.pms.service.RequirementManagementService;
+import com.brad.pms.service.WorkflowTemplateService;
 import com.brad.pms.ai.query.AiTaskQueryService;
 import com.brad.pms.ai.command.PmsCommandRegistry;
+import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
+import com.brad.pms.workflow.WorkflowNodeDefinition;
+import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -38,6 +43,8 @@ class AiConnectorQueryServiceTest {
     @Mock AiTaskQueryService taskQueryService;
     @Mock DevelopmentItemWorkflowService workflowService;
     @Mock PmsCommandRegistry commandRegistry;
+    @Mock RequirementManagementService requirementManagementService;
+    @Mock WorkflowTemplateService workflowTemplateService;
 
     @Test
     void queriesResourcesThroughExistingPermissionAwareServices() {
@@ -103,8 +110,34 @@ class AiConnectorQueryServiceTest {
                 .hasMessageContaining("不支持");
     }
 
+    @Test
+    void projectContextPreservesTemplateNodePositions() {
+        ProjectDTO project = new ProjectDTO();
+        project.setId(78L);
+        project.setVersion(3);
+        project.setWorkflowTemplateVersionId(88L);
+        project.setCurrentNodeKey("delivery");
+        project.setCurrentNodeName("交付");
+        when(projectService.detail(78L)).thenReturn(project);
+        when(workflowTemplateService.getDefinition(88L)).thenReturn(new WorkflowTemplateDefinition(2, List.of(
+                projectNode("intake", "接收"), projectNode("delivery", "交付"))));
+        when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
+
+        AiWorkflowContextDTO context = service().context("project", 78L);
+
+        assertThat(context.workflow().nodes()).extracting(AiWorkflowContextDTO.Node::position)
+                .containsExactly(0, 1);
+        assertThat(context.workflow().nodes()).extracting(AiWorkflowContextDTO.Node::status)
+                .containsExactly(0, 1);
+    }
+
+    private WorkflowNodeDefinition projectNode(String key, String name) {
+        return new WorkflowNodeDefinition(key, name, null, null, null, List.of(), List.of(), false, List.of());
+    }
+
     private AiConnectorQueryService service() {
         return new AiConnectorQueryService(projectService, developmentItemService,
-                iterationPlanService, taskQueryService, workflowService, commandRegistry);
+                iterationPlanService, taskQueryService, workflowService, commandRegistry,
+                requirementManagementService, workflowTemplateService);
     }
 }

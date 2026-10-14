@@ -71,13 +71,14 @@ public class AiConnectorCapabilityService {
                 "v1",
                 resources,
                 List.copyOf(scopes),
+                Map.of("resourceGet", true),
                 workflowTypes(),
                 viewer(),
                 LocalDate.now(BUSINESS_ZONE).toString());
     }
 
     private List<AiCapabilityDTO.WorkflowTypeCapability> workflowTypes() {
-        List<ProjectTypeDTO> activeTypes = workflowTemplateService.listProjectTypes();
+        List<ProjectTypeDTO> activeTypes = workflowTemplateService.listProjectCreationTypes();
         List<WorkflowTemplateSummaryDTO> publishedTemplates = workflowTemplateService.listTemplates(null, true);
         Map<Long, List<WorkflowTemplateSummaryDTO>> templatesByType = publishedTemplates.stream()
                 .filter(summary -> summary != null && summary.getProjectTypeId() != null)
@@ -88,13 +89,13 @@ public class AiConnectorCapabilityService {
         List<AiCapabilityDTO.WorkflowTypeCapability> result = new ArrayList<>();
         for (ProjectTypeDTO type : activeTypes) {
             if (type == null || type.getId() == null || type.getCode() == null || type.getCode().isBlank()) continue;
-            addWorkflowType(result, type.getCode(), type.getName(), templatesByType.get(type.getId()));
+            addWorkflowType(result, type.getId(), type.getCode(), type.getName(), templatesByType.get(type.getId()));
         }
         return List.copyOf(result);
     }
 
     private void addWorkflowType(List<AiCapabilityDTO.WorkflowTypeCapability> target,
-                                 String processType, String label,
+                                 Long projectTypeId, String processType, String label,
                                  List<WorkflowTemplateSummaryDTO> summaries) {
         if (summaries == null || summaries.isEmpty()) return;
         List<AiCapabilityDTO.WorkflowTemplateCapability> templates = new ArrayList<>();
@@ -116,7 +117,7 @@ public class AiConnectorCapabilityService {
             }
         }
         if (!templates.isEmpty()) {
-            target.add(new AiCapabilityDTO.WorkflowTypeCapability(processType, label, templates));
+            target.add(new AiCapabilityDTO.WorkflowTypeCapability(projectTypeId, processType, label, templates));
         }
     }
 

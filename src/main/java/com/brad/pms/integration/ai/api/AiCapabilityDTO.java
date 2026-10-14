@@ -8,6 +8,7 @@ public record AiCapabilityDTO(
         String version,
         List<ResourceCapability> resources,
         List<String> scopes,
+        Map<String, Boolean> features,
         List<WorkflowTypeCapability> workflowTypes,
         Viewer viewer,
         String today) {
@@ -15,6 +16,7 @@ public record AiCapabilityDTO(
     public AiCapabilityDTO {
         resources = resources == null ? List.of() : List.copyOf(resources);
         scopes = scopes == null ? List.of() : List.copyOf(scopes);
+        features = features == null ? Map.of() : Map.copyOf(features);
         workflowTypes = workflowTypes == null ? List.of() : List.copyOf(workflowTypes);
     }
 
@@ -42,6 +44,7 @@ public record AiCapabilityDTO(
     }
 
     public record WorkflowTypeCapability(
+            Long projectTypeId,
             String processType,
             String label,
             List<WorkflowTemplateCapability> templates) {

@@ -38,6 +38,16 @@ class AiCommandContractTest {
     }
 
     @Test
+    void requirementAnalysisSavePublishesItsNarrowWriteContract() {
+        var descriptor = PmsCommandMetadata.descriptor(CommandName.REQUIREMENT_ANALYSIS_SAVE);
+
+        assertThat(descriptor.scopes()).containsExactly(
+                "pms:requirement:write", "pms:command:preview", "pms:command:execute");
+        assertThat(descriptor.parameters()).containsKeys("requirementId", "nodeId", "version", "patch");
+        assertThat(descriptor.refreshScopes()).containsExactly("requirement-detail");
+    }
+
+    @Test
     void previewRequestDoesNotAcceptAnExecutionIdempotencyKey() {
         CommandPreviewRequest request = new CommandPreviewRequest(
                 CommandName.TASK_CREATE,

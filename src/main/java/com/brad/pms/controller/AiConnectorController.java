@@ -13,6 +13,7 @@ import com.brad.pms.integration.ai.api.AiOperationPreviewDTO;
 import com.brad.pms.integration.ai.api.AiOperationPreviewRequest;
 import com.brad.pms.integration.ai.api.AiQueryRequest;
 import com.brad.pms.integration.ai.api.AiQueryResultDTO;
+import com.brad.pms.integration.ai.api.AiResourceDetailDTO;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.integration.ai.security.AiConnectorScopePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,12 @@ public class AiConnectorController {
     @PostMapping("/query")
     public ResponseResult<AiQueryResultDTO> query(@RequestBody AiQueryRequest request) {
         return ResponseResult.success(queryService.query(request));
+    }
+
+    @GetMapping("/resources/{resourceType}/{resourceId}")
+    public ResponseResult<AiResourceDetailDTO> resource(@PathVariable String resourceType,
+                                                         @PathVariable Long resourceId) {
+        return ResponseResult.success(queryService.resource(resourceType, resourceId));
     }
 
     @GetMapping("/context/{resourceType}/{resourceId}")

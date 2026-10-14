@@ -23,14 +23,19 @@ import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.RequirementListDTO;
 import com.brad.pms.integration.ai.api.AiQueryRequest;
 import com.brad.pms.integration.ai.api.AiQueryResultDTO;
+import com.brad.pms.integration.ai.api.AiResourceDetailDTO;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.service.DevelopmentItemService;
 import com.brad.pms.service.DevelopmentItemWorkflowService;
 import com.brad.pms.service.IterationPlanService;
 import com.brad.pms.service.ProjectService;
+import com.brad.pms.service.RequirementManagementService;
+import com.brad.pms.service.WorkflowTemplateService;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
+import com.brad.pms.workflow.WorkflowNodeDefinition;
+import com.brad.pms.workflow.WorkflowTemplateDefinition;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -60,6 +65,8 @@ public class AiConnectorQueryService {
     private final AiTaskQueryService taskQueryService;
     private final DevelopmentItemWorkflowService workflowService;
     private final PmsCommandRegistry commandRegistry;
+    private final RequirementManagementService requirementManagementService;
+    private final WorkflowTemplateService workflowTemplateService;
 
     public AiQueryResultDTO query(AiQueryRequest request) {
         String resourceType = normalizeResourceType(request == null ? null : request.resourceType());
@@ -86,6 +93,17 @@ public class AiConnectorQueryService {
             case "project" -> projectContext(resourceId);
             case "topic", "story", "requirement" -> developmentItemContext(type, resourceId);
             default -> throw BusinessException.error("不支持的流程上下文资源类型: " + type);
+        };
+    }
+
+    public AiResourceDetailDTO resource(String resourceType, Long resourceId) {
+        String type = normalizeResourceType(resourceType);
+        if (resourceId == null) throw BusinessException.notFound("资源不存在");
+        return switch (type) {
+            case "project" -> projectResource(resourceId);
+            case "requirement" -> requirementResource(resourceId);
+            case "topic", "story" -> developmentItemResource(type, resourceId);
+            default -> throw BusinessException.error("不支持的资源详情类型: " + type);
         };
     }
 
@@ -195,8 +213,100 @@ public class AiConnectorQueryService {
         ProjectDTO project = projectService.detail(projectId);
         AiWorkflowContextDTO.CurrentNode currentNode = project.getCurrentNodeKey() == null
                 ? null : new AiWorkflowContextDTO.CurrentNode(null, project.getCurrentNodeKey(), project.getCurrentNodeName());
+        WorkflowTemplateDefinition definition = workflowTemplateService.getDefinition(project.getWorkflowTemplateVersionId());
+        List<WorkflowNodeDefinition> definitions = safe(definition.nodes());
+        List<AiWorkflowContextDTO.Node> nodes = new ArrayList<>();
+        for (int position = 0; position < definitions.size(); position++) {
+            nodes.add(toProjectContextNode(definitions.get(position), project.getCurrentNodeKey(), position));
+        }
+        AiWorkflowContextDTO.Workflow workflow = new AiWorkflowContextDTO.Workflow(
+                project.getWorkflowTemplateVersionId(),
+                workflowTemplateService.getVersionNo(project.getWorkflowTemplateVersionId()),
+                nodes);
         return new AiWorkflowContextDTO("project", project.getId(), project.getVersion(), currentNode,
-                null, allowedProjectActions());
+                workflow, allowedProjectActions());
+    }
+
+    private AiWorkflowContextDTO.Node toProjectContextNode(
+            WorkflowNodeDefinition node, String currentNodeKey, int position) {
+        List<AiWorkflowContextDTO.Field> nodeFields = fields(node.fields());
+        List<String> actions = workflowComponentActions("project");
+        List<AiWorkflowContextDTO.Component> components = safe(node.runtimeComponents()).stream()
+                .filter(StringUtils::hasText)
+                .map(key -> new AiWorkflowContextDTO.Component(key, key, nodeFields, actions)).toList();
+        Integer status = Objects.equals(node.key(), currentNodeKey) ? 1 : 0;
+        return new AiWorkflowContextDTO.Node(null, node.key(), node.name(), position, status,
+                components, nodeFields, Map.of());
+    }
+
+    private AiResourceDetailDTO projectResource(Long projectId) {
+        ProjectDTO project = projectService.detail(projectId);
+        Map<String, Object> details = new LinkedHashMap<>();
+        put(details, "id", project.getId());
+        put(details, "code", project.getCode());
+        put(details, "name", project.getName());
+        put(details, "description", project.getDescription());
+        put(details, "status", project.getStatus());
+        put(details, "priority", project.getPriority());
+        put(details, "projectLevel", project.getProjectLevel());
+        put(details, "projectTypeId", project.getProjectTypeId());
+        put(details, "workflowTemplateVersionId", project.getWorkflowTemplateVersionId());
+        put(details, "ownerId", project.getOwnerId());
+        put(details, "ownerName", project.getOwnerName());
+        put(details, "projectManagerId", project.getProjectManagerId());
+        put(details, "projectManagerName", project.getProjectManagerName());
+        put(details, "orgUnitId", project.getOrgUnitId());
+        put(details, "orgUnitName", project.getOrgUnitName());
+        put(details, "startDate", project.getStartDate());
+        put(details, "endDate", project.getEndDate());
+        put(details, "currentNodeKey", project.getCurrentNodeKey());
+        put(details, "currentNodeName", project.getCurrentNodeName());
+        return new AiResourceDetailDTO("project", project.getId(), project.getVersion(), details);
+    }
+
+    private AiResourceDetailDTO requirementResource(Long requirementId) {
+        RequirementListDTO requirement = requirementManagementService.detail(requirementId);
+        Map<String, Object> details = new LinkedHashMap<>();
+        put(details, "id", requirement.getId());
+        put(details, "title", requirement.getTitle());
+        put(details, "description", requirement.getDescription());
+        put(details, "priority", requirement.getPriority());
+        put(details, "ownerId", requirement.getOwnerId());
+        put(details, "ownerName", requirement.getOwnerName());
+        put(details, "orgUnitId", requirement.getOrgUnitId());
+        put(details, "systemId", requirement.getSystemId());
+        put(details, "status", requirement.getStatus());
+        put(details, "version", requirement.getVersion());
+        put(details, "workflowConfigured", requirement.getWorkflowConfigured());
+        put(details, "workflowStatus", requirement.getWorkflowStatus());
+        put(details, "workflowProgress", requirement.getWorkflowProgress());
+        put(details, "executionTarget", requirement.getExecutionTarget());
+        return new AiResourceDetailDTO("requirement", requirement.getId(), requirement.getVersion(), details);
+    }
+
+    private AiResourceDetailDTO developmentItemResource(String resourceType, Long resourceId) {
+        DevelopmentItemType itemType = "topic".equals(resourceType)
+                ? DevelopmentItemType.TOPIC : DevelopmentItemType.STORY;
+        DevelopmentItemWorkflowDetailDTO item = workflowService.detail(itemType, resourceId);
+        Map<String, Object> details = new LinkedHashMap<>();
+        put(details, "id", item.getId());
+        put(details, "title", item.getTitle());
+        put(details, "projectId", item.getProjectId());
+        put(details, "projectCode", item.getProjectCode());
+        put(details, "projectName", item.getProjectName());
+        put(details, "topicId", item.getTopicId());
+        put(details, "topicTitle", item.getTopicTitle());
+        put(details, "ownerId", item.getOwnerId());
+        put(details, "ownerName", item.getOwnerName());
+        put(details, "developmentStatus", item.getDevelopmentStatus());
+        put(details, "developmentProgress", item.getDevelopmentProgress());
+        put(details, "iterationPlanId", item.getIterationPlanId());
+        put(details, "iterationPlanName", item.getIterationPlanName());
+        put(details, "workflowConfigured", item.getWorkflowConfigured());
+        put(details, "workflowStatus", item.getWorkflowStatus());
+        put(details, "templateVersionId", item.getTemplateVersionId());
+        put(details, "templateVersionNo", item.getTemplateVersionNo());
+        return new AiResourceDetailDTO(resourceType, item.getId(), null, details);
     }
 
     private AiWorkflowContextDTO developmentItemContext(String resourceType, Long resourceId) {
@@ -212,16 +322,19 @@ public class AiConnectorQueryService {
         for (int position = 0; position < sourceNodes.size(); position++) {
             nodes.add(toContextNode(sourceNodes.get(position), resourceType, position));
         }
-        AiWorkflowContextDTO.CurrentNode current = sourceNodes.stream()
+        DevelopmentItemWorkflowNodeDTO currentSourceNode = sourceNodes.stream()
                 .filter(node -> Objects.equals(node.getStatus(), 1)).findFirst()
                 .or(() -> sourceNodes.stream().findFirst())
-                .map(node -> new AiWorkflowContextDTO.CurrentNode(node.getId(), node.getNodeKey(), node.getName()))
                 .orElse(null);
+        AiWorkflowContextDTO.CurrentNode current = currentSourceNode == null ? null
+                : new AiWorkflowContextDTO.CurrentNode(
+                        currentSourceNode.getId(), currentSourceNode.getNodeKey(), currentSourceNode.getName());
         AiWorkflowContextDTO.Workflow workflow = Boolean.TRUE.equals(detail.getWorkflowConfigured())
                 || !nodes.isEmpty()
                 ? new AiWorkflowContextDTO.Workflow(detail.getTemplateVersionId(), detail.getTemplateVersionNo(), nodes)
                 : null;
-        Integer contextVersion = detail.getTemplateVersionNo();
+        Integer contextVersion = currentSourceNode == null || currentSourceNode.getVersion() == null
+                ? detail.getTemplateVersionNo() : currentSourceNode.getVersion();
         return new AiWorkflowContextDTO(resourceType, resourceId, contextVersion, current, workflow,
                 allowedDevelopmentActions(resourceType));
     }

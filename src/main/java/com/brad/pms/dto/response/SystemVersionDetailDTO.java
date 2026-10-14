@@ -23,4 +23,5 @@ public class SystemVersionDetailDTO {
     private String createdByName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private SystemVersionRelatedItemsDTO relatedItems;
 }

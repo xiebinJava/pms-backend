@@ -76,7 +76,7 @@ public class WorkflowTemplateService {
                 .stream().map(this::toProjectTypeDTO).toList();
     }
 
-    private List<ProjectTypeDTO> listProjectCreationTypes() {
+    public List<ProjectTypeDTO> listProjectCreationTypes() {
         return projectTypeMapper.selectList(new LambdaQueryWrapper<ProjectTypeDO>()
                         .eq(ProjectTypeDO::getStatus, 1)
                         .ne(ProjectTypeDO::getProjectCreationEnabled, false)
@@ -660,6 +660,14 @@ public class WorkflowTemplateService {
         WorkflowTemplateVersionDO version = versionMapper.selectById(versionId);
         if (version == null) throw BusinessException.error("流程模板版本不存在");
         return normalizeDefinition(version, parse(version.getDefinitionJson()));
+    }
+
+    /** Returns the persisted version number for a pinned workflow binding. */
+    public Integer getVersionNo(Long versionId) {
+        if (versionId == null) return null;
+        WorkflowTemplateVersionDO version = versionMapper.selectById(versionId);
+        if (version == null) throw BusinessException.error("流程模板版本不存在");
+        return version.getVersionNo();
     }
 
     public WorkflowNodeDefinition getNodeDefinition(Long versionId, String nodeKey) {
