@@ -10,7 +10,7 @@
 
 **Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
-状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
+状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6-9 未执行。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
 ## Global Constraints
 
@@ -136,11 +136,11 @@ Node.fieldValuesState 的枚举为 LOADED/NOT_REQUESTED/UNAVAILABLE；ContextMet
 
 AiDevelopmentComponentReader 签名按 Spec：JSON 型组件和 requirement-execution 先完成，后者从纯读 detail.executionTarget 读取、versions.entity=真实需求版本；无 JSON 但有绑定不能 EMPTY，不可读目标投影后 content={}、referencesScope=readable-only，不暴露目标。story-list/split 在 Task8接入真实故事表。
 
-- [ ] **Step 1：失败用例。** 实际节点2/1/0及历史选择；真实 entity/workflow/template/node/field/content 版本分离；legacy 保留 __components，focused 全部去掉、历史字段 NOT_REQUESTED、selected 组件正文仅一次；component 筛选不调用其他 get。无实例不创建且 get.workflowConfigured=false；READ/引用投影覆盖四类 get。focused 字节预算 524288 可过、524289 拒绝422且无成功 data，多字节中文按 UTF-8 计；legacy不限制。非法参数400、归属404、绑定409。门面 Clock 固定，元信息 scope/state 正确。委托 query scope 能访问四类 GET resources/context，缺 scope、非许可路由/方法拒绝；普通 CLI session仍依赖用户模块READ，不能伪称 session天然只读。
-- [ ] **Step 2：失败验证。** B: mvn -Dtest=AiProjectContextReaderTest,AiDevelopmentContextReaderTest,AiDevelopmentComponentReaderTest,AiWorkflowContextReadServiceTest,AiContextResponseBudgetTest,AiConnectorQueryServiceTest,AiConnectorCapabilityServiceTest,AiConnectorControllerTest,AiDelegationRoutePolicyTest test。研发组件测试覆盖无 JSON 有执行绑定、无绑定、不可读绑定、entityVersion与node.version不同四种情况。
-- [ ] **Step 3：实现切片。** 门面代理只读RR，装配/权限/投影/预算同一事务。project 用实际节点；development 用纯读实例及 nodeTaskSummaries，不复制 DTO 回退状态。focused 提取 __components 到唯一 content，selected 普通字段保留；非 selected 不加载新增内容。四类 resource 经代理RR，同一引用规则，并纠正需求流程摘要。scope route 仅补精确 GET resources 四类读取路径，保留其他授权规则；不放开 operations。两个新feature保持 false。
-- [ ] **Step 4：验证。** 重跑 Step 2、./scripts/validate-openapi.sh、git diff --check。接口/单元通过不等于数据库证明；不得更改写服务以绕过纯读失败。
-- [ ] **Step 5：提交。** feat: add focused readonly workflow context slice。
+- [x] **Step 1：失败用例。** 实际节点2/1/0及历史选择；真实 entity/workflow/template/node/field/content 版本分离；legacy 保留 __components，focused 全部去掉、历史字段 NOT_REQUESTED、selected 组件正文仅一次；component 筛选不调用其他 get。无实例不创建且 get.workflowConfigured=false；READ/引用投影覆盖四类 get。focused 字节预算 524288 可过、524289 拒绝422且无成功 data，多字节中文按 UTF-8 计；legacy不限制。非法参数400、归属404、绑定409。门面 Clock 固定，元信息 scope/state 正确。委托 query scope 能访问四类 GET resources/context，缺 scope、非许可路由/方法拒绝；普通 CLI session仍依赖用户模块READ，不能伪称 session天然只读。
+- [x] **Step 2：失败验证。** B: mvn -Dtest=AiProjectContextReaderTest,AiDevelopmentContextReaderTest,AiDevelopmentComponentReaderTest,AiWorkflowContextReadServiceTest,AiContextResponseBudgetTest,AiConnectorQueryServiceTest,AiConnectorCapabilityServiceTest,AiConnectorControllerTest,AiDelegationRoutePolicyTest test。研发组件测试覆盖无 JSON 有执行绑定、无绑定、不可读绑定、entityVersion与node.version不同四种情况。
+- [x] **Step 3：实现切片。** 门面代理只读RR，装配/权限/投影/预算同一事务。project 用实际节点；development 用纯读实例及 nodeTaskSummaries，不复制 DTO 回退状态。focused 提取 __components 到唯一 content，selected 普通字段保留；非 selected 不加载新增内容。四类 resource 经代理RR，同一引用规则，并纠正需求流程摘要。scope route 仅补精确 GET resources 四类读取路径，保留其他授权规则；不放开 operations。两个新feature保持 false。
+- [x] **Step 4：验证。** 重跑 Step 2、./scripts/validate-openapi.sh、git diff --check。接口/单元通过不等于数据库证明；不得更改写服务以绕过纯读失败。
+- [x] **Step 5：提交。** feat: add focused readonly workflow context slice。
 
 ### Task 6：提前完成隔离数据库纯读和 RR 证明
 
