@@ -138,9 +138,34 @@ public record AiWorkflowContextDTO(
             Integer workflowInstanceVersion,
             String permissionsScope,
             String referencesScope,
+            String contextVersion,
             List<Warning> warnings) {
         public ContextMeta {
             warnings = warnings == null ? List.of() : List.copyOf(warnings);
+        }
+
+        /** Source-compatible constructor for older context readers and fixtures. */
+        public ContextMeta(
+                int formatVersion,
+                boolean pureRead,
+                Instant loadedAt,
+                String businessTimezone,
+                String view,
+                String fieldValuesScope,
+                String componentContentScope,
+                Long selectedNodeId,
+                String selectedComponentKey,
+                boolean workflowConfigured,
+                String workflowStatus,
+                String terminalStatus,
+                Integer workflowInstanceVersion,
+                String permissionsScope,
+                String referencesScope,
+                List<Warning> warnings) {
+            this(formatVersion, pureRead, loadedAt, businessTimezone, view, fieldValuesScope,
+                    componentContentScope, selectedNodeId, selectedComponentKey, workflowConfigured,
+                    workflowStatus, terminalStatus, workflowInstanceVersion, permissionsScope,
+                    referencesScope, null, warnings);
         }
     }
 }

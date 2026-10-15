@@ -94,7 +94,7 @@ class AiProjectContextReaderTest {
         com.fasterxml.jackson.databind.JsonNode basicContent =
                 com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
                         .valueToTree(java.util.Collections.<String, Object>singletonMap("name", "订单中心"));
-        when(componentReader.read(any(), any(), any()))
+        when(componentReader.read(any(), any(), any(), any(), any()))
                 .thenReturn(List.of(new AiWorkflowContextDTO.Component("project-basic-info",
                         "project-basic-info", List.of(), List.of(), null,
                         basicContent,
@@ -124,6 +124,7 @@ class AiProjectContextReaderTest {
         assertThat(context.meta().fieldValuesScope()).isEqualTo("all-nodes");
         assertThat(context.meta().formatVersion()).isEqualTo(2);
         assertThat(context.meta().pureRead()).isTrue();
+        assertThat(context.meta().contextVersion()).isEqualTo("project:7:entity:3");
     }
 
     @Test
@@ -134,7 +135,7 @@ class AiProjectContextReaderTest {
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(
                 node(301L, "kickoff", 0, 0), node(299L, "design", 1, 1)));
         when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
-        when(componentReader.read(any(), any(), any())).thenReturn(List.of());
+        when(componentReader.read(any(), any(), any(), any(), any())).thenReturn(List.of());
         lenient().when(taskService.summarizeByNode(any(), any()))
                 .thenReturn(new com.brad.pms.dto.response.NodeTaskSummaryDTO(0, 0, 0));
         lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
@@ -187,7 +188,7 @@ class AiProjectContextReaderTest {
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(
                 node(301L, "kickoff", 0, 1), node(299L, "design", 1, 0)));
         when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
-        when(componentReader.read(any(), any(), any())).thenReturn(List.of(
+        when(componentReader.read(any(), any(), any(), any(), any())).thenReturn(List.of(
                 new AiWorkflowContextDTO.Component("project-basic-info", "project-basic-info",
                         List.of(), List.of(), null, null, "EMPTY", null, null)));
         lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
@@ -218,7 +219,7 @@ class AiProjectContextReaderTest {
         unknown.setFieldValues(new java.util.HashMap<>(node(301L, "mystery", 0, 1).getFieldValues()));
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(unknown));
         when(workflowTemplateService.getVersionNo(88L)).thenReturn(null);
-        when(componentReader.read(any(), any(), any())).thenReturn(List.of());
+        when(componentReader.read(any(), any(), any(), any(), any())).thenReturn(List.of());
         lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
         lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(2));
@@ -276,7 +277,7 @@ class AiProjectContextReaderTest {
                         .put("solution-design", "原始组件正文")));
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(node));
         when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
-        when(componentReader.read(any(), any(), any())).thenReturn(List.of());
+        when(componentReader.read(any(), any(), any(), any(), any())).thenReturn(List.of());
         lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
         lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(2));
@@ -298,7 +299,7 @@ class AiProjectContextReaderTest {
         when(nodeService.listReadOnly(7L)).thenReturn(List.of(
                 node(301L, "kickoff", 0, 1)));
         when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
-        when(componentReader.read(any(), any(), any())).thenReturn(List.of());
+        when(componentReader.read(any(), any(), any(), any(), any())).thenReturn(List.of());
         lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
         lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(2));
@@ -346,5 +347,30 @@ class AiProjectContextReaderTest {
                     assertThat(thrown.getCode()).isEqualTo(422);
                     assertThat(thrown.getMessage()).startsWith("NO_SELECTED_NODE:");
                 });
+    }
+
+    @Test
+    void projectComponentWarningsReachTheFinalContextMetadata() {
+        when(projectService.detail(7L)).thenReturn(project());
+        when(nodeService.listReadOnly(7L)).thenReturn(List.of(node(301L, "kickoff", 0, 1)));
+        when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
+        when(componentReader.read(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            List<String> warnings = (List<String>) invocation.getArgument(3);
+            warnings.add("UNKNOWN_VERSION:content");
+            return List.of(new AiWorkflowContextDTO.Component("project-basic-info", "project-basic-info",
+                    List.of(), List.of(), null, null, "LOADED", Map.of("content", 3), null));
+        });
+        lenient().when(topicMapper.selectList(any())).thenReturn(List.of());
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(allowedActionsRegistry.projectActions()).thenReturn(List.of());
+
+        AiWorkflowContextDTO context = reader().read(7L, ContextReadOptions.legacy());
+
+        assertThat(context.meta().warnings()).extracting(AiWorkflowContextDTO.Warning::code)
+                .contains("UNKNOWN_VERSION");
     }
 }

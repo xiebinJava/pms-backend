@@ -91,7 +91,7 @@ class AiWorkflowContextDTOTest {
                 2, true, Instant.EPOCH, "Asia/Shanghai", "focused",
                 "selected-node", "selected-component", 301L, "solution-design",
                 true, "IN_PROGRESS", null, 5,
-                "business-user", "readable-only", List.of());
+                "business-user", "readable-only", "project:7:entity:3", List.of());
 
         assertThat(meta.formatVersion()).isEqualTo(2);
         assertThat(meta.pureRead()).isTrue();
@@ -108,6 +108,7 @@ class AiWorkflowContextDTOTest {
         assertThat(meta.workflowInstanceVersion()).isEqualTo(5);
         assertThat(meta.permissionsScope()).isEqualTo("business-user");
         assertThat(meta.referencesScope()).isEqualTo("readable-only");
+        assertThat(meta.contextVersion()).isEqualTo("project:7:entity:3");
         assertThat(meta.warnings()).isEmpty();
     }
 

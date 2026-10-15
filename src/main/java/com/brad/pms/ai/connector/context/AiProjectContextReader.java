@@ -49,6 +49,13 @@ public class AiProjectContextReader {
     private final Clock clock;
 
     public AiWorkflowContextDTO read(Long projectId, ContextReadOptions options) {
+        return read(projectId, options, null);
+    }
+
+    public AiWorkflowContextDTO read(Long projectId, ContextReadOptions options,
+                                     ReadAuthorizationSnapshot authorizationSnapshot) {
+        AiContextReferenceProjector projector = authorizationSnapshot == null
+                ? referenceProjector : referenceProjector.scoped(authorizationSnapshot);
         com.brad.pms.dto.response.ProjectDTO project = projectService.detail(projectId);
         List<ProjectNodeDTO> nodes = orderedNodes(nodeService.listReadOnly(projectId));
         List<NodeRef> refs = nodeRefs(nodes);
@@ -74,7 +81,7 @@ public class AiProjectContextReader {
             if (!hasDefinition) unresolvedNodeConfig = true;
 
             List<AiWorkflowContextDTO.Component> components = isSelected
-                    ? readSelectedComponents(project, node, options.componentKey(), unknownComponents)
+                    ? readSelectedComponents(project, node, options.componentKey(), unknownComponents, projector)
                     : placeholderComponents(node);
             Map<String, Object> fieldValues;
             Map<String, Integer> fieldValueVersions;
@@ -92,7 +99,7 @@ public class AiProjectContextReader {
                         : new LinkedHashMap<>(node.getFieldValues());
                 // 项目 focused 也不携带组件原始 JSON（去重，正文仅来自 selected component 内容）。
                 if (focused) original.remove("__components");
-                fieldValues = referenceProjector.projectFieldValues("project", projectId, original);
+                fieldValues = projector.projectFieldValues("project", projectId, original);
                 fieldValueVersions = node.getFieldValueVersions();
                 fieldValuesState = "LOADED";
             }
@@ -127,13 +134,19 @@ public class AiProjectContextReader {
                         workflowTemplateService.getVersionNo(project.getWorkflowTemplateVersionId()),
                         contractNodes)
                 : null;
-        Map<String, Object> details = resourceDetails(project);
-        List<AiWorkflowContextDTO.Relation> relations = relations(projectId);
+        Map<String, Object> details = resourceDetails(project, projector);
+        List<AiWorkflowContextDTO.Relation> relations = relations(projectId, authorizationSnapshot);
         AiWorkflowContextDTO.ContextMeta meta = AiContextMetaFactory.build(options, selection, state,
-                options.componentKey(), configured, null, project.getVersion(), warnings, clock);
+                options.componentKey(), configured, null, project.getVersion(),
+                contextVersion("project", projectId, project.getVersion()), warnings, clock);
         return new AiWorkflowContextDTO("project", projectId, project.getVersion(), currentNode,
                 workflow, allowedActionsRegistry.projectActions(), project.getVersion(),
                 details, relations, meta);
+    }
+
+    private String contextVersion(String resourceType, Long resourceId, Integer entityVersion) {
+        return resourceType + ":" + resourceId + ":entity:" +
+                (entityVersion == null ? "unknown" : entityVersion);
     }
 
     private boolean hasDefinition(ProjectNodeDTO node) {
@@ -143,9 +156,10 @@ public class AiProjectContextReader {
     }
 
     private List<AiWorkflowContextDTO.Component> readSelectedComponents(com.brad.pms.dto.response.ProjectDTO project,
-            ProjectNodeDTO node, String componentKey, List<String> unknownComponents) {
+            ProjectNodeDTO node, String componentKey, List<String> unknownComponents,
+            AiContextReferenceProjector projector) {
         List<AiWorkflowContextDTO.Component> components =
-                componentReader.read(project, node, componentKey);
+                componentReader.read(project, node, componentKey, unknownComponents, projector);
         for (AiWorkflowContextDTO.Component component : components) {
             if ("UNSUPPORTED".equals(component.contentState())) unknownComponents.add(component.key());
         }
@@ -225,7 +239,7 @@ public class AiProjectContextReader {
         };
     }
 
-    private Map<String, Object> resourceDetails(ProjectDTO project) {
+    private Map<String, Object> resourceDetails(ProjectDTO project, AiContextReferenceProjector projector) {
         Map<String, Object> details = new LinkedHashMap<>();
         put(details, "name", project.getName());
         put(details, "description", project.getDescription());
@@ -240,14 +254,15 @@ public class AiProjectContextReader {
         put(details, "startDate", project.getStartDate());
         put(details, "endDate", project.getEndDate());
         put(details, "progress", project.getProgress());
-        return referenceProjector.projectResourceDetails("project", project.getId(), details);
+        return projector.projectResourceDetails("project", project.getId(), details);
     }
 
     private void put(Map<String, Object> details, String key, Object value) {
         if (value != null) details.put(key, value);
     }
 
-    private List<AiWorkflowContextDTO.Relation> relations(Long projectId) {
+    private List<AiWorkflowContextDTO.Relation> relations(Long projectId,
+                                                          ReadAuthorizationSnapshot authorizationSnapshot) {
         List<ProjectNodeDevelopmentTopicDO> topics = topicMapper.selectList(
                 new LambdaQueryWrapper<ProjectNodeDevelopmentTopicDO>()
                         .eq(ProjectNodeDevelopmentTopicDO::getProjectId, projectId)
@@ -255,7 +270,10 @@ public class AiProjectContextReader {
         List<AiWorkflowContextDTO.Relation> relations = new ArrayList<>();
         for (ProjectNodeDevelopmentTopicDO topic : topics == null ? List.<ProjectNodeDevelopmentTopicDO>of() : topics) {
             if (topic == null || topic.getId() == null || Boolean.TRUE.equals(topic.getDeleted())) continue;
-            if (!referencePolicy.canReadReference("topic", topic.getId())) continue;
+            boolean readable = authorizationSnapshot == null
+                    ? referencePolicy.canReadReference("topic", topic.getId())
+                    : authorizationSnapshot.canRead("topic", topic.getId());
+            if (!readable) continue;
             relations.add(new AiWorkflowContextDTO.Relation("topic", topic.getId(), topic.getTitle(), true));
         }
         return relations;

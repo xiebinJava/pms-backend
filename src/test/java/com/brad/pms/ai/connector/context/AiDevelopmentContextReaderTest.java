@@ -81,7 +81,8 @@ class AiDevelopmentContextReaderTest {
         when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
         when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
                 .thenReturn(configured());
-        lenient().when(componentReader.read(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        lenient().when(componentReader.read(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
         lenient().when(allowedActionsRegistry.developmentActions("requirement")).thenReturn(List.of("save_node"));
         lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(2));
@@ -96,6 +97,7 @@ class AiDevelopmentContextReaderTest {
         assertThat(context.meta().workflowInstanceVersion()).isEqualTo(7);
         assertThat(context.meta().workflowConfigured()).isTrue();
         assertThat(context.meta().workflowStatus()).isEqualTo("IN_PROGRESS");
+        assertThat(context.meta().contextVersion()).isEqualTo("requirement:23:entity:5");
         assertThat(context.workflow().templateVersionId()).isEqualTo(88L);
         AiWorkflowContextDTO.Node selected = context.workflow().nodes().get(1);
         assertThat(selected.taskSummary()).isEqualTo(new NodeTaskSummaryDTO(3, 1, 2));
@@ -136,7 +138,8 @@ class AiDevelopmentContextReaderTest {
         when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
         when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
                 .thenReturn(configured());
-        lenient().when(componentReader.read(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        lenient().when(componentReader.read(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
         lenient().when(allowedActionsRegistry.developmentActions("requirement")).thenReturn(List.of());
         lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(2));

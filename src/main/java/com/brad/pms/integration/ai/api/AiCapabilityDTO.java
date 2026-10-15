@@ -11,7 +11,23 @@ public record AiCapabilityDTO(
         Map<String, Boolean> features,
         List<WorkflowTypeCapability> workflowTypes,
         Viewer viewer,
-        String today) {
+        String today,
+        String agentContractVersion) {
+
+    public static final String EXTERNAL_AGENT_CONTRACT_VERSION = "agent-contract/v1";
+
+    /** Source-compatible constructor for older connector callers. */
+    public AiCapabilityDTO(
+            String version,
+            List<ResourceCapability> resources,
+            List<String> scopes,
+            Map<String, Boolean> features,
+            List<WorkflowTypeCapability> workflowTypes,
+            Viewer viewer,
+            String today) {
+        this(version, resources, scopes, features, workflowTypes, viewer, today,
+                EXTERNAL_AGENT_CONTRACT_VERSION);
+    }
 
     public AiCapabilityDTO {
         resources = resources == null ? List.of() : List.copyOf(resources);

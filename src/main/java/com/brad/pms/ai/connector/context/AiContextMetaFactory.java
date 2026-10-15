@@ -19,6 +19,7 @@ final class AiContextMetaFactory {
                                                   boolean workflowConfigured,
                                                   Integer workflowInstanceVersion,
                                                   Integer entityVersion,
+                                                  String contextVersion,
                                                   LinkedHashSet<Warning> warnings,
                                                   Clock clock) {
         String view = options.view();
@@ -30,8 +31,19 @@ final class AiContextMetaFactory {
                 componentContentScope,
                 selection.selectedNodeId(), selectedComponentKey,
                 workflowConfigured, state.status(), state.terminalStatus(), workflowInstanceVersion,
-                "business-user", "readable-only",
+                "business-user", "readable-only", contextVersion,
                 warnings == null ? List.of() : List.copyOf(warnings));
+    }
+
+    static AiWorkflowContextDTO.ContextMeta build(ContextReadOptions options, Selection selection,
+                                                  State state, String selectedComponentKey,
+                                                  boolean workflowConfigured,
+                                                  Integer workflowInstanceVersion,
+                                                  Integer entityVersion,
+                                                  LinkedHashSet<Warning> warnings,
+                                                  Clock clock) {
+        return build(options, selection, state, selectedComponentKey, workflowConfigured,
+                workflowInstanceVersion, entityVersion, null, warnings, clock);
     }
 
 }

@@ -5,6 +5,7 @@ import com.brad.pms.ai.command.PmsCommandDescriptor;
 import com.brad.pms.ai.command.PmsCommandMetadata;
 import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.convertor.Convertors;
+import com.brad.pms.ai.connector.context.AiWorkflowContextReadService;
 import com.brad.pms.dto.response.ProjectTypeDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
 import com.brad.pms.dto.response.WorkflowTemplateVersionSummaryDTO;
@@ -17,7 +18,7 @@ import com.brad.pms.service.WorkflowTemplateService;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
 import com.brad.pms.workflow.WorkflowNodeDefinition;
 import com.brad.pms.workflow.WorkflowTemplateDefinition;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -36,7 +37,6 @@ import java.util.Set;
  * hard-coding the current product's node or component names.
  */
 @Service
-@RequiredArgsConstructor
 public class AiConnectorCapabilityService {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
@@ -44,6 +44,24 @@ public class AiConnectorCapabilityService {
     private final PmsCommandRegistry commandRegistry;
     private final WorkflowTemplateService workflowTemplateService;
     private final UserService userService;
+    private final AiWorkflowContextReadService workflowContextReadService;
+
+    public AiConnectorCapabilityService(PmsCommandRegistry commandRegistry,
+                                        WorkflowTemplateService workflowTemplateService,
+                                        UserService userService) {
+        this(commandRegistry, workflowTemplateService, userService, null);
+    }
+
+    @Autowired
+    public AiConnectorCapabilityService(PmsCommandRegistry commandRegistry,
+                                        WorkflowTemplateService workflowTemplateService,
+                                        UserService userService,
+                                        AiWorkflowContextReadService workflowContextReadService) {
+        this.commandRegistry = commandRegistry;
+        this.workflowTemplateService = workflowTemplateService;
+        this.userService = userService;
+        this.workflowContextReadService = workflowContextReadService;
+    }
 
     public AiCapabilityDTO capabilities() {
         Map<String, List<AiCapabilityDTO.ActionCapability>> grouped = new LinkedHashMap<>();
@@ -72,15 +90,27 @@ public class AiConnectorCapabilityService {
                 resources,
                 List.copyOf(scopes),
                 Map.ofEntries(Map.entry("resourceGet", true),
-                        Map.entry("readonlyWorkflowContext", false),
-                        Map.entry("focusedWorkflowContext", false)),
+                        Map.entry("readonlyWorkflowContext", workflowContextAvailable()),
+                        Map.entry("focusedWorkflowContext", workflowContextAvailable())),
                 workflowTypes(),
                 viewer(),
-                LocalDate.now(BUSINESS_ZONE).toString());
+                LocalDate.now(BUSINESS_ZONE).toString(),
+                AiCapabilityDTO.EXTERNAL_AGENT_CONTRACT_VERSION);
+    }
+
+    private boolean workflowContextAvailable() {
+        // The catalog is emitted by the same Spring context as the read facade.
+        // A missing facade is a real capability outage, so fail closed for
+        // lightweight/unit construction and delegated clients.
+        return workflowContextReadService != null;
     }
 
     private List<AiCapabilityDTO.WorkflowTypeCapability> workflowTypes() {
-        List<ProjectTypeDTO> activeTypes = workflowTemplateService.listProjectCreationTypes();
+        // The capability catalog describes every workflow that AI may need to
+        // understand, including development-item workflows. Restricting this
+        // to project-creation types hides requirement/topic/story templates and
+        // forces clients to guess template IDs when creating those resources.
+        List<ProjectTypeDTO> activeTypes = workflowTemplateService.listProjectTypes();
         List<WorkflowTemplateSummaryDTO> publishedTemplates = workflowTemplateService.listTemplates(null, true);
         Map<Long, List<WorkflowTemplateSummaryDTO>> templatesByType = publishedTemplates.stream()
                 .filter(summary -> summary != null && summary.getProjectTypeId() != null)
@@ -200,6 +230,6 @@ public class AiConnectorCapabilityService {
     }
 
     private boolean scopeAvailable(String scope) {
-        return !UserContext.isDshDelegation() || UserContext.hasDshScope(scope);
+        return !UserContext.isDelegated() || UserContext.hasDelegationScope(scope);
     }
 }

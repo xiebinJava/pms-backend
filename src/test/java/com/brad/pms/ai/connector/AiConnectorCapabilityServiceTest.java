@@ -6,6 +6,7 @@ import com.brad.pms.ai.command.CommandPreviewRequest;
 import com.brad.pms.ai.command.CommandResult;
 import com.brad.pms.ai.command.PmsCommand;
 import com.brad.pms.ai.command.PmsCommandRegistry;
+import com.brad.pms.ai.connector.context.AiWorkflowContextReadService;
 import com.brad.pms.integration.ai.api.AiCapabilityDTO;
 import com.brad.pms.dto.response.ProjectTypeDTO;
 import com.brad.pms.dto.response.WorkflowTemplateSummaryDTO;
@@ -41,6 +42,7 @@ class AiConnectorCapabilityServiceTest {
         UserContext.set(new LoginUser(7L, "alex", "张伟"));
         WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
         UserService userService = mock(UserService.class);
+        AiWorkflowContextReadService contextReadService = mock(AiWorkflowContextReadService.class);
         ProjectTypeDTO topicType = new ProjectTypeDTO();
         topicType.setId(2L);
         topicType.setCode("topic-management");
@@ -63,7 +65,7 @@ class AiConnectorCapabilityServiceTest {
         when(workflowTemplateService.getDefinition(99L)).thenReturn(new WorkflowTemplateDefinition(2, List.of(
                 new WorkflowNodeDefinition("custom-node", "自定义节点", null, null, null,
                         List.of("development-control"), List.of(), false, List.of()))));
-        when(workflowTemplateService.listProjectCreationTypes()).thenReturn(List.of(topicType, customType));
+        when(workflowTemplateService.listProjectTypes()).thenReturn(List.of(topicType, customType));
         when(workflowTemplateService.listTemplates(null, true)).thenReturn(List.of(topic, custom));
         UserDO viewer = new UserDO();
         viewer.setId(7L);
@@ -71,7 +73,8 @@ class AiConnectorCapabilityServiceTest {
         when(userService.listByIds(List.of(7L))).thenReturn(List.of(viewer));
 
         PmsCommandRegistry registry = new PmsCommandRegistry(List.of(command(CommandName.TOPIC_CREATE)));
-        AiCapabilityDTO result = new AiConnectorCapabilityService(registry, workflowTemplateService, userService)
+        AiCapabilityDTO result = new AiConnectorCapabilityService(
+                registry, workflowTemplateService, userService, contextReadService)
                 .capabilities();
 
         assertThat(result.resources()).singleElement().satisfies(resource -> {
@@ -98,8 +101,31 @@ class AiConnectorCapabilityServiceTest {
         assertThat(result.viewer().id()).isEqualTo(7L);
         String wire = new ObjectMapper().writeValueAsString(result);
         assertThat(wire).contains("\"resourceGet\":true");
-        assertThat(wire).contains("\"readonlyWorkflowContext\":false");
-        assertThat(wire).contains("\"focusedWorkflowContext\":false");
+        assertThat(result.agentContractVersion()).isEqualTo("agent-contract/v1");
+        assertThat(result.features()).containsEntry("readonlyWorkflowContext", true);
+        assertThat(result.features()).containsEntry("focusedWorkflowContext", true);
+        assertThat(wire).contains("\"agentContractVersion\":\"agent-contract/v1\"");
+        assertThat(wire).contains("\"readonlyWorkflowContext\":true");
+        assertThat(wire).contains("\"focusedWorkflowContext\":true");
+    }
+
+    @Test
+    void delegatedReadOnlyCatalogDoesNotPublishWriteActions() {
+        LoginUser delegated = new LoginUser(7L, "alex", "张伟");
+        delegated.setDelegationScopes(List.of(
+                com.brad.pms.integration.ai.security.AiConnectorScopePolicy.PROJECT_READ));
+        UserContext.set(delegated);
+
+        PmsCommandRegistry registry = new PmsCommandRegistry(List.of(
+                command(CommandName.PROJECT_CREATE), command(CommandName.PROJECT_UPDATE)));
+        WorkflowTemplateService workflowTemplateService = mock(WorkflowTemplateService.class);
+        UserService userService = mock(UserService.class);
+        AiWorkflowContextReadService contextReadService = mock(AiWorkflowContextReadService.class);
+        AiCapabilityDTO result = new AiConnectorCapabilityService(
+                registry, workflowTemplateService, userService, contextReadService).capabilities();
+
+        assertThat(result.resources()).isEmpty();
+        assertThat(result.scopes()).containsExactly("pms:project:read");
     }
 
     private static PmsCommand command(CommandName name) {
