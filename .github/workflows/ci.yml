@@ -65,7 +65,7 @@ jobs:
           path: backend-security.json
           if-no-files-found: ignore
       - name: Generate backend SPDX SBOM
-        uses: anchore/sbom-action@v0.17.0
+        uses: anchore/sbom-action@v0.24.3
         with:
           image: pms-backend:ci
           format: spdx-json
