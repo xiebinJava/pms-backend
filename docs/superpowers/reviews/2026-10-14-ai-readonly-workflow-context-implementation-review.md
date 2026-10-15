@@ -338,3 +338,21 @@ C 提交：b36e5e2 test/docs: record readonly context delivery evidence；B 提�
 
 - referenceProjector 11 项全绿；resource/reader 相关 62 项全绿；隔离集成重跑 3 项全绿（21s）。
 - 南支付 feature flags 仍保持 false，等真实 API/模型验收完成。
+
+## 四次评审修复记录（深度自查，2026-10-14 晚）
+
+本轮自查对照 Spec 全文复核 reader/projector/resolver/widget 的每条合同，新发现 4 个真实缺口（B 提交 35de944）：
+
+| 发现 | Spec 依据 | 修复 | 测试 |
+| --- | --- | --- | --- |
+| NO_SELECTED_NODE 未实现：无选中节点却传 componentKey 时静默空响应 | §3 "无 selected 却指定组件为 422，message 前缀 NO_SELECTED_NODE:" | 项目/研发 reader 在 selection 后校验 `componentKey != null && selectedNodeId == null` → BusinessException(422) 前缀 NO_SELECTED_NODE: |AiProjectContextReaderTest.componentKeyWithoutSelectedNodeIsRejectedAs422WithNoSelectedNodePrefix、AiDevelopmentContextReaderTest 同名（断言 code=422+message 前缀） |
+| UNKNOWN_VERSION 警告缺失 | §5.1 meta.warnings 枚举含 UNKNOWN_VERSION；§5.3 已存在但 version=null → UNKNOWN_VERSION | 组件 reader 增加警告收集器（兼容 3 参旧签名），persisted-but-version-null 的 part 追加 "UNKNOWN_VERSION:<part>"，Reader 转成 Warning("UNKNOWN_VERSION") | AiProjectComponentReaderTest.persistedPartsWithoutVersionEmitUnknownVersionWarnings |
+| 有实例无节点被折叠为 NOT_CONFIGURED | §5.1 状态表："研发有实例无节点"→ INCONSISTENT | dev reader 不再 `workingConfigured && !nodes.isEmpty()`，直接传 configured 给 resolver；测试补"无节点实例→INCONSISTENT 且 workflowInstanceVersion=7" | AiDevelopmentContextReaderTest.instanceWithoutNodesIsInconsistentInsteadOfUnconfigured |
+| story-list 未限定 TOPIC 类型（STORY 详情若误挂则按 story 行误读） | §5.3 组件表 story-list 载体为专题节点 | AiDevelopmentComponentReader story-list 仅 TOPIC 生效，其余类型 → UNSUPPORTED | 既有 story-list 用例（TOPIC 路径）+ unresolved 分支覆盖 |
+
+连带校正：solution-design versions 不再补塞 content:null 键（spec 明确该组件 parts=package/decision/review:*；此前测试断言是我写错，改为 doesNotContainKey("content")）。
+
+### 验证
+
+- 安全集合 206 项全绿；隔离 MySQL 集成 3 项全绿（22.9s）。
+- feature flags 保持 false。
