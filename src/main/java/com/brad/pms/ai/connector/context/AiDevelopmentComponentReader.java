@@ -68,6 +68,9 @@ public class AiDevelopmentComponentReader {
                     : unsupported(key, config, fields, unknownComponents);
         }
         if ("story-list".equals(key)) {
+            if (itemType != DevelopmentItemType.TOPIC) {
+                return unsupported(key, config, fields, unknownComponents);
+            }
             return readStoryList(item, node, fields, unknownComponents);
         }
         if (!JSON_COMPONENTS.contains(key)) {

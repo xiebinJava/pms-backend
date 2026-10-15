@@ -47,13 +47,18 @@ public class AiDevelopmentContextReader {
         DevelopmentItemWorkflowDetailDTO detail = workflowService.detailIfInitialized(itemType, itemId);
         List<NodeRef> refs = nodeRefs(nodes(detail));
         Selection selection = nodeSelector.select(refs, options.nodeId());
-        boolean configured = Boolean.TRUE.equals(detail.getWorkflowConfigured()) && !nodes(detail).isEmpty();
+        // 实例存在性由 workflowConfigured 表达：有实例无节点交给状态表判 INCONSISTENT，不折叠成未配置。
+        boolean configured = Boolean.TRUE.equals(detail.getWorkflowConfigured());
         State state = stateResolver.resolve(resourceType, detail.getDevelopmentStatus(),
                 detail.getTerminalStatus(), configured, refs);
 
         LinkedHashSet<AiWorkflowContextDTO.Warning> warnings = new LinkedHashSet<>();
         List<String> unknownComponents = new ArrayList<>();
         Long selectedNodeId = selection.selectedNodeId();
+        if (options.componentKey() != null && selection.selectedNodeId() == null) {
+            throw com.brad.pms.common.exception.BusinessException.error(
+                    "NO_SELECTED_NODE: 当前没有选中的流程节点，无法按组件读取");
+        }
         boolean focused = ContextReadOptions.VIEW_FOCUSED.equals(options.view());
         List<AiWorkflowContextDTO.Node> contractNodes = new ArrayList<>(nodes(detail).size());
 
@@ -76,9 +81,14 @@ public class AiDevelopmentContextReader {
                     null, fieldValuesState, null,
                     isSelected ? taskSummary(detail, node) : null));
         }
-        for (String unknown : unknownComponents) {
-            warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_COMPONENT",
-                    "组件尚未支持只读读取: " + unknown));
+        for (String flag : unknownComponents) {
+            if (flag.startsWith("UNKNOWN_VERSION:")) {
+                warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_VERSION",
+                        "持久化内容的版本未知（部分: " + flag.substring("UNKNOWN_VERSION:".length()) + "）"));
+            } else {
+                warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_COMPONENT",
+                        "组件尚未支持只读读取: " + flag));
+            }
         }
         mergeWarnings(warnings, selection, state);
 
@@ -93,9 +103,13 @@ public class AiDevelopmentContextReader {
                 workflowService.detailIfInitialized(DevelopmentItemType.REQUIREMENT, itemId);
         List<NodeRef> refs = nodeRefs(nodes(workflow));
         Selection selection = nodeSelector.select(refs, options.nodeId());
-        boolean configured = Boolean.TRUE.equals(workflow.getWorkflowConfigured()) && !nodes(workflow).isEmpty();
+        boolean configured = Boolean.TRUE.equals(workflow.getWorkflowConfigured());
         State state = stateResolver.resolve(resourceType, detail.getStatus(),
                 detail.getTerminalStatus(), configured, refs);
+        if (options.componentKey() != null && selection.selectedNodeId() == null) {
+            throw com.brad.pms.common.exception.BusinessException.error(
+                    "NO_SELECTED_NODE: 当前没有选中的流程节点，无法按组件读取");
+        }
 
         LinkedHashSet<AiWorkflowContextDTO.Warning> warnings = new LinkedHashSet<>();
         List<String> unknownComponents = new ArrayList<>();
@@ -122,9 +136,14 @@ public class AiDevelopmentContextReader {
                     null, fieldValuesState, null,
                     isSelected ? taskSummary(workflow, node) : null));
         }
-        for (String unknown : unknownComponents) {
-            warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_COMPONENT",
-                    "组件尚未支持只读读取: " + unknown));
+        for (String flag : unknownComponents) {
+            if (flag.startsWith("UNKNOWN_VERSION:")) {
+                warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_VERSION",
+                        "持久化内容的版本未知（部分: " + flag.substring("UNKNOWN_VERSION:".length()) + "）"));
+            } else {
+                warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_COMPONENT",
+                        "组件尚未支持只读读取: " + flag));
+            }
         }
         mergeWarnings(warnings, selection, state);
 

@@ -332,4 +332,19 @@ class AiProjectContextReaderTest {
         assertThat(projected).doesNotContainKeys("__components", "executionTarget", "topicId");
         assertThat(projected).containsKey("kickoff.summary");
     }
+
+    @Test
+    void componentKeyWithoutSelectedNodeIsRejectedAs422WithNoSelectedNodePrefix() {
+        when(projectService.detail(7L)).thenReturn(project());
+        when(nodeService.listReadOnly(7L)).thenReturn(List.of());
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(allowedActionsRegistry.projectActions()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> reader().read(7L, new ContextReadOptions("focused", null, "solution-design")))
+                .isInstanceOfSatisfying(com.brad.pms.common.exception.BusinessException.class, thrown -> {
+                    assertThat(thrown.getCode()).isEqualTo(422);
+                    assertThat(thrown.getMessage()).startsWith("NO_SELECTED_NODE:");
+                });
+    }
 }

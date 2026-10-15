@@ -243,11 +243,30 @@ class AiProjectComponentReaderTest {
 
         assertThat(components).singleElement().satisfies(component -> {
             assertThat(component.contentState()).isEqualTo("LOADED");
+            // solution-design 的 part 集合由 spec 定义为 package/decision/review:*（无 content 键）。
             assertThat(component.versions()).containsKeys("package", "decision",
-                    "review:BUSINESS_PRODUCT", "review:TECHNICAL", "review:TEST_RELEASE", "content");
+                    "review:BUSINESS_PRODUCT", "review:TECHNICAL", "review:TEST_RELEASE");
+            assertThat(component.versions()).doesNotContainKey("content");
             assertThat(component.versions().get("package")).isZero();
             assertThat(component.versions().get("review:TEST_RELEASE")).isEqualTo(2);
             assertThat(component.versions().get("decision")).isNull();
         });
+    }
+
+    @Test
+    void persistedPartsWithoutVersionEmitUnknownVersionWarnings() {
+        AiProjectComponentReader reader = reader();
+        ProjectNodeDTO node = node(List.of("release-handover"));
+        when(releaseService.getReadSnapshot(7L, 301L)).thenReturn(new WorkbenchReadSnapshot<>(
+                new com.brad.pms.dto.response.NodeReleaseDTO(), true,
+                java.util.Map.of("content", new PersistedContentVersion(true, null))));
+
+        List<String> warnings = new java.util.ArrayList<>();
+        List<AiWorkflowContextDTO.Component> components =
+                reader.read(project(), node, "release-handover", warnings);
+
+        assertThat(components).singleElement().satisfies(component ->
+                assertThat(component.versions()).containsEntry("content", null));
+        assertThat(warnings).containsExactly("UNKNOWN_VERSION:content");
     }
 }

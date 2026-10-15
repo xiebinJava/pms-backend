@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -161,5 +162,53 @@ class AiDevelopmentContextReaderTest {
         detail.setWorkflowStatus("IN_PROGRESS");
         detail.setTerminalStatus(null);
         return detail;
+    }
+
+    @Test
+    void instanceWithoutNodesIsInconsistentInsteadOfUnconfigured() {
+        DevelopmentItemWorkflowDetailDTO brokenInstance = new DevelopmentItemWorkflowDetailDTO();
+        brokenInstance.setItemType("REQUIREMENT");
+        brokenInstance.setId(23L);
+        brokenInstance.setWorkflowConfigured(true);
+        brokenInstance.setWorkflowVersion(7);
+        when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
+        when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
+                .thenReturn(brokenInstance);
+        lenient().when(allowedActionsRegistry.developmentActions("requirement")).thenReturn(List.of());
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+
+        AiWorkflowContextDTO context = reader().read(
+                com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L, ContextReadOptions.legacy());
+
+        // spec: 研发有实例无节点 → INCONSISTENT（保留事实），而不是 NOT_CONFIGURED。
+        assertThat(context.meta().workflowStatus()).isEqualTo("INCONSISTENT");
+        assertThat(context.meta().workflowInstanceVersion()).isEqualTo(7);
+    }
+
+    @Test
+    void componentKeyWithoutSelectedNodeIsRejectedAs422() {
+        DevelopmentItemWorkflowDetailDTO brokenInstance = new DevelopmentItemWorkflowDetailDTO();
+        brokenInstance.setItemType("REQUIREMENT");
+        brokenInstance.setId(23L);
+        brokenInstance.setWorkflowConfigured(true);
+        when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
+        when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
+                .thenReturn(brokenInstance);
+        lenient().when(allowedActionsRegistry.developmentActions("requirement")).thenReturn(List.of());
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+
+        assertThatThrownBy(() -> reader().read(
+                com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L,
+                new ContextReadOptions("focused", null, "requirement-node-workbench")))
+                .isInstanceOfSatisfying(com.brad.pms.common.exception.BusinessException.class, thrown -> {
+                    assertThat(thrown.getCode()).isEqualTo(422);
+                    assertThat(thrown.getMessage()).startsWith("NO_SELECTED_NODE:");
+                });
     }
 }

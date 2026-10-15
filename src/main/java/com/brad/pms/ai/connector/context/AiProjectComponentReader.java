@@ -40,6 +40,11 @@ public class AiProjectComponentReader {
 
     public List<AiWorkflowContextDTO.Component> read(ProjectDTO project, ProjectNodeDTO node,
                                                      String componentKey) {
+        return read(project, node, componentKey, new ArrayList<>());
+    }
+
+    public List<AiWorkflowContextDTO.Component> read(ProjectDTO project, ProjectNodeDTO node,
+                                                     String componentKey, List<String> warnings) {
         if (project == null || project.getId() == null) throw BusinessException.notFound("项目不存在");
         if (node == null || node.getId() == null) throw BusinessException.notFound("节点不存在");
         List<String> attached = node.getComponents() == null ? List.of() : node.getComponents();
@@ -55,7 +60,7 @@ public class AiProjectComponentReader {
         List<AiWorkflowContextDTO.Field> fields = toContractFields(node.getFields());
         List<AiWorkflowContextDTO.Component> components = new ArrayList<>(requested.size());
         for (String key : requested) {
-            components.add(toComponent(project, node, key, fields));
+            components.add(toComponent(project, node, key, fields, warnings));
         }
         return components;
     }
@@ -72,7 +77,8 @@ public class AiProjectComponentReader {
     }
 
     private AiWorkflowContextDTO.Component toComponent(ProjectDTO project, ProjectNodeDTO node, String key,
-                                                       List<AiWorkflowContextDTO.Field> fields) {
+                                                       List<AiWorkflowContextDTO.Field> fields,
+                                                       List<String> warnings) {
         JsonNode config = node.getComponentConfigs() == null ? null : node.getComponentConfigs().get(key);
         return switch (key) {
             case "project-basic-info" -> {
@@ -82,20 +88,20 @@ public class AiProjectComponentReader {
                 yield new AiWorkflowContextDTO.Component(key, key, fields, List.of(), config,
                         objectMapper.valueToTree(projectBasicInfo(project)), "LOADED", versions, null);
             }
-            case "requirement-scope" -> readRequirementScope(node, config, fields);
-            case "solution-design" -> readWorkbenchSnapshot(node, "solution-design", config, fields,
+            case "requirement-scope" -> readRequirementScope(node, config, fields, warnings);
+            case "solution-design" -> readWorkbenchSnapshot(node, "solution-design", config, fields, warnings,
                     solutionDesignService.getReadSnapshot(node.getProjectId(), node.getId()));
-            case "plan-resource-risk" -> readWorkbenchSnapshot(node, "plan-resource-risk", config, fields,
+            case "plan-resource-risk" -> readWorkbenchSnapshot(node, "plan-resource-risk", config, fields, warnings,
                     planResourceRiskService.getReadSnapshot(node.getProjectId(), node.getId()));
-            case "development-control" -> readWorkbenchSnapshot(node, "development-control", config, fields,
+            case "development-control" -> readWorkbenchSnapshot(node, "development-control", config, fields, warnings,
                     developmentControlService.getReadSnapshot(node.getProjectId(), node.getId()));
-            case "business-acceptance" -> readWorkbenchSnapshot(node, "business-acceptance", config, fields,
+            case "business-acceptance" -> readWorkbenchSnapshot(node, "business-acceptance", config, fields, warnings,
                     acceptanceService.getReadSnapshot(node.getProjectId(), node.getId()));
-            case "release-handover" -> readWorkbenchSnapshot(node, "release-handover", config, fields,
+            case "release-handover" -> readWorkbenchSnapshot(node, "release-handover", config, fields, warnings,
                     releaseService.getReadSnapshot(node.getProjectId(), node.getId()));
-            case "value-review" -> readWorkbenchSnapshot(node, "value-review", config, fields,
+            case "value-review" -> readWorkbenchSnapshot(node, "value-review", config, fields, warnings,
                     valueReviewService.getReadSnapshot(node.getProjectId(), node.getId()));
-            case "knowledge-standard" -> readWorkbenchSnapshot(node, "knowledge-standard", config, fields,
+            case "knowledge-standard" -> readWorkbenchSnapshot(node, "knowledge-standard", config, fields, warnings,
                     knowledgeStandardService.getReadSnapshot(node.getProjectId(), node.getId()));
             default -> new AiWorkflowContextDTO.Component(key, key, fields, List.of(),
                     config, null, "UNSUPPORTED", null, null);
@@ -104,7 +110,8 @@ public class AiProjectComponentReader {
 
     /** Generic mapping for the single-baseline workbench snapshots. */
     private AiWorkflowContextDTO.Component readWorkbenchSnapshot(ProjectNodeDTO node, String componentKey,
-            JsonNode config, List<AiWorkflowContextDTO.Field> fields, WorkbenchReadSnapshot<?> snapshot) {
+            JsonNode config, List<AiWorkflowContextDTO.Field> fields, List<String> warnings,
+            WorkbenchReadSnapshot<?> snapshot) {
         boolean persisted = snapshot.hasPersistedContent();
         JsonNode content = persisted ? stripUiFlags(objectMapper.valueToTree(snapshot.display())) : null;
         // 每一个持久化 part 的真实版本都要出现在 versions 中（solution-design 的
@@ -112,16 +119,24 @@ public class AiProjectComponentReader {
         java.util.Map<String, Integer> versions = new java.util.LinkedHashMap<>();
         for (Map.Entry<String, PersistedContentVersion> part : snapshot.parts().entrySet()) {
             versions.put(part.getKey(), part.getValue() == null ? null : part.getValue().version());
+            if (part.getValue() != null && part.getValue().persisted()
+                    && part.getValue().version() == null) {
+                warnings.add("UNKNOWN_VERSION:" + part.getKey());
+            }
         }
-        if (!versions.containsKey("content")) versions.put("content", null);
         return new AiWorkflowContextDTO.Component(componentKey, componentKey, fields, List.of(),
                 config, content, persisted ? "LOADED" : "EMPTY", versions, null);
     }
 
     private AiWorkflowContextDTO.Component readRequirementScope(ProjectNodeDTO node, JsonNode config,
-                                                                List<AiWorkflowContextDTO.Field> fields) {
+                                                                List<AiWorkflowContextDTO.Field> fields,
+                                                                List<String> warnings) {
         WorkbenchReadSnapshot<com.brad.pms.dto.response.NodeRequirementScopeDTO> snapshot =
                 requirementScopeService.getReadSnapshot(node.getProjectId(), node.getId());
+        PersistedContentVersion contentPart = snapshot.parts().get("content");
+        if (contentPart != null && contentPart.persisted() && contentPart.version() == null) {
+            warnings.add("UNKNOWN_VERSION:content");
+        }
         if (!snapshot.hasPersistedContent()) {
             java.util.Map<String, Integer> emptyVersions = new java.util.HashMap<>();
             emptyVersions.put("content", null);

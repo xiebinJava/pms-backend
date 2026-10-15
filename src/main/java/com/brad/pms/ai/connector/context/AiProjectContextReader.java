@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.brad.pms.ai.connector.context.AiContextNodeSelector.Selection;
 import com.brad.pms.ai.connector.context.AiContextWorkflowStateResolver.State;
 import com.brad.pms.common.enums.ProjectStatus;
+import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.entity.ProjectNodeDevelopmentTopicDO;
@@ -58,6 +59,9 @@ public class AiProjectContextReader {
         State state = stateResolver.resolve("project", projectStatus(project), null, configured, refs);
 
         Long selectedNodeId = selection.selectedNodeId();
+        if (options.componentKey() != null && selectedNodeId == null) {
+            throw BusinessException.error("NO_SELECTED_NODE: 当前没有选中的流程节点，无法按组件读取");
+        }
         boolean focused = ContextReadOptions.VIEW_FOCUSED.equals(options.view());
         List<String> unknownComponents = new ArrayList<>();
         boolean unresolvedNodeConfig = false;
@@ -105,9 +109,14 @@ public class AiProjectContextReader {
             warnings.add(new AiWorkflowContextDTO.Warning("UNRESOLVED_NODE_CONFIG",
                     "部分实际节点在工作流模板定义中未声明"));
         }
-        for (String unknown : unknownComponents) {
-            warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_COMPONENT",
-                    "组件尚未支持只读装载: " + unknown));
+        for (String flag : unknownComponents) {
+            if (flag.startsWith("UNKNOWN_VERSION:")) {
+                warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_VERSION",
+                        "持久化内容的版本未知（部分: " + flag.substring("UNKNOWN_VERSION:".length()) + "）"));
+            } else {
+                warnings.add(new AiWorkflowContextDTO.Warning("UNKNOWN_COMPONENT",
+                        "组件尚未支持只读装载: " + flag));
+            }
         }
         mergeWarnings(warnings, selection, state);
 
