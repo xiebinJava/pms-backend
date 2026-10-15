@@ -155,6 +155,57 @@ apply_statement() {
   sql "INSERT INTO pms_schema_migration_step (version, step_no, checksum) VALUES ('$escaped_version', $step_no, '$escaped_checksum')"
 }
 
+record_migration_step() {
+  local version="$1" step_no="$2" checksum="$3" escaped_version escaped_checksum
+  escaped_version="${version//\'/\'\'}"
+  escaped_checksum="${checksum//\'/\'\'}"
+  sql "INSERT INTO pms_schema_migration_step (version, step_no, checksum) VALUES ('$escaped_version', $step_no, '$escaped_checksum')"
+}
+
+apply_v71_statement() {
+  local version="$1" step_no="$2" checksum="$3" statement="$4" object_exists
+
+  # V71 is also run by the manually managed OceanBase path. That path can be
+  # interrupted after a DDL statement succeeds but before its checkpoint is
+  # written, so detect the four DDL objects before retrying the statement.
+  case "$step_no" in
+    1)
+      object_exists="$(sql "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='pms_ai_conversation' AND column_name='event_sequence';" | tr -d '[:space:]')"
+      ;;
+    6)
+      object_exists="$(sql "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='pms_ai_operation_event' AND index_name='uk_pms_ai_operation_event_plan_sequence';" | tr -d '[:space:]')"
+      ;;
+    8)
+      object_exists="$(sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='pms_ai_event_sequence_rebuild';" | tr -d '[:space:]')"
+      ;;
+    10)
+      object_exists="$(sql "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='pms_ai_operation_event' AND index_name='uk_pms_ai_operation_event_conversation_sequence';" | tr -d '[:space:]')"
+      ;;
+    *)
+      object_exists="0"
+      ;;
+  esac
+
+  if [[ "$step_no" == "8" ]]; then
+    if [[ "$object_exists" == "0" ]]; then
+      record_migration_step "$version" "$step_no" "$checksum"
+      return 0
+    fi
+  elif [[ "$step_no" == "1" || "$step_no" == "10" ]]; then
+    if [[ "$object_exists" == "1" ]]; then
+      record_migration_step "$version" "$step_no" "$checksum"
+      return 0
+    fi
+  elif [[ "$step_no" == "6" ]]; then
+    if [[ "$object_exists" == "0" ]]; then
+      record_migration_step "$version" "$step_no" "$checksum"
+      return 0
+    fi
+  fi
+
+  apply_statement "$version" "$step_no" "$checksum" "$statement"
+}
+
 apply_migration_file() {
   local file="$1" version="$2" checksum="$3"
   local step_no=0 line buffer='' statement
@@ -165,12 +216,20 @@ apply_migration_file() {
       statement="${buffer%$'\n'}"
       statement="${statement%;}"
       buffer=''
-      apply_statement "$version" "$step_no" "$checksum" "$statement"
+      if [[ "$version" == "71" ]]; then
+        apply_v71_statement "$version" "$step_no" "$checksum" "$statement"
+      else
+        apply_statement "$version" "$step_no" "$checksum" "$statement"
+      fi
     fi
   done < "$file"
   if [[ -n "${buffer//[$' \t\r\n']/}" ]]; then
     step_no=$((step_no + 1))
-    apply_statement "$version" "$step_no" "$checksum" "$buffer"
+    if [[ "$version" == "71" ]]; then
+      apply_v71_statement "$version" "$step_no" "$checksum" "$buffer"
+    else
+      apply_statement "$version" "$step_no" "$checksum" "$buffer"
+    fi
   fi
 }
 

@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 class AiProjectComponentReaderTest {
 
     @Mock NodeRequirementScopeService requirementScopeService;
+    @Mock AiContextReferenceProjector referenceProjector;
 
     private final ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
@@ -175,6 +176,8 @@ class AiProjectComponentReaderTest {
             mock(com.brad.pms.service.NodeKnowledgeStandardService.class);
 
     private AiProjectComponentReader reader() {
+        lenient().when(referenceProjector.projectProjectComponentContent(any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         lenient().when(solutionDesignService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
                 new com.brad.pms.dto.response.WorkbenchReadSnapshot<>(
                         new com.brad.pms.dto.response.NodeSolutionDesignDTO(), false, java.util.Map.of()));
@@ -198,7 +201,7 @@ class AiProjectComponentReaderTest {
                         new com.brad.pms.dto.response.NodeKnowledgeStandardDTO(), false, java.util.Map.of()));
         return new AiProjectComponentReader(objectMapper, requirementScopeService, solutionDesignService,
                 planResourceRiskService, developmentControlService, acceptanceService, releaseService,
-                valueReviewService, knowledgeStandardService);
+                valueReviewService, knowledgeStandardService, referenceProjector);
     }
 
     private static ProjectDTO project() {

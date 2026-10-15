@@ -68,7 +68,7 @@ public class AiConnectorQueryService {
     private final PmsCommandRegistry commandRegistry;
     private final RequirementManagementService requirementManagementService;
     private final WorkflowTemplateService workflowTemplateService;
-    private final com.brad.pms.ai.connector.context.AiWorkflowContextReadService workflowContextReadService;
+    private final com.brad.pms.ai.connector.context.AiContextDataPort contextDataPort;
     private final com.brad.pms.ai.connector.context.AiContextReadPolicy contextReadPolicy;
     private final com.brad.pms.ai.connector.context.AiContextReferenceProjector referenceProjector;
 
@@ -97,7 +97,8 @@ public class AiConnectorQueryService {
     public AiWorkflowContextDTO context(String resourceType, Long resourceId, ContextReadOptions options) {
         String type = normalizeResourceType(resourceType);
         if (resourceId == null) throw BusinessException.notFound("资源不存在");
-        return workflowContextReadService.context(type, resourceId, options);
+        return contextDataPort.read(type, resourceId, options,
+                UserContext.userIdOrNull());
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true,
@@ -399,8 +400,8 @@ public class AiConnectorQueryService {
 
     private boolean scopeAvailable(CommandName name) {
         PmsCommandDescriptor descriptor = PmsCommandMetadata.descriptor(name);
-        return !UserContext.isDshDelegation()
-                || descriptor.scopes().stream().allMatch(UserContext::hasDshScope);
+        return !UserContext.isDelegated()
+                || descriptor.scopes().stream().allMatch(UserContext::hasDelegationScope);
     }
 
     private List<AiWorkflowContextDTO.Field> fields(List<WorkflowFieldDefinition> definitions) {

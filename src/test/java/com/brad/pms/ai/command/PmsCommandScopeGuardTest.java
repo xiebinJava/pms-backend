@@ -36,7 +36,7 @@ class PmsCommandScopeGuardTest {
     }
 
     @Test
-    void leavesLegacyAiDelegationTokensUntouched() {
+    void leavesDelegationTokensWithoutPmsScopesUntouched() {
         delegation(List.of("ai:command:preview"));
 
         assertThatCode(() -> PmsCommandScopeGuard.requireScope(CommandName.NODE_COMPLETE))
@@ -53,7 +53,7 @@ class PmsCommandScopeGuardTest {
     }
 
     private static void delegation(List<String> scopes) {
-        LoginUser user = new LoginUser(7L, "dsh", "DSH");
+        LoginUser user = new LoginUser(7L, "ai-client", "AI Client");
         user.setDelegationScopes(scopes);
         UserContext.set(user);
     }

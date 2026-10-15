@@ -1,0 +1,16 @@
+{
+  "contractVersion": "requirement-analysis/v1",
+  "draft": {
+    "facts": [
+      {
+        "text": "引用不存在的资源",
+        "sourceRefs": ["requirement:999999"]
+      }
+    ],
+    "inferences": [],
+    "assumptions": [],
+    "patch": {
+      "status": "DONE"
+    }
+  }
+}

@@ -24,6 +24,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AiOperationAutomaticExecutionTest {
 
     @Test
+    void persistsTheGeneratedOperationIdInsideThePreviewSnapshot() throws Exception {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsCommandRegistry registry = mock(PmsCommandRegistry.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        CommandPreview proposal = new CommandPreview(
+                null, CommandName.PROJECT_CREATE, Instant.now().plusSeconds(600),
+                "v1", List.of(), List.of(Map.of("entity", "project")), List.of("project-list"));
+        AtomicReference<AiOperationDO> captured = new AtomicReference<>();
+        doAnswer(invocation -> {
+            captured.set(invocation.getArgument(0, AiOperationDO.class));
+            return 1;
+        }).when(mapper).insert(any(AiOperationDO.class));
+
+        AiOperationService service = new AiOperationService(mapper, registry, objectMapper, contractRegistry);
+        CommandPreview returned = service.persistPreview(7L,
+                new CommandPreviewRequest(CommandName.PROJECT_CREATE, Map.of("name", "测试项目"), "global:pms", "v1"),
+                proposal);
+
+        assertThat(returned.operationId()).isNotBlank();
+        assertThat(objectMapper.readTree(captured.get().getPreviewJson()).path("operationId").asText())
+                .isEqualTo(returned.operationId());
+        assertThat(captured.get().getExpectedVersionsJson()).contains("project");
+    }
+
+    @Test
     void reservesTheIdempotencyKeyAndReturnsTheStoredResultOnRetry() throws Exception {
         AiOperationMapper mapper = mock(AiOperationMapper.class);
         PmsCommandRegistry registry = mock(PmsCommandRegistry.class);

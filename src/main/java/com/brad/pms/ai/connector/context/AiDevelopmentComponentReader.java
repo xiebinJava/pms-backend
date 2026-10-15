@@ -4,11 +4,11 @@ import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.workflow.DevelopmentItemType;
+import com.brad.pms.workflow.StoryNodeWorkbenchPolicy;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -41,6 +41,18 @@ public class AiDevelopmentComponentReader {
                                                      Integer entityVersion,
                                                      String componentKey,
                                                      List<String> unknownComponents) {
+        return read(itemType, item, node, entityVersion, componentKey, unknownComponents,
+                referenceProjector, null);
+    }
+
+    public List<AiWorkflowContextDTO.Component> read(DevelopmentItemType itemType,
+                                                     DevelopmentItemWorkflowDetailDTO item,
+                                                     DevelopmentItemWorkflowNodeDTO node,
+                                                     Integer entityVersion,
+                                                     String componentKey,
+                                                     List<String> unknownComponents,
+                                                     AiContextReferenceProjector projector,
+                                                     ReadAuthorizationSnapshot authorizationSnapshot) {
         List<String> attached = node.getRuntimeComponents() == null ? List.of() : node.getRuntimeComponents();
         List<String> requested;
         if (componentKey == null || componentKey.isBlank()) {
@@ -53,25 +65,27 @@ public class AiDevelopmentComponentReader {
         List<AiWorkflowContextDTO.Component> components = new ArrayList<>(requested.size());
         List<AiWorkflowContextDTO.Field> fields = contractFields(node.getFields());
         for (String key : requested) {
-            components.add(toComponent(itemType, item, node, entityVersion, key, fields, unknownComponents));
+            components.add(toComponent(itemType, item, node, entityVersion, key, fields, unknownComponents,
+                    projector, authorizationSnapshot));
         }
         return components;
     }
 
     private AiWorkflowContextDTO.Component toComponent(DevelopmentItemType itemType,
             DevelopmentItemWorkflowDetailDTO item, DevelopmentItemWorkflowNodeDTO node, Integer entityVersion,
-            String key, List<AiWorkflowContextDTO.Field> fields, List<String> unknownComponents) {
+            String key, List<AiWorkflowContextDTO.Field> fields, List<String> unknownComponents,
+            AiContextReferenceProjector projector, ReadAuthorizationSnapshot authorizationSnapshot) {
         var config = node.getComponentConfigs() == null ? null : node.getComponentConfigs().get(key);
         if (REQUIREMENT_EXECUTION.equals(key)) {
             return itemType == DevelopmentItemType.REQUIREMENT
-                    ? readExecutionTarget(item, entityVersion, fields)
+                    ? readExecutionTarget(item, entityVersion, fields, authorizationSnapshot)
                     : unsupported(key, config, fields, unknownComponents);
         }
         if ("story-list".equals(key)) {
             if (itemType != DevelopmentItemType.TOPIC) {
                 return unsupported(key, config, fields, unknownComponents);
             }
-            return readStoryList(item, node, fields, unknownComponents);
+            return readStoryList(item, node, fields, unknownComponents, authorizationSnapshot);
         }
         if (!JSON_COMPONENTS.contains(key)) {
             return unsupported(key, config, fields, unknownComponents);
@@ -83,18 +97,45 @@ public class AiDevelopmentComponentReader {
         versions.put("node", node.getVersion());
         if (state == null || state.isNull()) {
             return new AiWorkflowContextDTO.Component(key, key, fields, List.of(), config,
-                    null, "EMPTY", versions, null);
+                    null, "EMPTY", versions, saveContract(itemType, item, node, key, config));
         }
         com.fasterxml.jackson.databind.JsonNode content =
-                referenceProjector.projectComponentContent(itemType.name().toLowerCase(java.util.Locale.ROOT),
+                projector.projectComponentContent(itemType.name().toLowerCase(java.util.Locale.ROOT),
                         item.getId(), key, state);
         return new AiWorkflowContextDTO.Component(key, key, fields, List.of(), config,
-                content, "LOADED", versions, null);
+                content, "LOADED", versions, saveContract(itemType, item, node, key, config));
+    }
+
+    /**
+     * Describes the narrow server command an AI writer may use for JSON-backed story workbench
+     * content. The read context remains pure; this is only a capability declaration.
+     */
+    private Map<String, Object> saveContract(DevelopmentItemType itemType,
+                                             DevelopmentItemWorkflowDetailDTO item,
+                                             DevelopmentItemWorkflowNodeDTO node,
+                                             String componentKey,
+                                             com.fasterxml.jackson.databind.JsonNode config) {
+        if (itemType != DevelopmentItemType.STORY
+                || !"story-node-workbench".equals(componentKey)) return null;
+        String variant = config == null ? null : config.path("variant").asText(null);
+        if (!StoryNodeWorkbenchPolicy.supports(variant)) return null;
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("command", "development-item.node.field.update");
+        contract.put("itemType", itemType.name());
+        contract.put("itemId", item == null ? null : item.getId());
+        contract.put("nodeId", node.getId());
+        contract.put("version", node.getVersion());
+        contract.put("componentKey", componentKey);
+        contract.put("variant", variant);
+        contract.put("fieldValuesPath", "__components." + componentKey);
+        contract.put("writableFields", StoryNodeWorkbenchPolicy.writableFields(variant));
+        return contract;
     }
 
     private AiWorkflowContextDTO.Component readExecutionTarget(DevelopmentItemWorkflowDetailDTO item,
                                                                Integer entityVersion,
-                                                               List<AiWorkflowContextDTO.Field> fields) {
+                                                               List<AiWorkflowContextDTO.Field> fields,
+                                                               ReadAuthorizationSnapshot authorizationSnapshot) {
         Map<String, Integer> versions = new LinkedHashMap<>();
         versions.put("entity", entityVersion);
         var target = item.getExecutionTarget();
@@ -105,7 +146,7 @@ public class AiDevelopmentComponentReader {
                     fields, List.of(), null, null, "EMPTY", emptyVersions, null);
         }
         String targetType = target.getTargetType().name().toLowerCase(java.util.Locale.ROOT);
-        boolean readable = targetReferencePolicy.canReadReference(targetType, target.getTargetId());
+        boolean readable = canReadReference(authorizationSnapshot, targetType, target.getTargetId());
         Map<String, Object> content = new LinkedHashMap<>();
         if (readable) {
             put(content, "title", target.getTitle());
@@ -131,7 +172,7 @@ public class AiDevelopmentComponentReader {
      */
     private AiWorkflowContextDTO.Component readStoryList(DevelopmentItemWorkflowDetailDTO item,
             DevelopmentItemWorkflowNodeDTO node, List<AiWorkflowContextDTO.Field> fields,
-            List<String> unknownComponents) {
+            List<String> unknownComponents, ReadAuthorizationSnapshot authorizationSnapshot) {
         Long topicId = item.getTopicId();
         Long mountNode = item.getTopicWorkflowNodeId();
         if (topicId == null || mountNode == null || !Objects.equals(mountNode, node.getId())) {
@@ -143,7 +184,7 @@ public class AiDevelopmentComponentReader {
         for (var story : storyService.listByTopic(topicId)) {
             if (story == null || story.getId() == null) continue;
             if (!Objects.equals(story.getTopicWorkflowNodeId(), node.getId())) continue;
-            if (!targetReferencePolicy.canReadReference("story", story.getId())) continue;
+            if (!canReadReference(authorizationSnapshot, "story", story.getId())) continue;
             Map<String, Object> row = new LinkedHashMap<>();
             put(row, "id", story.getId());
             put(row, "title", story.getTitle());
@@ -174,6 +215,13 @@ public class AiDevelopmentComponentReader {
         } else {
             content.put("testingResults", mapper.valueToTree(testingState));
         }
+    }
+
+    private boolean canReadReference(ReadAuthorizationSnapshot authorizationSnapshot,
+                                     String resourceType, Long resourceId) {
+        return authorizationSnapshot == null
+                ? targetReferencePolicy.canReadReference(resourceType, resourceId)
+                : authorizationSnapshot.canRead(resourceType, resourceId);
     }
     private AiWorkflowContextDTO.Component unsupported(String key, com.fasterxml.jackson.databind.JsonNode config,
                                                        List<AiWorkflowContextDTO.Field> fields,

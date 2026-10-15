@@ -44,6 +44,11 @@ class OceanbaseUpgradeScriptTest {
         assertThat(script).contains("pms_schema_migration_step");
         assertThat(script).contains("PMS_ACCEPT_FLYWAY_BASELINE");
         assertThat(script).contains("No pending migrations");
+        assertThat(script).contains("apply_v71_statement");
+        assertThat(script).contains("information_schema.statistics");
+        assertThat(script).contains("record_migration_step");
+        assertThat(script).contains("step_no\" == \"6\"");
+        assertThat(script).contains("object_exists\" == \"0\"");
         assertThat(script).doesNotContain("DROP DATABASE");
         assertThat(script).doesNotContain("TRUNCATE");
     }

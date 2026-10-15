@@ -20,7 +20,7 @@ public class LoginUser {
     private String nameZh;
     private String displayName;
     private Long sessionId;
-    /** Non-null only when this request was authenticated with a DSH delegation token. */
+    /** Non-null only when this request was authenticated with an AI delegation token. */
     private List<String> delegationScopes;
 
     public LoginUser(Long id, String username, String nickname) {

@@ -38,15 +38,20 @@ class AiOperationContractAuditTest {
                 "1.0.0");
         CommandPreview proposal = new CommandPreview(
                 "ignored", CommandName.PROJECT_CREATE, Instant.now().plusSeconds(60),
-                "context-v7", List.of(), List.of(), List.of("project-list"));
+                "context-v7", List.of(), List.of(), List.of("project-list"), List.of(
+                        new CommandPreview.Precondition("PROJECT_OWNER_REQUIRED", "请先指定负责人", true,
+                                "project.update", Map.of("projectId", 22L))));
 
-        service.persistPreview(7L, request, proposal);
+        CommandPreview persisted = service.persistPreview(7L, request, proposal);
 
         var captor = org.mockito.ArgumentCaptor.forClass(AiOperationDO.class);
         org.mockito.Mockito.verify(mapper).insert(captor.capture());
         assertThat(captor.getValue().getContractId())
                 .isEqualTo("pms-project-assistant/project-kickoff");
         assertThat(captor.getValue().getContractVersion()).isEqualTo("1.0.0");
+        assertThat(persisted.preconditions()).extracting(CommandPreview.Precondition::code)
+                .containsExactly("PROJECT_OWNER_REQUIRED");
+        assertThat(captor.getValue().getPreviewJson()).contains("PROJECT_OWNER_REQUIRED");
     }
 
     @Test

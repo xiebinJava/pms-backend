@@ -74,22 +74,9 @@ public class DefaultOidcTokenClient implements OidcTokenClient {
         return toValidatedClaims(claims);
     }
 
-    @Override
-    public OidcValidatedClaims validateRelayedIdToken(AuthProviderProperties.Oidc oidc,
-                                                      OidcEndpoints endpoints,
-                                                      String idToken,
-                                                      Set<String> allowedAudiences) {
-        if (allowedAudiences == null || allowedAudiences.isEmpty()) {
-            throw BusinessException.forbidden("未配置允许的 SSO 客户端");
-        }
-        Claims claims = verifiedClaims(oidc, endpoints, idToken, allowedAudiences, null);
-        return toValidatedClaims(claims);
-    }
-
     /**
-     * Shared signature/issuer/audience verification. `nonce` is only required for
-     * the browser login flow; a relayed token is verified against the audiences
-     * the deployment allow-lists instead.
+     * Shared signature, issuer, audience and nonce verification for the browser
+     * login flow.
      */
     private Claims verifiedClaims(AuthProviderProperties.Oidc oidc,
                                   OidcEndpoints endpoints,

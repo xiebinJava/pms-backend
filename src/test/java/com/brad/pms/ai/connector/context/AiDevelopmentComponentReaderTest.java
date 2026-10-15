@@ -202,4 +202,41 @@ class AiDevelopmentComponentReaderTest {
                 node(null, 4), 5, "release-handover", unknown))
                 .isInstanceOf(com.brad.pms.common.exception.BusinessException.class);
     }
+
+    @Test
+    void storyWorkbenchExposesAStableSaveContractForAiDrafts() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO story = new DevelopmentItemWorkflowDetailDTO();
+        story.setItemType("STORY");
+        story.setId(34L);
+
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(383L);
+        node.setVersion(2);
+        node.setRuntimeComponents(List.of("story-node-workbench"));
+        node.setComponentConfigs(Map.of("story-node-workbench",
+                mapper.valueToTree(Map.of("variant", "writing"))));
+        node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
+                "story-node-workbench", Map.of("descriptionAndAcceptance", "现有内容")))));
+
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        List<AiWorkflowContextDTO.Component> components = reader(real, policy).read(
+                DevelopmentItemType.STORY, story, node, null, "story-node-workbench", new ArrayList<>());
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.saveContract()).isNotNull();
+            assertThat(component.saveContract()).containsEntry("command", "development-item.node.field.update");
+            assertThat(component.saveContract()).containsEntry("itemType", "STORY");
+            assertThat(component.saveContract()).containsEntry("itemId", 34L);
+            assertThat(component.saveContract()).containsEntry("nodeId", 383L);
+            assertThat(component.saveContract()).containsEntry("version", 2);
+            assertThat(component.saveContract()).containsEntry("componentKey", "story-node-workbench");
+            assertThat(component.saveContract()).containsEntry("variant", "writing");
+            assertThat(component.saveContract()).containsEntry("fieldValuesPath",
+                    "__components.story-node-workbench");
+            assertThat(component.saveContract().get("writableFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .contains("descriptionAndAcceptance", "background", "acceptanceCriteria", "priority");
+        });
+    }
 }

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "references": {
+    "pms-front": {
+      "path": "../pms-front",
+      "description": "PMS 前端仓库。改页面、接口调用、路由和样式时使用这个目录。"
+    }
+  }
+}

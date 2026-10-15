@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * JWT 生成与解析（轻量登录方案，便于开源）
@@ -46,7 +45,7 @@ public class JwtTokenProvider {
         return builder.signWith(key, SignatureAlgorithm.HS256).compact();
     }
 
-    /** A short-lived, scope-limited token for the Work Helper read/preview bridge. */
+    /** A short-lived, scope-limited token for an AI client. */
     public String createAiDelegationToken(Long userId, Long sessionId, Set<String> scopes) {
         Date now = new Date();
         return Jwts.builder()
@@ -60,29 +59,6 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    /**
-     * Creates the short-lived token used by the DSH server-side PMS plugin.
-     * The audience and id make this token distinguishable from the legacy PMS
-     * AI bridge token and give downstream services enough data for tracing and
-     * replay investigation.
-     */
-    public String createDshDelegationToken(Long userId, Long sessionId, String dshSessionId,
-                                           String agentId, Set<String> scopes) {
-        Date now = new Date();
-        var builder = Jwts.builder()
-                .setId(UUID.randomUUID().toString())
-                .setAudience("dsh-pms")
-                .setSubject(String.valueOf(userId))
-                .setIssuedAt(now)
-                .setExpiration(new Date(now.getTime() + 120_000L))
-                .claim("sid", sessionId)
-                .claim("kind", "AI_DELEGATION")
-                .claim("scope", scopes == null ? List.of() : scopes.stream().sorted().toList());
-        if (dshSessionId != null && !dshSessionId.isBlank()) builder.claim("dsh_sid", dshSessionId);
-        if (agentId != null && !agentId.isBlank()) builder.claim("agent", agentId);
-        return builder.signWith(key, SignatureAlgorithm.HS256).compact();
-    }
-
     public LoginUser parseAiDelegationToken(String token) {
         Claims claims = parseClaims(token);
         if (!"AI_DELEGATION".equals(claims.get("kind", String.class))) {
@@ -92,29 +68,7 @@ public class JwtTokenProvider {
         return user;
     }
 
-    public LoginUser parseDshDelegationToken(String token) {
-        Claims claims = parseClaims(token);
-        if (!"AI_DELEGATION".equals(claims.get("kind", String.class))
-                || !"dsh-pms".equals(claims.getAudience())
-                || claims.getId() == null || claims.getId().isBlank()) {
-            throw new IllegalArgumentException("不是 DSH PMS 委托令牌");
-        }
-        return loginUserFromClaims(claims);
-    }
-
-    public boolean isDshDelegationToken(String token) {
-        try {
-            parseDshDelegationToken(token);
-            return true;
-        } catch (RuntimeException ignored) {
-            return false;
-        }
-    }
-
-    /**
-     * Identifies both the legacy AI bridge token and the DSH token without
-     * exposing parser failures to the authentication boundary.
-     */
+    /** Identifies an AI delegation token without exposing parser failures. */
     public boolean isAiDelegationToken(String token) {
         try {
             parseAiDelegationToken(token);

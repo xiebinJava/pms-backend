@@ -29,35 +29,47 @@ class AiWorkflowContextReadServiceTest {
 
     @Test
     void legacyOptionsAreTheDefaultWhenCallersPassNull() {
-        when(projectReader.read(7L, ContextReadOptions.legacy())).thenReturn(context());
+        when(projectReader.read(org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class))).thenReturn(context());
 
         service().context("project", 7L, null);
 
-        verify(projectReader).read(7L, ContextReadOptions.legacy());
+        verify(projectReader).read(org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class));
         verify(budget).requireWithinFocusedLimit(context());
     }
 
     @Test
     void projectTopicStoryAndRequirementRouteToTheirReaders() {
-        when(projectReader.read(7L, ContextReadOptions.legacy())).thenReturn(context());
-        when(developmentReader.read(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L,
-                ContextReadOptions.legacy())).thenReturn(context());
-        when(developmentReader.read(com.brad.pms.workflow.DevelopmentItemType.TOPIC, 8L,
-                ContextReadOptions.legacy())).thenReturn(context());
-        when(developmentReader.read(com.brad.pms.workflow.DevelopmentItemType.STORY, 9L,
-                ContextReadOptions.legacy())).thenReturn(context());
+        when(projectReader.read(org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class))).thenReturn(context());
+        when(developmentReader.read(org.mockito.ArgumentMatchers.eq(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT),
+                org.mockito.ArgumentMatchers.eq(23L), org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class))).thenReturn(context());
+        when(developmentReader.read(org.mockito.ArgumentMatchers.eq(com.brad.pms.workflow.DevelopmentItemType.TOPIC),
+                org.mockito.ArgumentMatchers.eq(8L), org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class))).thenReturn(context());
+        when(developmentReader.read(org.mockito.ArgumentMatchers.eq(com.brad.pms.workflow.DevelopmentItemType.STORY),
+                org.mockito.ArgumentMatchers.eq(9L), org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class))).thenReturn(context());
 
         service().context("project", 7L, ContextReadOptions.legacy());
         service().context("requirement", 23L, ContextReadOptions.legacy());
         service().context("topic", 8L, ContextReadOptions.legacy());
         service().context("story", 9L, ContextReadOptions.legacy());
 
-        verify(developmentReader).read(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT,
-                23L, ContextReadOptions.legacy());
-        verify(developmentReader).read(com.brad.pms.workflow.DevelopmentItemType.TOPIC,
-                8L, ContextReadOptions.legacy());
-        verify(developmentReader).read(com.brad.pms.workflow.DevelopmentItemType.STORY,
-                9L, ContextReadOptions.legacy());
+        verify(developmentReader).read(org.mockito.ArgumentMatchers.eq(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT),
+                org.mockito.ArgumentMatchers.eq(23L), org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class));
+        verify(developmentReader).read(org.mockito.ArgumentMatchers.eq(com.brad.pms.workflow.DevelopmentItemType.TOPIC),
+                org.mockito.ArgumentMatchers.eq(8L), org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class));
+        verify(developmentReader).read(org.mockito.ArgumentMatchers.eq(com.brad.pms.workflow.DevelopmentItemType.STORY),
+                org.mockito.ArgumentMatchers.eq(9L), org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class));
     }
 
     @org.mockito.Mock com.brad.pms.ai.connector.context.AiContextReadPolicy requireReadPolicy;
@@ -76,7 +88,7 @@ class AiWorkflowContextReadServiceTest {
                 .isInstanceOf(BusinessException.class).hasMessageContaining("无权读取");
         verify(developmentReader, never()).read(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -86,12 +98,14 @@ class AiWorkflowContextReadServiceTest {
         assertThatThrownBy(() -> service().context("project", null, ContextReadOptions.legacy()))
                 .isInstanceOf(BusinessException.class);
         verify(projectReader, never()).read(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void aMissingReaderResultIsNeverPassedThroughTheBudgetAsSuccess() {
-        when(projectReader.read(7L, ContextReadOptions.legacy())).thenThrow(
+        when(projectReader.read(org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.eq(ContextReadOptions.legacy()),
+                org.mockito.ArgumentMatchers.any(ReadAuthorizationSnapshot.class))).thenThrow(
                 new BusinessException("无权读取该类型对象"));
 
         assertThatThrownBy(() -> service().context("project", 7L, ContextReadOptions.legacy()))

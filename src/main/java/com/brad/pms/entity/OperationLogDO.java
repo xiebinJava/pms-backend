@@ -24,11 +24,5 @@ public class OperationLogDO {
     private String requestId;
     private String ip;
     private String userAgent;
-    private String dshSessionId;
-    private String dshAgentId;
-    private String dshAgentVersion;
-    private String dshWorkspace;
-    private String dshTool;
-    private String dshOperationId;
     private LocalDateTime createdAt;
 }

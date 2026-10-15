@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-/** Stable content fingerprint used to correlate DSH prompt injection with PMS audit records. */
+/** Stable content fingerprint used to correlate AI prompt injection with PMS audit records. */
 public final class PmsAgentContractFingerprint {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()

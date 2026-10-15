@@ -81,7 +81,7 @@ class PmsAgentContractRegistryTest {
     }
 
     @Test
-    void rejectsAReadToolThatIsNotPublishedByDsh() {
+    void rejectsAReadToolThatIsNotPublishedByTheRegistry() {
         PmsAgentContractLoader loader = new PmsAgentContractLoader(WRITE_COMMANDS, READ_TOOLS);
         String yaml = validYaml("project.create", "pms_admin_console");
 

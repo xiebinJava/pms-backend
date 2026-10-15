@@ -55,12 +55,12 @@ public final class UserContext {
         return user != null && SystemRole.isAdministrator(user.getSystemRole());
     }
 
-    public static boolean isDshDelegation() {
+    public static boolean isDelegated() {
         LoginUser user = HOLDER.get();
         return user != null && user.getDelegationScopes() != null;
     }
 
-    public static boolean hasDshScope(String scope) {
+    public static boolean hasDelegationScope(String scope) {
         LoginUser user = HOLDER.get();
         List<String> scopes = user == null ? null : user.getDelegationScopes();
         return scopes != null && scopes.contains(scope);

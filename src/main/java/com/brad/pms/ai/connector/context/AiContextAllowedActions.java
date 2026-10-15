@@ -54,7 +54,7 @@ public class AiContextAllowedActions {
 
     private boolean scopeAvailable(CommandName name) {
         PmsCommandDescriptor descriptor = PmsCommandMetadata.descriptor(name);
-        return !UserContext.isDshDelegation()
-                || descriptor.scopes().stream().allMatch(UserContext::hasDshScope);
+        return !UserContext.isDelegated()
+                || descriptor.scopes().stream().allMatch(UserContext::hasDelegationScope);
     }
 }

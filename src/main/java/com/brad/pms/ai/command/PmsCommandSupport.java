@@ -37,8 +37,16 @@ public class PmsCommandSupport {
     public CommandPreview preview(CommandPreviewRequest request, CommandName name, String description,
                                   Map<String, Object> change, List<String> warnings,
                                   List<String> refreshScopes) {
+        return preview(request, name, description, change, warnings, refreshScopes, List.of());
+    }
+
+    public CommandPreview preview(CommandPreviewRequest request, CommandName name, String description,
+                                  Map<String, Object> change, List<String> warnings,
+                                  List<String> refreshScopes,
+                                  List<CommandPreview.Precondition> preconditions) {
         return new CommandPreview(null, name, Instant.now().plusSeconds(600), request.contextVersion(),
-                warnings, change == null ? List.of() : List.of(new LinkedHashMap<>(change)), refreshScopes);
+                warnings, change == null ? List.of() : List.of(new LinkedHashMap<>(change)), refreshScopes,
+                preconditions);
     }
 
     public CommandResult result(AiOperationDO operation, String message, Map<String, Object> data,

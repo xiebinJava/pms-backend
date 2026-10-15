@@ -29,20 +29,15 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    void dshDelegationTokenRequiresDshAudienceAndRoundTripsIdentity() {
+    void aiDelegationTokenRoundTripsIdentityAndScopes() {
         JwtTokenProvider provider = new JwtTokenProvider("12345678901234567890123456789012", 30);
 
-        LoginUser parsed = provider.parseDshDelegationToken(provider.createDshDelegationToken(
-                7L, 9L, "dsh-session-1", "project_assistant", Set.of("pms:project:read")));
+        String token = provider.createAiDelegationToken(7L, 9L, Set.of("pms:project:read"));
+        LoginUser parsed = provider.parseAiDelegationToken(token);
 
         assertThat(parsed.getId()).isEqualTo(7L);
         assertThat(parsed.getSessionId()).isEqualTo(9L);
-        assertThat(provider.hasAiDelegationScope(
-                provider.createDshDelegationToken(7L, 9L, "dsh-session-1", "project_assistant", Set.of("pms:project:read")),
-                "pms:project:read")).isTrue();
-        assertThatThrownBy(() -> provider.parseDshDelegationToken(
-                provider.createAiDelegationToken(7L, 9L, Set.of("pms:project:read"))))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(provider.hasAiDelegationScope(token, "pms:project:read")).isTrue();
     }
 
     @Test

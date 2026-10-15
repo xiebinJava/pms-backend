@@ -65,43 +65,14 @@ class AuthInterceptorTest {
     }
 
     @Test
-    void delegationTokenMayReadDshProjectListWithPmsProjectScope() {
-        MockHttpServletRequest request = new MockHttpServletRequest(
-                "GET", "/api/integration/dsh/v1/projects");
-        request.setContextPath("/api");
-        when(tokenProvider.isDshDelegationToken("token")).thenReturn(true);
-        when(tokenProvider.hasAiDelegationScope("token", "pms:project:read")).thenReturn(true);
-
-        Boolean allowed = ReflectionTestUtils.invokeMethod(
-                interceptor, "allowedAiDelegationRoute", request, "token");
-
-        assertThat(allowed).isTrue();
-    }
-
-    @Test
-    void legacyAiDelegationTokenCannotEnterDshIntegrationFacade() {
-        MockHttpServletRequest request = new MockHttpServletRequest(
-                "GET", "/api/integration/dsh/v1/projects");
-        request.setContextPath("/api");
-        when(tokenProvider.isDshDelegationToken("legacy-token")).thenReturn(false);
-        when(tokenProvider.hasAiDelegationScope("legacy-token", "pms:project:read")).thenReturn(true);
-
-        Boolean allowed = ReflectionTestUtils.invokeMethod(
-                interceptor, "allowedAiDelegationRoute", request, "legacy-token");
-
-        assertThat(allowed).isFalse();
-    }
-
-    @Test
     void delegationTokenInAuthorizationHeaderStillUsesIntegrationRoutePolicy() throws Exception {
-        when(tokenProvider.isAiDelegationToken("dsh-token")).thenReturn(true);
-        when(tokenProvider.parseAiDelegationToken("dsh-token")).thenReturn(new LoginUser(7L, "alex", "张伟"));
-        when(tokenProvider.isDshDelegationToken("dsh-token")).thenReturn(true);
-        when(tokenProvider.hasAiDelegationScope("dsh-token", "pms:query:read")).thenReturn(false);
+        when(tokenProvider.isAiDelegationToken("ai-token")).thenReturn(true);
+        when(tokenProvider.parseAiDelegationToken("ai-token")).thenReturn(new LoginUser(7L, "alex", "张伟"));
+        when(tokenProvider.hasAiDelegationScope("ai-token", "pms:query:read")).thenReturn(false);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integration/ai/v1/query");
         request.setContextPath("/api");
-        request.addHeader("Authorization", "Bearer dsh-token");
+        request.addHeader("Authorization", "Bearer ai-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
         Method method = TestController.class.getDeclaredMethod("secured");
         HandlerMethod handler = new HandlerMethod(new TestController(), method);

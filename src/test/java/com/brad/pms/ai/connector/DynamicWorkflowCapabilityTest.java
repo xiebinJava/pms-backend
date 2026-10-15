@@ -52,7 +52,7 @@ class DynamicWorkflowCapabilityTest {
                                                 List.of(), List.of())),
                                 List.of(), Map.of("decision", "继续")))),
                 List.of(), null, null, null, null);
-        when(readService.context("topic", 7L, ContextReadOptions.legacy())).thenReturn(contract);
+        when(readService.read("topic", 7L, ContextReadOptions.legacy(), null)).thenReturn(contract);
 
         AiWorkflowContextDTO context = service().context("topic", 7L);
 
@@ -65,7 +65,7 @@ class DynamicWorkflowCapabilityTest {
                     .containsExactly("story-list", "custom-review");
             assertThat(item.fieldValues()).containsEntry("decision", "继续");
         });
-        verify(readService).context("topic", 7L, ContextReadOptions.legacy());
+        verify(readService).read("topic", 7L, ContextReadOptions.legacy(), null);
     }
 
     @org.mockito.Mock com.brad.pms.ai.connector.context.AiWorkflowContextReadService readService;

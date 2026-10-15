@@ -39,11 +39,12 @@ class AiContextReferenceProjectorTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AiContextReferenceProjector projector;
+    private AiContextReadPolicy policy;
 
     @BeforeEach
     void initIdentity() {
         UserContext.set(new LoginUser(11L, "u", "U"));
-        AiContextReadPolicy policy = new AiContextReadPolicy(projectMapper, requirementMapper,
+        policy = new AiContextReadPolicy(projectMapper, requirementMapper,
                 topicMapper, storyMapper, iterationPlanMapper, authorizationService, projectPermissionService);
         projector = new AiContextReferenceProjector(policy);
     }
@@ -186,6 +187,60 @@ class AiContextReferenceProjectorTest {
     }
 
     @Test
+    void requirementWorkbenchUsesTargetTypeWhenProjectingTargetId() {
+        AiContextReadPolicy policy = org.mockito.Mockito.mock(AiContextReadPolicy.class);
+        when(policy.canReadReference("topic", 7L)).thenReturn(true);
+        AiContextReferenceProjector localProjector = new AiContextReferenceProjector(policy);
+        JsonNode content = objectMapper.valueToTree(Map.of(
+                "targetType", "TOPIC",
+                "targetId", 7L,
+                "navigationId", 7L,
+                "title", "专题目标"));
+
+        JsonNode projected = localProjector.projectComponentContent(
+                "requirement", 23L, "requirement-node-workbench", content);
+
+        assertThat(projected.get("targetType").asText()).isEqualTo("TOPIC");
+        assertThat(projected.get("targetId").asLong()).isEqualTo(7L);
+        assertThat(projected.get("navigationId").asLong()).isEqualTo(7L);
+    }
+
+    @Test
+    void projectSnapshotContentFiltersNestedDevelopmentReferences() {
+        AiContextReadPolicy policy = org.mockito.Mockito.mock(AiContextReadPolicy.class);
+        when(policy.canReadReference("topic", 10L)).thenReturn(true);
+        when(policy.canReadReference("story", 20L)).thenReturn(true);
+        when(policy.canReadReference("iteration_plan", 30L)).thenReturn(true);
+        AiContextReferenceProjector localProjector = new AiContextReferenceProjector(policy);
+        JsonNode content = objectMapper.valueToTree(Map.of(
+                "topics", List.of(Map.of(
+                        "id", 10L,
+                        "stories", List.of(
+                                Map.of("id", 20L, "iterationPlanId", 30L, "iterationPlanName", "可读迭代"),
+                                Map.of("id", 21L, "iterationPlanId", 31L, "iterationPlanName", "不可读迭代")))),
+                "summary", Map.of("topicCount", 1, "storyCount", 2)));
+
+        JsonNode projected = localProjector.projectProjectComponentContent("development-control", content);
+
+        assertThat(projected.path("topics")).hasSize(1);
+        assertThat(projected.path("topics").get(0).path("stories")).hasSize(1);
+        assertThat(projected.path("topics").get(0).path("stories").get(0).path("id").asLong())
+                .isEqualTo(20L);
+        assertThat(projected.path("topics").get(0).path("stories").get(0).path("iterationPlanId").asLong())
+                .isEqualTo(30L);
+    }
+
+    @Test
+    void malformedKnownComponentContentDoesNotCrashProjection() {
+        JsonNode content = objectMapper.createArrayNode().add(1).add(2);
+
+        JsonNode projected = projector.projectComponentContent(
+                "story", 8L, "story-node-workbench", content);
+
+        assertThat(projected).isEqualTo(content);
+    }
+
+    @Test
     void projectScopedRequirementsAreNotMistakenForStandaloneRequirements() {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("scopeItems", List.of(Map.of("id", 501L, "title", "项目内范围项")));
@@ -262,6 +317,25 @@ class AiContextReferenceProjectorTest {
         // 输入不被修改。
         assertThat(components.has("unknown-workbench")).isTrue();
         assertThat(fieldValues).isEqualTo(expectedInput);
+    }
+
+    @Test
+    void mapBackedComponentsWithJsonNodeValuesAreProjectedToo() {
+        when(authorizationService.has("project:read")).thenReturn(true);
+        Map<String, Object> components = new LinkedHashMap<>();
+        components.put("story-node-workbench", objectMapper.valueToTree(Map.of(
+                "projectId", 7L, "title", "故事")));
+        Map<String, Object> fieldValues = new LinkedHashMap<>();
+        fieldValues.put("__components", components);
+
+        Map<String, Object> projected = projector.projectFieldValues("story", 8L, fieldValues);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedComponents = (Map<String, Object>) projected.get("__components");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> workbench = (Map<String, Object>) projectedComponents.get("story-node-workbench");
+        assertThat(workbench).doesNotContainKey("projectId");
+        assertThat(workbench).containsEntry("title", "故事");
     }
 
     @Test

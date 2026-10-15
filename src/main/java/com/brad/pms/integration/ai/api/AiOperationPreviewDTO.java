@@ -14,7 +14,19 @@ public record AiOperationPreviewDTO(
         String contextVersion,
         List<String> warnings,
         List<Map<String, Object>> changes,
-        List<String> refreshScopes) {
+        List<String> refreshScopes,
+        List<CommandPreview.Precondition> preconditions) {
+
+    public AiOperationPreviewDTO(
+            String operationId,
+            String command,
+            Instant expiresAt,
+            String contextVersion,
+            List<String> warnings,
+            List<Map<String, Object>> changes,
+            List<String> refreshScopes) {
+        this(operationId, command, expiresAt, contextVersion, warnings, changes, refreshScopes, List.of());
+    }
 
     public static AiOperationPreviewDTO from(CommandPreview preview) {
         return new AiOperationPreviewDTO(
@@ -24,6 +36,7 @@ public record AiOperationPreviewDTO(
                 preview.contextVersion(),
                 preview.warnings(),
                 preview.changes(),
-                preview.refreshScopes());
+                preview.refreshScopes(),
+                preview.preconditions());
     }
 }

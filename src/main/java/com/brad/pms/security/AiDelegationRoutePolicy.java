@@ -3,9 +3,9 @@ package com.brad.pms.security;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * Central route and scope policy for short-lived AI/DSH delegation tokens.
+ * Central route and scope policy for short-lived AI delegation tokens.
  *
- * <p>Legacy {@code /ai/*} routes keep their existing scopes while the DSH
+ * <p>Legacy {@code /ai/*} routes keep their existing scopes while the
  * integration facade uses the narrower {@code pms:*} scopes. Keeping this
  * mapping in one place prevents new integration endpoints from accidentally
  * bypassing the delegation boundary.</p>
@@ -16,12 +16,8 @@ public final class AiDelegationRoutePolicy {
         String path = normalizePath(request);
         String method = request.getMethod();
 
-        if (path.startsWith("/integration/dsh/v1/")
-                && !tokenProvider.isDshDelegationToken(token)) {
-            return false;
-        }
         if (path.startsWith("/integration/ai/v1/")
-                && !tokenProvider.isDshDelegationToken(token)) {
+                && !tokenProvider.isAiDelegationToken(token)) {
             return false;
         }
 
@@ -38,29 +34,6 @@ public final class AiDelegationRoutePolicy {
             return tokenProvider.hasAiDelegationScope(token, "ai:command:preview");
         }
 
-        if ("GET".equalsIgnoreCase(method) && "/integration/dsh/v1/capabilities".equals(path)) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
-        }
-        if ("GET".equalsIgnoreCase(method)
-                && path.matches("/integration/dsh/v1/agent-contracts/[^/]+/[^/]+")) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
-        }
-        if ("POST".equalsIgnoreCase(method) && "/integration/dsh/v1/query".equals(path)) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
-        }
-        if ("GET".equalsIgnoreCase(method) && "/integration/dsh/v1/projects".equals(path)) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
-        }
-        if ("GET".equalsIgnoreCase(method) && path.matches("/integration/dsh/v1/projects/[^/]+")) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
-        }
-        if ("GET".equalsIgnoreCase(method)
-                && path.matches("/integration/dsh/v1/projects/[^/]+/tasks")) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:task:read");
-        }
-        if ("GET".equalsIgnoreCase(method) && "/integration/dsh/v1/people".equals(path)) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:project:read");
-        }
         if ("GET".equalsIgnoreCase(method) && "/integration/ai/v1/capabilities".equals(path)) {
             return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
         }
@@ -74,13 +47,6 @@ public final class AiDelegationRoutePolicy {
         if ("GET".equalsIgnoreCase(method)
                 && path.matches("/integration/ai/v1/resources/(project|requirement|topic|story)/[^/]+")) {
             return tokenProvider.hasAiDelegationScope(token, "pms:query:read");
-        }
-        if ("POST".equalsIgnoreCase(method) && "/integration/dsh/v1/commands/preview".equals(path)) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:command:preview");
-        }
-        if ("POST".equalsIgnoreCase(method)
-                && path.matches("/integration/dsh/v1/operations/[^/]+/execute")) {
-            return tokenProvider.hasAiDelegationScope(token, "pms:command:execute");
         }
         if ("POST".equalsIgnoreCase(method)
                 && "/integration/ai/v1/operations/execute".equals(path)) {

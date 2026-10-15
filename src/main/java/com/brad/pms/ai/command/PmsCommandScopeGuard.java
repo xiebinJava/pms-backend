@@ -8,15 +8,15 @@ import java.util.List;
 /**
  * Command-level delegation-scope guard for the PMS surface.
  *
- * <p>The DSH facade already gates each endpoint by its endpoint scope
+ * <p>The AI integration facade already gates each endpoint by its endpoint scope
  * ({@code pms:command:preview} / {@code pms:command:execute}). This guard adds
  * the per-command half: a PMS delegation token must also hold every scope the
  * command declares (for example {@code pms:workflow:write} for
  * {@code node.complete}), so a narrowed token cannot preview or execute a
  * command the capability catalog would never publish to it.
  *
- * <p>Legacy AI delegation tokens ({@code ai:*}) and ordinary user sessions keep
- * their existing semantics.
+ * <p>Delegation tokens without a PMS command scope and ordinary user sessions
+ * keep their existing semantics.
  */
 public final class PmsCommandScopeGuard {
 
@@ -27,10 +27,10 @@ public final class PmsCommandScopeGuard {
     }
 
     public static void requireScope(CommandName name) {
-        if (!UserContext.isDshDelegation()) return;
-        if (!UserContext.hasDshScope(PREVIEW_SCOPE) && !UserContext.hasDshScope(EXECUTE_SCOPE)) return;
+        if (!UserContext.isDelegated()) return;
+        if (!UserContext.hasDelegationScope(PREVIEW_SCOPE) && !UserContext.hasDelegationScope(EXECUTE_SCOPE)) return;
         List<String> required = PmsCommandMetadata.descriptor(name).scopes();
-        boolean missing = required.stream().anyMatch(scope -> !UserContext.hasDshScope(scope));
+        boolean missing = required.stream().anyMatch(scope -> !UserContext.hasDelegationScope(scope));
         if (missing) {
             throw BusinessException.forbidden("没有该命令的权限范围: " + name.code());
         }

@@ -51,13 +51,15 @@ public class AiOperationService {
         operation.setContractId(request.contractId());
         operation.setContractVersion(request.contractVersion());
         operation.setArgumentsJson(write(request.arguments()));
-        operation.setPreviewJson(write(proposal));
-        operation.setExpectedVersionsJson(write(proposal.changes()));
         operation.setStatus(PREVIEW);
         operation.setExpiresAt(expiresAt);
+        CommandPreview persistedPreview = new CommandPreview(operationId, proposal.command(),
+                expiresAt.atZone(ZoneId.systemDefault()).toInstant(), proposal.contextVersion(),
+                proposal.warnings(), proposal.changes(), proposal.refreshScopes(), proposal.preconditions());
+        operation.setPreviewJson(write(persistedPreview));
+        operation.setExpectedVersionsJson(write(persistedPreview.changes()));
         operationMapper.insert(operation);
-        return new CommandPreview(operationId, proposal.command(), expiresAt.atZone(ZoneId.systemDefault()).toInstant(), proposal.contextVersion(),
-                proposal.warnings(), proposal.changes(), proposal.refreshScopes());
+        return persistedPreview;
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package com.brad.pms.ai.connector.context;
 
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
+import com.brad.pms.security.UserContext;
 import com.brad.pms.workflow.DevelopmentItemType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class AiWorkflowContextReadService {
+public class AiWorkflowContextReadService implements AiContextDataPort {
 
     private final AiProjectContextReader projectReader;
     private final AiDevelopmentContextReader developmentReader;
@@ -29,14 +30,23 @@ public class AiWorkflowContextReadService {
         String type = normalize(resourceType);
         // 主对象模块 READ：requirement→REQUIREMENT_READ，其余→PROJECT_READ；查询范围不等于模块读取权限。
         contextReadPolicy.requireRead(type);
+        ReadAuthorizationSnapshot authorizationSnapshot = ReadAuthorizationSnapshot.forUser(
+                UserContext.userIdOrNull(), contextReadPolicy);
         AiWorkflowContextDTO context = switch (type) {
-            case "project" -> projectReader.read(resourceId, safeOptions);
+            case "project" -> projectReader.read(resourceId, safeOptions, authorizationSnapshot);
             case "requirement", "topic", "story" -> developmentReader.read(
-                    DevelopmentItemType.valueOf(normalizedItemType(type)), resourceId, safeOptions);
+                    DevelopmentItemType.valueOf(normalizedItemType(type)), resourceId, safeOptions,
+                    authorizationSnapshot);
             default -> throw BusinessException.error("不支持的流程上下文资源类型: " + type);
         };
         budget.requireWithinFocusedLimit(context);
         return context;
+    }
+
+    @Override
+    public AiWorkflowContextDTO read(String resourceType, Long resourceId,
+                                     ContextReadOptions options, Long userId) {
+        return context(resourceType, resourceId, options);
     }
 
     private String normalize(String value) {

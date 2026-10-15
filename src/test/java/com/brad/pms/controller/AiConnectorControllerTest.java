@@ -1,6 +1,7 @@
 package com.brad.pms.controller;
 
 import com.brad.pms.ai.connector.AutomaticCommandExecutionService;
+import com.brad.pms.ai.connector.AiConnectorQueryService;
 import com.brad.pms.ai.command.CommandResult;
 import com.brad.pms.ai.command.CommandName;
 import com.brad.pms.ai.command.CommandPreview;
@@ -10,7 +11,12 @@ import com.brad.pms.integration.ai.api.AiAutomaticExecuteRequest;
 import com.brad.pms.integration.ai.api.AiOperationPreviewRequest;
 import com.brad.pms.integration.ai.api.AiOperationPreviewDTO;
 import com.brad.pms.integration.ai.api.AiOperationResultDTO;
+import com.brad.pms.integration.ai.api.AiResourceDetailDTO;
+import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
+import com.brad.pms.ai.connector.context.ContextReadOptions;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 import java.util.Map;
@@ -22,6 +28,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AiConnectorControllerTest {
 
@@ -59,5 +67,30 @@ class AiConnectorControllerTest {
         assertThat(response.getData().changes()).hasSize(1);
         verify(previewService).preview(any());
         verifyNoInteractions(executionService);
+    }
+
+    @Test
+    void exposesReadOnlyContextAndResourceRoutesWithParsedOptions() throws Exception {
+        AutomaticCommandExecutionService executionService = mock(AutomaticCommandExecutionService.class);
+        AiConnectorQueryService queryService = mock(AiConnectorQueryService.class);
+        ContextReadOptions options = new ContextReadOptions("focused", 301L, "solution-design");
+        when(queryService.context("project", 7L, options)).thenReturn(
+                new AiWorkflowContextDTO("project", 7L, 3, null, null, List.of()));
+        when(queryService.resource("project", 7L)).thenReturn(
+                new AiResourceDetailDTO("project", 7L, 3, Map.of("name", "订单中心")));
+        AiConnectorController controller = new AiConnectorController(
+                executionService, null, queryService, null);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        mvc.perform(get("/integration/ai/v1/context/project/7")
+                        .param("view", "focused")
+                        .param("nodeId", "301")
+                        .param("componentKey", "solution-design"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/integration/ai/v1/resources/project/7"))
+                .andExpect(status().isOk());
+
+        verify(queryService).context("project", 7L, options);
+        verify(queryService).resource("project", 7L);
     }
 }

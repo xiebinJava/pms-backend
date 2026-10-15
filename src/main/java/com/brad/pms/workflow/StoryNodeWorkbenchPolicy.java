@@ -6,6 +6,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -51,6 +55,30 @@ public final class StoryNodeWorkbenchPolicy {
 
     public static Set<String> variants() {
         return VARIANTS.keySet();
+    }
+
+    /**
+     * Returns the fields an external writer may send for a workbench variant.
+     * The order is stable so an AI client can cache and render the contract.
+     */
+    public static List<String> writableFields(String variant) {
+        Map<String, FieldSpec> specs = VARIANTS.get(variant);
+        if (specs == null) return List.of();
+        Set<String> fields = new LinkedHashSet<>(specs.keySet().stream().sorted().toList());
+        if ("writing".equals(variant)) {
+            fields.add("baseTitle");
+            fields.add("baseTopicId");
+            fields.add("title");
+            fields.add("topicId");
+        }
+        if ("iteration".equals(variant)) {
+            fields.add("developerIds");
+            fields.add("testerIds");
+        }
+        if ("development".equals(variant)) fields.add("testCases");
+        List<String> ordered = new ArrayList<>(fields);
+        Collections.sort(ordered);
+        return List.copyOf(ordered);
     }
 
     /** Only whitelisted fields are writable; unknown incoming fields are dropped and server history is preserved. */

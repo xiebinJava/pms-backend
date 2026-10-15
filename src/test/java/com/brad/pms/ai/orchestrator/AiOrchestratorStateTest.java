@@ -1,0 +1,65 @@
+package com.brad.pms.ai.orchestrator;
+
+import com.brad.pms.ai.orchestrator.domain.AiOrchestratorEventType;
+import com.brad.pms.ai.orchestrator.domain.AiOrchestratorState;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class AiOrchestratorStateTest {
+
+    @Test
+    void followsThePreviewFirstLifecycle() {
+        AiOrchestratorState state = AiOrchestratorState.RECEIVED;
+
+        state = state.transition(AiOrchestratorEventType.CONTEXT_READ);
+        state = state.transition(AiOrchestratorEventType.DRAFT_VALIDATED);
+        state = state.transition(AiOrchestratorEventType.PLAN_CREATED);
+        state = state.transition(AiOrchestratorEventType.PREVIEW_CREATED);
+        state = state.transition(AiOrchestratorEventType.WAITING_CONFIRMATION);
+        state = state.transition(AiOrchestratorEventType.EXECUTION_STARTED);
+        state = state.transition(AiOrchestratorEventType.EXECUTION_FINISHED);
+        state = state.transition(AiOrchestratorEventType.VERIFICATION_FINISHED);
+
+        assertThat(state).isEqualTo(AiOrchestratorState.SUCCEEDED);
+    }
+
+    @Test
+    void rejectsExecutionBeforePreviewAndConfirmation() {
+        assertThatThrownBy(() -> AiOrchestratorState.PLAN_READY.transition(
+                AiOrchestratorEventType.EXECUTION_STARTED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PLAN_READY")
+                .hasMessageContaining("EXECUTION_STARTED");
+    }
+
+    @Test
+    void mapsVersionConflictsAndCancellationToTerminalStates() {
+        assertThat(AiOrchestratorState.WAITING_CONFIRMATION.transition(
+                AiOrchestratorEventType.CONFLICT))
+                .isEqualTo(AiOrchestratorState.CONFLICT);
+        assertThat(AiOrchestratorState.WAITING_CONFIRMATION.transition(
+                AiOrchestratorEventType.CANCELLED))
+                .isEqualTo(AiOrchestratorState.CANCELLED);
+    }
+
+    @Test
+    void recordsFailuresAndConflictsBeforeExecutionStarts() {
+        assertThat(AiOrchestratorState.PLAN_READY.transition(AiOrchestratorEventType.FAILED))
+                .isEqualTo(AiOrchestratorState.FAILED);
+        assertThat(AiOrchestratorState.PLAN_READY.transition(AiOrchestratorEventType.CONFLICT))
+                .isEqualTo(AiOrchestratorState.CONFLICT);
+        assertThat(AiOrchestratorState.PREVIEWED.transition(AiOrchestratorEventType.FAILED))
+                .isEqualTo(AiOrchestratorState.FAILED);
+    }
+
+    @Test
+    void rejectsEveryTransitionFromTerminalStates() {
+        assertThatThrownBy(() -> AiOrchestratorState.SUCCEEDED.transition(
+                AiOrchestratorEventType.CONTEXT_READ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUCCEEDED")
+                .hasMessageContaining("CONTEXT_READ");
+    }
+}

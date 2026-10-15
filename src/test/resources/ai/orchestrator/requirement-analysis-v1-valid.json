@@ -1,0 +1,34 @@
+{
+  "contractVersion": "requirement-analysis/v1",
+  "draft": {
+    "facts": [
+      {
+        "text": "需求当前处于分析节点",
+        "sourceRefs": ["requirement:33"],
+        "confidence": "high"
+      }
+    ],
+    "inferences": [
+      {
+        "text": "需要补充验收条件",
+        "sourceRefs": ["requirement:33"],
+        "confidence": "medium"
+      }
+    ],
+    "assumptions": [
+      {
+        "text": "当前需求范围仍由产品负责人确认",
+        "sourceRefs": []
+      }
+    ],
+    "unresolvedDecisions": [
+      {
+        "text": "是否需要兼容旧版本客户端",
+        "sourceRefs": []
+      }
+    ],
+    "patch": {
+      "analysis": "补充结构化分析内容"
+    }
+  }
+}

@@ -47,7 +47,7 @@ class CommandPreviewServiceScopeTest {
 
     @Test
     void allowsWorkflowPreviewWhenTheDelegationTokenHoldsEveryDeclaredScope() {
-        LoginUser user = new LoginUser(7L, "dsh", "DSH");
+        LoginUser user = new LoginUser(7L, "ai-client", "AI Client");
         user.setDelegationScopes(List.of("pms:command:preview", "pms:command:execute", "pms:workflow:write"));
         UserContext.set(user);
         PmsCommand command = mock(PmsCommand.class);

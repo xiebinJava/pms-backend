@@ -8,7 +8,7 @@ import java.util.Set;
  * Scope vocabulary for the neutral connector facade.
  *
  * <p>These scopes are only the connector boundary. Ordinary PMS permissions
- * and the command-level DSH scope guard remain authoritative for the actual
+ * and the command-level delegation scope guard remain authoritative for the actual
  * operation.</p>
  */
 public final class AiConnectorScopePolicy {

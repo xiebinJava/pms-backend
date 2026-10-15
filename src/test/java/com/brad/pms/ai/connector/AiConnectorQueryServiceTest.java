@@ -121,15 +121,15 @@ class AiConnectorQueryServiceTest {
         AiWorkflowContextDTO context = new AiWorkflowContextDTO("project", 78L, 3, null,
                 new AiWorkflowContextDTO.Workflow(88L, 4, List.of()),
                 List.of(), 3, null, null, null);
-        when(readService.context("project", 78L, ContextReadOptions.legacy())).thenReturn(context);
-        when(readService.context("project", 78L,
-                new ContextReadOptions("focused", 301L, null))).thenReturn(context);
+        when(readService.read("project", 78L, ContextReadOptions.legacy(), null)).thenReturn(context);
+        when(readService.read("project", 78L,
+                new ContextReadOptions("focused", 301L, null), null)).thenReturn(context);
 
         assertThat(service().context("project", 78L, ContextReadOptions.legacy()).resourceType())
                 .isEqualTo("project");
         assertThat(service().context("project", 78L,
                 new ContextReadOptions("focused", 301L, null)).resourceId()).isEqualTo(78L);
-        verify(readService).context("project", 78L, ContextReadOptions.legacy());
+        verify(readService).read("project", 78L, ContextReadOptions.legacy(), null);
     }
 
     @Test
@@ -153,11 +153,11 @@ class AiConnectorQueryServiceTest {
 
     @Test
     void storyContextDelegatesToThePureReadServiceWithoutLegacyDetail() {
-        when(readService.context("story", 9L, ContextReadOptions.legacy())).thenReturn(
+        when(readService.read("story", 9L, ContextReadOptions.legacy(), null)).thenReturn(
                 new AiWorkflowContextDTO("story", 9L, 2, null, null, List.of(), null, null, null, null));
 
         assertThat(service().context("story", 9L).resourceType()).isEqualTo("story");
-        verify(readService).context("story", 9L, ContextReadOptions.legacy());
+        verify(readService).read("story", 9L, ContextReadOptions.legacy(), null);
         verify(workflowService, never()).detail(any(), any());
     }
 
