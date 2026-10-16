@@ -6,6 +6,9 @@ import com.brad.pms.dto.response.ProjectDTO;
 import com.brad.pms.dto.response.ProjectNodeDTO;
 import com.brad.pms.dto.response.WorkbenchReadSnapshot;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
+import com.brad.pms.ai.node.NodeWorkbench;
+import com.brad.pms.ai.node.NodeWorkbenchRegistry;
+import com.brad.pms.ai.node.TypedNodeWorkbench;
 import com.brad.pms.service.NodeRequirementScopeService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +41,7 @@ public class AiProjectComponentReader {
     private final com.brad.pms.service.NodeValueReviewService valueReviewService;
     private final com.brad.pms.service.NodeKnowledgeStandardService knowledgeStandardService;
     private final AiContextReferenceProjector referenceProjector;
+    private final NodeWorkbenchRegistry workbenchRegistry;
 
     public List<AiWorkflowContextDTO.Component> read(ProjectDTO project, ProjectNodeDTO node,
                                                      String componentKey) {
@@ -94,7 +98,8 @@ public class AiProjectComponentReader {
                 Map<String, Integer> versions = new java.util.HashMap<>();
                 versions.put("content", entityVersion);
                 yield new AiWorkflowContextDTO.Component(key, key, fields, List.of(), config,
-                        objectMapper.valueToTree(projectBasicInfo(project)), "LOADED", versions, null);
+                        objectMapper.valueToTree(projectBasicInfo(project)), "LOADED", versions,
+                        saveContract(node, key, versions));
             }
             case "requirement-scope" -> readRequirementScope(node, config, fields, warnings, projector);
             case "solution-design" -> readWorkbenchSnapshot(node, "solution-design", config, fields, warnings,
@@ -134,7 +139,8 @@ public class AiProjectComponentReader {
             }
         }
         return new AiWorkflowContextDTO.Component(componentKey, componentKey, fields, List.of(),
-                config, content, persisted ? "LOADED" : "EMPTY", versions, null);
+                config, content, persisted ? "LOADED" : "EMPTY", versions,
+                saveContract(node, componentKey, versions));
     }
 
     private AiWorkflowContextDTO.Component readRequirementScope(ProjectNodeDTO node, JsonNode config,
@@ -152,7 +158,7 @@ public class AiProjectComponentReader {
             emptyVersions.put("content", null);
             return new AiWorkflowContextDTO.Component("requirement-scope", "requirement-scope",
                     fields, List.of(), config, null,
-                    "EMPTY", emptyVersions, null);
+                    "EMPTY", emptyVersions, saveContract(node, "requirement-scope", emptyVersions));
         }
         Integer version = snapshot.parts().get("content") == null
                 ? null : snapshot.parts().get("content").version();
@@ -162,7 +168,34 @@ public class AiProjectComponentReader {
         versions.put("content", version);
         return new AiWorkflowContextDTO.Component("requirement-scope", "requirement-scope",
                 fields, List.of(), config, content, "LOADED",
-                versions, null);
+                versions, saveContract(node, "requirement-scope", versions));
+    }
+
+    /**
+     * Publishes the exact project node workbench contract consumed by the CLI.
+     * Writable fields come from the registered command type; the CLI never derives
+     * them from display content or a default workflow template.
+     */
+    private Map<String, Object> saveContract(ProjectNodeDTO node, String componentKey,
+                                             Map<String, Integer> versions) {
+        if ("project-basic-info".equals(componentKey)
+                || !workbenchRegistry.keys().contains(componentKey)) return null;
+        NodeWorkbench workbench = workbenchRegistry.require(componentKey);
+        List<String> writable = workbench instanceof TypedNodeWorkbench typed
+                ? new ArrayList<>(typed.writableFields()) : List.of();
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("command", "node.field.update");
+        contract.put("projectId", node.getProjectId());
+        contract.put("nodeId", node.getId());
+        contract.put("nodeVersion", node.getVersion());
+        contract.put("workbench", componentKey);
+        contract.put("fieldValuesPath", "fields");
+        contract.put("contractVersion", "project-node-workbench/v1");
+        contract.put("writableFields", writable);
+        contract.put("dynamicFields", workbench.dynamicFields());
+        contract.put("protectedFields", List.of("projectId", "nodeId", "workbench"));
+        contract.put("versions", versions == null ? Map.of() : versions);
+        return contract;
     }
 
     private JsonNode stripUiFlags(JsonNode content) {

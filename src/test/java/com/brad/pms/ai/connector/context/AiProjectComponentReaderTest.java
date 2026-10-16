@@ -33,6 +33,7 @@ class AiProjectComponentReaderTest {
 
     @Mock NodeRequirementScopeService requirementScopeService;
     @Mock AiContextReferenceProjector referenceProjector;
+    @Mock com.brad.pms.ai.node.NodeWorkbenchRegistry workbenchRegistry;
 
     private final ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
@@ -176,6 +177,7 @@ class AiProjectComponentReaderTest {
             mock(com.brad.pms.service.NodeKnowledgeStandardService.class);
 
     private AiProjectComponentReader reader() {
+        lenient().when(workbenchRegistry.keys()).thenReturn(java.util.Set.of());
         lenient().when(referenceProjector.projectProjectComponentContent(any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
         lenient().when(solutionDesignService.getReadSnapshot(any(), any())).thenAnswer(invocation ->
@@ -201,7 +203,7 @@ class AiProjectComponentReaderTest {
                         new com.brad.pms.dto.response.NodeKnowledgeStandardDTO(), false, java.util.Map.of()));
         return new AiProjectComponentReader(objectMapper, requirementScopeService, solutionDesignService,
                 planResourceRiskService, developmentControlService, acceptanceService, releaseService,
-                valueReviewService, knowledgeStandardService, referenceProjector);
+                valueReviewService, knowledgeStandardService, referenceProjector, workbenchRegistry);
     }
 
     private static ProjectDTO project() {
@@ -271,5 +273,34 @@ class AiProjectComponentReaderTest {
         assertThat(components).singleElement().satisfies(component ->
                 assertThat(component.versions()).containsEntry("content", null));
         assertThat(warnings).containsExactly("UNKNOWN_VERSION:content");
+    }
+
+    @Test
+    void typedProjectWorkbenchPublishesItsWritableFieldsAndNodeVersion() {
+        com.brad.pms.ai.node.TypedNodeWorkbench workbench = new com.brad.pms.ai.node.TypedNodeWorkbench(
+                "solution-design", com.brad.pms.dto.request.NodeSolutionPackageUpdateCmd.class,
+                "solutionPackage", (projectId, nodeId) -> new Object(),
+                (projectId, nodeId, command) -> command, objectMapper,
+                new com.brad.pms.ai.node.NodeFieldLabels());
+        when(solutionDesignService.getReadSnapshot(7L, 301L)).thenReturn(new WorkbenchReadSnapshot<>(
+                new com.brad.pms.dto.response.NodeSolutionDesignDTO(), false, java.util.Map.of()));
+
+        ProjectNodeDTO node = node(List.of("solution-design"));
+        node.setVersion(6);
+        AiProjectComponentReader reader = reader();
+        when(workbenchRegistry.keys()).thenReturn(java.util.Set.of("solution-design"));
+        when(workbenchRegistry.require("solution-design")).thenReturn(workbench);
+        List<AiWorkflowContextDTO.Component> components = reader.read(project(), node, "solution-design");
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.saveContract()).containsEntry("command", "node.field.update");
+            assertThat(component.saveContract()).containsEntry("projectId", 7L);
+            assertThat(component.saveContract()).containsEntry("nodeId", 301L);
+            assertThat(component.saveContract()).containsEntry("nodeVersion", 6);
+            assertThat(component.saveContract()).containsEntry("workbench", "solution-design");
+            assertThat(component.saveContract().get("writableFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactlyInAnyOrder("productSolution", "technicalSolution");
+        });
     }
 }
