@@ -814,6 +814,7 @@ public class DevelopmentItemWorkflowService {
         dto.setTemplateVersionId(workflow.getTemplateVersionId());
         dto.setTerminalStatus(workflow.getTerminalStatus());
         dto.setWorkflowVersion(workflow.getVersion());
+        dto.setProjectMountNodeKey(workflow.getProjectMountNodeKey());
         WorkflowTemplateVersionDO templateVersion = templateVersionMapper.selectById(workflow.getTemplateVersionId());
         dto.setTemplateVersionNo(templateVersion == null ? null : templateVersion.getVersionNo());
 

@@ -52,6 +52,8 @@ public class DevelopmentItemWorkflowDetailDTO {    private String itemType;
     private List<DevelopmentItemWorkflowNodeDTO> nodes;
     /** Pinned workflow instance version, distinct from the template version number. */
     private Integer workflowVersion;
+    /** Persisted project workflow node key used to bind a topic/requirement to its source project node. */
+    private String projectMountNodeKey;
     /** Flat task totals per workflow node, including subtasks and surviving children of deleted parents. */
     private Map<Long, NodeTaskSummaryDTO> nodeTaskSummaries;
 }

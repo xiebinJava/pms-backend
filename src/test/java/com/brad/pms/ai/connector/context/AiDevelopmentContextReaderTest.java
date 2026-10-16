@@ -214,4 +214,43 @@ class AiDevelopmentContextReaderTest {
                     assertThat(thrown.getMessage()).startsWith("NO_SELECTED_NODE:");
                 });
     }
+
+    @Test
+    void topicContextPublishesProjectFactsAndReadableProjectRelation() {
+        DevelopmentItemWorkflowDetailDTO topic = new DevelopmentItemWorkflowDetailDTO();
+        topic.setItemType("TOPIC");
+        topic.setId(12L);
+        topic.setTitle("研发流程专题");
+        topic.setProjectId(9L);
+        topic.setProjectName("PMS 项目");
+        topic.setProjectMountNodeKey("develop");
+        topic.setWorkflowConfigured(true);
+        topic.setWorkflowVersion(4);
+        topic.setTemplateVersionId(77L);
+        topic.setTemplateVersionNo(2);
+        topic.setNodes(List.of(node(301L, 0, 1, 4)));
+        when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.TOPIC, 12L))
+                .thenReturn(topic);
+        lenient().when(referencePolicy.canReadReference("project", 9L)).thenReturn(true);
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(componentReader.read(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+        lenient().when(allowedActionsRegistry.developmentActions("topic")).thenReturn(List.of());
+
+        AiWorkflowContextDTO context = reader().read(
+                com.brad.pms.workflow.DevelopmentItemType.TOPIC, 12L, ContextReadOptions.legacy());
+
+        assertThat(context.resourceDetails())
+                .containsEntry("projectId", 9L)
+                .containsEntry("projectName", "PMS 项目")
+                .containsEntry("sourceProjectNodeKey", "develop");
+        assertThat(context.relations()).anySatisfy(relation -> {
+            assertThat(relation.resourceType()).isEqualTo("project");
+            assertThat(relation.resourceId()).isEqualTo(9L);
+            assertThat(relation.readable()).isTrue();
+        });
+    }
 }

@@ -280,4 +280,38 @@ class AiDevelopmentComponentReaderTest {
                     .hasSize(6);
         });
     }
+
+    @Test
+    void topicResearchPublishesPersistedNodeFieldContract() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO topic = new DevelopmentItemWorkflowDetailDTO();
+        topic.setItemType("TOPIC");
+        topic.setId(12L);
+        topic.setProjectMountNodeKey("develop");
+
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(301L);
+        node.setVersion(4);
+        node.setRuntimeComponents(List.of("topic-research"));
+        node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
+                "topic-research", Map.of("needed", "YES")))));
+
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        List<AiWorkflowContextDTO.Component> components = reader(real, policy).read(
+                DevelopmentItemType.TOPIC, topic, node, null, "topic-research", new ArrayList<>());
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.saveContract()).isNotNull();
+            assertThat(component.saveContract()).containsEntry("command", "development-item.node.field.update");
+            assertThat(component.saveContract()).containsEntry("itemType", "TOPIC");
+            assertThat(component.saveContract()).containsEntry("itemId", 12L);
+            assertThat(component.saveContract()).containsEntry("nodeId", 301L);
+            assertThat(component.saveContract()).containsEntry("version", 4);
+            assertThat(component.saveContract()).containsEntry("componentKey", "topic-research");
+            assertThat(component.saveContract()).containsEntry("sourceProjectNodeKey", "develop");
+            assertThat(component.saveContract().get("writableFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("needed", "goal", "reportUrl", "skipReason");
+        });
+    }
 }

@@ -315,6 +315,12 @@ public class AiDevelopmentContextReader {
             put(details, "developmentProgress", detail.getDevelopmentProgress());
             put(details, "ownerId", detail.getOwnerId());
             put(details, "ownerName", detail.getOwnerName());
+            put(details, "projectId", detail.getProjectId());
+            put(details, "projectCode", detail.getProjectCode());
+            put(details, "projectName", detail.getProjectName());
+            put(details, "sourceNodeId", detail.getSourceNodeId());
+            put(details, "sourceNodeName", detail.getSourceNodeName());
+            put(details, "sourceProjectNodeKey", detail.getProjectMountNodeKey());
             if (itemType == DevelopmentItemType.STORY) {
                 put(details, "startDate", detail.getStartDate());
                 put(details, "dueDate", detail.getDueDate());
@@ -385,6 +391,12 @@ public class AiDevelopmentContextReader {
                     && canReadReference(authorizationSnapshot, "iteration_plan", detail.getIterationPlanId())) {
                 relations.add(new AiWorkflowContextDTO.Relation("iteration_plan",
                         detail.getIterationPlanId(), detail.getIterationPlanName(), true));
+            }
+        } else if (itemType == DevelopmentItemType.TOPIC) {
+            if (detail.getProjectId() != null
+                    && canReadReference(authorizationSnapshot, "project", detail.getProjectId())) {
+                relations.add(new AiWorkflowContextDTO.Relation("project", detail.getProjectId(),
+                        detail.getProjectName(), true));
             }
         }
         if (detail.getSourceRequirements() != null) {

@@ -115,6 +115,9 @@ public class AiDevelopmentComponentReader {
                                              DevelopmentItemWorkflowNodeDTO node,
                                              String componentKey,
                                              com.fasterxml.jackson.databind.JsonNode config) {
+        if (itemType == DevelopmentItemType.TOPIC || itemType == DevelopmentItemType.REQUIREMENT) {
+            return genericSaveContract(itemType, item, node, componentKey);
+        }
         if (itemType != DevelopmentItemType.STORY
                 || !"story-node-workbench".equals(componentKey)) return null;
         String variant = config == null ? null : config.path("variant").asText(null);
@@ -140,6 +143,47 @@ public class AiDevelopmentComponentReader {
         contract.put("fieldContracts", StoryNodeWorkbenchPolicy.fieldContracts(variant).stream()
                 .map(this::fieldContract)
                 .toList());
+        return contract;
+    }
+
+    /**
+     * Declares the persisted JSON fields that requirement/topic node scenarios may update.
+     * The CLI consumes this contract instead of inferring fields from a template or UI DTO.
+     */
+    private Map<String, Object> genericSaveContract(DevelopmentItemType itemType,
+                                                     DevelopmentItemWorkflowDetailDTO item,
+                                                     DevelopmentItemWorkflowNodeDTO node,
+                                                     String componentKey) {
+        List<String> writable = switch (componentKey) {
+            case "topic-research" -> List.of("needed", "goal", "reportUrl", "skipReason");
+            case "topic-design-review" -> List.of("productPlanUrl", "uiPlanUrl", "technicalPlanUrl",
+                    "productReviewerIds", "designReviewerIds", "technicalReviewerIds",
+                    "productReviewSuggestion", "designReviewSuggestion", "technicalReviewSuggestion",
+                    "productReviewStatus", "designReviewStatus", "technicalReviewStatus");
+            case "requirement-receiving-analysis" -> List.of("category", "strategicFitScore", "decision",
+                    "supplementNote", "decisionReason");
+            case "requirement-node-workbench" -> List.of("background", "acceptanceCriteria", "conclusion",
+                    "shouldIntegrate", "requirementIds", "requirementSpecification", "businessResult",
+                    "businessConfirmation", "residualIssues", "expectedLaunchStartDate",
+                    "expectedLaunchEndDate");
+            default -> List.of();
+        };
+        if (writable.isEmpty()) return null;
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("command", "development-item.node.field.update");
+        contract.put("itemType", itemType.name());
+        contract.put("itemId", item == null ? null : item.getId());
+        contract.put("nodeId", node.getId());
+        contract.put("version", node.getVersion());
+        contract.put("componentKey", componentKey);
+        contract.put("fieldValuesPath", "__components." + componentKey);
+        contract.put("sourceProjectNodeKey", item == null ? null : item.getProjectMountNodeKey());
+        contract.put("contractVersion", "node-field/v1");
+        contract.put("writableFields", writable);
+        contract.put("effectiveWritableFields", writable);
+        contract.put("protectedFields", itemType == DevelopmentItemType.REQUIREMENT
+                ? List.of("systemId", "targetType", "targetId", "ownerId", "status", "startDate", "endDate")
+                : List.of("status"));
         return contract;
     }
 
