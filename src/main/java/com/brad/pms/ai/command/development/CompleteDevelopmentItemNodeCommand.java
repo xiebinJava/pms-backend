@@ -37,7 +37,8 @@ public class CompleteDevelopmentItemNodeCommand implements PmsCommand {
         var node = itemSupport.node(args);
         List<CommandPreview.Precondition> preconditions = preconditions(args, node);
         return support.preview(request, name(), "完成研发事项流程节点", itemSupport.change("complete", args, node),
-                List.of("完成前必须满足节点必填字段和任务完成规则"), REFRESH, preconditions);
+                List.of("兼容旧入口：该操作不会填写节点详情；需要同时保存负责人、排期或字段时请使用 development-item.node.complete-with-data",
+                        "完成前必须满足节点必填字段和任务完成规则"), REFRESH, preconditions);
     }
 
     @Override

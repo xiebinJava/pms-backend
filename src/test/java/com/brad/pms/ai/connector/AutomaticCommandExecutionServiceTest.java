@@ -52,13 +52,23 @@ class AutomaticCommandExecutionServiceTest {
                 .thenReturn(expected);
 
         AutomaticCommandExecutionService service = new AutomaticCommandExecutionService(operationService);
-        CommandResult actual = service.execute(request(CommandName.PROJECT_CREATE, null));
+        CommandResult actual = service.execute(request(CommandName.TASK_ASSIGN, null));
 
         assertThat(actual).isSameAs(expected);
         ArgumentCaptor<CommandPreviewRequest> captor = ArgumentCaptor.forClass(CommandPreviewRequest.class);
         verify(operationService).executeAutomatically(eq(7L), captor.capture(), eq("idem-1"), eq("pms-cli"), eq("req-1"));
         assertThat(captor.getValue().contextId()).isEqualTo("global:pms");
         assertThat(captor.getValue().contextVersion()).isEqualTo("v1");
+    }
+
+    @Test
+    void rejectsHighRiskCommandsAtTheServerAutomaticBoundary() {
+        UserContext.set(new LoginUser(7L, "admin", "管理员"));
+        AutomaticCommandExecutionService service = new AutomaticCommandExecutionService(operationService);
+
+        assertThatThrownBy(() -> service.execute(request(CommandName.PROJECT_CREATE, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("高风险操作必须先 preview 再 execute");
     }
 
     @Test

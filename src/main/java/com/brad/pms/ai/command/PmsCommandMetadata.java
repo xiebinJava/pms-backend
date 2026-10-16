@@ -25,7 +25,8 @@ public final class PmsCommandMetadata {
             case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK, STORY_CREATE, STORY_UPDATE,
                  STORY_TOPIC_LINK -> "pms:development:write";
             case DEVELOPMENT_ITEM_NODE_OWNER_UPDATE, DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
-                 DEVELOPMENT_ITEM_NODE_FIELD_UPDATE, DEVELOPMENT_ITEM_NODE_COMPLETE -> "pms:workflow:write";
+                 DEVELOPMENT_ITEM_NODE_FIELD_UPDATE, DEVELOPMENT_ITEM_NODE_COMPLETE,
+                 DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA -> "pms:workflow:write";
             case DEVELOPMENT_ITEM_TASK_CREATE -> "pms:development:write";
             case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE, ITERATION_PLAN_STORY_ADD,
                  ITERATION_PLAN_STORY_REMOVE -> "pms:iteration:write";
@@ -43,6 +44,7 @@ public final class PmsCommandMetadata {
             case STORY_CREATE, STORY_UPDATE, STORY_TOPIC_LINK -> List.of("story");
             case DEVELOPMENT_ITEM_NODE_OWNER_UPDATE, DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
                  DEVELOPMENT_ITEM_NODE_FIELD_UPDATE, DEVELOPMENT_ITEM_NODE_COMPLETE,
+                 DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA,
                  DEVELOPMENT_ITEM_TASK_CREATE -> List.of("topic", "story", "requirement");
             case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
                  ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> List.of("iteration_plan");
@@ -297,10 +299,21 @@ public final class PmsCommandMetadata {
                     Map.entry("nodeId", Map.of("type", "integer", "required", true)),
                     Map.entry("fieldValues", Map.of("type", "object", "required", true)),
                     Map.entry("version", Map.of("type", "integer", "required", true))));
-            case DEVELOPMENT_ITEM_NODE_COMPLETE -> descriptor(name, "完成研发事项流程节点并推进流程", "high", List.of(
+            case DEVELOPMENT_ITEM_NODE_COMPLETE -> descriptor(name, "完成研发事项流程节点并推进流程（兼容旧入口；不会填写节点详情）", "high", List.of(
                     Map.entry("itemType", Map.of("type", "string", "required", true)),
                     Map.entry("itemId", Map.of("type", "integer", "required", true)),
                     Map.entry("nodeId", Map.of("type", "integer", "required", true))));
+            case DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA -> descriptor(name,
+                    "保存研发事项流程节点详情并完成节点，字段、负责人和排期在一次原子操作中提交",
+                    "medium", List.of(
+                    Map.entry("itemType", Map.of("type", "string", "required", true)),
+                    Map.entry("itemId", Map.of("type", "integer", "required", true)),
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                    Map.entry("version", Map.of("type", "integer", "required", true)),
+                    Map.entry("ownerId", Map.of("type", "integer")),
+                    Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("endDate", Map.of("type", "string", "format", "date")),
+                    Map.entry("fieldValues", Map.of("type", "object", "description", "节点动态字段补丁；未传字段保留原值"))));
             case DEVELOPMENT_ITEM_TASK_CREATE -> descriptor(name, "在研发事项流程节点创建任务或子任务", "medium", List.of(
                     Map.entry("itemType", Map.of("type", "string", "required", true)),
                     Map.entry("itemId", Map.of("type", "integer", "required", true)),

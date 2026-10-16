@@ -35,6 +35,7 @@ public enum CommandName {
     DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE("development-item.node.schedule.update"),
     DEVELOPMENT_ITEM_NODE_FIELD_UPDATE("development-item.node.field.update"),
     DEVELOPMENT_ITEM_NODE_COMPLETE("development-item.node.complete"),
+    DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA("development-item.node.complete-with-data"),
     DEVELOPMENT_ITEM_TASK_CREATE("development-item.task.create"),
     ITERATION_PLAN_CREATE("iteration-plan.create"),
     ITERATION_PLAN_UPDATE("iteration-plan.update"),

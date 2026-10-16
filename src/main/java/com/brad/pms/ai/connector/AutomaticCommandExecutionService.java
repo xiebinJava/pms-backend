@@ -4,6 +4,7 @@ import com.brad.pms.ai.command.AiOperationService;
 import com.brad.pms.ai.command.CommandName;
 import com.brad.pms.ai.command.CommandPreviewRequest;
 import com.brad.pms.ai.command.CommandResult;
+import com.brad.pms.ai.command.PmsCommandMetadata;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.security.UserContext;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,9 @@ public class AutomaticCommandExecutionService {
 
         Long userId = UserContext.userId();
         Context context = normalizeContext(request);
+        if ("high".equalsIgnoreCase(PmsCommandMetadata.descriptor(request.name()).risk())) {
+            throw BusinessException.conflict("高风险操作必须先 preview 再 execute");
+        }
         CommandPreviewRequest previewRequest = new CommandPreviewRequest(
                 request.name(),
                 request.arguments(),
@@ -60,6 +64,7 @@ public class AutomaticCommandExecutionService {
                  DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,
                  DEVELOPMENT_ITEM_NODE_FIELD_UPDATE,
                  DEVELOPMENT_ITEM_NODE_COMPLETE,
+                 DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA,
                  DEVELOPMENT_ITEM_TASK_CREATE,
                  ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
                  ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> true;
