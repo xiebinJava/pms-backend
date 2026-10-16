@@ -128,8 +128,29 @@ public class AiDevelopmentComponentReader {
         contract.put("componentKey", componentKey);
         contract.put("variant", variant);
         contract.put("fieldValuesPath", "__components." + componentKey);
-        contract.put("writableFields", StoryNodeWorkbenchPolicy.writableFields(variant));
+        contract.put("contractVersion", StoryNodeWorkbenchPolicy.contractVersion());
+        List<String> effectiveWritableFields = StoryNodeWorkbenchPolicy.effectiveWritableFields(variant);
+        contract.put("writableFields", effectiveWritableFields);
+        contract.put("effectiveWritableFields", effectiveWritableFields);
+        contract.put("protectedFields", StoryNodeWorkbenchPolicy.protectedFields(variant));
+        contract.put("requiredFields", StoryNodeWorkbenchPolicy.fieldContracts(variant).stream()
+                .filter(StoryNodeWorkbenchPolicy.FieldContract::required)
+                .map(StoryNodeWorkbenchPolicy.FieldContract::key)
+                .toList());
+        contract.put("fieldContracts", StoryNodeWorkbenchPolicy.fieldContracts(variant).stream()
+                .map(this::fieldContract)
+                .toList());
         return contract;
+    }
+
+    private Map<String, Object> fieldContract(StoryNodeWorkbenchPolicy.FieldContract field) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("key", field.key());
+        result.put("type", field.type());
+        result.put("required", field.required());
+        result.put("nullable", field.nullable());
+        result.put("collection", field.collection());
+        return result;
     }
 
     private AiWorkflowContextDTO.Component readExecutionTarget(DevelopmentItemWorkflowDetailDTO item,

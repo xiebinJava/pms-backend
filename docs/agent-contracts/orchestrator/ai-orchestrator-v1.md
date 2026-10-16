@@ -46,21 +46,25 @@
 RECEIVED
   → CONTEXT_READY
   → DRAFT_VALIDATED
-  → PLAN_READY
+  → PLAN_READY           （需求分析路径）
+  → NEEDS_INPUT          （故事路径：缺少必填字段；当前 Plan 终态，补充信息生成新 Plan）
   → PREVIEWED
   → WAITING_CONFIRMATION
   → EXECUTING
   → VERIFYING
   → SUCCEEDED
+  → WRITE_RESULT_UNKNOWN （回读无法证明写入结果；只能用原幂等键重新读取验证）
 ```
 
 终态还包括 `FAILED`、`CONFLICT`、`CANCELLED`。旧版本执行必须进入 `CONFLICT`，不自动刷新、不自动重试。
 
 ### 事件类型
 
-`CONTEXT_READ`、`DRAFT_VALIDATED`、`PLAN_CREATED`、`PREVIEW_CREATED`、`WAITING_CONFIRMATION`、`EXECUTION_STARTED`、`EXECUTION_FINISHED`、`VERIFICATION_FINISHED`、`FAILED`、`CONFLICT`、`CANCELLED`。
+`CONTEXT_READ`、`DRAFT_VALIDATED`、`INPUT_REQUIRED`（NEEDS_INPUT 输出）、`PLAN_CREATED`、`PREVIEW_CREATED`、`WAITING_CONFIRMATION`、`EXECUTION_STARTED`、`EXECUTION_FINISHED`、`VERIFICATION_FINISHED`、`READBACK_UNKNOWN`（回读未证明，进入 WRITE_RESULT_UNKNOWN 时输出）、`FAILED`、`CONFLICT`、`CANCELLED`。
 
-每个计划的事件使用从 1 开始的 `sequence_no`，由数据库唯一约束保证顺序不重复；客户端通过 `afterSequence` 轮询，不依赖 SSE。
+每个会话的事件使用从 1 开始的 `sequence_no`，由数据库唯一约束
+`(conversation_id, sequence_no)` 保证顺序不重复；客户端通过会话级
+`afterSequence` 轮询，不依赖 SSE。一个会话可以包含多个计划，游标不能按计划重置。
 
 ## Agent Draft 契约
 
@@ -124,6 +128,8 @@ GET /conversations/{conversationId}/events?afterSequence=0
 ```
 
 所有请求使用认证用户 `UserContext.userId()`，不接受 body 中的用户 ID。确认接口必须带幂等键；相同幂等键重复请求返回原 operation 和验证结果。
+Session/latestPlan 同时返回 `idempotencyKey`、`confirmedAt` 和 `executedAt`，用于独立
+CLI 进程恢复已持久化的确认事实；这些字段不替代 Connector 的回读验证。
 
 ## 持久化
 
@@ -132,7 +138,7 @@ GET /conversations/{conversationId}/events?afterSequence=0
 - `pms_ai_conversation`：`id`、`user_id`、`resource_type`、`resource_id`、`status`、`created_at`、`updated_at`。
 - `pms_ai_conversation_turn`：`id`、`conversation_id`、`role`、`message_text`、`draft_json`、`request_id`、`created_at`。
 - `pms_ai_plan`：`id`、`conversation_id`、`turn_id`、`intent`、`resource_type`、`resource_id`、`node_id`、`context_version`、`context_snapshot_json`、`draft_json`、`preview_operation_id`、`idempotency_key`、`status`、`verification_json`、`error_code`、`error_message`、时间字段。
-- `pms_ai_operation_event`：`id`、`conversation_id`、`plan_id`、`operation_id`、`sequence_no`、`event_type`、`detail_json`、`created_at`；唯一键为 `(plan_id, sequence_no)`。
+- `pms_ai_operation_event`：`id`、`conversation_id`、`plan_id`、`operation_id`、`sequence_no`、`event_type`、`detail_json`、`created_at`；唯一键为 `(conversation_id, sequence_no)`。
 
 第一期不单独建 ContextSnapshot 表；快照作为计划不可变输入保存，便于审计和复现。
 
@@ -140,8 +146,8 @@ GET /conversations/{conversationId}/events?afterSequence=0
 
 1. 读取、预览和执行都经过现有 scope/policy 检查；没有权限时不返回资源正文或可推断的敏感字段。
 2. 计划保存的 `context_version` 是执行时的预期版本；版本变化返回 `CONFLICT`，不会产生第二次业务写入。
-3. 写入成功但回读失败必须标记为 `FAILED` 且错误类型为 `WRITE_RESULT_UNKNOWN`，不能伪报成功。
-4. 事件写入和状态推进在同一事务内完成；外部命令执行边界沿用已有 operation 事务和幂等策略。
+3. 写入成功但回读无法证明时，计划进入 `WRITE_RESULT_UNKNOWN`（事件 `READBACK_UNKNOWN`），不能伪报成功；该状态下只能使用原幂等键重新读取并验证，不得以新幂等键再次写入。回读证明受保护字段被改变或 patch 未生效时同样算未能证明，交由用户处置或明确失败，不把执行响应直接当成功。
+4. 事件写入和状态推进在同一事务内完成；外部命令执行在独立的 REQUIRES_NEW 事务中落盘 operation 结果（保证崩溃后可从持久化事实恢复），幂等键预留与业务写入回滚在一起。
 5. 模型配置不进入 PMS Backend 或生产 CLI；外部 Agent 只提交结构化 Draft，后端只验证和编排。
 
 ## 验收标准

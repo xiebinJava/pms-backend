@@ -3,12 +3,14 @@ package com.brad.pms.ai.orchestrator.domain;
 public enum AiOrchestratorEventType {
     CONTEXT_READ,
     DRAFT_VALIDATED,
+    INPUT_REQUIRED,
     PLAN_CREATED,
     PREVIEW_CREATED,
     WAITING_CONFIRMATION,
     EXECUTION_STARTED,
     EXECUTION_FINISHED,
     VERIFICATION_FINISHED,
+    READBACK_UNKNOWN,
     FAILED,
     CONFLICT,
     CANCELLED

@@ -48,6 +48,24 @@ class AiOrchestratorIsolatedAcceptanceTest {
                 "VERIFICATION_FINISHED");
     }
 
+    @Test
+    void storyAcceptanceContractRequiresTheRealReadbackAndAuditStages() throws Exception {
+        String spec = Files.readString(Path.of("docs/agent-contracts/pms/story-node-orchestrator-e2e.md"));
+        assertThat(spec).contains(
+                "focused context",
+                "NEEDS_INPUT",
+                "WAITING_CONFIRMATION",
+                "回读验证",
+                "PMS_E2E_DB_URL",
+                "WRITE_RESULT_UNKNOWN",
+                "story.delete");
+
+        if ("true".equals(System.getenv("PMS_E2E_STORY_ORCHESTRATOR"))) {
+            String databaseUrl = System.getenv("PMS_E2E_DB_URL");
+            assertThat(databaseUrl).as("故事真实验收必须提供只读数据库连接").isNotBlank();
+        }
+    }
+
     private String required(String name) {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) throw new IllegalStateException("缺少隔离验收配置: " + name);

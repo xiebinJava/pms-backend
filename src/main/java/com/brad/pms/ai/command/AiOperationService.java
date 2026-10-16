@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -62,7 +63,7 @@ public class AiOperationService {
         return persistedPreview;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public CommandResult execute(Long userId, OperationExecuteRequest request) {
         AiOperationDO operation = operationMapper.selectByIdForUpdate(request.operationId());
         if (operation == null) throw BusinessException.notFound("操作预览不存在");
@@ -84,10 +85,28 @@ public class AiOperationService {
         validateExecutionBinding(operation, request);
         validateContractBinding(operation.getContractId(), operation.getContractVersion(), operation.getCommandName());
 
+        if (operation.getIdempotencyKey() != null
+                && !request.idempotencyKey().equals(operation.getIdempotencyKey())) {
+            throw BusinessException.conflict("该预览已经绑定其他幂等键，请使用原幂等键");
+        }
+        AiOperationDO existing = operationMapper.selectByUserIdAndIdempotencyKeyForUpdate(
+                userId, request.idempotencyKey());
+        if (existing != null && !Objects.equals(existing.getId(), operation.getId())) {
+            throw BusinessException.conflict("幂等键已经用于其他操作，请更换幂等键");
+        }
+        // Reserve the key before invoking the business command. The reservation
+        // is part of this REQUIRES_NEW transaction, so a command failure rolls
+        // it back together with any partial business writes.
+        operation.setIdempotencyKey(request.idempotencyKey());
+        try {
+            operationMapper.updateById(operation);
+        } catch (DuplicateKeyException exception) {
+            throw BusinessException.conflict("幂等键已经用于其他操作，请更换幂等键");
+        }
+
         CommandName commandName = parseCommandName(operation.getCommandName());
         PmsCommandScopeGuard.requireScope(commandName);
         CommandResult result = registry.require(commandName).execute(operation);
-        operation.setIdempotencyKey(request.idempotencyKey());
         operation.setResultJson(write(result));
         operation.setStatus(SUCCEEDED);
         operation.setExecutedAt(LocalDateTime.now());

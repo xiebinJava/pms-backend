@@ -35,6 +35,15 @@ class StoryNodeWorkbenchPolicyTest {
         assertThat(result.path("mergeStatus").asText()).isEqualTo("MERGED");
     }
 
+    @Test
+    void developmentRequiredFieldsPersistNewContentThroughMerge() throws Exception {
+        var result = StoryNodeWorkbenchPolicy.merge(
+                mapper.readTree("{\"implementationNote\":\"旧方案\",\"selfTestResult\":\"旧自测\"}"),
+                mapper.readTree("{\"implementationNote\":\"新的实现说明\",\"selfTestResult\":\"新的自测结果\"}"), "development");
+        assertThat(result.path("implementationNote").asText()).isEqualTo("新的实现说明");
+        assertThat(result.path("selfTestResult").asText()).isEqualTo("新的自测结果");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"{\"testCases\":[{\"id\":\"00000000-0000-4000-8000-000000000001\",\"priority\":\"BAD\"}]}", "{\"testCases\":null}", "{\"mergeStatus\":null}", "{\"testCases\":[{\"id\":\"00000000-0000-4000-8000-000000000001\",\"priority\":null}]}"})
     void developmentRejectsMalformedCasesAndStatuses(String json) throws Exception {
@@ -132,6 +141,45 @@ class StoryNodeWorkbenchPolicyTest {
         assertThatCode(() -> StoryNodeWorkbenchPolicy.validate(
                 mapper.readTree("{\"acceptanceCriteria\":\"\",\"background\":\"\"}"), "writing"))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void exposesAStableFieldContractWithDevelopmentRequiredFields() {
+        var contracts = StoryNodeWorkbenchPolicy.fieldContracts("development");
+
+        assertThat(contracts).extracting(StoryNodeWorkbenchPolicy.FieldContract::key)
+                .containsExactly("codeLink", "deployEnv", "implementationNote", "mergeStatus", "selfTestResult", "testCases");
+        assertThat(contracts.stream().filter(contract -> contract.key().equals("implementationNote")).findFirst())
+                .get().extracting(StoryNodeWorkbenchPolicy.FieldContract::required).isEqualTo(true);
+        assertThat(contracts.stream().filter(contract -> contract.key().equals("selfTestResult")).findFirst())
+                .get().extracting(StoryNodeWorkbenchPolicy.FieldContract::required).isEqualTo(true);
+        assertThat(contracts.stream().filter(contract -> contract.key().equals("codeLink")).findFirst())
+                .get().extracting(StoryNodeWorkbenchPolicy.FieldContract::required).isEqualTo(false);
+        assertThat(contracts.stream().filter(contract -> contract.key().equals("testCases")).findFirst())
+                .get().extracting(StoryNodeWorkbenchPolicy.FieldContract::nullable).isEqualTo(false);
+    }
+
+    @Test
+    void effectiveWritableFieldsMatchMergeBehaviorAndProtectIdentityFields() {
+        assertThat(StoryNodeWorkbenchPolicy.effectiveWritableFields("writing"))
+                .containsExactly("acceptanceCriteria", "background", "descriptionAndAcceptance", "priority");
+        assertThat(StoryNodeWorkbenchPolicy.protectedFields("writing"))
+                .contains("baseTitle", "baseTopicId", "title", "topicId");
+    }
+
+    @Test
+    void requiredFieldsTreatMissingNullBlankAndEmptyValuesAsMissing() throws Exception {
+        assertThat(StoryNodeWorkbenchPolicy.missingRequiredFields(
+                mapper.readTree("{}"), mapper.readTree("{}"), "development"))
+                .containsExactly("implementationNote", "selfTestResult");
+        assertThat(StoryNodeWorkbenchPolicy.missingRequiredFields(
+                mapper.readTree("{\"implementationNote\":\"   \",\"selfTestResult\":null}"),
+                mapper.readTree("{}"), "development"))
+                .containsExactly("implementationNote", "selfTestResult");
+        assertThat(StoryNodeWorkbenchPolicy.missingRequiredFields(
+                mapper.readTree("{\"implementationNote\":\"已完成\"}"),
+                mapper.readTree("{\"selfTestResult\":\"通过\"}"), "development"))
+                .isEmpty();
     }
 
     @ParameterizedTest

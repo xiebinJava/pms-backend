@@ -5,6 +5,7 @@ import com.brad.pms.ai.orchestrator.contract.AgentDraft;
 import com.brad.pms.ai.orchestrator.contract.AgentDraftItem;
 import com.brad.pms.ai.orchestrator.contract.AiAgentDraftValidator;
 import com.brad.pms.ai.orchestrator.contract.DraftValidationResult;
+import com.brad.pms.ai.orchestrator.contract.StoryNodeContract;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -91,6 +92,53 @@ class AiAgentDraftValidatorTest {
         assertThatThrownBy(() -> AgentDraft.parse(mapper,
                 json.replace("\"patch\":{", "\"unexpected\":true,\"patch\":{")))
                 .isInstanceOf(Exception.class);
+    }
+
+    @Test
+    void validatesStoryDraftAgainstTheFocusedNodeContractAndReferences() {
+        var storyContext = new AiWorkflowContextDTO("story", 34L, 8,
+                new AiWorkflowContextDTO.CurrentNode(702L, "development", "开发"), null,
+                List.of("development-item.node.field.update"), null, Map.of(), List.of(), null);
+        var contract = new StoryNodeContract(702L, "development", "开发", 8, "development",
+                List.of(new StoryNodeContract.Field("implementationNote", "实现说明", "string", true, false, false)),
+                List.of("implementationNote"), List.of("status"),
+                List.of("development-item.node.field.update"), List.of(), List.of(), true);
+        AgentDraft draft = new AgentDraft("story-workbench/v1", new AgentDraft.DraftPayload(
+                List.of(new AgentDraftItem("节点事实", List.of("story-node:702#component:story-node-workbench"), null)),
+                List.of(), List.of(), List.of(), Map.of("implementationNote", "已完成")));
+
+        assertThat(validator.validateStory(draft, storyContext, contract).valid()).isTrue();
+    }
+
+    @Test
+    void rejectsNode定位FieldsAndUnknownStoryFieldsInTheDraftPatch() {
+        var storyContext = new AiWorkflowContextDTO("story", 34L, 8,
+                new AiWorkflowContextDTO.CurrentNode(702L, "development", "开发"), null,
+                List.of(), null, Map.of(), List.of(), null);
+        var contract = new StoryNodeContract(702L, "development", "开发", 8, "development",
+                List.of(), List.of("implementationNote"), List.of("status"), List.of(), List.of(), List.of(), true);
+        AgentDraft draft = new AgentDraft("story-workbench/v1", new AgentDraft.DraftPayload(
+                List.of(), List.of(), List.of(), List.of(),
+                Map.of("nodeId", 702L, "unknown", "x", "status", "DONE")));
+
+        assertThat(validator.validateStory(draft, storyContext, contract).errorCodes())
+                .containsExactlyInAnyOrder("NODE_FIELD_IN_DRAFT", "UNKNOWN_FIELD", "PROTECTED_FIELD");
+    }
+
+    @Test
+    void rejectsStoryPatchValuesBeforePreviewWhenPolicyValidationFails() {
+        var storyContext = new AiWorkflowContextDTO("story", 34L, 8,
+                new AiWorkflowContextDTO.CurrentNode(702L, "development", "开发"), null,
+                List.of("development-item.node.field.update"), null, Map.of(), List.of(), null);
+        var contract = new StoryNodeContract(702L, "development", "开发", 8, "development",
+                List.of(), List.of("implementationNote", "mergeStatus"), List.of("status"), List.of(),
+                List.of(), List.of(), true);
+        AgentDraft draft = new AgentDraft("story-workbench/v1", new AgentDraft.DraftPayload(
+                List.of(), List.of(), List.of(), List.of(),
+                Map.of("implementationNote", "完成", "mergeStatus", "INVALID")));
+
+        assertThat(validator.validateStory(draft, storyContext, contract).errorCodes())
+                .containsExactly("FIELD_VALUE_INVALID");
     }
 
     private AgentDraft validDraft() {

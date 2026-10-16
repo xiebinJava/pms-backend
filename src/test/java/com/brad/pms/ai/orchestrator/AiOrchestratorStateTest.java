@@ -55,6 +55,25 @@ class AiOrchestratorStateTest {
     }
 
     @Test
+    void recordsAnUnknownWriteResultWhenReadbackCannotProveTheWrite() {
+        assertThat(AiOrchestratorState.VERIFYING.transition(AiOrchestratorEventType.READBACK_UNKNOWN))
+                .isEqualTo(AiOrchestratorState.WRITE_RESULT_UNKNOWN);
+        assertThat(AiOrchestratorState.WRITE_RESULT_UNKNOWN.transition(
+                AiOrchestratorEventType.VERIFICATION_FINISHED))
+                .isEqualTo(AiOrchestratorState.SUCCEEDED);
+        assertThat(AiOrchestratorState.WRITE_RESULT_UNKNOWN.transition(AiOrchestratorEventType.CONFLICT))
+                .isEqualTo(AiOrchestratorState.CONFLICT);
+    }
+
+    @Test
+    void representsMissingStoryInputAsATerminalPlanState() {
+        assertThat(AiOrchestratorState.DRAFT_VALIDATED.transition(AiOrchestratorEventType.INPUT_REQUIRED))
+                .isEqualTo(AiOrchestratorState.NEEDS_INPUT);
+        assertThatThrownBy(() -> AiOrchestratorState.NEEDS_INPUT.transition(
+                AiOrchestratorEventType.PLAN_CREATED)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void rejectsEveryTransitionFromTerminalStates() {
         assertThatThrownBy(() -> AiOrchestratorState.SUCCEEDED.transition(
                 AiOrchestratorEventType.CONTEXT_READ))

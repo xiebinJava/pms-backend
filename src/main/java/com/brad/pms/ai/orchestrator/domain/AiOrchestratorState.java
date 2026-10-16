@@ -7,11 +7,13 @@ public enum AiOrchestratorState {
     RECEIVED,
     CONTEXT_READY,
     DRAFT_VALIDATED,
+    NEEDS_INPUT,
     PLAN_READY,
     PREVIEWED,
     WAITING_CONFIRMATION,
     EXECUTING,
     VERIFYING,
+    WRITE_RESULT_UNKNOWN,
     SUCCEEDED,
     FAILED,
     CONFLICT,
@@ -37,8 +39,12 @@ public enum AiOrchestratorState {
                 AiOrchestratorEventType.DRAFT_VALIDATED, DRAFT_VALIDATED,
                 AiOrchestratorEventType.FAILED, FAILED));
         result.put(DRAFT_VALIDATED, Map.of(
+                AiOrchestratorEventType.INPUT_REQUIRED, NEEDS_INPUT,
                 AiOrchestratorEventType.PLAN_CREATED, PLAN_READY,
                 AiOrchestratorEventType.FAILED, FAILED));
+        result.put(NEEDS_INPUT, Map.of(
+                AiOrchestratorEventType.FAILED, FAILED,
+                AiOrchestratorEventType.CONFLICT, CONFLICT));
         result.put(PLAN_READY, Map.of(
                 AiOrchestratorEventType.PREVIEW_CREATED, PREVIEWED,
                 AiOrchestratorEventType.CONFLICT, CONFLICT,
@@ -59,6 +65,12 @@ public enum AiOrchestratorState {
                 AiOrchestratorEventType.FAILED, FAILED));
         result.put(VERIFYING, Map.of(
                 AiOrchestratorEventType.VERIFICATION_FINISHED, SUCCEEDED,
+                AiOrchestratorEventType.READBACK_UNKNOWN, WRITE_RESULT_UNKNOWN,
+                AiOrchestratorEventType.FAILED, FAILED));
+        result.put(WRITE_RESULT_UNKNOWN, Map.of(
+                AiOrchestratorEventType.VERIFICATION_FINISHED, SUCCEEDED,
+                AiOrchestratorEventType.READBACK_UNKNOWN, WRITE_RESULT_UNKNOWN,
+                AiOrchestratorEventType.CONFLICT, CONFLICT,
                 AiOrchestratorEventType.FAILED, FAILED));
         return Map.copyOf(result);
     }

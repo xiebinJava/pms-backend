@@ -37,6 +37,11 @@ public interface AiOperationEventMapper extends BaseMapper<AiOperationEventDO> {
                     @Param("eventType") String eventType,
                     @Param("detailJson") String detailJson);
 
+    @Select("SELECT COUNT(1) FROM pms_ai_operation_event "
+            + "WHERE plan_id = #{planId} AND event_type = #{eventType}")
+    int countByPlanAndType(@Param("planId") Long planId,
+                           @Param("eventType") String eventType);
+
     @Select("SELECT e.* FROM pms_ai_operation_event e "
             + "JOIN pms_ai_conversation c ON c.id = e.conversation_id "
             + "WHERE e.conversation_id = #{conversationId} AND c.user_id = #{userId} "

@@ -234,9 +234,50 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract()).containsEntry("variant", "writing");
             assertThat(component.saveContract()).containsEntry("fieldValuesPath",
                     "__components.story-node-workbench");
+            assertThat(component.saveContract()).containsEntry("contractVersion", "story-node-workbench/v1");
             assertThat(component.saveContract().get("writableFields"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
-                    .contains("descriptionAndAcceptance", "background", "acceptanceCriteria", "priority");
+                    .containsExactly("acceptanceCriteria", "background", "descriptionAndAcceptance", "priority")
+                    .doesNotContain("title", "topicId", "baseTitle", "baseTopicId");
+            assertThat(component.saveContract().get("effectiveWritableFields"))
+                    .isEqualTo(component.saveContract().get("writableFields"));
+            assertThat(component.saveContract().get("requiredFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .isEmpty();
+            assertThat(component.saveContract().get("protectedFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .contains("title", "status", "ownerId", "startDate", "dueDate", "topicId");
+        });
+    }
+
+    @Test
+    void storyDevelopmentWorkbenchPublishesRequiredFieldContract() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO story = new DevelopmentItemWorkflowDetailDTO();
+        story.setItemType("STORY");
+        story.setId(34L);
+
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(383L);
+        node.setVersion(3);
+        node.setRuntimeComponents(List.of("story-node-workbench"));
+        node.setComponentConfigs(Map.of("story-node-workbench",
+                mapper.valueToTree(Map.of("variant", "development"))));
+        node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
+                "story-node-workbench", Map.of("implementationNote", "已有实现")))));
+
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        List<AiWorkflowContextDTO.Component> components = reader(real, policy).read(
+                DevelopmentItemType.STORY, story, node, null, "story-node-workbench", new ArrayList<>());
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.saveContract()).containsEntry("variant", "development");
+            assertThat(component.saveContract().get("requiredFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("implementationNote", "selfTestResult");
+            assertThat(component.saveContract().get("fieldContracts"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .hasSize(6);
         });
     }
 }

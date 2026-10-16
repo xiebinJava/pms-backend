@@ -15,10 +15,16 @@ import java.util.Set;
 
 /** Validates and merges the structured state of a story node workbench variant. */
 public final class StoryNodeWorkbenchPolicy {
+    public record FieldContract(String key, String type, boolean required, boolean nullable, boolean collection) { }
+
     private record FieldSpec(int maxLength, boolean requiresDate) {
         static FieldSpec text(int maxLength) { return new FieldSpec(maxLength, false); }
         static FieldSpec date() { return new FieldSpec(10, true); }
     }
+
+    private static final String CONTRACT_VERSION = "story-node-workbench/v1";
+    private static final Map<String, Set<String>> REQUIRED_FIELDS = Map.of(
+            "development", Set.of("implementationNote", "selfTestResult"));
 
     private static final Map<String, Map<String, FieldSpec>> VARIANTS = Map.of(
             "writing", Map.of(
@@ -53,6 +59,10 @@ public final class StoryNodeWorkbenchPolicy {
         return variant != null && VARIANTS.containsKey(variant);
     }
 
+    public static String contractVersion() {
+        return CONTRACT_VERSION;
+    }
+
     public static Set<String> variants() {
         return VARIANTS.keySet();
     }
@@ -62,15 +72,14 @@ public final class StoryNodeWorkbenchPolicy {
      * The order is stable so an AI client can cache and render the contract.
      */
     public static List<String> writableFields(String variant) {
+        return effectiveWritableFields(variant);
+    }
+
+    /** Returns only fields that {@link #merge(JsonNode, JsonNode, String)} actually persists. */
+    public static List<String> effectiveWritableFields(String variant) {
         Map<String, FieldSpec> specs = VARIANTS.get(variant);
         if (specs == null) return List.of();
         Set<String> fields = new LinkedHashSet<>(specs.keySet().stream().sorted().toList());
-        if ("writing".equals(variant)) {
-            fields.add("baseTitle");
-            fields.add("baseTopicId");
-            fields.add("title");
-            fields.add("topicId");
-        }
         if ("iteration".equals(variant)) {
             fields.add("developerIds");
             fields.add("testerIds");
@@ -79,6 +88,45 @@ public final class StoryNodeWorkbenchPolicy {
         List<String> ordered = new ArrayList<>(fields);
         Collections.sort(ordered);
         return List.copyOf(ordered);
+    }
+
+    /** Returns the stable field contract consumed by external AI writers. */
+    public static List<FieldContract> fieldContracts(String variant) {
+        Map<String, FieldSpec> specs = VARIANTS.get(variant);
+        if (specs == null) return List.of();
+        Set<String> required = REQUIRED_FIELDS.getOrDefault(variant, Set.of());
+        return effectiveWritableFields(variant).stream()
+                .map(key -> new FieldContract(key, fieldType(key), required.contains(key), isNullable(key, required),
+                        isCollection(key)))
+                .toList();
+    }
+
+    private static boolean isNullable(String key, Set<String> required) {
+        // testCases uses an empty array to clear history; JSON null is rejected by validate().
+        return !required.contains(key) && !"testCases".equals(key);
+    }
+
+    /** Fields that an external writer must never include in a story-node patch. */
+    public static List<String> protectedFields(String variant) {
+        if (!supports(variant)) return List.of();
+        Set<String> fields = new LinkedHashSet<>(List.of("title", "status", "ownerId", "startDate", "dueDate"));
+        if ("writing".equals(variant)) {
+            fields.add("baseTitle");
+            fields.add("baseTopicId");
+            fields.add("topicId");
+        }
+        return fields.stream().sorted().toList();
+    }
+
+    /** Returns required fields missing from the effective state after applying an incoming patch. */
+    public static List<String> missingRequiredFields(JsonNode existing, JsonNode incoming, String variant) {
+        if (!supports(variant)) throw new IllegalArgumentException("故事节点工作台类型无效");
+        ObjectNode effective = merge(existing, incoming, variant);
+        return fieldContracts(variant).stream()
+                .filter(FieldContract::required)
+                .map(FieldContract::key)
+                .filter(key -> isMissing(effective.get(key)))
+                .toList();
     }
 
     /** Only whitelisted fields are writable; unknown incoming fields are dropped and server history is preserved. */
@@ -202,6 +250,23 @@ public final class StoryNodeWorkbenchPolicy {
         if (spec.requiresDate() && !text.isBlank() && !validDate(text.trim())) {
             throw new IllegalArgumentException("请填写有效的日期");
         }
+    }
+
+    private static boolean isMissing(JsonNode value) {
+        if (value == null || value.isNull()) return true;
+        if (value.isTextual()) return value.asText().isBlank();
+        if (value.isArray() || value.isObject()) return value.isEmpty();
+        return false;
+    }
+
+    private static String fieldType(String key) {
+        if ("launchDate".equals(key)) return "date";
+        if (isCollection(key)) return "array";
+        return "string";
+    }
+
+    private static boolean isCollection(String key) {
+        return Set.of("testCases", "developerIds", "testerIds").contains(key);
     }
 
     private static boolean validUuid(String value) {
