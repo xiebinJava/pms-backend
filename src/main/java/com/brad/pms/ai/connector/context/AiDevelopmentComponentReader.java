@@ -5,6 +5,7 @@ import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.StoryNodeWorkbenchPolicy;
+import com.brad.pms.workflow.TopicDevelopmentTestingPolicy;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -118,6 +119,9 @@ public class AiDevelopmentComponentReader {
         if (itemType == DevelopmentItemType.TOPIC || itemType == DevelopmentItemType.REQUIREMENT) {
             return genericSaveContract(itemType, item, node, componentKey);
         }
+        if (itemType == DevelopmentItemType.STORY && "story-testing".equals(componentKey)) {
+            return storyTestingSaveContract(item, node, config);
+        }
         if (itemType != DevelopmentItemType.STORY
                 || !"story-node-workbench".equals(componentKey)) return null;
         String variant = config == null ? null : config.path("variant").asText(null);
@@ -144,6 +148,42 @@ public class AiDevelopmentComponentReader {
                 .map(this::fieldContract)
                 .toList());
         return contract;
+    }
+
+    /**
+     * Describes the structured test result record persisted by the story-testing component.
+     * Its field whitelist is owned by the same policy that merges and validates the JSON state.
+     */
+    private Map<String, Object> storyTestingSaveContract(DevelopmentItemWorkflowDetailDTO item,
+                                                          DevelopmentItemWorkflowNodeDTO node,
+                                                          com.fasterxml.jackson.databind.JsonNode config) {
+        if (config == null || !config.path("testingResultsEnabled").asBoolean(false)) return null;
+        List<String> writableFields = TopicDevelopmentTestingPolicy.writableFields();
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("command", "development-item.node.field.update");
+        contract.put("itemType", DevelopmentItemType.STORY.name());
+        contract.put("itemId", item == null ? null : item.getId());
+        contract.put("nodeId", node.getId());
+        contract.put("version", node.getVersion());
+        contract.put("componentKey", "story-testing");
+        contract.put("fieldValuesPath", "__components.story-testing");
+        contract.put("contractVersion", TopicDevelopmentTestingPolicy.contractVersion());
+        contract.put("writableFields", writableFields);
+        contract.put("effectiveWritableFields", writableFields);
+        contract.put("protectedFields", List.of("dueDate", "ownerId", "startDate", "status", "title"));
+        contract.put("requiredFields", List.of());
+        contract.put("fieldContracts", writableFields.stream().map(this::testingFieldContract).toList());
+        return contract;
+    }
+
+    private Map<String, Object> testingFieldContract(String key) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("key", key);
+        result.put("type", "residualIssues".equals(key) ? "array" : "string");
+        result.put("required", false);
+        result.put("nullable", true);
+        result.put("collection", "residualIssues".equals(key));
+        return result;
     }
 
     /**

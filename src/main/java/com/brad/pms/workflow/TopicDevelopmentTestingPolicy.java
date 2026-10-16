@@ -4,11 +4,26 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.util.List;
 import java.util.Set;
 
 /** Validates optional testing records without introducing a new node-completion gate. */
 public final class TopicDevelopmentTestingPolicy {
+    private static final String CONTRACT_VERSION = "story-testing/v1";
+    private static final List<String> WRITABLE_FIELDS = List.of(
+            "buildVersion", "reportUrl", "residualIssues", "testStatus");
+
     private TopicDevelopmentTestingPolicy() { }
+
+    /** Stable version for the AI-facing testing write contract. */
+    public static String contractVersion() {
+        return CONTRACT_VERSION;
+    }
+
+    /** Fields accepted by {@link #merge(JsonNode, JsonNode)} and exposed to AI writers. */
+    public static List<String> writableFields() {
+        return WRITABLE_FIELDS;
+    }
 
     /** Only supported fields are writable; historical metadata comes from the server, not the request. */
     public static ObjectNode merge(JsonNode existing, JsonNode incoming) {

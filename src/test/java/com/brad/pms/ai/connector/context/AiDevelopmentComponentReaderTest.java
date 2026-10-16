@@ -282,6 +282,81 @@ class AiDevelopmentComponentReaderTest {
     }
 
     @Test
+    void storyTestingPublishesAStableSaveContractForAiTestResults() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO story = new DevelopmentItemWorkflowDetailDTO();
+        story.setItemType("STORY");
+        story.setId(34L);
+
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(386L);
+        node.setVersion(1);
+        node.setRuntimeComponents(List.of("story-testing"));
+        node.setComponentConfigs(Map.of("story-testing",
+                mapper.valueToTree(Map.of("testingResultsEnabled", true))));
+        node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
+                "story-testing", Map.of("testStatus", "IN_PROGRESS")))));
+
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        List<AiWorkflowContextDTO.Component> components = reader(real, policy).read(
+                DevelopmentItemType.STORY, story, node, null, "story-testing", new ArrayList<>());
+
+        assertThat(components).singleElement().satisfies(component -> {
+            assertThat(component.saveContract()).isNotNull();
+            assertThat(component.saveContract()).containsEntry("command", "development-item.node.field.update");
+            assertThat(component.saveContract()).containsEntry("itemType", "STORY");
+            assertThat(component.saveContract()).containsEntry("itemId", 34L);
+            assertThat(component.saveContract()).containsEntry("nodeId", 386L);
+            assertThat(component.saveContract()).containsEntry("version", 1);
+            assertThat(component.saveContract()).containsEntry("componentKey", "story-testing");
+            assertThat(component.saveContract()).containsEntry("fieldValuesPath", "__components.story-testing");
+            assertThat(component.saveContract()).containsEntry("contractVersion", "story-testing/v1");
+            assertThat(component.saveContract().get("writableFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("buildVersion", "reportUrl", "residualIssues", "testStatus");
+            assertThat(component.saveContract().get("requiredFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .isEmpty();
+            assertThat(component.saveContract().get("protectedFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("dueDate", "ownerId", "startDate", "status", "title");
+            assertThat(component.saveContract().get("fieldContracts"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly(
+                            Map.of("key", "buildVersion", "type", "string", "required", false,
+                                    "nullable", true, "collection", false),
+                            Map.of("key", "reportUrl", "type", "string", "required", false,
+                                    "nullable", true, "collection", false),
+                            Map.of("key", "residualIssues", "type", "array", "required", false,
+                                    "nullable", true, "collection", true),
+                            Map.of("key", "testStatus", "type", "string", "required", false,
+                                    "nullable", true, "collection", false));
+        });
+    }
+
+    @Test
+    void disabledStoryTestingDoesNotPublishAWriteContract() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO story = new DevelopmentItemWorkflowDetailDTO();
+        story.setItemType("STORY");
+        story.setId(34L);
+
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(386L);
+        node.setVersion(1);
+        node.setRuntimeComponents(List.of("story-testing"));
+        node.setComponentConfigs(Map.of("story-testing",
+                mapper.valueToTree(Map.of("testingResultsEnabled", false))));
+
+        AiContextReferenceProjector real = new AiContextReferenceProjector(policy);
+        List<AiWorkflowContextDTO.Component> components = reader(real, policy).read(
+                DevelopmentItemType.STORY, story, node, null, "story-testing", new ArrayList<>());
+
+        assertThat(components).singleElement().satisfies(component ->
+                assertThat(component.saveContract()).isNull());
+    }
+
+    @Test
     void topicResearchPublishesPersistedNodeFieldContract() {
         var mapper = JsonMapper.builder().build();
         DevelopmentItemWorkflowDetailDTO topic = new DevelopmentItemWorkflowDetailDTO();
