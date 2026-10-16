@@ -45,6 +45,7 @@ class AiConnectorControllerTest {
                 null, null, "idem-1", "pms-cli", "req-1"));
 
         assertThat(response.getData().operationId()).isEqualTo(result.operationId());
+        assertThat(response.getData().auditId()).isEqualTo(result.operationId());
         assertThat(response.getData().status()).isEqualTo(result.status());
         verify(executionService).execute(any());
     }

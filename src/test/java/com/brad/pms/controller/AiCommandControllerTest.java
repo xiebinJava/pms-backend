@@ -52,6 +52,21 @@ class AiCommandControllerTest {
     }
 
     @Test
+    void exposesAuditIdFromTheLegacyOperationExecuteRoute() {
+        CommandResult result = new CommandResult("op-legacy", "SUCCEEDED", "已执行",
+                Map.of("projectId", 7L), List.of("project-detail"));
+        when(executionService.execute(any())).thenReturn(result);
+
+        AiCommandController controller = new AiCommandController(previewService, executionService, registry);
+
+        ResponseResult<com.brad.pms.integration.ai.api.AiOperationResultDTO> response = controller.execute(
+                "op-legacy", new AiCommandController.ExecuteBody("idem-legacy"));
+
+        assertThat(response.getData().operationId()).isEqualTo("op-legacy");
+        assertThat(response.getData().auditId()).isEqualTo("op-legacy");
+    }
+
+    @Test
     void contextControllerReturnsBackendSnapshot() {
         PageContextSnapshot snapshot = new PageContextSnapshot("project-detail:7:none",
                 PageContextType.PROJECT_DETAIL, "/projects/7", 7L, null, Instant.now(), "v1", Map.of());

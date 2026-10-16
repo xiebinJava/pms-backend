@@ -11,7 +11,22 @@ public record AiOperationResultDTO(
         String status,
         String message,
         Map<String, Object> data,
-        List<String> refreshScopes) {
+        List<String> refreshScopes,
+        String auditId) {
+
+    /**
+     * Keeps the response shape source-compatible for internal orchestrator callers that do not
+     * need to spell out the audit identifier. The current operation table uses its primary key
+     * as both the operation and audit identifier.
+     */
+    public AiOperationResultDTO(
+            String operationId,
+            String status,
+            String message,
+            Map<String, Object> data,
+            List<String> refreshScopes) {
+        this(operationId, status, message, data, refreshScopes, operationId);
+    }
 
     public static AiOperationResultDTO from(CommandResult result) {
         return new AiOperationResultDTO(
@@ -19,6 +34,7 @@ public record AiOperationResultDTO(
                 result.status(),
                 result.message(),
                 result.data(),
-                result.refreshScopes());
+                result.refreshScopes(),
+                result.operationId());
     }
 }

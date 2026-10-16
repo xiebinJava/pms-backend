@@ -9,6 +9,7 @@ import com.brad.pms.ai.command.CommandResult;
 import com.brad.pms.ai.command.OperationExecuteRequest;
 import com.brad.pms.ai.command.PmsCommandRegistry;
 import com.brad.pms.common.response.ResponseResult;
+import com.brad.pms.integration.ai.api.AiOperationResultDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,10 +41,11 @@ public class AiCommandController {
     }
 
     @PostMapping("/operations/{operationId}/execute")
-    public ResponseResult<CommandResult> execute(@PathVariable String operationId,
-                                                 @RequestBody ExecuteBody body) {
-        return ResponseResult.success(executionService.execute(
-                new OperationExecuteRequest(operationId, body.idempotencyKey())));
+    public ResponseResult<AiOperationResultDTO> execute(@PathVariable String operationId,
+                                                       @RequestBody ExecuteBody body) {
+        CommandResult result = executionService.execute(
+                new OperationExecuteRequest(operationId, body.idempotencyKey()));
+        return ResponseResult.success(AiOperationResultDTO.from(result));
     }
 
     public record ExecuteBody(String idempotencyKey) {
