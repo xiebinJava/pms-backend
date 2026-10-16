@@ -4,7 +4,7 @@
 
 ## Goal
 
-让 Claude、Codex 等外部 Agent 能够通过 `pms-cli` 读取 PMS 上下文、创建只读子 Agent、生成节点必填字段草稿，并在用户确认后安全推进项目、需求、专题和故事。
+让 Claude、Codex、DeepSeek 等外部 Agent 能够通过 `pms-cli` 读取 PMS 上下文、创建只读子 Agent、生成节点必填字段草稿，并依据 PMS 能力策略安全推进项目、需求、专题和故事。
 
 ## Product boundary
 
@@ -21,9 +21,10 @@ read context
   → read node contract
   → create read-only child tasks when useful
   → merge facts and draft changes
+  → draft validation
   → preview
-  → explicit user confirmation
-  → execute with scoped write authority
+  → automatic execution for low/medium-risk automatic capabilities
+  → explicit confirmation only for high-risk capabilities
   → read back and verify
 ```
 
@@ -67,7 +68,8 @@ AgentWorkSession
 ## Safety rules
 
 - 读取和草稿阶段不得产生 PMS 写入。
-- 所有写入先预览，再等待用户确认。
+- 所有写入先经过服务端 preview；低/中风险且 capability 标记为 `automatic` 的操作由 Agent 直接执行，不再要求重复人工确认。
+- 高风险操作仍必须由用户明确确认；Agent 不得用 `executeMode=auto` 绕过该门禁。
 - 执行必须使用幂等键、上下文版本和操作编号。
 - 版本冲突返回 `CONFLICT`，不得覆盖新数据。
 - 回读失败返回 `WRITE_RESULT_UNKNOWN`，不得盲目重试。
