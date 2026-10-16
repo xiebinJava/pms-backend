@@ -25,6 +25,8 @@ class StoryNodeContractResolverTest {
                 .containsExactly("implementationNote", "selfTestResult", "testCases");
         assertThat(result.contract().requiredFields()).extracting("key")
                 .containsExactly("implementationNote", "selfTestResult");
+        assertThat(result.contract().allowedActions())
+                .containsExactly("development-item.node.field.update", "development-item.node.complete-with-data");
         assertThat(result.missingFields()).containsExactly("implementationNote", "selfTestResult");
     }
 
@@ -42,6 +44,9 @@ class StoryNodeContractResolverTest {
                 mapper.valueToTree(Map.of("variant", "development")), mapper.valueToTree(content), "LOADED",
                 Map.of("node", 8), Map.of(
                 "command", "development-item.node.field.update",
+                "completionCommand", "development-item.node.complete-with-data",
+                "completionSupported", true,
+                "completionRequiredMetadata", List.of("ownerId", "startDate", "endDate"),
                 "variant", "development",
                 "writableFields", List.of("implementationNote", "selfTestResult", "testCases"),
                 "protectedFields", List.of("status", "ownerId"),

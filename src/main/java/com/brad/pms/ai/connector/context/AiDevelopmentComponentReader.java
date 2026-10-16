@@ -28,6 +28,9 @@ public class AiDevelopmentComponentReader {
             "requirement-receiving-analysis", "requirement-node-workbench", "topic-research",
             "topic-design-review", "story-node-workbench", "story-testing");
     private static final String REQUIREMENT_EXECUTION = "requirement-execution";
+    private static final String COMPLETION_COMMAND = TopicDevelopmentTestingPolicy.completionCommand();
+    private static final List<String> COMPLETION_REQUIRED_METADATA =
+            TopicDevelopmentTestingPolicy.completionRequiredMetadata();
 
     private final AiContextReferenceProjector referenceProjector;
     private final AiContextReadPolicy targetReferencePolicy;
@@ -140,6 +143,7 @@ public class AiDevelopmentComponentReader {
         contract.put("writableFields", effectiveWritableFields);
         contract.put("effectiveWritableFields", effectiveWritableFields);
         contract.put("protectedFields", StoryNodeWorkbenchPolicy.protectedFields(variant));
+        addCompletionContract(contract);
         contract.put("requiredFields", StoryNodeWorkbenchPolicy.fieldContracts(variant).stream()
                 .filter(StoryNodeWorkbenchPolicy.FieldContract::required)
                 .map(StoryNodeWorkbenchPolicy.FieldContract::key)
@@ -171,9 +175,18 @@ public class AiDevelopmentComponentReader {
         contract.put("writableFields", writableFields);
         contract.put("effectiveWritableFields", writableFields);
         contract.put("protectedFields", List.of("dueDate", "ownerId", "startDate", "status", "title"));
+        contract.put("completionCommand", TopicDevelopmentTestingPolicy.completionCommand());
+        contract.put("completionSupported", true);
+        contract.put("completionRequiredMetadata", TopicDevelopmentTestingPolicy.completionRequiredMetadata());
         contract.put("requiredFields", List.of());
         contract.put("fieldContracts", writableFields.stream().map(this::testingFieldContract).toList());
         return contract;
+    }
+
+    private void addCompletionContract(Map<String, Object> contract) {
+        contract.put("completionCommand", COMPLETION_COMMAND);
+        contract.put("completionSupported", true);
+        contract.put("completionRequiredMetadata", COMPLETION_REQUIRED_METADATA);
     }
 
     private Map<String, Object> testingFieldContract(String key) {

@@ -51,9 +51,15 @@ public class StoryNodeContractResolver {
                     .toList();
         }
         String command = text(saveContract.get("command"));
+        List<String> allowedActions = new ArrayList<>();
+        if (command != null) allowedActions.add(command);
+        String completionCommand = text(saveContract.get("completionCommand"));
+        if (bool(saveContract.get("completionSupported")) && completionCommand != null) {
+            allowedActions.add(completionCommand);
+        }
         StoryNodeContract contract = new StoryNodeContract(
                 node.id(), node.key(), node.label(), node.version(), variant, required, writable,
-                protectedFields, command == null ? List.of() : List.of(command), List.of(),
+                protectedFields, List.copyOf(allowedActions), List.of(),
                 List.of("必填字段不能为空或只包含空白字符"), !writable.isEmpty() && command != null);
         return new Resolution(contract, missingFields(component.content(), variant, required));
     }

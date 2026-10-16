@@ -5,11 +5,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TopicDevelopmentTestingPolicyTest {
     private final ObjectMapper mapper = new ObjectMapper();
+
+    @Test
+    void exposesTheCompletionContractMetadataUsedByStoryTesting() {
+        assertThat(TopicDevelopmentTestingPolicy.completionCommand())
+                .isEqualTo("development-item.node.complete-with-data");
+        assertThat(TopicDevelopmentTestingPolicy.completionRequiredMetadata())
+                .containsExactly("ownerId", "startDate", "endDate");
+    }
 
     @Test void acceptsOptionalFieldsAndAnEmptyDraftIssue() throws Exception {
         var state = mapper.readTree("""

@@ -10,6 +10,8 @@ import java.util.Set;
 /** Validates optional testing records without introducing a new node-completion gate. */
 public final class TopicDevelopmentTestingPolicy {
     private static final String CONTRACT_VERSION = "story-testing/v1";
+    private static final String COMPLETION_COMMAND = "development-item.node.complete-with-data";
+    private static final List<String> COMPLETION_REQUIRED_METADATA = List.of("ownerId", "startDate", "endDate");
     private static final List<String> WRITABLE_FIELDS = List.of(
             "buildVersion", "reportUrl", "residualIssues", "testStatus");
 
@@ -23,6 +25,16 @@ public final class TopicDevelopmentTestingPolicy {
     /** Fields accepted by {@link #merge(JsonNode, JsonNode)} and exposed to AI writers. */
     public static List<String> writableFields() {
         return WRITABLE_FIELDS;
+    }
+
+    /** Command that atomically saves node metadata and advances the current story node. */
+    public static String completionCommand() {
+        return COMPLETION_COMMAND;
+    }
+
+    /** Node metadata required by the completion command, kept outside component patch fields. */
+    public static List<String> completionRequiredMetadata() {
+        return COMPLETION_REQUIRED_METADATA;
     }
 
     /** Only supported fields are writable; historical metadata comes from the server, not the request. */

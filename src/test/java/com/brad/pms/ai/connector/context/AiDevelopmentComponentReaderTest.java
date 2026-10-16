@@ -81,6 +81,7 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.versions()).containsEntry("node", 4);
             assertThat(component.content().get("conclusion").asText()).isEqualTo("可行");
             assertThat(component.content().has("topicId")).isFalse();
+        assertThat(component.saveContract()).doesNotContainKey("completionCommand");
         });
         assertThat(unknown).isEmpty();
     }
@@ -247,6 +248,15 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract().get("protectedFields"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .contains("title", "status", "ownerId", "startDate", "dueDate", "topicId");
+            assertThat(component.saveContract()).containsEntry("completionCommand",
+                    "development-item.node.complete-with-data");
+            assertThat(component.saveContract()).containsEntry("completionSupported", true);
+            assertThat(component.saveContract().get("completionRequiredMetadata"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("ownerId", "startDate", "endDate");
+            assertThat(component.saveContract().get("writableFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .doesNotContain("title", "status", "ownerId", "startDate", "endDate");
         });
     }
 
@@ -278,7 +288,48 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract().get("fieldContracts"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .hasSize(6);
+            assertThat(component.saveContract()).containsEntry("completionCommand",
+                    "development-item.node.complete-with-data");
+            assertThat(component.saveContract()).containsEntry("completionSupported", true);
+            assertThat(component.saveContract().get("completionRequiredMetadata"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("ownerId", "startDate", "endDate");
+            assertThat(component.saveContract().get("writableFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .doesNotContain("title", "status", "ownerId", "startDate", "endDate");
         });
+    }
+
+    @Test
+    void storyAcceptanceWorkbenchPublishesCompletionContractWithoutOpeningProtectedFields() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO story = new DevelopmentItemWorkflowDetailDTO();
+        story.setItemType("STORY");
+        story.setId(34L);
+
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(387L);
+        node.setVersion(1);
+        node.setRuntimeComponents(List.of("story-node-workbench"));
+        node.setComponentConfigs(Map.of("story-node-workbench",
+                mapper.valueToTree(Map.of("variant", "acceptance"))));
+        node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
+                "story-node-workbench", Map.of("acceptanceConclusion", "PASS")))));
+
+        AiWorkflowContextDTO.Component component = reader(new AiContextReferenceProjector(policy), policy).read(
+                DevelopmentItemType.STORY, story, node, null, "story-node-workbench", new ArrayList<>())
+                .get(0);
+
+        assertThat(component.saveContract()).containsEntry("completionCommand",
+                "development-item.node.complete-with-data");
+        assertThat(component.saveContract()).containsEntry("completionSupported", true);
+        assertThat(component.saveContract().get("completionRequiredMetadata"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                .containsExactly("ownerId", "startDate", "endDate");
+        assertThat(component.saveContract().get("writableFields"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                .containsExactly("acceptanceConclusion", "acceptanceNote")
+                .doesNotContain("title", "status", "ownerId", "startDate", "endDate");
     }
 
     @Test
@@ -331,6 +382,15 @@ class AiDevelopmentComponentReaderTest {
                                     "nullable", true, "collection", true),
                             Map.of("key", "testStatus", "type", "string", "required", false,
                                     "nullable", true, "collection", false));
+            assertThat(component.saveContract()).containsEntry("completionCommand",
+                    "development-item.node.complete-with-data");
+            assertThat(component.saveContract()).containsEntry("completionSupported", true);
+            assertThat(component.saveContract().get("completionRequiredMetadata"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("ownerId", "startDate", "endDate");
+            assertThat(component.saveContract().get("writableFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .doesNotContain("title", "status", "ownerId", "startDate", "endDate");
         });
     }
 
@@ -387,6 +447,25 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract().get("writableFields"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .containsExactly("needed", "goal", "reportUrl", "skipReason");
+            assertThat(component.saveContract()).doesNotContainKey("completionCommand");
         });
+    }
+
+    @Test
+    void unsupportedStoryWorkbenchVariantDoesNotPublishCompletionCapability() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO story = new DevelopmentItemWorkflowDetailDTO();
+        story.setItemType("STORY");
+        story.setId(34L);
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(399L);
+        node.setVersion(1);
+        node.setRuntimeComponents(List.of("story-node-workbench"));
+        node.setComponentConfigs(Map.of("story-node-workbench",
+                mapper.valueToTree(Map.of("variant", "unknown"))));
+
+        assertThat(reader(new AiContextReferenceProjector(policy), policy).read(
+                DevelopmentItemType.STORY, story, node, null, "story-node-workbench", new ArrayList<>()))
+                .singleElement().satisfies(component -> assertThat(component.saveContract()).isNull());
     }
 }
