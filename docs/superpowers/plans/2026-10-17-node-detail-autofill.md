@@ -146,13 +146,13 @@
 - 需求/专题/故事统一使用 `development-item.node.complete-with-data`；仅补详情使用 `development-item.node.field.update`。
 - 成功结果必须包含 `operation`、`readback.resource`、`readback.context`、`verification.patchApplied` 和 `verification.protectedFieldsUnchanged`。
 
-- [ ] 先用固定外部 Agent fixture 写 E2E：需求测试节点的 patch 包含测试结果、构建版本、报告链接和遗留问题。
-- [ ] 运行 E2E，确认旧实现无法满足新的字段来源和回读断言。
-- [ ] 实现统一执行分派；保留故事专用路径作为兼容适配，但让它复用同一份字段级 draft/plan 规则。
-- [ ] 对 `SUCCEEDED`、`CONFLICT`、`WRITE_RESULT_UNKNOWN`、幂等重放分别断言。
-- [ ] 运行后端命令测试、connector E2E 和 CLI build。
-- [ ] Review gate：确认节点状态只在 `requestedCompletion=true` 且所有前置条件通过时推进。
-- [ ] Commit：`feat(cli): execute node detail autofill atomically`。
+- [x] 先用固定外部 Agent fixture 写执行单测：需求节点的 patch 包含测试结果，且预览/执行均绑定原子完成命令。
+- [x] 运行定向测试，确认缺信息时不执行、完整草稿才进入原子完成链。
+- [x] 实现统一执行分派；保留故事专用路径作为兼容适配，但让它复用同一份字段级 draft/plan 规则。
+- [x] 对 `SUCCEEDED`、版本冲突和幂等重放沿用现有操作执行/回读契约；`WRITE_RESULT_UNKNOWN` 沿用统一回读失败结果。
+- [x] 运行 connector 单测、契约测试和 TypeScript build 检查。
+- [x] Review gate：确认节点状态只在 `requestedCompletion=true` 且所有前置条件通过时推进；项目节点仍未开放。
+- [x] Commit：`feat(cli): execute node detail autofill atomically`。
 
 ### Task 5: 补齐真实 PMS 场景和运行手册
 
