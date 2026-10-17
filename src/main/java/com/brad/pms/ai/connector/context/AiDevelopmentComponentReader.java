@@ -4,6 +4,7 @@ import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.workflow.DevelopmentItemType;
+import com.brad.pms.workflow.RequirementReceivingAnalysisConfig;
 import com.brad.pms.workflow.StoryNodeWorkbenchPolicy;
 import com.brad.pms.workflow.TopicDevelopmentTestingPolicy;
 import com.brad.pms.workflow.WorkflowFieldDefinition;
@@ -123,7 +124,7 @@ public class AiDevelopmentComponentReader {
                                              String componentKey,
                                              com.fasterxml.jackson.databind.JsonNode config) {
         if (itemType == DevelopmentItemType.TOPIC || itemType == DevelopmentItemType.REQUIREMENT) {
-            return genericSaveContract(itemType, item, node, componentKey);
+            return genericSaveContract(itemType, item, node, componentKey, config);
         }
         if (itemType == DevelopmentItemType.STORY && "story-testing".equals(componentKey)) {
             return storyTestingSaveContract(item, node, config);
@@ -211,15 +212,17 @@ public class AiDevelopmentComponentReader {
     private Map<String, Object> genericSaveContract(DevelopmentItemType itemType,
                                                      DevelopmentItemWorkflowDetailDTO item,
                                                      DevelopmentItemWorkflowNodeDTO node,
-                                                     String componentKey) {
+                                                     String componentKey,
+                                                     com.fasterxml.jackson.databind.JsonNode config) {
         List<String> writable = switch (componentKey) {
             case "topic-research" -> List.of("needed", "goal", "reportUrl", "skipReason");
             case "topic-design-review" -> List.of("productPlanUrl", "uiPlanUrl", "technicalPlanUrl",
                     "productReviewerIds", "designReviewerIds", "technicalReviewerIds",
                     "productReviewSuggestion", "designReviewSuggestion", "technicalReviewSuggestion",
                     "productReviewStatus", "designReviewStatus", "technicalReviewStatus");
-            case "requirement-receiving-analysis" -> List.of("category", "strategicFitScore", "decision",
-                    "supplementNote", "decisionReason");
+            case "requirement-receiving-analysis" -> List.of("validity", "filterReasons", "interpretation",
+                    "filterNote", "category", "feasibilityScore", "roiScore", "strategicFitScore",
+                    "analysisConclusion", "decision", "supplementNote", "decisionReason");
             case "requirement-node-workbench" -> List.of("background", "acceptanceCriteria", "conclusion",
                     "shouldIntegrate", "requirementIds", "requirementSpecification", "businessResult",
                     "businessConfirmation", "residualIssues", "expectedLaunchStartDate",
@@ -243,13 +246,57 @@ public class AiDevelopmentComponentReader {
                 ? List.of("systemId", "targetType", "targetId", "ownerId", "status", "startDate", "endDate")
                 : List.of("status"));
         addCompletionContract(contract);
-        List<Map<String, Object>> fieldContracts = genericFieldContracts(node, writable);
+        List<Map<String, Object>> fieldContracts = "requirement-receiving-analysis".equals(componentKey)
+                ? requirementReceivingAnalysisFieldContracts(config)
+                : genericFieldContracts(node, writable);
         contract.put("requiredFields", fieldContracts.stream()
                 .filter(field -> Boolean.TRUE.equals(field.get("required")))
                 .map(field -> field.get("key"))
                 .toList());
         contract.put("fieldContracts", fieldContracts);
         return contract;
+    }
+
+    private List<Map<String, Object>> requirementReceivingAnalysisFieldContracts(
+            com.fasterxml.jackson.databind.JsonNode configNode) {
+        RequirementReceivingAnalysisConfig config = RequirementReceivingAnalysisConfig.from(configNode);
+        List<Map<String, Object>> fields = new ArrayList<>();
+        fields.add(componentField("validity", "有效性", "enum", config.showFilter(), false,
+                List.of("PENDING", "VALID", "INVALID", "INSUFFICIENT_INFO")));
+        fields.add(componentField("filterReasons", "过滤原因", "array", config.showFilter(), false,
+                List.of("DUPLICATE", "OUT_OF_SCOPE", "INSUFFICIENT_INFO", "LOW_VALUE", "INFEASIBLE",
+                        "EXISTING_SOLUTION", "OTHER")));
+        fields.add(componentField("interpretation", "需求解释", "textarea", config.showFilter(), false, List.of()));
+        fields.add(componentField("filterNote", "过滤备注", "textarea", config.showFilter(), false, List.of()));
+        fields.add(componentField("category", "需求分类", "enum", config.showAnalysis(), config.requireCategory(),
+                List.of("FUNCTIONAL", "NON_FUNCTIONAL")));
+        fields.add(componentField("feasibilityScore", "可实现性", "number", config.showFeasibilityScore(),
+                config.requireFeasibilityScore(), List.of()));
+        fields.add(componentField("roiScore", "ROI", "number", config.showRoiScore(), config.requireRoiScore(),
+                List.of()));
+        fields.add(componentField("strategicFitScore", "战略契合度", "number", config.showStrategicFitScore(),
+                config.requireStrategicFitScore(), List.of()));
+        fields.add(componentField("analysisConclusion", "分析结论", "textarea", config.showAnalysis(),
+                config.requireAnalysisConclusion(), List.of()));
+        fields.add(componentField("decision", "接收结论", "enum", config.showDecision(), true,
+                List.of("PASS", "NEEDS_INFO", "REJECT")));
+        fields.add(componentField("supplementNote", "补充说明", "textarea", config.showDecision(), false, List.of()));
+        fields.add(componentField("decisionReason", "决策原因", "textarea", config.showDecision(), false, List.of()));
+        return fields;
+    }
+
+    private Map<String, Object> componentField(String key, String label, String type, boolean visible,
+                                               boolean required, List<String> options) {
+        Map<String, Object> field = new LinkedHashMap<>();
+        field.put("key", key);
+        field.put("label", label);
+        field.put("type", type);
+        field.put("required", required);
+        field.put("nullable", !required);
+        field.put("collection", "array".equals(type));
+        if (!options.isEmpty()) field.put("options", options);
+        field.put("visible", visible);
+        return field;
     }
 
     private List<Map<String, Object>> genericFieldContracts(DevelopmentItemWorkflowNodeDTO node,

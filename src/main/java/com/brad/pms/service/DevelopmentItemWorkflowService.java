@@ -504,7 +504,11 @@ public class DevelopmentItemWorkflowService {
         } else {
             nextComponents = objectMapper.createObjectNode();
         }
-        for (String key : List.of(WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH, WorkflowComponentKey.TOPIC_RESEARCH, WorkflowComponentKey.TOPIC_DESIGN_REVIEW)) {
+        for (String key : List.of(
+                WorkflowComponentKey.REQUIREMENT_RECEIVING_ANALYSIS,
+                WorkflowComponentKey.REQUIREMENT_NODE_WORKBENCH,
+                WorkflowComponentKey.TOPIC_RESEARCH,
+                WorkflowComponentKey.TOPIC_DESIGN_REVIEW)) {
             JsonNode state = incomingComponents.get(key);
             if (definition.runtimeComponents().contains(key) && state != null && state.isObject()) {
                 nextComponents.set(key, state.deepCopy());

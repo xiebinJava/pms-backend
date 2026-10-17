@@ -224,6 +224,27 @@ class DevelopmentItemWorkflowServiceFieldTest {
     }
 
     @Test
+    void acceptsRequirementReceivingAnalysisStateWhenComponentIsBound() {
+        ObjectMapper mapper = new ObjectMapper();
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition(
+                "analysis", "需求接收分析", "", "", "", List.of(), List.of(), false, List.of(),
+                List.of("component:requirement-receiving-analysis"), Map.of());
+        Map<String, JsonNode> incoming = Map.of("__components", mapper.valueToTree(Map.of(
+                "requirement-receiving-analysis", Map.of(
+                        "category", "FUNCTIONAL",
+                        "strategicFitScore", 4,
+                        "decision", "PASS"))));
+
+        Map<String, JsonNode> merged = ReflectionTestUtils.invokeMethod(
+                service, "preserveComponentValues", Map.of(), "{}", incoming, definition);
+
+        assertThat(merged.get("__components").path("requirement-receiving-analysis").path("category").asText())
+                .isEqualTo("FUNCTIONAL");
+        assertThat(merged.get("__components").path("requirement-receiving-analysis").path("decision").asText())
+                .isEqualTo("PASS");
+    }
+
+    @Test
     void acceptsClarificationWorkbenchStateWhenNodeUsesTheWorkbenchComponent() {
         ObjectMapper mapper = new ObjectMapper();
         WorkflowNodeDefinition definition = new WorkflowNodeDefinition(
