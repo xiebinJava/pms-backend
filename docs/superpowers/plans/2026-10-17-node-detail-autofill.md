@@ -97,12 +97,12 @@
 - `validateAgentProgressionDraft()` 返回字段级诊断：`unknownFields`、`protectedFields`、`missingSources`、`unsafePayloadKeys`、`unresolvedDecisions`。
 - 缺少来源只对拟写入的 patch 字段报错；空 patch 仍可用于只读分析。
 
-- [ ] 写失败测试：未知字段、保护字段、无 sourceRefs、credential key、低置信 inference 写入高风险结论。
-- [ ] 运行测试，确认失败原因对应契约缺失。
-- [ ] 实现 schema 和校验；沿用现有 `assertSafeAgentPayload()`，禁止把原始聊天记录或密码放入 draft。
-- [ ] 将校验结果接入 `scenario progression draft`，只输出诊断和 contextVersion，不创建 preview。
-- [ ] 运行 connector contract/unit 全部相关测试。
-- [ ] Review gate：确认校验失败不会触发任何 PMS 写命令。
+- [x] 写失败测试：未知字段、保护字段、无 sourceRefs、credential key、低置信 inference 写入高风险结论。
+- [x] 运行测试，确认失败原因对应契约缺失。
+- [x] 实现 schema 和校验；沿用现有 `assertSafeAgentPayload()`，禁止把原始聊天记录或密码放入 draft。
+- [x] 将校验结果接入 `scenario progression draft`，只输出诊断和 contextVersion，不创建 preview。
+- [x] 运行 connector contract/unit 全部相关测试。
+- [x] Review gate：确认校验失败不会触发任何 PMS 写命令。
 - [ ] Commit：`feat(cli): validate field provenance for node detail drafts`。
 
 ### Task 3: 生成字段差异、缺失项和风险计划
