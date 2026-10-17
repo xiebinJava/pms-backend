@@ -75,11 +75,11 @@
 - [x] 运行后端 context 测试和 connector contract 测试，确认测试先失败。
 - [x] 实现契约投影；字段定义来自真实模板和 `StoryNodeWorkbenchPolicy`/`WorkflowFieldValueValidator`，不在 CLI 重复维护字段清单。
 - [x] 为旧 PMS/旧组件保留宽松解析：缺少新增字段时仍可读取，但不得伪造 completionSupported。
-- [ ] 运行：
+- [x] 运行：
   `mvn -q -Dtest=AiDevelopmentComponentReaderTest,AiWorkflowContextReadServiceTest test`
   和 `pnpm exec vitest run tests/contract/agent-context-cli.test.ts --reporter=dot`。
 - [x] Review gate：检查字段契约是否覆盖需求、专题、故事三类资源，且没有泄漏保护字段当前值。
-- [ ] Commit：`feat(ai): publish node detail completion contracts`。
+- [x] Commit：`feat(ai): publish node detail completion contracts`。
 
 ### Task 2: 增加外部 Agent 草稿的字段级安全校验
 
@@ -103,7 +103,7 @@
 - [x] 将校验结果接入 `scenario progression draft`，只输出诊断和 contextVersion，不创建 preview。
 - [x] 运行 connector contract/unit 全部相关测试。
 - [x] Review gate：确认校验失败不会触发任何 PMS 写命令。
-- [ ] Commit：`feat(cli): validate field provenance for node detail drafts`。
+- [x] Commit：`feat(cli): validate field provenance for node detail drafts`。
 
 ### Task 3: 生成字段差异、缺失项和风险计划
 
@@ -121,13 +121,13 @@
 - `fieldChanges[]` 至少包含 `key`、`label`、`from`、`to`、`sourceType`、`confidence`。
 - `COMPLETE_NODE` 缺少必填字段时返回 `NEEDS_INPUT`，不创建可执行写入 preview；`UPDATE_NODE_FIELDS` 只计划字段更新，不推进状态。
 
-- [ ] 写失败测试：完整草稿产生正确 diff；缺 owner/schedule/required field 只返回缺失项；UPDATE_NODE_FIELDS 不调用 complete-with-data。
-- [ ] 写失败测试：inference 低置信字段进入 WAITING_CONFIRMATION；版本不一致返回 CONFLICT。
-- [ ] 实现 plan 归一化：从 context 的 `saveContract` 读取 command、version、fieldContracts 和 completion metadata；禁止本地字段猜测。
-- [ ] 把 PMS preview 的 preconditions 原样保留，并将缺失项转换成可供外部 Agent 询问的结构。
-- [ ] 运行 plan/unit/contract 测试。
-- [ ] Review gate：检查 plan 输出是否足以让 Agent 一次性向用户提问，而不是逐字段反复确认。
-- [ ] Commit：`feat(cli): plan node detail autofill changes`。
+- [x] 写失败测试：完整草稿产生正确 diff；缺 owner/schedule/required field 只返回缺失项；UPDATE_NODE_FIELDS 不调用 complete-with-data。
+- [x] 写失败测试：inference 低置信字段进入 WAITING_CONFIRMATION；版本不一致返回 CONFLICT。
+- [x] 实现 plan 归一化：从 context 的 `saveContract` 读取 command、version、fieldContracts 和 completion metadata；禁止本地字段猜测。
+- [x] 把 PMS preview 的 preconditions 原样保留，并将缺失项转换成可供外部 Agent 询问的结构。
+- [x] 运行 plan/unit/contract 测试。
+- [x] Review gate：检查 plan 输出是否足以让 Agent 一次性向用户提问，而不是逐字段反复确认。
+- [x] Commit：`feat(cli): plan node detail autofill changes`。
 
 ### Task 4: 接入原子保存详情并完成节点
 
