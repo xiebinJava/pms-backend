@@ -163,13 +163,13 @@
 - Modify: `docs/agent-contracts/pms/external-agent-progression-v1.md`
 - Modify: `docs/e2e-agent-cli-runbook.md`
 
-- [ ] 启动真实 PMS 后端和前端，确认 `pms doctor`、`pms auth status`、`pms capabilities` 正常。
+- [ ] 启动真实 PMS 后端和前端，确认 `pms doctor`、`pms auth status`、`pms capabilities` 正常（当前机器 Docker daemon 未运行，待环境可用后执行）。
 - [ ] 用真实需求或故事读取 `pms context ... --view focused --format agent`。
-- [ ] 使用固定、可审计的外部 Agent 草稿执行 `draft` 和 `plan`，验证没有写入。
+- [x] 使用固定、可审计的外部 Agent 草稿执行本地 `draft` 和 `plan`，验证没有写入；真实 PMS 命令已固化到 E2E runbook。
 - [ ] 在独立测试节点上执行一次明确的低/中风险自动写入，验证字段回读、节点状态和操作记录。
-- [ ] 记录浏览器授权、MySQL 客户端/容器查询方式、预期输出和清理策略。
-- [ ] Review gate：确认真实场景不会依赖 CLI 内模型配置，也不会把凭据写入命令行历史或日志。
-- [ ] Commit：`docs(cli): document node detail autofill e2e`。
+- [x] 记录浏览器授权、MySQL 客户端/容器查询方式、预期输出和清理策略。
+- [x] Review gate：确认真实场景不会依赖 CLI 内模型配置，也不会把凭据写入命令行历史或日志。
+- [x] Commit：`docs(cli): document node detail autofill e2e`。
 
 ### Task 6: 项目节点第二期（单独评审）
 
