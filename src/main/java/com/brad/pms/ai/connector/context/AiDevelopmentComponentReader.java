@@ -6,6 +6,8 @@ import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.workflow.DevelopmentItemType;
 import com.brad.pms.workflow.StoryNodeWorkbenchPolicy;
 import com.brad.pms.workflow.TopicDevelopmentTestingPolicy;
+import com.brad.pms.workflow.WorkflowFieldDefinition;
+import com.brad.pms.workflow.WorkflowFieldType;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +30,7 @@ public class AiDevelopmentComponentReader {
             "requirement-receiving-analysis", "requirement-node-workbench", "topic-research",
             "topic-design-review", "story-node-workbench", "story-testing");
     private static final String REQUIREMENT_EXECUTION = "requirement-execution";
+    private static final String NODE_DETAIL_CONTRACT_VERSION = "node-detail/v1";
     private static final String COMPLETION_COMMAND = TopicDevelopmentTestingPolicy.completionCommand();
     private static final List<String> COMPLETION_REQUIRED_METADATA =
             TopicDevelopmentTestingPolicy.completionRequiredMetadata();
@@ -138,7 +141,8 @@ public class AiDevelopmentComponentReader {
         contract.put("componentKey", componentKey);
         contract.put("variant", variant);
         contract.put("fieldValuesPath", "__components." + componentKey);
-        contract.put("contractVersion", StoryNodeWorkbenchPolicy.contractVersion());
+        contract.put("contractVersion", NODE_DETAIL_CONTRACT_VERSION);
+        contract.put("componentContractVersion", StoryNodeWorkbenchPolicy.contractVersion());
         List<String> effectiveWritableFields = StoryNodeWorkbenchPolicy.effectiveWritableFields(variant);
         contract.put("writableFields", effectiveWritableFields);
         contract.put("effectiveWritableFields", effectiveWritableFields);
@@ -171,7 +175,8 @@ public class AiDevelopmentComponentReader {
         contract.put("version", node.getVersion());
         contract.put("componentKey", "story-testing");
         contract.put("fieldValuesPath", "__components.story-testing");
-        contract.put("contractVersion", TopicDevelopmentTestingPolicy.contractVersion());
+        contract.put("contractVersion", NODE_DETAIL_CONTRACT_VERSION);
+        contract.put("componentContractVersion", TopicDevelopmentTestingPolicy.contractVersion());
         contract.put("writableFields", writableFields);
         contract.put("effectiveWritableFields", writableFields);
         contract.put("protectedFields", List.of("dueDate", "ownerId", "startDate", "status", "title"));
@@ -231,13 +236,62 @@ public class AiDevelopmentComponentReader {
         contract.put("componentKey", componentKey);
         contract.put("fieldValuesPath", "__components." + componentKey);
         contract.put("sourceProjectNodeKey", item == null ? null : item.getProjectMountNodeKey());
-        contract.put("contractVersion", "node-field/v1");
+        contract.put("contractVersion", NODE_DETAIL_CONTRACT_VERSION);
         contract.put("writableFields", writable);
         contract.put("effectiveWritableFields", writable);
         contract.put("protectedFields", itemType == DevelopmentItemType.REQUIREMENT
                 ? List.of("systemId", "targetType", "targetId", "ownerId", "status", "startDate", "endDate")
                 : List.of("status"));
+        addCompletionContract(contract);
+        List<Map<String, Object>> fieldContracts = genericFieldContracts(node, writable);
+        contract.put("requiredFields", fieldContracts.stream()
+                .filter(field -> Boolean.TRUE.equals(field.get("required")))
+                .map(field -> field.get("key"))
+                .toList());
+        contract.put("fieldContracts", fieldContracts);
         return contract;
+    }
+
+    private List<Map<String, Object>> genericFieldContracts(DevelopmentItemWorkflowNodeDTO node,
+                                                             List<String> writableFields) {
+        Map<String, WorkflowFieldDefinition> definitions = new LinkedHashMap<>();
+        if (node.getFields() != null) {
+            node.getFields().stream().filter(Objects::nonNull).forEach(field -> definitions.put(field.key(), field));
+        }
+        return writableFields.stream().map(key -> {
+            WorkflowFieldDefinition definition = definitions.get(key);
+            Map<String, Object> field = new LinkedHashMap<>();
+            field.put("key", key);
+            field.put("label", definition == null || definition.label() == null ? key : definition.label());
+            field.put("type", definition == null ? "string" : contractType(definition.type()));
+            field.put("required", definition != null && definition.required());
+            field.put("nullable", definition == null || !definition.required());
+            field.put("collection", definition != null && isCollection(definition.type()));
+            if (definition != null && definition.options() != null && !definition.options().isEmpty()) {
+                field.put("options", definition.options());
+            }
+            return field;
+        }).toList();
+    }
+
+    private String contractType(WorkflowFieldType type) {
+        if (type == null) return "string";
+        return switch (type) {
+            case NUMBER -> "number";
+            case DATE -> "date";
+            case DATE_RANGE -> "date-range";
+            case RADIO, SINGLE_SELECT -> "enum";
+            case MULTI_SELECT, PERSON_MULTI, ATTACHMENT -> "array";
+            case PERSON -> "person";
+            case TEXTAREA -> "textarea";
+            case TEXT -> "string";
+        };
+    }
+
+    private boolean isCollection(WorkflowFieldType type) {
+        return type == WorkflowFieldType.MULTI_SELECT
+                || type == WorkflowFieldType.PERSON_MULTI
+                || type == WorkflowFieldType.ATTACHMENT;
     }
 
     private Map<String, Object> fieldContract(StoryNodeWorkbenchPolicy.FieldContract field) {

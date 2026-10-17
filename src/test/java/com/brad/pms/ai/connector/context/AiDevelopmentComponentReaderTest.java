@@ -5,6 +5,8 @@ import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
 import com.brad.pms.dto.response.RequirementExecutionTargetDTO;
 import com.brad.pms.integration.ai.api.AiWorkflowContextDTO;
 import com.brad.pms.workflow.DevelopmentItemType;
+import com.brad.pms.workflow.WorkflowFieldDefinition;
+import com.brad.pms.workflow.WorkflowFieldType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
@@ -81,7 +83,9 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.versions()).containsEntry("node", 4);
             assertThat(component.content().get("conclusion").asText()).isEqualTo("可行");
             assertThat(component.content().has("topicId")).isFalse();
-        assertThat(component.saveContract()).doesNotContainKey("completionCommand");
+        assertThat(component.saveContract()).containsEntry("contractVersion", "node-detail/v1");
+        assertThat(component.saveContract()).containsEntry("completionCommand",
+                "development-item.node.complete-with-data");
         });
         assertThat(unknown).isEmpty();
     }
@@ -235,7 +239,8 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract()).containsEntry("variant", "writing");
             assertThat(component.saveContract()).containsEntry("fieldValuesPath",
                     "__components.story-node-workbench");
-            assertThat(component.saveContract()).containsEntry("contractVersion", "story-node-workbench/v1");
+            assertThat(component.saveContract()).containsEntry("contractVersion", "node-detail/v1");
+            assertThat(component.saveContract()).containsEntry("componentContractVersion", "story-node-workbench/v1");
             assertThat(component.saveContract().get("writableFields"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .containsExactly("acceptanceCriteria", "background", "descriptionAndAcceptance", "priority")
@@ -361,7 +366,8 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract()).containsEntry("version", 1);
             assertThat(component.saveContract()).containsEntry("componentKey", "story-testing");
             assertThat(component.saveContract()).containsEntry("fieldValuesPath", "__components.story-testing");
-            assertThat(component.saveContract()).containsEntry("contractVersion", "story-testing/v1");
+            assertThat(component.saveContract()).containsEntry("contractVersion", "node-detail/v1");
+            assertThat(component.saveContract()).containsEntry("componentContractVersion", "story-testing/v1");
             assertThat(component.saveContract().get("writableFields"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .containsExactly("buildVersion", "reportUrl", "residualIssues", "testStatus");
@@ -428,6 +434,10 @@ class AiDevelopmentComponentReaderTest {
         node.setId(301L);
         node.setVersion(4);
         node.setRuntimeComponents(List.of("topic-research"));
+        node.setFields(List.of(
+                new WorkflowFieldDefinition("needed", "是否需要调研", WorkflowFieldType.SINGLE_SELECT, true,
+                        List.of("YES", "NO")),
+                new WorkflowFieldDefinition("goal", "调研目标", WorkflowFieldType.TEXTAREA, false, List.of())));
         node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
                 "topic-research", Map.of("needed", "YES")))));
 
@@ -447,8 +457,49 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract().get("writableFields"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .containsExactly("needed", "goal", "reportUrl", "skipReason");
-            assertThat(component.saveContract()).doesNotContainKey("completionCommand");
+            assertThat(component.saveContract()).containsEntry("contractVersion", "node-detail/v1");
+            assertThat(component.saveContract()).containsEntry("completionCommand",
+                    "development-item.node.complete-with-data");
+            assertThat(component.saveContract()).containsEntry("completionSupported", true);
+            assertThat(component.saveContract().get("requiredFields"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .containsExactly("needed");
+            assertThat(component.saveContract().get("fieldContracts"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                    .anySatisfy(value -> assertThat(value).isEqualTo(Map.of(
+                            "key", "needed", "label", "是否需要调研", "type", "enum", "required", true,
+                            "nullable", false, "collection", false, "options", List.of("YES", "NO"))));
         });
+    }
+
+    @Test
+    void requirementNodeWorkbenchPublishesCompletionContractFromTemplateFields() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO requirement = item(null);
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(401L);
+        node.setVersion(6);
+        node.setRuntimeComponents(List.of("requirement-node-workbench"));
+        node.setFields(List.of(new WorkflowFieldDefinition(
+                "acceptanceCriteria", "验收标准", WorkflowFieldType.TEXTAREA, true, List.of())));
+        node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
+                "requirement-node-workbench", Map.of("acceptanceCriteria", "可验收")))));
+
+        AiWorkflowContextDTO.Component component = reader(new AiContextReferenceProjector(policy), policy).read(
+                DevelopmentItemType.REQUIREMENT, requirement, node, null, "requirement-node-workbench",
+                new ArrayList<>()).get(0);
+
+        assertThat(component.saveContract()).containsEntry("contractVersion", "node-detail/v1");
+        assertThat(component.saveContract()).containsEntry("version", 6);
+        assertThat(component.saveContract()).containsEntry("completionSupported", true);
+        assertThat(component.saveContract().get("protectedFields"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                .contains("status", "ownerId", "startDate", "endDate");
+        assertThat(component.saveContract().get("fieldContracts"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                .anySatisfy(value -> assertThat(value).isEqualTo(Map.of(
+                        "key", "acceptanceCriteria", "label", "验收标准", "type", "textarea", "required", true,
+                        "nullable", false, "collection", false)));
     }
 
     @Test
