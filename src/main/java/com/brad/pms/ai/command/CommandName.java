@@ -17,6 +17,7 @@ public enum CommandName {
     MEMBER_ADD("member.add"),
     MEMBER_REMOVE("member.remove"),
     NODE_COMPLETE("node.complete"),
+    NODE_COMPLETE_WITH_DATA("node.complete-with-data"),
     NODE_FIELD_UPDATE("node.field.update"),
     NODE_ROLLBACK("node.rollback"),
     NODE_OWNER_UPDATE("node.owner.update"),

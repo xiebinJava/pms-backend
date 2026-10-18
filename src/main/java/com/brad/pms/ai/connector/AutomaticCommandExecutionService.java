@@ -58,7 +58,7 @@ public class AutomaticCommandExecutionService {
 
     private boolean requiresConcreteContext(CommandName command) {
         return switch (command) {
-            case NODE_COMPLETE, NODE_FIELD_UPDATE, NODE_ROLLBACK,
+            case NODE_COMPLETE, NODE_COMPLETE_WITH_DATA, NODE_FIELD_UPDATE, NODE_ROLLBACK,
                  NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE, TASK_CREATE,
                  DEVELOPMENT_ITEM_NODE_OWNER_UPDATE,
                  DEVELOPMENT_ITEM_NODE_SCHEDULE_UPDATE,

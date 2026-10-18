@@ -31,6 +31,15 @@ public interface NodeWorkbench {
     /** Applies the patch and returns the refreshed document. */
     Object write(Long projectId, Long nodeId, Map<String, Object> patch);
 
+    /**
+     * Confirms any workbench-level baseline required before the node can be
+     * completed. Workbenches without a separate confirmation step keep the
+     * default no-op behavior.
+     */
+    default void confirmForCompletion(Long projectId, Long nodeId) {
+        // no-op
+    }
+
     @FunctionalInterface
     interface Saver {
         Object save(Long projectId, Long nodeId, Object command);

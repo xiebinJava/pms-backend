@@ -57,7 +57,8 @@ class CompleteDevelopmentItemNodeWithDataCommandTest {
                 .containsEntry("action", "complete-with-data")
                 .containsEntry("ownerId", 2L)
                 .containsEntry("startDate", LocalDate.of(2026, 10, 10))
-                .containsEntry("endDate", LocalDate.of(2026, 10, 20));
+                .containsEntry("endDate", LocalDate.of(2026, 10, 20))
+                .containsEntry("completionMode", "AUTO_CONFIRM");
         assertThat(preview.changes().get(0)).containsKey("fieldValues");
     }
 

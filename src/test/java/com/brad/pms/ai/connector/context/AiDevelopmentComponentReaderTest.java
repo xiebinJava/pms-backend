@@ -296,6 +296,7 @@ class AiDevelopmentComponentReaderTest {
             assertThat(component.saveContract()).containsEntry("completionCommand",
                     "development-item.node.complete-with-data");
             assertThat(component.saveContract()).containsEntry("completionSupported", true);
+            assertThat(component.saveContract()).containsEntry("completionMode", "AUTO_CONFIRM");
             assertThat(component.saveContract().get("completionRequiredMetadata"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .containsExactly("ownerId", "startDate", "endDate");
@@ -328,6 +329,7 @@ class AiDevelopmentComponentReaderTest {
         assertThat(component.saveContract()).containsEntry("completionCommand",
                 "development-item.node.complete-with-data");
         assertThat(component.saveContract()).containsEntry("completionSupported", true);
+        assertThat(component.saveContract()).containsEntry("completionMode", "AUTO_CONFIRM");
         assertThat(component.saveContract().get("completionRequiredMetadata"))
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                 .containsExactly("ownerId", "startDate", "endDate");
@@ -335,6 +337,27 @@ class AiDevelopmentComponentReaderTest {
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                 .containsExactly("acceptanceConclusion", "acceptanceNote")
                 .doesNotContain("title", "status", "ownerId", "startDate", "endDate");
+    }
+
+    @Test
+    void topicDesignReviewDeclaresDomainConfirmationRequirement() {
+        var mapper = JsonMapper.builder().build();
+        DevelopmentItemWorkflowDetailDTO topic = new DevelopmentItemWorkflowDetailDTO();
+        topic.setItemType("TOPIC");
+        topic.setId(15L);
+        DevelopmentItemWorkflowNodeDTO node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(101L);
+        node.setVersion(2);
+        node.setRuntimeComponents(List.of("topic-design-review"));
+        node.setFieldValues(Map.of("__components", mapper.valueToTree(Map.of(
+                "topic-design-review", Map.of("productPlanUrl", "https://example.test/plan")))));
+
+        AiWorkflowContextDTO.Component component = reader(new AiContextReferenceProjector(policy), policy).read(
+                DevelopmentItemType.TOPIC, topic, node, null, "topic-design-review", new ArrayList<>())
+                .get(0);
+
+        assertThat(component.saveContract()).containsEntry("completionMode", "REQUIRES_DOMAIN_CONFIRMATION");
+        assertThat(component.saveContract()).containsEntry("completionBlockReason", "需要产品、设计和技术评审完成");
     }
 
     @Test

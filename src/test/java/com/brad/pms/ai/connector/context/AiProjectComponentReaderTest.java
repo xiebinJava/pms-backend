@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,6 +35,7 @@ class AiProjectComponentReaderTest {
     @Mock NodeRequirementScopeService requirementScopeService;
     @Mock AiContextReferenceProjector referenceProjector;
     @Mock com.brad.pms.ai.node.NodeWorkbenchRegistry workbenchRegistry;
+    @Mock com.brad.pms.ai.node.NodeWorkbench workbench;
 
     private final ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
@@ -159,6 +161,32 @@ class AiProjectComponentReaderTest {
         assertThatThrownBy(() -> reader.read(project(), node(List.of("requirement-scope")), null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("数据库异常");
+    }
+
+    @Test
+    void publishesCompletionModeForEachProjectWorkbench() {
+        AiProjectComponentReader reader = reader();
+        when(workbenchRegistry.keys()).thenReturn(Set.of(
+                "requirement-scope", "solution-design", "plan-resource-risk", "business-acceptance",
+                "development-control", "knowledge-standard"));
+        when(workbenchRegistry.require(org.mockito.ArgumentMatchers.anyString())).thenReturn(workbench);
+        when(requirementScopeService.getReadSnapshot(7L, 301L)).thenReturn(new WorkbenchReadSnapshot<>(
+                new NodeRequirementScopeDTO(), false, Map.of("content", new PersistedContentVersion(false, null))));
+
+        Map<String, String> expected = Map.of(
+                "requirement-scope", "AUTO_CONFIRM",
+                "solution-design", "REQUIRES_DOMAIN_CONFIRMATION",
+                "plan-resource-risk", "REQUIRES_DOMAIN_CONFIRMATION",
+                "business-acceptance", "REQUIRES_DOMAIN_CONFIRMATION",
+                "development-control", "VALIDATE_ONLY",
+                "knowledge-standard", "AUTO_CONFIRM");
+
+        for (Map.Entry<String, String> entry : expected.entrySet()) {
+            AiWorkflowContextDTO.Component component = reader.read(
+                    project(), node(List.of(entry.getKey())), entry.getKey()).get(0);
+            assertThat(component.saveContract())
+                    .containsEntry("completionMode", entry.getValue());
+        }
     }
 
     private final com.brad.pms.service.NodeSolutionDesignService solutionDesignService =
@@ -298,6 +326,8 @@ class AiProjectComponentReaderTest {
             assertThat(component.saveContract()).containsEntry("nodeId", 301L);
             assertThat(component.saveContract()).containsEntry("nodeVersion", 6);
             assertThat(component.saveContract()).containsEntry("workbench", "solution-design");
+            assertThat(component.saveContract()).containsEntry("completionSupported", true);
+            assertThat(component.saveContract()).containsEntry("completionCommand", "node.complete-with-data");
             assertThat(component.saveContract().get("writableFields"))
                     .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                     .containsExactlyInAnyOrder("productSolution", "technicalSolution");

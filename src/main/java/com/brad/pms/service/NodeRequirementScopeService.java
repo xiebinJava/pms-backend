@@ -139,6 +139,30 @@ public class NodeRequirementScopeService {
         return result;
     }
 
+    /**
+     * Completion path used by the AI atomic node command. The explicit request
+     * to complete the node is also the user's confirmation of the current
+     * requirement list, so promote the saved draft items before confirming the
+     * baseline instead of forcing a second interactive UI round trip.
+     */
+    @Transactional
+    public void confirmForCompletion(Long projectId, Long nodeId) {
+        ProjectNodeDO node = permissionService.requireManageableNode(projectId, nodeId, "确认需求范围基线");
+        requireRequirementNode(node);
+        List<ProjectNodeRequirementDO> requirements = requirementMapper.selectList(new LambdaQueryWrapper<ProjectNodeRequirementDO>()
+                .eq(ProjectNodeRequirementDO::getProjectId, projectId)
+                .eq(ProjectNodeRequirementDO::getNodeId, nodeId));
+        for (ProjectNodeRequirementDO requirement : requirements) {
+            if (!Integer.valueOf(1).equals(requirement.getStatus())) {
+                requirement.setStatus(1);
+                if (requirementMapper.updateById(requirement) != 1) {
+                    throw BusinessException.conflict("需求清单已被其他人修改，请刷新后重试");
+                }
+            }
+        }
+        confirm(projectId, nodeId);
+    }
+
     /** Called by node lifecycle completion so a client cannot bypass baseline confirmation. */
     public void requireConfirmed(Long projectId, Long nodeId) {
         permissionService.requireProjectReadable(projectId);

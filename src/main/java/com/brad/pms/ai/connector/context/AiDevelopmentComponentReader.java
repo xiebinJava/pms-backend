@@ -148,7 +148,7 @@ public class AiDevelopmentComponentReader {
         contract.put("writableFields", effectiveWritableFields);
         contract.put("effectiveWritableFields", effectiveWritableFields);
         contract.put("protectedFields", StoryNodeWorkbenchPolicy.protectedFields(variant));
-        addCompletionContract(contract);
+        addCompletionContract(contract, componentKey);
         contract.put("requiredFields", StoryNodeWorkbenchPolicy.fieldContracts(variant).stream()
                 .filter(StoryNodeWorkbenchPolicy.FieldContract::required)
                 .map(StoryNodeWorkbenchPolicy.FieldContract::key)
@@ -184,15 +184,19 @@ public class AiDevelopmentComponentReader {
         contract.put("completionCommand", TopicDevelopmentTestingPolicy.completionCommand());
         contract.put("completionSupported", true);
         contract.put("completionRequiredMetadata", TopicDevelopmentTestingPolicy.completionRequiredMetadata());
+        CompletionContract.addTo(contract, CompletionContract.developmentMode("story-testing"),
+                CompletionContract.developmentBlockReason("story-testing"));
         contract.put("requiredFields", List.of());
         contract.put("fieldContracts", writableFields.stream().map(this::testingFieldContract).toList());
         return contract;
     }
 
-    private void addCompletionContract(Map<String, Object> contract) {
+    private void addCompletionContract(Map<String, Object> contract, String componentKey) {
         contract.put("completionCommand", COMPLETION_COMMAND);
         contract.put("completionSupported", true);
         contract.put("completionRequiredMetadata", COMPLETION_REQUIRED_METADATA);
+        CompletionContract.addTo(contract, CompletionContract.developmentMode(componentKey),
+                CompletionContract.developmentBlockReason(componentKey));
     }
 
     private Map<String, Object> testingFieldContract(String key) {
@@ -245,7 +249,7 @@ public class AiDevelopmentComponentReader {
         contract.put("protectedFields", itemType == DevelopmentItemType.REQUIREMENT
                 ? List.of("systemId", "targetType", "targetId", "ownerId", "status", "startDate", "endDate")
                 : List.of("status"));
-        addCompletionContract(contract);
+        addCompletionContract(contract, componentKey);
         List<Map<String, Object>> fieldContracts = "requirement-receiving-analysis".equals(componentKey)
                 ? requirementReceivingAnalysisFieldContracts(config)
                 : genericFieldContracts(node, writable);

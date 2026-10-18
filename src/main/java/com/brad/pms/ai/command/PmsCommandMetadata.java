@@ -20,7 +20,7 @@ public final class PmsCommandMetadata {
                  REQUIREMENT_EXECUTION_TARGET_UNLINK -> "pms:requirement:write";
             case FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE,
                  PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE -> "pms:project:write";
-            case NODE_COMPLETE, NODE_ROLLBACK -> "pms:workflow:write";
+            case NODE_COMPLETE, NODE_COMPLETE_WITH_DATA, NODE_ROLLBACK -> "pms:workflow:write";
             case NODE_FIELD_UPDATE, NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> "pms:workflow:write";
             case TOPIC_CREATE, TOPIC_UPDATE, TOPIC_PROJECT_LINK, STORY_CREATE, STORY_UPDATE,
                  STORY_TOPIC_LINK -> "pms:development:write";
@@ -49,7 +49,7 @@ public final class PmsCommandMetadata {
             case ITERATION_PLAN_CREATE, ITERATION_PLAN_UPDATE,
                  ITERATION_PLAN_STORY_ADD, ITERATION_PLAN_STORY_REMOVE -> List.of("iteration_plan");
             case TASK_CREATE, TASK_ASSIGN, TASK_UPDATE -> List.of("task");
-            case NODE_COMPLETE, NODE_FIELD_UPDATE, NODE_ROLLBACK,
+            case NODE_COMPLETE, NODE_COMPLETE_WITH_DATA, NODE_FIELD_UPDATE, NODE_ROLLBACK,
                  NODE_OWNER_UPDATE, NODE_SCHEDULE_UPDATE -> List.of("project_node");
             case PROJECT_ARCHIVE, PROJECT_CREATE, PROJECT_DELETE, PROJECT_UPDATE,
                  FOLLOWER_ADD, FOLLOWER_REMOVE, MEMBER_ADD, MEMBER_REMOVE, BATCH_WRITE -> List.of("project");
@@ -159,6 +159,25 @@ public final class PmsCommandMetadata {
                     Map.of(
                             "projectId", Map.of("type", "integer", "required", true),
                             "nodeId", Map.of("type", "integer", "required", true)),
+                    true,
+                    true,
+                    List.of("project-detail", "project-dashboard", "task-board"));
+            case NODE_COMPLETE_WITH_DATA -> new PmsCommandDescriptor(
+                    name,
+                    "保存项目节点详情并完成节点，字段、负责人和排期在一次原子操作中提交",
+                    "write",
+                    "high",
+                    true,
+                    List.of("pms:workflow:write", "pms:command:preview", "pms:command:execute"),
+                    Map.ofEntries(
+                            Map.entry("projectId", Map.of("type", "integer", "required", true)),
+                            Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                            Map.entry("workbench", Map.of("type", "string", "required", true)),
+                            Map.entry("fields", Map.of("type", "object", "required", true,
+                                    "description", "仅包含需要保存的工作台字段")),
+                            Map.entry("ownerId", Map.of("type", "integer")),
+                            Map.entry("startDate", Map.of("type", "string", "format", "date")),
+                            Map.entry("endDate", Map.of("type", "string", "format", "date"))),
                     true,
                     true,
                     List.of("project-detail", "project-dashboard", "task-board"));

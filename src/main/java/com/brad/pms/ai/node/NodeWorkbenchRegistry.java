@@ -54,7 +54,7 @@ public class NodeWorkbenchRegistry {
                 requirementScope::get,
                 (projectId, nodeId, command) -> requirementScope.saveDraft(
                         projectId, nodeId, (NodeRequirementScopeUpdateCmd) command),
-                objectMapper, labels));
+                objectMapper, labels, requirementScope::confirmForCompletion));
         table.put("solution-design", new TypedNodeWorkbench(
                 "solution-design", NodeSolutionPackageUpdateCmd.class,
                 "solutionPackage", solutionDesign::get,

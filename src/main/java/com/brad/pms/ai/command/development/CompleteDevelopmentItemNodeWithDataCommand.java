@@ -7,6 +7,7 @@ import com.brad.pms.ai.command.CommandPreviewRequest;
 import com.brad.pms.ai.command.CommandResult;
 import com.brad.pms.ai.command.PmsCommand;
 import com.brad.pms.ai.command.PmsCommandSupport;
+import com.brad.pms.ai.connector.context.CompletionContract;
 import com.brad.pms.dto.request.DevelopmentItemNodeUpdateCmd;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowDetailDTO;
 import com.brad.pms.dto.response.DevelopmentItemWorkflowNodeDTO;
@@ -52,6 +53,8 @@ public class CompleteDevelopmentItemNodeWithDataCommand implements PmsCommand {
         Map<String, JsonNode> values = mergeFieldValues(node, incoming);
 
         Map<String, Object> change = itemSupport.change("complete-with-data", args, node);
+        CompletionContract.addTo(change, CompletionContract.developmentMode(node.getRuntimeComponents()),
+                CompletionContract.developmentBlockReason(node.getRuntimeComponents()));
         change.put("ownerId", ownerId);
         change.put("startDate", startDate);
         change.put("endDate", endDate);

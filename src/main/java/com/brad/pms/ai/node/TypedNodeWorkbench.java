@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 /**
@@ -25,6 +26,7 @@ public final class TypedNodeWorkbench implements NodeWorkbench {
     private final String documentPath;
     private final BiFunction<Long, Long, Object> reader;
     private final Saver saver;
+    private final BiConsumer<Long, Long> completionConfirmer;
     private final ObjectMapper mapper;
     private final NodeFieldLabels labels;
 
@@ -34,7 +36,7 @@ public final class TypedNodeWorkbench implements NodeWorkbench {
                               Saver saver,
                               ObjectMapper mapper,
                               NodeFieldLabels labels) {
-        this(key, commandType, null, reader, saver, mapper, labels);
+        this(key, commandType, null, reader, saver, mapper, labels, (projectId, nodeId) -> { });
     }
 
     /**
@@ -49,12 +51,34 @@ public final class TypedNodeWorkbench implements NodeWorkbench {
                               Saver saver,
                               ObjectMapper mapper,
                               NodeFieldLabels labels) {
+        this(key, commandType, documentPath, reader, saver, mapper, labels, (projectId, nodeId) -> { });
+    }
+
+    public TypedNodeWorkbench(String key,
+                              Class<?> commandType,
+                              BiFunction<Long, Long, Object> reader,
+                              Saver saver,
+                              ObjectMapper mapper,
+                              NodeFieldLabels labels,
+                              BiConsumer<Long, Long> completionConfirmer) {
+        this(key, commandType, null, reader, saver, mapper, labels, completionConfirmer);
+    }
+
+    public TypedNodeWorkbench(String key,
+                              Class<?> commandType,
+                              String documentPath,
+                              BiFunction<Long, Long, Object> reader,
+                              Saver saver,
+                              ObjectMapper mapper,
+                              NodeFieldLabels labels,
+                              BiConsumer<Long, Long> completionConfirmer) {
         this.key = key;
         this.label = labels.workbench(key);
         this.commandType = commandType;
         this.documentPath = documentPath;
         this.reader = reader;
         this.saver = saver;
+        this.completionConfirmer = completionConfirmer;
         this.mapper = mapper;
         this.labels = labels;
     }
@@ -102,6 +126,11 @@ public final class TypedNodeWorkbench implements NodeWorkbench {
         merged.put("version", asInteger(document.get("version")));
         merged.putAll(patch);
         return saver.save(projectId, nodeId, mapper.convertValue(merged, commandType));
+    }
+
+    @Override
+    public void confirmForCompletion(Long projectId, Long nodeId) {
+        completionConfirmer.accept(projectId, nodeId);
     }
 
     private Map<String, Object> toMap(Object document) {

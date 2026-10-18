@@ -185,6 +185,11 @@ public class AiProjectComponentReader {
                 ? new ArrayList<>(typed.writableFields()) : List.of();
         Map<String, Object> contract = new LinkedHashMap<>();
         contract.put("command", "node.field.update");
+        contract.put("completionSupported", true);
+        contract.put("completionCommand", "node.complete-with-data");
+        contract.put("completionRequiredMetadata", List.of("ownerId", "startDate", "endDate"));
+        CompletionContract.addTo(contract, CompletionContract.projectMode(componentKey),
+                CompletionContract.projectBlockReason(componentKey));
         contract.put("projectId", node.getProjectId());
         contract.put("nodeId", node.getId());
         contract.put("nodeVersion", node.getVersion());
