@@ -83,6 +83,11 @@ class AiOperationContractAuditTest {
         assertThat(captor.getValue().getProvenanceJson()).contains("draft-provenance/v1");
         assertThat(persisted.provenanceRef()).isEqualTo("operation:" + persisted.operationId());
         assertThat(persisted.draftDigest()).isEqualTo("sha256:" + "a".repeat(64));
+
+        CommandPreview auditReadback = new ObjectMapper().findAndRegisterModules()
+                .readValue(captor.getValue().getPreviewJson(), CommandPreview.class);
+        assertThat(auditReadback.provenanceRef()).isEqualTo(persisted.provenanceRef());
+        assertThat(auditReadback.draftDigest()).isEqualTo(persisted.draftDigest());
     }
 
     @Test
