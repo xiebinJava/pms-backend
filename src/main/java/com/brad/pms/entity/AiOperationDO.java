@@ -26,6 +26,7 @@ public class AiOperationDO {
     private String argumentsJson;
     private String previewJson;
     private String expectedVersionsJson;
+    private String provenanceJson;
     private String status;
     private String idempotencyKey;
     private String resultJson;

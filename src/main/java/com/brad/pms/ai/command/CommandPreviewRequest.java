@@ -12,14 +12,25 @@ public record CommandPreviewRequest(
         String contextId,
         String contextVersion,
         String contractId,
-        String contractVersion) {
+        String contractVersion,
+        Map<String, Object> provenance) {
 
     public CommandPreviewRequest(
             CommandName name,
             Map<String, Object> arguments,
             String contextId,
             String contextVersion) {
-        this(name, arguments, contextId, contextVersion, null, null);
+        this(name, arguments, contextId, contextVersion, null, null, null);
+    }
+
+    public CommandPreviewRequest(
+            CommandName name,
+            Map<String, Object> arguments,
+            String contextId,
+            String contextVersion,
+            String contractId,
+            String contractVersion) {
+        this(name, arguments, contextId, contextVersion, contractId, contractVersion, null);
     }
 
     public CommandPreviewRequest {
@@ -28,6 +39,7 @@ public record CommandPreviewRequest(
                 ? Map.of()
                 : new LinkedHashMap<>(arguments);
         arguments = Collections.unmodifiableMap(copy);
+        provenance = provenance == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(provenance));
         contextId = requireText(contextId, "contextId");
         contextVersion = requireText(contextVersion, "contextVersion");
         if ((contractId == null) != (contractVersion == null)

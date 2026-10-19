@@ -16,7 +16,9 @@ public record CommandPreview(
         List<String> warnings,
         List<Map<String, Object>> changes,
         List<String> refreshScopes,
-        List<Precondition> preconditions) {
+        List<Precondition> preconditions,
+        String provenanceRef,
+        String draftDigest) {
 
     public CommandPreview(
             String operationId,
@@ -26,7 +28,19 @@ public record CommandPreview(
             List<String> warnings,
             List<Map<String, Object>> changes,
             List<String> refreshScopes) {
-        this(operationId, command, expiresAt, contextVersion, warnings, changes, refreshScopes, List.of());
+        this(operationId, command, expiresAt, contextVersion, warnings, changes, refreshScopes, List.of(), null, null);
+    }
+
+    public CommandPreview(
+            String operationId,
+            CommandName command,
+            Instant expiresAt,
+            String contextVersion,
+            List<String> warnings,
+            List<Map<String, Object>> changes,
+            List<String> refreshScopes,
+            List<Precondition> preconditions) {
+        this(operationId, command, expiresAt, contextVersion, warnings, changes, refreshScopes, preconditions, null, null);
     }
 
     public CommandPreview {

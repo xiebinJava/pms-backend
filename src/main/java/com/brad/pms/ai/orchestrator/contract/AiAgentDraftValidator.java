@@ -163,6 +163,12 @@ public class AiAgentDraftValidator {
         if (context.resourceType() != null && context.resourceId() != null) {
             references.add(context.resourceType() + ":" + context.resourceId());
         }
+        addNodeReferences(references, context.resourceType(), context.currentNode());
+        if (context.workflow() != null && context.workflow().nodes() != null) {
+            for (AiWorkflowContextDTO.Node node : context.workflow().nodes()) {
+                if (node != null) addNodeReferences(references, context.resourceType(), node);
+            }
+        }
         for (AiWorkflowContextDTO.Relation relation : context.relations()) {
             if (relation != null && relation.readable()
                     && relation.resourceType() != null && relation.resourceId() != null) {
@@ -170,6 +176,25 @@ public class AiAgentDraftValidator {
             }
         }
         return references;
+    }
+
+    private void addNodeReferences(Set<String> references, String resourceType,
+                                   AiWorkflowContextDTO.CurrentNode node) {
+        if (node == null || node.id() == null || resourceType == null || resourceType.isBlank()) return;
+        String nodeRef = resourceType + "-node:" + node.id();
+        references.add(nodeRef);
+    }
+
+    private void addNodeReferences(Set<String> references, String resourceType,
+                                   AiWorkflowContextDTO.Node node) {
+        if (node == null || node.id() == null || resourceType == null || resourceType.isBlank()) return;
+        String nodeRef = resourceType + "-node:" + node.id();
+        references.add(nodeRef);
+        for (AiWorkflowContextDTO.Component component : node.components()) {
+            if (component != null && component.key() != null && !component.key().isBlank()) {
+                references.add(nodeRef + "#component:" + component.key());
+            }
+        }
     }
 
     private DraftValidationResult.ValidationError error(String code, String path, String message) {

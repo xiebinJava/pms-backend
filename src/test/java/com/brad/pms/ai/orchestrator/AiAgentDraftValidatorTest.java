@@ -40,6 +40,15 @@ class AiAgentDraftValidatorTest {
     }
 
     @Test
+    void acceptsReadableCurrentNodeReferencesInGenericDrafts() {
+        AgentDraft draft = new AgentDraft("requirement-analysis/v1", new AgentDraft.DraftPayload(
+                List.of(new AgentDraftItem("节点事实", List.of("requirement-node:375"), "high")),
+                List.of(), List.of(), List.of(), Map.of("analysis", "内容")));
+
+        assertThat(validator.validate(draft, context).valid()).isTrue();
+    }
+
+    @Test
     void rejectsMissingArraysAndEmptyPatch() {
         AgentDraft.DraftPayload draft = new AgentDraft.DraftPayload(
                 null, List.of(), List.of(), List.of(), Map.of());

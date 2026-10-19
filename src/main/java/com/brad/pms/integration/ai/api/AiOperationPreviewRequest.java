@@ -15,7 +15,21 @@ public record AiOperationPreviewRequest(
         String contractId,
         String contractVersion,
         String clientId,
-        String requestId) {
+        String requestId,
+        Map<String, Object> provenance) {
+
+    public AiOperationPreviewRequest(
+            String command,
+            Map<String, Object> arguments,
+            String contextId,
+            String contextVersion,
+            String contractId,
+            String contractVersion,
+            String clientId,
+            String requestId) {
+        this(command, arguments, contextId, contextVersion, contractId, contractVersion,
+                clientId, requestId, null);
+    }
 
     public CommandPreviewRequest toCommandPreviewRequest() {
         if (command == null || command.isBlank()) throw BusinessException.error("command 不能为空");
@@ -27,7 +41,7 @@ public record AiOperationPreviewRequest(
         }
         try {
             return new CommandPreviewRequest(commandName, arguments, contextId, contextVersion,
-                    contractId, contractVersion);
+                    contractId, contractVersion, provenance);
         } catch (IllegalArgumentException exception) {
             throw BusinessException.error(exception.getMessage());
         }

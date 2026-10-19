@@ -102,6 +102,7 @@ class AiConnectorCapabilityServiceTest {
         String wire = new ObjectMapper().writeValueAsString(result);
         assertThat(wire).contains("\"resourceGet\":true");
         assertThat(result.agentContractVersion()).isEqualTo("agent-contract/v1");
+        assertThat(result.provenanceVersions()).containsExactly("draft-provenance/v1");
         assertThat(result.features()).containsEntry("readonlyWorkflowContext", true);
         assertThat(result.features()).containsEntry("focusedWorkflowContext", true);
         assertThat(wire).contains("\"agentContractVersion\":\"agent-contract/v1\"");

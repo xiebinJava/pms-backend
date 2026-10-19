@@ -12,7 +12,8 @@ public record AiCapabilityDTO(
         List<WorkflowTypeCapability> workflowTypes,
         Viewer viewer,
         String today,
-        String agentContractVersion) {
+        String agentContractVersion,
+        List<String> provenanceVersions) {
 
     public static final String EXTERNAL_AGENT_CONTRACT_VERSION = "agent-contract/v1";
 
@@ -26,7 +27,7 @@ public record AiCapabilityDTO(
             Viewer viewer,
             String today) {
         this(version, resources, scopes, features, workflowTypes, viewer, today,
-                EXTERNAL_AGENT_CONTRACT_VERSION);
+                EXTERNAL_AGENT_CONTRACT_VERSION, List.of());
     }
 
     public AiCapabilityDTO {
@@ -34,6 +35,7 @@ public record AiCapabilityDTO(
         scopes = scopes == null ? List.of() : List.copyOf(scopes);
         features = features == null ? Map.of() : Map.copyOf(features);
         workflowTypes = workflowTypes == null ? List.of() : List.copyOf(workflowTypes);
+        provenanceVersions = provenanceVersions == null ? List.of() : List.copyOf(provenanceVersions);
     }
 
     public record ResourceCapability(String type, List<ActionCapability> actions) {

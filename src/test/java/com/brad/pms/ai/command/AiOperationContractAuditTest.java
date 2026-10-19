@@ -55,6 +55,37 @@ class AiOperationContractAuditTest {
     }
 
     @Test
+    void persistsProvenanceAndBindsItToThePreviewOperation() throws Exception {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        when(mapper.insert(any(AiOperationDO.class))).thenReturn(1);
+        when(contractRegistry.isCommandAllowed(null, null, "project.create")).thenReturn(true);
+        AiOperationService service = new AiOperationService(
+                mapper, mock(PmsCommandRegistry.class), new ObjectMapper().findAndRegisterModules(), contractRegistry);
+        Map<String, Object> provenance = Map.of(
+                "contractVersion", "draft-provenance/v1",
+                "draftDigest", "sha256:" + "a".repeat(64),
+                "fieldSources", Map.of("name", Map.of(
+                        "sourceType", "pms_context",
+                        "sourceRefs", List.of("project:42"),
+                        "confidence", "high")));
+        CommandPreviewRequest request = new CommandPreviewRequest(
+                CommandName.PROJECT_CREATE, Map.of("name", "测试项目"), "project-42", "context-v7",
+                null, null, provenance);
+        CommandPreview proposal = new CommandPreview(
+                "ignored", CommandName.PROJECT_CREATE, Instant.now().plusSeconds(60),
+                "context-v7", List.of(), List.of(), List.of("project-list"));
+
+        CommandPreview persisted = service.persistPreview(7L, request, proposal);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AiOperationDO.class);
+        org.mockito.Mockito.verify(mapper).insert(captor.capture());
+        assertThat(captor.getValue().getProvenanceJson()).contains("draft-provenance/v1");
+        assertThat(persisted.provenanceRef()).isEqualTo("operation:" + persisted.operationId());
+        assertThat(persisted.draftDigest()).isEqualTo("sha256:" + "a".repeat(64));
+    }
+
+    @Test
     void refusesToExecuteAPreviewAfterItsContractVersionIsNoLongerCurrent() {
         AiOperationMapper mapper = mock(AiOperationMapper.class);
         PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);

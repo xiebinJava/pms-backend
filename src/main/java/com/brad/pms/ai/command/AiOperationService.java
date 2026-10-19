@@ -1,6 +1,7 @@
 package com.brad.pms.ai.command;
 
 import com.brad.pms.ai.contract.PmsAgentContractRegistry;
+import com.brad.pms.ai.connector.AiProvenanceValidator;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.entity.AiOperationDO;
 import com.brad.pms.mapper.AiOperationMapper;
@@ -52,11 +53,16 @@ public class AiOperationService {
         operation.setContractId(request.contractId());
         operation.setContractVersion(request.contractVersion());
         operation.setArgumentsJson(write(request.arguments()));
+        AiProvenanceValidator.Validated provenance = AiProvenanceValidator.validate(
+                request.provenance(), objectMapper);
+        if (provenance != null) operation.setProvenanceJson(provenance.json());
         operation.setStatus(PREVIEW);
         operation.setExpiresAt(expiresAt);
         CommandPreview persistedPreview = new CommandPreview(operationId, proposal.command(),
                 expiresAt.atZone(ZoneId.systemDefault()).toInstant(), proposal.contextVersion(),
-                proposal.warnings(), proposal.changes(), proposal.refreshScopes(), proposal.preconditions());
+                proposal.warnings(), proposal.changes(), proposal.refreshScopes(), proposal.preconditions(),
+                provenance == null ? null : "operation:" + operationId,
+                provenance == null ? null : provenance.draftDigest());
         operation.setPreviewJson(write(persistedPreview));
         operation.setExpectedVersionsJson(write(persistedPreview.changes()));
         operationMapper.insert(operation);
@@ -106,7 +112,7 @@ public class AiOperationService {
 
         CommandName commandName = parseCommandName(operation.getCommandName());
         PmsCommandScopeGuard.requireScope(commandName);
-        CommandResult result = registry.require(commandName).execute(operation);
+        CommandResult result = withLegacyWarning(operation, registry.require(commandName).execute(operation));
         operation.setResultJson(write(result));
         operation.setStatus(SUCCEEDED);
         operation.setExecutedAt(LocalDateTime.now());
@@ -195,7 +201,7 @@ public class AiOperationService {
             throw BusinessException.conflict("幂等键已经用于其他操作，请更换幂等键");
         }
 
-        CommandResult result = command.execute(operation);
+        CommandResult result = withLegacyWarning(operation, command.execute(operation));
         operation.setResultJson(write(result));
         operation.setStatus(SUCCEEDED);
         operation.setExecutedAt(LocalDateTime.now());
@@ -209,6 +215,15 @@ public class AiOperationService {
 
     public List<Map<String, Object>> expectedChanges(AiOperationDO operation) {
         return read(operation.getExpectedVersionsJson(), new TypeReference<>() { });
+    }
+
+    private CommandResult withLegacyWarning(AiOperationDO operation, CommandResult result) {
+        if (result == null || operation.getProvenanceJson() != null
+                || result.warnings().contains("PROVENANCE_NOT_AUDITED")) return result;
+        java.util.ArrayList<String> warnings = new java.util.ArrayList<>(result.warnings());
+        warnings.add("PROVENANCE_NOT_AUDITED");
+        return new CommandResult(result.operationId(), result.status(), result.message(), result.data(),
+                result.refreshScopes(), warnings);
     }
 
     private void validateContractBinding(String contractId, String contractVersion, String commandName) {

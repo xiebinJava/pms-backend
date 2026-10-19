@@ -95,7 +95,8 @@ public class AiConnectorCapabilityService {
                 workflowTypes(),
                 viewer(),
                 LocalDate.now(BUSINESS_ZONE).toString(),
-                AiCapabilityDTO.EXTERNAL_AGENT_CONTRACT_VERSION);
+                AiCapabilityDTO.EXTERNAL_AGENT_CONTRACT_VERSION,
+                List.of(AiProvenanceValidator.CONTRACT_VERSION));
     }
 
     private boolean workflowContextAvailable() {

@@ -85,7 +85,10 @@ class AiOperationAutomaticExecutionTest {
         CommandResult first = service.executeAutomatically(7L, request, "idem-1", "pms-cli", "request-1");
         CommandResult retry = service.executeAutomatically(7L, request, "idem-1", "pms-cli", "request-2");
 
-        assertThat(first).isEqualTo(expected);
+        assertThat(first).usingRecursiveComparison()
+                .ignoringFields("warnings")
+                .isEqualTo(expected);
+        assertThat(first.warnings()).containsExactly("PROVENANCE_NOT_AUDITED");
         assertThat(retry.operationId()).isEqualTo(expected.operationId());
         assertThat(retry.status()).isEqualTo(expected.status());
         assertThat(retry.message()).isEqualTo(expected.message());

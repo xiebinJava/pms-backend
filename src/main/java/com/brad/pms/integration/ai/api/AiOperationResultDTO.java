@@ -12,7 +12,8 @@ public record AiOperationResultDTO(
         String message,
         Map<String, Object> data,
         List<String> refreshScopes,
-        String auditId) {
+        String auditId,
+        List<String> warnings) {
 
     /**
      * Keeps the response shape source-compatible for internal orchestrator callers that do not
@@ -25,7 +26,17 @@ public record AiOperationResultDTO(
             String message,
             Map<String, Object> data,
             List<String> refreshScopes) {
-        this(operationId, status, message, data, refreshScopes, operationId);
+        this(operationId, status, message, data, refreshScopes, operationId, List.of());
+    }
+
+    public AiOperationResultDTO(
+            String operationId,
+            String status,
+            String message,
+            Map<String, Object> data,
+            List<String> refreshScopes,
+            String auditId) {
+        this(operationId, status, message, data, refreshScopes, auditId, List.of());
     }
 
     public static AiOperationResultDTO from(CommandResult result) {
@@ -35,6 +46,7 @@ public record AiOperationResultDTO(
                 result.message(),
                 result.data(),
                 result.refreshScopes(),
-                result.operationId());
+                result.operationId(),
+                result.warnings());
     }
 }
