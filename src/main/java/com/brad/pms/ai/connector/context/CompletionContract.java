@@ -14,6 +14,16 @@ public final class CompletionContract {
 
     private CompletionContract() { }
 
+    /**
+     * Resource fields that a completion command is allowed to change in
+     * addition to the selected node component.  This list is returned in the
+     * operation result so the connector can verify protected-field changes
+     * from server-declared data instead of trusting execute input.
+     */
+    public static List<String> allowedMutations() {
+        return List.of("status", "ownerId", "startDate", "endDate");
+    }
+
     public static void addTo(Map<String, Object> contract, Mode mode, String blockReason) {
         contract.put("completionMode", mode.name());
         contract.put("completionAutomaticConfirmation", mode == Mode.AUTO_CONFIRM);

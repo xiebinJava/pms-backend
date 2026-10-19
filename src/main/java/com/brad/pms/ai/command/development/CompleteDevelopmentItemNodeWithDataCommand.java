@@ -58,6 +58,7 @@ public class CompleteDevelopmentItemNodeWithDataCommand implements PmsCommand {
         change.put("ownerId", ownerId);
         change.put("startDate", startDate);
         change.put("endDate", endDate);
+        change.put("allowedMutations", CompletionContract.allowedMutations());
         if (incoming != null) change.put("fieldValues", incoming);
         return support.preview(request, name(), "保存节点详情并完成研发事项流程节点", change,
                 List.of("负责人、排期和动态字段会与节点推进在同一事务中提交"), REFRESH,
@@ -94,7 +95,9 @@ public class CompleteDevelopmentItemNodeWithDataCommand implements PmsCommand {
         workflowService.updateNode(type, itemSupport.itemId(args), itemSupport.nodeId(args), update);
         DevelopmentItemWorkflowDetailDTO detail = workflowService.completeNode(
                 type, itemSupport.itemId(args), itemSupport.nodeId(args));
-        return support.result(operation, "研发事项节点详情已保存并完成", Map.of("workflow", detail), REFRESH);
+        return support.result(operation, "研发事项节点详情已保存并完成", Map.of(
+                "workflow", detail,
+                "allowedMutations", CompletionContract.allowedMutations()), REFRESH);
     }
 
     private Map<String, JsonNode> mergeFieldValues(DevelopmentItemWorkflowNodeDTO node,

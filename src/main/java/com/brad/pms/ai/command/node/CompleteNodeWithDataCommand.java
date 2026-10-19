@@ -101,6 +101,7 @@ public class CompleteNodeWithDataCommand implements PmsCommand {
         change.put("fromEndDate", node.getEndDate());
         change.put("toStartDate", startDate);
         change.put("toEndDate", endDate);
+        change.put("allowedMutations", CompletionContract.allowedMutations());
         change.put("projectVersion", project.getVersion());
         change.put("nodeVersion", node.getVersion());
 
@@ -162,6 +163,7 @@ public class CompleteNodeWithDataCommand implements PmsCommand {
         data.put("workbench", workbench.key());
         data.put("document", document);
         data.put("nodes", nodes);
+        data.put("allowedMutations", CompletionContract.allowedMutations());
         return new CommandResult(operation.getId(), "SUCCEEDED", "节点详情已保存并完成", data, REFRESH_SCOPES);
     }
 

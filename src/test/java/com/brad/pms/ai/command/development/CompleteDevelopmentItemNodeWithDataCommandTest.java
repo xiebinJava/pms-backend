@@ -58,7 +58,8 @@ class CompleteDevelopmentItemNodeWithDataCommandTest {
                 .containsEntry("ownerId", 2L)
                 .containsEntry("startDate", LocalDate.of(2026, 10, 10))
                 .containsEntry("endDate", LocalDate.of(2026, 10, 20))
-                .containsEntry("completionMode", "AUTO_CONFIRM");
+                .containsEntry("completionMode", "AUTO_CONFIRM")
+                .containsEntry("allowedMutations", List.of("status", "ownerId", "startDate", "endDate"));
         assertThat(preview.changes().get(0)).containsKey("fieldValues");
     }
 
@@ -113,7 +114,10 @@ class CompleteDevelopmentItemNodeWithDataCommandTest {
                 "ownerId", 2L, "startDate", "2026-10-10", "endDate", "2026-10-20",
                 "fieldValues", Map.of("businessResult", "已完成"))));
 
-        command.execute(operation);
+        var result = command.execute(operation);
+
+        assertThat(result.data().get("allowedMutations"))
+                .isEqualTo(List.of("status", "ownerId", "startDate", "endDate"));
 
         verify(workflowService).updateNode(org.mockito.ArgumentMatchers.eq(DevelopmentItemType.STORY),
                 org.mockito.ArgumentMatchers.eq(34L), org.mockito.ArgumentMatchers.eq(383L),

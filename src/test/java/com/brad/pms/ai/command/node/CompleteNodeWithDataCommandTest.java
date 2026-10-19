@@ -67,6 +67,8 @@ class CompleteNodeWithDataCommandTest {
             assertThat(change).containsEntry("nodeVersion", 4);
             assertThat(change).containsEntry("workbenchVersion", 9);
             assertThat(change).containsEntry("completionMode", "REQUIRES_DOMAIN_CONFIRMATION");
+            assertThat(change.get("allowedMutations"))
+                    .isEqualTo(List.of("status", "ownerId", "startDate", "endDate"));
             assertThat(change.get("fieldVersions")).isEqualTo(Map.of("productSolution", 2));
         });
     }
@@ -96,6 +98,8 @@ class CompleteNodeWithDataCommandTest {
         CommandResult result = command().execute(operation);
 
         assertThat(result.status()).isEqualTo("SUCCEEDED");
+        assertThat(result.data().get("allowedMutations"))
+                .isEqualTo(List.of("status", "ownerId", "startDate", "endDate"));
         var order = inOrder(workbench, nodeService);
         order.verify(workbench).write(22L, 7L, Map.of("productSolution", "新方案"));
         order.verify(workbench).confirmForCompletion(22L, 7L);
