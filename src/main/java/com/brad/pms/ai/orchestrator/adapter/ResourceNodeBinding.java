@@ -15,6 +15,7 @@ public record ResourceNodeBinding(
         Long nodeId,
         Long nodeVersion,
         String componentKey,
+        String label,
         Map<String, Object> saveContract,
         List<String> writableFields,
         List<String> protectedFields,

@@ -16,7 +16,7 @@ import java.util.Set;
  * saveContracts are counted, the first array element is never selected
  * implicitly, and project entity versions are never used as node versions.
  */
-final class ResourceNodeBindingResolver {
+public final class ResourceNodeBindingResolver {
 
     private ResourceNodeBindingResolver() {
     }
@@ -86,8 +86,10 @@ final class ResourceNodeBindingResolver {
         Integer workflowInstanceVersion = context.meta() == null ? null : context.meta().workflowInstanceVersion();
         Integer componentVersion = selected.versions() == null ? null : selected.versions().get("content");
         Long contextVersion = context.version() == null ? null : context.version().longValue();
+        String label = selected.label() == null || selected.label().isBlank()
+                ? node.label() : selected.label();
         return new ResourceNodeBinding(context.resourceType(), context.resourceId(), nodeId,
-                resolvedNodeVersion, selected.key(), saveContract, writableFields, protectedFields,
+                resolvedNodeVersion, selected.key(), label, saveContract, writableFields, protectedFields,
                 true, entityVersion, workflowInstanceVersion, componentVersion, contextVersion);
     }
 
@@ -141,7 +143,7 @@ final class ResourceNodeBindingResolver {
         return List.copyOf(unique);
     }
 
-    static List<String> strings(Object value) {
+    public static List<String> strings(Object value) {
         if (!(value instanceof List<?> list)) return List.of();
         List<String> result = new ArrayList<>();
         for (Object item : list) {

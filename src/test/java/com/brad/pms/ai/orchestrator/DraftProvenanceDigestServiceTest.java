@@ -105,7 +105,7 @@ class DraftProvenanceDigestServiceTest {
         assertThat(withConfidence.get(0)).containsOnlyKeys("text", "sourceRefs", "confidence");
 
         Map<String, Object> snapshot = DraftProvenanceDigestService.versionSnapshot(
-                new ResourceNodeBinding("project", 42L, 301L, 6L, "solution-design", Map.of(),
+                new ResourceNodeBinding("project", 42L, 301L, 6L, "solution-design", "方案", Map.of(),
                         List.of("testResult"), List.of(), true, null, null, null, null));
         assertThat(snapshot).containsOnlyKeys(
                 "nodeVersion", "entityVersion", "workflowInstanceVersion", "componentVersion", "contextVersion");

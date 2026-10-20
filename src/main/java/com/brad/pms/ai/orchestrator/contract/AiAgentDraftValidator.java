@@ -184,7 +184,8 @@ public class AiAgentDraftValidator {
     }
 
     private void validateItems(List<AgentDraftItem> items, String field,
-                               List<DraftValidationResult.ValidationError> errors) {        if (items == null) {
+                               List<DraftValidationResult.ValidationError> errors) {
+        if (items == null) {
             errors.add(error("MISSING_FIELD", "draft." + field, field + " 不能为空"));
             return;
         }

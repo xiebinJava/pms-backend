@@ -7,6 +7,10 @@ import com.brad.pms.ai.command.OperationExecuteRequest;
 import com.brad.pms.ai.connector.context.ContextReadOptions;
 import com.brad.pms.ai.orchestrator.api.AiOrchestratorRequest;
 import com.brad.pms.ai.orchestrator.api.AiOrchestratorResponse;
+import com.brad.pms.ai.orchestrator.adapter.ResourceNodeBinding;
+import com.brad.pms.ai.orchestrator.adapter.ResourceNodeBindingResolver;
+import com.brad.pms.ai.orchestrator.adapter.ResourceOrchestratorAdapter;
+import com.brad.pms.ai.orchestrator.adapter.ResourceOrchestratorAdapterRegistry;
 import com.brad.pms.ai.orchestrator.connector.AiConnectorPort;
 import com.brad.pms.ai.orchestrator.contract.AgentDraft;
 import com.brad.pms.ai.orchestrator.contract.AiAgentDraftValidator;
@@ -58,6 +62,9 @@ public class AiOrchestratorService {
     private static final String NEEDS_INPUT = "NEEDS_INPUT";
     private static final String STORY_CONTRACT_VERSION = "story-workbench/v1";
     private static final String STORY_INTENT = "STORY_NODE_FIELD_UPDATE";
+    private static final String RESOURCE_NODE_CONTRACT_VERSION = "resource-node/v1";
+    private static final String RESOURCE_NODE_FIELD_UPDATE_INTENT = "RESOURCE_NODE_FIELD_UPDATE";
+    private static final String RESOURCE_NODE_COMPLETE_INTENT = "RESOURCE_NODE_COMPLETE";
     private static final java.util.Set<String> NODE_ID_KEYS = Set.of(
             "nodeId", "contextVersion", "resourceId", "resourceType", "version", "__components");
 
@@ -71,6 +78,7 @@ public class AiOrchestratorService {
     private final AiOrchestratorVerificationService verificationService;
     private final ObjectMapper objectMapper;
     private final StoryNodeContractResolver storyNodeContractResolver;
+    private final ResourceOrchestratorAdapterRegistry resourceAdapterRegistry;
 
     @Autowired
     public AiOrchestratorService(AiConversationMapper conversationMapper,
@@ -81,9 +89,11 @@ public class AiOrchestratorService {
                                  AiConnectorPort connectorPort,
                                  AiAgentDraftValidator draftValidator,
                                  AiOrchestratorVerificationService verificationService,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 ResourceOrchestratorAdapterRegistry resourceAdapterRegistry) {
         this(conversationMapper, turnMapper, planMapper, eventMapper, operationMapper, connectorPort,
-                draftValidator, verificationService, objectMapper, new StoryNodeContractResolver());
+                draftValidator, verificationService, objectMapper, new StoryNodeContractResolver(),
+                resourceAdapterRegistry);
     }
 
     public AiOrchestratorService(AiConversationMapper conversationMapper,
@@ -95,7 +105,8 @@ public class AiOrchestratorService {
                                  AiAgentDraftValidator draftValidator,
                                  AiOrchestratorVerificationService verificationService,
                                  ObjectMapper objectMapper,
-                                 StoryNodeContractResolver storyNodeContractResolver) {
+                                 StoryNodeContractResolver storyNodeContractResolver,
+                                 ResourceOrchestratorAdapterRegistry resourceAdapterRegistry) {
         this.conversationMapper = conversationMapper;
         this.turnMapper = turnMapper;
         this.planMapper = planMapper;
@@ -106,6 +117,22 @@ public class AiOrchestratorService {
         this.verificationService = verificationService;
         this.objectMapper = objectMapper;
         this.storyNodeContractResolver = storyNodeContractResolver;
+        this.resourceAdapterRegistry = resourceAdapterRegistry;
+    }
+
+    /** Requirement/story-only constructor kept for existing tests; project/topic routing is empty. */
+    public AiOrchestratorService(AiConversationMapper conversationMapper,
+                          AiConversationTurnMapper turnMapper,
+                          AiPlanMapper planMapper,
+                          AiOperationEventMapper eventMapper,
+                          AiOperationMapper operationMapper,
+                          AiConnectorPort connectorPort,
+                          AiAgentDraftValidator draftValidator,
+                          AiOrchestratorVerificationService verificationService,
+                          ObjectMapper objectMapper) {
+        this(conversationMapper, turnMapper, planMapper, eventMapper, operationMapper, connectorPort,
+                draftValidator, verificationService, objectMapper, new StoryNodeContractResolver(),
+                new ResourceOrchestratorAdapterRegistry(List.of()));
     }
 
     @Transactional
@@ -117,8 +144,8 @@ public class AiOrchestratorService {
             throw BusinessException.error("资源类型和资源 ID 必须为有效值");
         }
         String resourceType = normalizeResourceType(command.resourceType());
-        if (!List.of("requirement", "story").contains(resourceType)) {
-            throw BusinessException.error("当前编排器只支持 requirement 或 story 资源");
+        if (!List.of("requirement", "story", "project", "topic").contains(resourceType)) {
+            throw BusinessException.error("当前编排器只支持 requirement、story、project 或 topic 资源");
         }
         AiConversationDO conversation = new AiConversationDO();
         conversation.setUserId(userId);
@@ -148,6 +175,9 @@ public class AiOrchestratorService {
 
         if ("story".equals(conversation.getResourceType())) {
             return appendStoryTurn(userId, conversation, command);
+        }
+        if (resourceAdapterRegistry.find(conversation.getResourceType()).isPresent()) {
+            return appendResourceNodeTurn(userId, conversation, command);
         }
 
         AiWorkflowContextDTO context = connectorPort.readContext(
@@ -282,6 +312,163 @@ public class AiOrchestratorService {
         }
         return planView(plan, context, validatedDraft, null, null, null, validation.errors(),
                 ResourceNodeContract.from(contract), missingFields, questions(missingFields));
+    }
+
+    /**
+     * Routes a project/topic resource-node turn through the adapter registry.
+     * The intent derives from the draft: requestedCompletion=true means
+     * RESOURCE_NODE_COMPLETE, everything else stays RESOURCE_NODE_FIELD_UPDATE.
+     * REJECTED is never persisted as a plan status; completion semantics are
+     * exposed only at the progression-run boundary.
+     */
+    private AiOrchestratorResponse.PlanView appendResourceNodeTurn(
+            Long userId, AiConversationDO conversation,
+            AiOrchestratorRequest.AppendTurnCommand command) {
+        if (!RESOURCE_NODE_CONTRACT_VERSION.equals(command.contractVersion())
+                || !RESOURCE_NODE_CONTRACT_VERSION.equals(command.draft().contractVersion())) {
+            throw BusinessException.error("项目/专题节点只支持 " + RESOURCE_NODE_CONTRACT_VERSION + " 契约");
+        }
+        if (command.nodeId() == null || command.nodeId() <= 0) {
+            throw BusinessException.error("资源节点 turn 必须提供正整数 nodeId");
+        }
+        AiPlanDO latestPlan = planMapper.selectLatestByConversationUser(conversation.getId(), userId);
+        if (latestPlan != null && !terminalPlan(latestPlan.getStatus())
+                && latestPlan.getNodeId() != null && !Objects.equals(latestPlan.getNodeId(), command.nodeId())) {
+            throw BusinessException.conflict("CONVERSATION_TARGET_MISMATCH: 当前会话仍在推进另一个资源节点");
+        }
+
+        ResourceOrchestratorAdapter adapter = resourceAdapterRegistry.require(conversation.getResourceType());
+        AiWorkflowContextDTO context = connectorPort.readContext(
+                conversation.getResourceType(), conversation.getResourceId(),
+                new ContextReadOptions(ContextReadOptions.VIEW_FOCUSED, command.nodeId(),
+                        command.componentKey()));
+        validateResourceNodeContextTarget(conversation, context);
+        ResourceNodeBinding binding = adapter.resolveBinding(
+                context, command.nodeId(), command.componentKey(), command.nodeVersion());
+
+        String intent = Boolean.TRUE.equals(command.draft().draft() == null ? null
+                : command.draft().draft().requestedCompletion())
+                ? RESOURCE_NODE_COMPLETE_INTENT : RESOURCE_NODE_FIELD_UPDATE_INTENT;
+        AgentDraft validatedDraft = mergePendingResourceNodePatch(latestPlan, command.draft(), binding);
+        DraftValidationResult validation = adapter.validateDraft(validatedDraft, context, binding);
+        if (!validation.valid()) {
+            throw BusinessException.error("资源节点 Agent Draft 校验失败: " + validation.errorCodes());
+        }
+        List<String> missingFields = resourceNodeMissingFields(binding, validatedDraft.draft().patch());
+
+        AiConversationTurnDO turn = new AiConversationTurnDO();
+        turn.setConversationId(conversation.getId());
+        turn.setRole("AGENT");
+        turn.setMessageText(command.message().trim());
+        turn.setRequestId(command.requestId());
+        turn.setDraftJson(write(command.draft()));
+        turnMapper.insert(turn);
+        if (turn.getId() == null) throw BusinessException.error("保存 AI 会话轮次失败");
+
+        AiPlanDO plan = new AiPlanDO();
+        plan.setConversationId(conversation.getId());
+        plan.setTurnId(turn.getId());
+        plan.setIntent(intent);
+        plan.setResourceType(conversation.getResourceType());
+        plan.setResourceId(conversation.getResourceId());
+        plan.setNodeId(binding.nodeId());
+        plan.setNodeVersion(binding.nodeVersion());
+        plan.setComponentKey(binding.componentKey());
+        plan.setContextVersion(binding.contextVersion());
+        plan.setContextSnapshotJson(write(context));
+        plan.setDraftJson(write(validatedDraft));
+        plan.setStatus(missingFields.isEmpty() ? PLAN_READY : NEEDS_INPUT);
+        if (!missingFields.isEmpty()) {
+            plan.setErrorCode("RESOURCE_NODE_MISSING_INPUT");
+            plan.setErrorMessage("资源节点仍缺少必填字段: " + String.join(", ", missingFields));
+        }
+        plan.setCreatedAt(LocalDateTime.now());
+        plan.setUpdatedAt(LocalDateTime.now());
+        planMapper.insert(plan);
+        if (plan.getId() == null) throw BusinessException.error("创建 AI 执行计划失败");
+
+        appendEvent(plan, null, AiOrchestratorEventType.CONTEXT_READ,
+                Map.of("resourceType", plan.getResourceType(), "resourceId", plan.getResourceId(),
+                        "nodeId", plan.getNodeId(), "componentKey", plan.getComponentKey()));
+        appendEvent(plan, null, AiOrchestratorEventType.DRAFT_VALIDATED,
+                Map.of("contractVersion", command.draft().contractVersion(), "intent", intent));
+        if (missingFields.isEmpty()) {
+            appendEvent(plan, null, AiOrchestratorEventType.PLAN_CREATED,
+                    Map.of("intent", plan.getIntent(), "nodeId", plan.getNodeId()));
+        } else {
+            appendEvent(plan, null, AiOrchestratorEventType.INPUT_REQUIRED,
+                    Map.of("code", "RESOURCE_NODE_MISSING_INPUT", "missingFields", missingFields));
+        }
+        return planView(plan, context, validatedDraft, null, null, null, validation.errors(),
+                adapter.nodeContract(binding), missingFields, resourceNodeQuestions(missingFields));
+    }
+
+    private void validateResourceNodeContextTarget(AiConversationDO conversation,
+                                                   AiWorkflowContextDTO context) {
+        if (context == null || !Objects.equals(context.resourceType(), conversation.getResourceType())
+                || !Objects.equals(context.resourceId(), conversation.getResourceId())) {
+            throw BusinessException.notFound("资源节点上下文不存在");
+        }
+        if (context.currentNode() == null || context.currentNode().id() == null) {
+            throw BusinessException.error("CAPABILITY_UNAVAILABLE: 上下文没有当前节点");
+        }
+    }
+
+    /**
+     * NEEDS_INPUT 续轮语义 for resource nodes: only patch entries still inside
+     * the current saveContract writable set are carried into the new Plan; the
+     * previous Plan JSON and status remain unchanged.
+     */
+    private AgentDraft mergePendingResourceNodePatch(AiPlanDO latestPlan, AgentDraft submitted,
+                                                     ResourceNodeBinding binding) {
+        if (latestPlan == null || !NEEDS_INPUT.equals(latestPlan.getStatus())
+                || !Objects.equals(latestPlan.getNodeId(), binding.nodeId())
+                || latestPlan.getDraftJson() == null) {
+            return submitted;
+        }
+        AgentDraft previous = readDraft(latestPlan);
+        if (!RESOURCE_NODE_CONTRACT_VERSION.equals(previous.contractVersion())
+                || previous.draft() == null || submitted.draft() == null) {
+            return submitted;
+        }
+        Map<String, Object> previousPatch = previous.draft().patch() == null ? Map.of() : previous.draft().patch();
+        Set<String> writable = Set.copyOf(binding.writableFields());
+        Set<String> protectedFields = Set.copyOf(binding.protectedFields());
+        Map<String, Object> merged = submitted.draft().patch() == null
+                ? new LinkedHashMap<>() : new LinkedHashMap<>(submitted.draft().patch());
+        for (Map.Entry<String, Object> entry : previousPatch.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (key == null || value == null || protectedFields.contains(key)
+                    || ResourceNodeBinding.NODE_POSITIONING_KEYS.contains(key)
+                    || !writable.contains(key)
+                    || (value instanceof String text && text.isBlank())
+                    || carriesNoValue(value)) {
+                continue;
+            }
+            merged.putIfAbsent(key, value);
+        }
+        return new AgentDraft(submitted.contractVersion(), new AgentDraft.DraftPayload(
+                submitted.draft().facts(), submitted.draft().inferences(), submitted.draft().assumptions(),
+                submitted.draft().unresolvedDecisions(), merged,
+                submitted.draft().requestedCompletion(), submitted.draft().fieldSources()));
+    }
+
+    private List<String> resourceNodeMissingFields(ResourceNodeBinding binding, Map<String, Object> patch) {
+        List<String> required = ResourceNodeBindingResolver.strings(binding.saveContract().get("requiredFields"));
+        if (required.isEmpty()) return List.of();
+        Map<String, Object> values = patch == null ? Map.of() : patch;
+        return required.stream()
+                .filter(field -> {
+                    Object value = values.get(field);
+                    return value == null || (value instanceof String text && text.isBlank())
+                            || carriesNoValue(value);
+                })
+                .toList();
+    }
+
+    private List<String> resourceNodeQuestions(List<String> missingFields) {
+        return missingFields.stream().map(field -> "请补充必填字段：" + field).toList();
     }
 
     /**
