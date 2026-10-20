@@ -13,6 +13,7 @@ import com.brad.pms.ai.orchestrator.contract.AiAgentDraftValidator;
 import com.brad.pms.ai.orchestrator.contract.DraftValidationResult;
 import com.brad.pms.ai.orchestrator.contract.StoryNodeContract;
 import com.brad.pms.ai.orchestrator.contract.StoryNodeContractResolver;
+import com.brad.pms.ai.orchestrator.contract.ResourceNodeContract;
 import com.brad.pms.ai.orchestrator.domain.AiOrchestratorEventType;
 import com.brad.pms.ai.orchestrator.domain.AiOrchestratorState;
 import com.brad.pms.ai.orchestrator.persistence.AiConversationDO;
@@ -280,7 +281,7 @@ public class AiOrchestratorService {
                     Map.of("code", "STORY_MISSING_INPUT", "missingFields", missingFields));
         }
         return planView(plan, context, validatedDraft, null, null, null, validation.errors(),
-                contract, missingFields, questions(missingFields));
+                ResourceNodeContract.from(contract), missingFields, questions(missingFields));
     }
 
     /**
@@ -698,7 +699,7 @@ public class AiOrchestratorService {
             List<String> missing = storyNodeContractResolver.missingFields(context, resolution.contract(),
                     draft == null || draft.draft() == null ? Map.of() : draft.draft().patch());
             return planView(plan, context, draft, preview, operation, verification, validationErrors,
-                    resolution.contract(), missing, questions(missing));
+                    ResourceNodeContract.from(resolution.contract()), missing, questions(missing));
         } catch (RuntimeException exception) {
             return planView(plan, context, draft, preview, operation, verification, validationErrors);
         }
@@ -718,14 +719,15 @@ public class AiOrchestratorService {
                                                       AiOperationResultDTO operation,
                                                       AiOrchestratorResponse.VerificationView verification,
                                                       List<DraftValidationResult.ValidationError> validationErrors,
-                                                      StoryNodeContract nodeContract,
+                                                      ResourceNodeContract nodeContract,
                                                       List<String> missingFields,
                                                       List<String> questions) {
         return new AiOrchestratorResponse.PlanView(plan.getId(), plan.getTurnId(), plan.getIntent(), plan.getStatus(),
                 plan.getResourceType(), plan.getResourceId(), plan.getNodeId(), plan.getContextVersion(),
                 context, draft, preview, operation, verification, validationErrors,
                 plan.getErrorCode(), plan.getErrorMessage(), nodeContract, missingFields, questions,
-                plan.getIdempotencyKey(), plan.getConfirmedAt(), plan.getExecutedAt());
+                plan.getIdempotencyKey(), plan.getConfirmedAt(), plan.getExecutedAt(),
+                plan.getNodeVersion(), plan.getComponentKey());
     }
 
     private List<String> questions(List<String> missingFields) {

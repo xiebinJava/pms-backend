@@ -19,6 +19,8 @@ public class AiPlanDO {
     private String resourceType;
     private Long resourceId;
     private Long nodeId;
+    private Long nodeVersion;
+    private String componentKey;
     private Long contextVersion;
     private String contextSnapshotJson;
     private String draftJson;

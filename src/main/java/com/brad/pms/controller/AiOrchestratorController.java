@@ -45,7 +45,8 @@ public class AiOrchestratorController {
         return ResponseResult.success(service.appendTurn(UserContext.userId(), conversationId,
                 request == null ? null : new AiOrchestratorRequest.AppendTurnCommand(
                         request.message(), request.contractVersion(), request.draft(), request.nodeId(),
-                        request.contextVersion(), request.requestId())));
+                        request.contextVersion(), request.requestId(),
+                        request.nodeVersion(), request.componentKey())));
     }
 
     @PostMapping("/plans/{planId}/preview")

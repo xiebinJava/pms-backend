@@ -2,7 +2,7 @@ package com.brad.pms.ai.orchestrator.api;
 
 import com.brad.pms.ai.orchestrator.contract.AgentDraft;
 import com.brad.pms.ai.orchestrator.contract.DraftValidationResult;
-import com.brad.pms.ai.orchestrator.contract.StoryNodeContract;
+import com.brad.pms.ai.orchestrator.contract.ResourceNodeContract;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.brad.pms.integration.ai.api.AiOperationPreviewDTO;
 import com.brad.pms.integration.ai.api.AiOperationResultDTO;
@@ -42,12 +42,14 @@ public final class AiOrchestratorResponse {
             List<DraftValidationResult.ValidationError> validationErrors,
             String errorCode,
             String errorMessage,
-            @JsonInclude(JsonInclude.Include.NON_NULL) StoryNodeContract nodeContract,
+            @JsonInclude(JsonInclude.Include.NON_NULL) ResourceNodeContract nodeContract,
             @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> missingFields,
             @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> questions,
             @JsonInclude(JsonInclude.Include.NON_NULL) String idempotencyKey,
             @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime confirmedAt,
-            @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime executedAt) {
+            @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime executedAt,
+            @JsonInclude(JsonInclude.Include.NON_NULL) Long nodeVersion,
+            @JsonInclude(JsonInclude.Include.NON_NULL) String componentKey) {
 
         public PlanView {
             validationErrors = validationErrors == null ? List.of() : List.copyOf(validationErrors);
@@ -74,7 +76,7 @@ public final class AiOrchestratorResponse {
                 String errorMessage) {
             this(planId, turnId, intent, status, resourceType, resourceId, nodeId, contextVersion,
                     contextSnapshot, draft, preview, operation, verification, validationErrors,
-                    errorCode, errorMessage, null, List.of(), List.of(), null, null, null);
+                    errorCode, errorMessage, null, List.of(), List.of(), null, null, null, null, null);
         }
     }
 

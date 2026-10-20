@@ -16,7 +16,9 @@ public final class AiOrchestratorRequest {
             AgentDraft draft,
             Long nodeId,
             Long contextVersion,
-            String requestId) {
+            String requestId,
+            Long nodeVersion,
+            String componentKey) {
     }
 
     public record ConfirmPlanRequest(String idempotencyKey) {
@@ -31,6 +33,8 @@ public final class AiOrchestratorRequest {
             AgentDraft draft,
             Long nodeId,
             Long contextVersion,
-            String requestId) {
+            String requestId,
+            Long nodeVersion,
+            String componentKey) {
     }
 }

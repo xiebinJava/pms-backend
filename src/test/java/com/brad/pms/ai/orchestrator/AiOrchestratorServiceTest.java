@@ -103,7 +103,7 @@ class AiOrchestratorServiceTest {
                 new AiOrchestratorRequest.CreateConversationCommand("requirement", 33L));
         AiOrchestratorResponse.PlanView prepared = service.appendTurn(7L, created.conversationId(),
                 new AiOrchestratorRequest.AppendTurnCommand("请分析并保存", "requirement-analysis/v1",
-                        draft, 375L, 4L, "request-1"));
+                        draft, 375L, 4L, "request-1", null, null));
         AiOrchestratorResponse.PlanView planned = service.preview(7L, prepared.planId());
         AiOrchestratorResponse.PlanView executed = service.confirm(7L, planned.planId(), "idem-1");
 
@@ -131,7 +131,7 @@ class AiOrchestratorServiceTest {
 
         assertThatThrownBy(() -> service.appendTurn(7L, 10L,
                 new AiOrchestratorRequest.AppendTurnCommand("分析", "requirement-analysis/v1", draft,
-                        375L, 4L, "request-1")))
+                        375L, 4L, "request-1", null, null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("UNKNOWN_SOURCE_REF");
         verify(connectorPort, never()).preview(any());
@@ -365,7 +365,7 @@ class AiOrchestratorServiceTest {
                 new AiOrchestratorRequest.CreateConversationCommand("story", 34L));
         AiOrchestratorResponse.PlanView result = service.appendTurn(7L, created.conversationId(),
                 new AiOrchestratorRequest.AppendTurnCommand("补充开发信息", "story-workbench/v1",
-                        draft, 702L, 8L, "story-turn-1"));
+                        draft, 702L, 8L, "story-turn-1", null, null));
 
         assertThat(result.status()).isEqualTo("NEEDS_INPUT");
         assertThat(result.errorCode()).isEqualTo("STORY_MISSING_INPUT");
@@ -407,14 +407,14 @@ class AiOrchestratorServiceTest {
                 new AiOrchestratorRequest.CreateConversationCommand("story", 34L));
         AiOrchestratorResponse.PlanView firstTurn = service.appendTurn(7L, created.conversationId(),
                 new AiOrchestratorRequest.AppendTurnCommand("补充实现说明", "story-workbench/v1",
-                        storyDraft(Map.of("implementationNote", "先写实现说明")), 702L, 8L, "story-turn-first"));
+                        storyDraft(Map.of("implementationNote", "先写实现说明")), 702L, 8L, "story-turn-first", null, null));
         assertThat(firstTurn.status()).isEqualTo("NEEDS_INPUT");
         AiPlanDO needsInputPlan = storedPlans.get(0);
         String needsInputDraftJson = needsInputPlan.getDraftJson();
 
         AiOrchestratorResponse.PlanView secondTurn = service.appendTurn(7L, created.conversationId(),
                 new AiOrchestratorRequest.AppendTurnCommand("补充自测结果", "story-workbench/v1",
-                        storyDraft(Map.of("selfTestResult", "通过")), 702L, 8L, "story-turn-second"));
+                        storyDraft(Map.of("selfTestResult", "通过")), 702L, 8L, "story-turn-second", null, null));
 
         assertThat(secondTurn.status()).isEqualTo("PLAN_READY");
         assertThat(secondTurn.errorCode()).isNull();
@@ -441,7 +441,7 @@ class AiOrchestratorServiceTest {
 
         assertThatThrownBy(() -> service.appendTurn(7L, 10L,
                 new AiOrchestratorRequest.AppendTurnCommand("切换节点", "story-workbench/v1",
-                        storyDraft(Map.of("implementationNote", "x")), 702L, 8L, "story-turn-2")))
+                        storyDraft(Map.of("implementationNote", "x")), 702L, 8L, "story-turn-2", null, null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("CONVERSATION_TARGET_MISMATCH");
         verify(connectorPort, never()).readContext(any(), any(), any());
@@ -501,7 +501,7 @@ class AiOrchestratorServiceTest {
                 new AiOrchestratorRequest.CreateConversationCommand("story", 34L));
         AiOrchestratorResponse.PlanView prepared = service.appendTurn(7L, created.conversationId(),
                 new AiOrchestratorRequest.AppendTurnCommand("完成开发节点", "story-workbench/v1",
-                        draft, 702L, 8L, "story-turn-3"));
+                        draft, 702L, 8L, "story-turn-3", null, null));
         AiOrchestratorResponse.PlanView planned = service.preview(7L, prepared.planId());
 
         ArgumentCaptor<CommandPreviewRequest> request = ArgumentCaptor.forClass(CommandPreviewRequest.class);

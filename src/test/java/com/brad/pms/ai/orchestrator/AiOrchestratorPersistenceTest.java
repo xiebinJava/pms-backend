@@ -79,8 +79,28 @@ class AiOrchestratorPersistenceTest {
     }
 
     @Test
-    void migrationContainsUserIsolationAndEventSequenceConstraints() throws IOException {
+    void migrationAddsNullableProjectTopicBindingsWithoutNewTables() throws IOException {
         String migration;
+        try (InputStream stream = getClass().getResourceAsStream(
+                "/db/migration/V73__ai_orchestrator_project_topic_binding.sql")) {
+            assertThat(stream).as("V73 migration").isNotNull();
+            migration = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertThat(migration)
+                .contains("ALTER TABLE pms_ai_plan")
+                .contains("ADD COLUMN node_version BIGINT NULL")
+                .contains("ADD COLUMN component_key VARCHAR(160) NULL")
+                .doesNotContain("CREATE TABLE");
+    }
+
+    @Test
+    void planEntityCarriesProjectTopicBindings() throws NoSuchFieldException {
+        assertThat(AiPlanDO.class.getDeclaredField("nodeVersion").getType()).isEqualTo(Long.class);
+        assertThat(AiPlanDO.class.getDeclaredField("componentKey").getType()).isEqualTo(String.class);
+    }
+
+    @Test
+    void migrationContainsUserIsolationAndEventSequenceConstraints() throws IOException {        String migration;
         try (InputStream stream = getClass().getResourceAsStream("/db/migration/V70__ai_orchestrator.sql")) {
             assertThat(stream).as("V70 migration").isNotNull();
             migration = new String(stream.readAllBytes(), StandardCharsets.UTF_8);

@@ -81,4 +81,41 @@ class AiOrchestratorStateTest {
                 .hasMessageContaining("SUCCEEDED")
                 .hasMessageContaining("CONTEXT_READ");
     }
+
+    @Test
+    void keepsTheFrozenStateSetWithoutActOrRejectedStates() {
+        assertThat(AiOrchestratorState.values())
+                .extracting(AiOrchestratorState::name)
+                .containsExactly(
+                        "RECEIVED",
+                        "CONTEXT_READY",
+                        "DRAFT_VALIDATED",
+                        "NEEDS_INPUT",
+                        "PLAN_READY",
+                        "PREVIEWED",
+                        "WAITING_CONFIRMATION",
+                        "EXECUTING",
+                        "VERIFYING",
+                        "WRITE_RESULT_UNKNOWN",
+                        "SUCCEEDED",
+                        "FAILED",
+                        "CONFLICT",
+                        "CANCELLED")
+                .doesNotContain("ACTIVE", "REJECTED");
+    }
+
+    @Test
+    void needsInputNeverLoopsBackIntoTheStateMachine() {
+        assertThatThrownBy(() -> AiOrchestratorState.NEEDS_INPUT.transition(
+                AiOrchestratorEventType.CONTEXT_READ))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> AiOrchestratorState.NEEDS_INPUT.transition(
+                AiOrchestratorEventType.DRAFT_VALIDATED))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> AiOrchestratorState.NEEDS_INPUT.transition(
+                AiOrchestratorEventType.VERIFICATION_FINISHED))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(AiOrchestratorState.NEEDS_INPUT.transition(AiOrchestratorEventType.CONFLICT))
+                .isEqualTo(AiOrchestratorState.CONFLICT);
+    }
 }
