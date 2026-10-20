@@ -91,6 +91,37 @@ class AiOperationContractAuditTest {
     }
 
     @Test
+    void returnsPmsOwnedExpectedVersionsFromTheValidatedPreviewChanges() {
+        AiOperationMapper mapper = mock(AiOperationMapper.class);
+        PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);
+        when(mapper.insert(any(AiOperationDO.class))).thenReturn(1);
+        when(contractRegistry.isCommandAllowed(null, null, "node.complete-with-data")).thenReturn(true);
+        AiOperationService service = new AiOperationService(
+                mapper, mock(PmsCommandRegistry.class), new ObjectMapper().findAndRegisterModules(), contractRegistry);
+        CommandPreviewRequest request = new CommandPreviewRequest(
+                CommandName.NODE_COMPLETE_WITH_DATA,
+                Map.of("projectId", 22L, "nodeId", 31L),
+                "project-22", "context-v7");
+        CommandPreview proposal = new CommandPreview(
+                "ignored", CommandName.NODE_COMPLETE_WITH_DATA, Instant.now().plusSeconds(60),
+                "context-v7", List.of(), List.of(Map.of(
+                        "projectVersion", 12,
+                        "nodeVersion", 4,
+                        "workbenchVersion", 3,
+                        "fieldVersions", Map.of("testResult", 2))), List.of("project-detail"));
+
+        CommandPreview persisted = service.persistPreview(7L, request, proposal);
+
+        assertThat(persisted.expectedVersions()).containsEntry("contextVersion", "context-v7")
+                .containsEntry("entityVersion", 12)
+                .containsEntry("nodeVersion", 4)
+                .containsEntry("componentVersion", 3)
+                .containsEntry("fieldVersions", Map.of("testResult", 2));
+        assertThat(com.brad.pms.integration.ai.api.AiOperationPreviewDTO.from(persisted).expectedVersions())
+                .isEqualTo(persisted.expectedVersions());
+    }
+
+    @Test
     void refusesToExecuteAPreviewAfterItsContractVersionIsNoLongerCurrent() {
         AiOperationMapper mapper = mock(AiOperationMapper.class);
         PmsAgentContractRegistry contractRegistry = mock(PmsAgentContractRegistry.class);

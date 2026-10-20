@@ -12,6 +12,7 @@ public record AiOperationPreviewDTO(
         String command,
         Instant expiresAt,
         String contextVersion,
+        Map<String, Object> expectedVersions,
         List<String> warnings,
         List<Map<String, Object>> changes,
         List<String> refreshScopes,
@@ -27,7 +28,8 @@ public record AiOperationPreviewDTO(
             List<String> warnings,
             List<Map<String, Object>> changes,
             List<String> refreshScopes) {
-        this(operationId, command, expiresAt, contextVersion, warnings, changes, refreshScopes, List.of(), null, null);
+        this(operationId, command, expiresAt, contextVersion, Map.of(), warnings, changes, refreshScopes,
+                List.of(), null, null);
     }
 
     public AiOperationPreviewDTO(
@@ -39,7 +41,8 @@ public record AiOperationPreviewDTO(
             List<Map<String, Object>> changes,
             List<String> refreshScopes,
             List<CommandPreview.Precondition> preconditions) {
-        this(operationId, command, expiresAt, contextVersion, warnings, changes, refreshScopes, preconditions, null, null);
+        this(operationId, command, expiresAt, contextVersion, Map.of(), warnings, changes, refreshScopes,
+                preconditions, null, null);
     }
 
     public static AiOperationPreviewDTO from(CommandPreview preview) {
@@ -48,6 +51,7 @@ public record AiOperationPreviewDTO(
                 preview.command().code(),
                 preview.expiresAt(),
                 preview.contextVersion(),
+                preview.expectedVersions(),
                 preview.warnings(),
                 preview.changes(),
                 preview.refreshScopes(),
