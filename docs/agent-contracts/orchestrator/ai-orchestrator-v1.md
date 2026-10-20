@@ -18,13 +18,13 @@
   → 返回有序进度事件和最终结果
 ```
 
-第一期只支持 `requirement.analysis.save`，用于验证“自然语言准备成果并保存到当前需求节点”这一垂直场景。模型仍由 Claude、Codex、DeepSeek 或其他外部 Agent 持有；后端不保存模型密钥，也不直接调用模型。
+当前 Orchestrator 保留需求分析和故事节点的既有路径，并扩展 `project/topic` 的资源节点会话路径，用于验证“自然语言读取上下文、生成节点草稿、预览、确认、执行和回读”的统一闭环。模型仍由 Claude、Codex、DeepSeek 或其他外部 Agent 持有；后端不保存模型密钥，也不直接调用模型。
 
 ## 范围和非目标
 
 范围：会话、轮次、上下文快照、结构化 Agent Draft、预览、确认、执行、事件和回读验证。
 
-非目标：完整聊天 UI、SSE、自动推进项目节点、多 Agent 调度、模型供应商平台、微服务拆分、复制一套 PMS 业务规则。
+非目标：完整聊天 UI、SSE、跨资源事务、多 Agent 调度、模型供应商平台、微服务拆分、复制一套 PMS 业务规则。
 
 ## 领域对象和状态
 
@@ -32,7 +32,7 @@
 
 - `Conversation`：一个用户围绕一个 PMS 资源进行的协作会话。
 - `Turn`：用户消息或 Agent 草稿的一次输入记录。
-- `Intent`：第一期固定为 `REQUIREMENT_ANALYSIS_SAVE`。
+- `Intent`：按资源和动作映射为 `READ_CONTEXT`、`UPDATE_NODE_FIELDS`、`COMPLETE_NODE`；需求分析保存继续使用既有 `REQUIREMENT_ANALYSIS_SAVE`。
 - `ContextSnapshot`：由 PMS 当前上下文接口返回的 JSON、资源版本、当前节点和读取时间。
 - `Plan`：把一个已验证意图绑定到具体资源、节点、版本和结构化补丁。
 - `Preview`：既有 Connector/PMS 命令生成的变更预览，作为确认依据。
@@ -40,14 +40,14 @@
 - `OperationEvent`：按序记录上下文读取、预览、执行和验证阶段。
 - `Verification`：执行后重新读取资源和上下文，并判断目标补丁是否已生效、受保护字段是否未变。
 
-### Plan 状态
+### Plan 状态（状态与事件分开定义）
 
 ```text
 RECEIVED
   → CONTEXT_READY
   → DRAFT_VALIDATED
-  → PLAN_READY           （需求分析路径）
-  → NEEDS_INPUT          （故事路径：缺少必填字段；当前 Plan 终态，补充信息生成新 Plan）
+  → PLAN_READY
+  → NEEDS_INPUT          （当前 Plan 终态；补充信息后生成新 Plan，不在状态机内回环）
   → PREVIEWED
   → WAITING_CONFIRMATION
   → EXECUTING
@@ -56,7 +56,7 @@ RECEIVED
   → WRITE_RESULT_UNKNOWN （回读无法证明写入结果；只能用原幂等键重新读取验证）
 ```
 
-终态还包括 `FAILED`、`CONFLICT`、`CANCELLED`。旧版本执行必须进入 `CONFLICT`，不自动刷新、不自动重试。
+终态还包括 `FAILED`、`CONFLICT`、`CANCELLED`。旧版本执行必须进入 `CONFLICT`，不自动刷新、不自动重试。`NEEDS_INPUT` 的多轮续接由服务层合并新一轮 patch 并创建不可变的新 Plan 实现，不能把它画成状态机回环。
 
 ### 事件类型
 
@@ -68,7 +68,28 @@ RECEIVED
 
 ## Agent Draft 契约
 
-契约版本固定为 `requirement-analysis/v1`，与 Connector 的 `AgentDraftContract` 对齐：
+需求分析继续使用 `requirement-analysis/v1`；project/topic 的节点会话使用 Connector 的 `resource-node/v1` 草稿契约。两者都由外部 Agent 生成、由 PMS 校验，不能混用字段形状。
+
+`resource-node/v1` 的核心形状为：
+
+```json
+{
+  "contractVersion": "resource-node/v1",
+  "resourceType": "project",
+  "intent": "UPDATE_NODE_FIELDS",
+  "nodeId": "node-123",
+  "nodeVersion": 7,
+  "componentKey": "project-basic-info",
+  "fieldChanges": [{"fieldKey": "description", "value": "...", "sourceRefs": ["project:42"]}],
+  "requestedCompletion": false,
+  "facts": [],
+  "inferences": [],
+  "assumptions": [],
+  "unresolvedDecisions": []
+}
+```
+
+需求分析的既有形状如下：
 
 ```json
 {
@@ -103,6 +124,18 @@ public interface AiConnectorPort {
 
 适配器只能调用现有 `AiWorkflowContextReadService`、`CommandPreviewService`、`CommandExecutionService` 或其现有安全入口，不能直接访问业务 Mapper。
 
+资源与命令映射固定如下：
+
+| 资源 | READ_CONTEXT | UPDATE_NODE_FIELDS | COMPLETE_NODE |
+| --- | --- | --- | --- |
+| project | focused context + `project_node` capability | `node.field.update`；`project-basic-info` 走 `project.update` | `node.complete-with-data` |
+| requirement | focused context + development-item capability | `development-item.node.field.update` | `development-item.node.complete-with-data` |
+| topic | focused context + development-item capability | `development-item.node.field.update` | `development-item.node.complete-with-data` |
+| story | focused context + story workbench binding | `development-item.node.field.update`（workbench variant） | `development-item.node.complete-with-data` / workbench `completionCommand` |
+
+可写组件选择遵循统一 resolver：恰好一个可写 `saveContract` 时可省略
+`componentKey`；多个必须显式指定，否则返回 `CAPABILITY_UNAVAILABLE`；零个只阻止写入意图，读取仍返回 `writeCapable=false`。project/topic 没有声明的 `fieldContracts` 不得由 Orchestrator 伪造，必填信息只从后端 preview preconditions 或当前组件合同得出。
+
 ## HTTP 协议（v1）
 
 路由统一使用 `/integration/ai/v1/orchestrator`：
@@ -113,7 +146,7 @@ POST /conversations
   result: { conversationId, status }
 
 POST /conversations/{conversationId}/turns
-  body: { message, contractVersion, draft, nodeId, contextVersion, requestId }
+  body: { message, contractVersion, draft, nodeId, nodeVersion, componentKey, contextVersion, requestId }
   result: { turnId, planId, status, contextSnapshot, validationErrors }
 
 POST /plans/{planId}/preview
@@ -145,14 +178,15 @@ CLI 进程恢复已持久化的确认事实；这些字段不替代 Connector �
 ## 安全、失败和一致性
 
 1. 读取、预览和执行都经过现有 scope/policy 检查；没有权限时不返回资源正文或可推断的敏感字段。
-2. 计划保存的 `context_version` 是执行时的预期版本；版本变化返回 `CONFLICT`，不会产生第二次业务写入。
-3. 写入成功但回读无法证明时，计划进入 `WRITE_RESULT_UNKNOWN`（事件 `READBACK_UNKNOWN`），不能伪报成功；该状态下只能使用原幂等键重新读取并验证，不得以新幂等键再次写入。回读证明受保护字段被改变或 patch 未生效时同样算未能证明，交由用户处置或明确失败，不把执行响应直接当成功。
-4. 事件写入和状态推进在同一事务内完成；外部命令执行在独立的 REQUIRES_NEW 事务中落盘 operation 结果（保证崩溃后可从持久化事实恢复），幂等键预留与业务写入回滚在一起。
-5. 模型配置不进入 PMS Backend 或生产 CLI；外部 Agent 只提交结构化 Draft，后端只验证和编排。
+2. `contextVersion` 是需求/故事兼容的关联字段和快照标签；project/topic 上只作快照标签，不能拿它代替节点并发版本。真正的并发保护由 preview 捕获的版本轴决定：project 的实体版本、节点 `nodeContract.version`、组件/字段版本（若声明）；topic 的流程/节点版本以及后端实际声明的其他版本轴。节点写入的 `nodeVersion` 必须来自当前 `nodeContract`。
+3. 计划保存的版本快照必须进入 provenance/digest 绑定；任何版本轴变化返回 `CONFLICT`，不会产生第二次业务写入。
+4. 写入成功但回读无法证明时，计划进入 `WRITE_RESULT_UNKNOWN`（事件 `READBACK_UNKNOWN`），不能伪报成功；该状态下只能使用原幂等键重新读取并验证，不得以新幂等键再次写入。回读证明受保护字段被改变或 patch 未生效时同样算未能证明，交由用户处置或明确失败，不把执行响应直接当成功。
+5. 事件写入和状态推进在同一事务内完成；外部命令执行在独立的 REQUIRES_NEW 事务中落盘 operation 结果（保证崩溃后可从持久化事实恢复），幂等键预留与业务写入回滚在一起。
+6. 模型配置不进入 PMS Backend 或生产 CLI；外部 Agent 只提交结构化 Draft，后端只验证和编排。
 
 ## 验收标准
 
-- 一条有效 Draft 能从 turn 走到 `WAITING_CONFIRMATION`，预览展示当前节点、版本和变更。
+- 一条有效 Draft 能从 turn 走到 `WAITING_CONFIRMATION`，预览展示当前节点、版本轴和变更；project 的 `project-basic-info` 仍走 `project.update`，不伪装成节点字段写入。
 - 用户确认后执行成功，回读内容包含目标 patch，当前节点和受保护字段保持不变。
 - 相同幂等键重放不产生第二次业务效果。
 - 使用旧版本和新幂等键返回 `409 CONFLICT`，不产生第二次业务效果。
