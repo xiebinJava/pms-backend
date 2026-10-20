@@ -17,6 +17,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -38,21 +39,25 @@ public class AiOrchestratorVerificationService {
             AiWorkflowContextDTO after = connectorPort.readContext(
                     plan.getResourceType(), plan.getResourceId(),
                     new ContextReadOptions(ContextReadOptions.VIEW_FOCUSED, plan.getNodeId(),
-                            "story".equalsIgnoreCase(plan.getResourceType()) ? STORY_NODE_WORKBENCH : null));
+                            focusedComponentKey(plan)));
 
             boolean resourceReadback = resource != null
                     && Objects.equals(resource.resourceType(), plan.getResourceType())
                     && Objects.equals(resource.resourceId(), plan.getResourceId());
             boolean contextReadback = after != null
                     && Objects.equals(after.resourceType(), plan.getResourceType())
-                    && Objects.equals(after.resourceId(), plan.getResourceId());
+                    && Objects.equals(after.resourceId(), plan.getResourceId())
+                    && resourceContextMatches(plan, after);
+            Set<String> allowedMutations = allowedMutations(operation);
             boolean protectedFieldsUnchanged = contextReadback
                     && storyContextMatches(plan, after)
-                    && unchangedWorkflowState(before, after)
-                    && storyProtectedFieldsUnchanged(plan, before, after)
+                    && unchangedWorkflowState(plan, before, after, allowedMutations)
+                    && storyProtectedFieldsUnchanged(plan, before, after, allowedMutations)
+                    && resourceProtectedFieldsUnchanged(plan, before, after, allowedMutations)
                     && versionDidNotMoveBack(plan, after);
             Map<String, Object> resourceDetails = resource == null ? null : resource.details();
-            boolean patchApplied = "SUCCEEDED".equals(operation == null ? null : operation.status())
+            boolean patchApplied = resourceReadback && contextReadback
+                    && "SUCCEEDED".equals(operation == null ? null : operation.status())
                     && patchInReadback(plan, after, resourceDetails, draft.draft().patch());
 
             if (!resourceReadback || !contextReadback) {
@@ -73,6 +78,12 @@ public class AiOrchestratorVerificationService {
         }
     }
 
+    private String focusedComponentKey(AiPlanDO plan) {
+        if ("story".equalsIgnoreCase(plan.getResourceType())) return STORY_NODE_WORKBENCH;
+        if (isResourceNodePlan(plan)) return plan.getComponentKey();
+        return null;
+    }
+
     private boolean versionDidNotMoveBack(AiPlanDO plan, AiWorkflowContextDTO after) {
         if ("story".equalsIgnoreCase(plan.getResourceType())) {
             AiWorkflowContextDTO.Node node = after == null || after.workflow() == null ? null
@@ -83,24 +94,35 @@ public class AiOrchestratorVerificationService {
                     && Objects.equals(after.version(), node.version())
                     && plan.getContextVersion() != null && after.version() >= plan.getContextVersion();
         }
-        return after.version() != null && plan.getContextVersion() != null
-                && after.version() >= plan.getContextVersion();
+        if (after == null || after.version() == null || plan.getContextVersion() == null
+                || after.version() < plan.getContextVersion()) return false;
+        if (isResourceNodePlan(plan)) {
+            AiWorkflowContextDTO.Node node = findNode(after, plan.getNodeId());
+            return node != null && node.version() != null && plan.getNodeVersion() != null
+                    && node.version() >= plan.getNodeVersion();
+        }
+        return true;
     }
 
-    private boolean unchangedWorkflowState(AiWorkflowContextDTO before, AiWorkflowContextDTO after) {
+    private boolean unchangedWorkflowState(AiPlanDO plan, AiWorkflowContextDTO before,
+                                           AiWorkflowContextDTO after, Set<String> allowedMutations) {
         if (before == null || after == null) return false;
+        if (isResourceNodePlan(plan)) {
+            AiWorkflowContextDTO.Node beforeNode = findNode(before, plan.getNodeId());
+            AiWorkflowContextDTO.Node afterNode = findNode(after, plan.getNodeId());
+            return beforeNode != null && afterNode != null
+                    && protectedDetailsEqual(before.resourceDetails(), after.resourceDetails(), allowedMutations)
+                    && nodeProtectedFieldsEqual(beforeNode, afterNode, allowedMutations);
+        }
         if (!Objects.equals(nodeId(before), nodeId(after))
                 || !Objects.equals(nodeKey(before), nodeKey(after))) {
             return false;
         }
-        if (!protectedDetailsEqual(before.resourceDetails(), after.resourceDetails())) return false;
+        if (!protectedDetailsEqual(before.resourceDetails(), after.resourceDetails(), allowedMutations)) return false;
         AiWorkflowContextDTO.Node beforeNode = selectedNode(before);
         AiWorkflowContextDTO.Node afterNode = selectedNode(after);
         return beforeNode != null && afterNode != null
-                && Objects.equals(beforeNode.status(), afterNode.status())
-                && Objects.equals(beforeNode.ownerId(), afterNode.ownerId())
-                && Objects.equals(beforeNode.startDate(), afterNode.startDate())
-                && Objects.equals(beforeNode.endDate(), afterNode.endDate());
+                && nodeProtectedFieldsEqual(beforeNode, afterNode, allowedMutations);
     }
 
     private Long nodeId(AiWorkflowContextDTO context) {
@@ -118,13 +140,26 @@ public class AiOrchestratorVerificationService {
                 .findFirst().orElse(null);
     }
 
-    private boolean protectedDetailsEqual(Map<String, Object> before, Map<String, Object> after) {
+    private boolean protectedDetailsEqual(Map<String, Object> before, Map<String, Object> after,
+                                          Set<String> allowedMutations) {
         if (before == null || after == null) return false;
         for (String key : new String[]{"systemId", "targetType", "targetId", "title", "baseTitle",
                 "topicId", "baseTopicId", "ownerId", "status", "developmentStatus", "startDate",
                 "endDate", "dueDate"}) {
+            if (allowedMutations.contains(key)) continue;
             if (!Objects.equals(before.get(key), after.get(key))) return false;
         }
+        return true;
+    }
+
+    private boolean nodeProtectedFieldsEqual(AiWorkflowContextDTO.Node before,
+                                             AiWorkflowContextDTO.Node after,
+                                             Set<String> allowedMutations) {
+        if (before == null || after == null) return false;
+        if (!allowedMutations.contains("status") && !Objects.equals(before.status(), after.status())) return false;
+        if (!allowedMutations.contains("ownerId") && !Objects.equals(before.ownerId(), after.ownerId())) return false;
+        if (!allowedMutations.contains("startDate") && !Objects.equals(before.startDate(), after.startDate())) return false;
+        if (!allowedMutations.contains("endDate") && !Objects.equals(before.endDate(), after.endDate())) return false;
         return true;
     }
 
@@ -167,7 +202,8 @@ public class AiOrchestratorVerificationService {
 
     private boolean storyProtectedFieldsUnchanged(AiPlanDO plan,
                                                   AiWorkflowContextDTO before,
-                                                  AiWorkflowContextDTO after) {
+                                                  AiWorkflowContextDTO after,
+                                                  Set<String> allowedMutations) {
         if (!"story".equalsIgnoreCase(plan.getResourceType())) return true;
         AiWorkflowContextDTO.Component beforeComponent = storyComponent(before, plan.getNodeId());
         AiWorkflowContextDTO.Component afterComponent = storyComponent(after, plan.getNodeId());
@@ -177,11 +213,44 @@ public class AiOrchestratorVerificationService {
         if (!(rawProtected instanceof List<?> protectedFields)) return false;
         for (Object field : protectedFields) {
             if (!(field instanceof String key) || key.isBlank()) continue;
+            if (allowedMutations.contains(key)) continue;
             JsonNode beforeValue = value(beforeComponent.content(), key);
             JsonNode afterValue = value(afterComponent.content(), key);
             if (!Objects.equals(beforeValue, afterValue)) return false;
         }
         return true;
+    }
+
+    private boolean resourceProtectedFieldsUnchanged(AiPlanDO plan,
+                                                     AiWorkflowContextDTO before,
+                                                     AiWorkflowContextDTO after,
+                                                     Set<String> allowedMutations) {
+        if (!isResourceNodePlan(plan)) return true;
+        AiWorkflowContextDTO.Component beforeComponent = resourceComponent(before, plan);
+        AiWorkflowContextDTO.Component afterComponent = resourceComponent(after, plan);
+        if (beforeComponent == null || afterComponent == null) return false;
+        List<String> protectedFields = resourceProtectedFields(beforeComponent, afterComponent);
+        for (String field : protectedFields) {
+            if (allowedMutations.contains(field)) continue;
+            Object beforeValue = resourceField(before, beforeComponent, plan.getNodeId(), field);
+            Object afterValue = resourceField(after, afterComponent, plan.getNodeId(), field);
+            if (beforeValue == null && afterValue == null) continue;
+            if (!Objects.equals(beforeValue, afterValue)) return false;
+        }
+        return true;
+    }
+
+    private List<String> resourceProtectedFields(AiWorkflowContextDTO.Component before,
+                                                  AiWorkflowContextDTO.Component after) {
+        java.util.LinkedHashSet<String> fields = new java.util.LinkedHashSet<>();
+        for (AiWorkflowContextDTO.Component component : List.of(before, after)) {
+            if (component.saveContract() == null) continue;
+            Object raw = component.saveContract().get("protectedFields");
+            if (raw instanceof List<?> list) {
+                list.stream().filter(String.class::isInstance).map(String.class::cast).forEach(fields::add);
+            }
+        }
+        return List.copyOf(fields);
     }
 
     private boolean patchInReadback(AiPlanDO plan,
@@ -193,7 +262,85 @@ public class AiOrchestratorVerificationService {
             AiWorkflowContextDTO.Component component = storyComponent(after, plan.getNodeId());
             return component != null && containsPatch(component.content(), objectMapper.valueToTree(patch));
         }
+        if (isResourceNodePlan(plan)) {
+            AiWorkflowContextDTO.Component component = resourceComponent(after, plan);
+            return component != null && containsPatch(componentContent(after, component, plan.getNodeId()), patch);
+        }
         return containsPatch(resourceDetails, patch) || containsPatchInWorkflowComponents(after, patch);
+    }
+
+    private boolean resourceContextMatches(AiPlanDO plan, AiWorkflowContextDTO context) {
+        if (!isResourceNodePlan(plan)) return true;
+        AiWorkflowContextDTO.Node node = findNode(context, plan.getNodeId());
+        if (node == null || node.version() == null || plan.getNodeVersion() == null
+                || node.version() < plan.getNodeVersion()) return false;
+        if (!Objects.equals(plan.getIntent(), "RESOURCE_NODE_COMPLETE")
+                && (context.currentNode() == null || !Objects.equals(context.currentNode().id(), plan.getNodeId()))) {
+            return false;
+        }
+        return resourceComponent(context, plan) != null;
+    }
+
+    private boolean isResourceNodePlan(AiPlanDO plan) {
+        return plan != null && ("project".equalsIgnoreCase(plan.getResourceType())
+                || "topic".equalsIgnoreCase(plan.getResourceType()));
+    }
+
+    private AiWorkflowContextDTO.Node findNode(AiWorkflowContextDTO context, Long nodeId) {
+        if (context == null || context.workflow() == null || nodeId == null) return null;
+        return context.workflow().nodes().stream()
+                .filter(node -> node != null && Objects.equals(node.id(), nodeId))
+                .findFirst().orElse(null);
+    }
+
+    private AiWorkflowContextDTO.Component resourceComponent(AiWorkflowContextDTO context, AiPlanDO plan) {
+        AiWorkflowContextDTO.Node node = findNode(context, plan.getNodeId());
+        if (node == null || plan.getComponentKey() == null) return null;
+        return node.components().stream()
+                .filter(component -> component != null && Objects.equals(component.key(), plan.getComponentKey()))
+                .findFirst().orElse(null);
+    }
+
+    private Map<String, Object> componentContent(AiWorkflowContextDTO context,
+                                                 AiWorkflowContextDTO.Component component,
+                                                 Long nodeId) {
+        if (component.content() != null && component.content().isObject()) {
+            return objectMapper.convertValue(component.content(), Map.class);
+        }
+        AiWorkflowContextDTO.Node node = findNode(context, nodeId);
+        Object path = component.saveContract() == null ? null : component.saveContract().get("fieldValuesPath");
+        if (node != null && path instanceof String text && node.fieldValues() != null) {
+            Object current = node.fieldValues();
+            for (String segment : text.split("\\.")) {
+                if (!(current instanceof Map<?, ?> values)) return Map.of();
+                current = values.get(segment);
+            }
+            if (current instanceof Map<?, ?> values) return objectMapper.convertValue(values, Map.class);
+        }
+        return Map.of();
+    }
+
+    private Object resourceField(AiWorkflowContextDTO context,
+                                 AiWorkflowContextDTO.Component component,
+                                 Long nodeId,
+                                 String field) {
+        if (context.resourceDetails() != null && context.resourceDetails().containsKey(field)) {
+            return context.resourceDetails().get(field);
+        }
+        return componentContent(context, component, nodeId).get(field);
+    }
+
+    private Set<String> allowedMutations(AiOperationResultDTO operation) {
+        if (operation == null || operation.data() == null) return Set.of();
+        Object raw = operation.data().get("allowedMutations");
+        if (raw instanceof List<?> list) {
+            return list.stream().filter(String.class::isInstance).map(String.class::cast).collect(java.util.stream.Collectors.toSet());
+        }
+        if (raw instanceof Map<?, ?> map) {
+            return map.keySet().stream().filter(String.class::isInstance).map(String.class::cast)
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+        return Set.of();
     }
 
     private boolean containsPatchInWorkflowComponents(AiWorkflowContextDTO context,

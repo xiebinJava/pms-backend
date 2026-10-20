@@ -162,12 +162,80 @@ class AiOrchestratorVerificationServiceTest {
         assertThat(result.protectedFieldsUnchanged()).isFalse();
     }
 
+    @Test
+    void verifiesAProjectPatchOnlyFromTheSelectedNodeComponent() throws Exception {
+        AiWorkflowContextDTO before = projectContext(Map.of(), Map.of("status", "OPEN"), 6);
+        AiWorkflowContextDTO after = projectContext(Map.of("evidence", "已完成"),
+                Map.of("status", "OPEN"), 7);
+        AiPlanDO plan = projectPlan(before, 6L, "solution-design");
+        AgentDraft draft = resourceDraft(Map.of("evidence", "已完成"));
+        when(connectorPort.readResource("project", 42L)).thenReturn(
+                new AiResourceDetailDTO("project", 42L, 4, Map.of("title", "项目", "status", "OPEN")));
+        when(connectorPort.readContext(any(), any(), any())).thenReturn(after);
+
+        var result = service.verify(plan, draft, new AiOperationResultDTO(
+                "op-project", "SUCCEEDED", "已保存", Map.of(), List.of()));
+
+        assertThat(result.status()).isEqualTo("SUCCEEDED");
+        verify(connectorPort).readContext("project", 42L, new ContextReadOptions(
+                ContextReadOptions.VIEW_FOCUSED, 301L, "solution-design"));
+    }
+
+    @Test
+    void rejectsAProjectPatchReadbackFromAnotherComponent() throws Exception {
+        AiWorkflowContextDTO before = projectContext(Map.of(), Map.of("status", "OPEN"), 6);
+        AiWorkflowContextDTO after = projectContext(Map.of(), Map.of("status", "OPEN"), 7,
+                Map.of("evidence", "已完成"));
+        AiPlanDO plan = projectPlan(before, 6L, "solution-design");
+        AgentDraft draft = resourceDraft(Map.of("evidence", "已完成"));
+        when(connectorPort.readResource("project", 42L)).thenReturn(
+                new AiResourceDetailDTO("project", 42L, 4, Map.of("title", "项目", "status", "OPEN")));
+        when(connectorPort.readContext(any(), any(), any())).thenReturn(after);
+
+        var result = service.verify(plan, draft, new AiOperationResultDTO(
+                "op-project", "SUCCEEDED", "已保存", Map.of(), List.of()));
+
+        assertThat(result.status()).isEqualTo("WRITE_RESULT_UNKNOWN");
+        assertThat(result.patchApplied()).isFalse();
+    }
+
+    @Test
+    void rejectsAProjectReadbackFromAStaleNodeVersion() throws Exception {
+        AiWorkflowContextDTO before = projectContext(Map.of(), Map.of("status", "OPEN"), 6);
+        AiWorkflowContextDTO after = projectContext(
+                Map.of("evidence", "已完成"), Map.of("status", "OPEN"), 5);
+        AiPlanDO plan = projectPlan(before, 6L, "solution-design");
+        AgentDraft draft = resourceDraft(Map.of("evidence", "已完成"));
+        when(connectorPort.readResource("project", 42L)).thenReturn(
+                new AiResourceDetailDTO("project", 42L, 4, Map.of("title", "项目", "status", "OPEN")));
+        when(connectorPort.readContext(any(), any(), any())).thenReturn(after);
+
+        var result = service.verify(plan, draft, new AiOperationResultDTO(
+                "op-project", "SUCCEEDED", "已保存", Map.of(), List.of()));
+
+        assertThat(result.status()).isEqualTo("WRITE_RESULT_UNKNOWN");
+        assertThat(result.patchApplied()).isFalse();
+    }
+
     private AiPlanDO storyPlan(AiWorkflowContextDTO context, long version) throws Exception {
         AiPlanDO plan = new AiPlanDO();
         plan.setResourceType("story");
         plan.setResourceId(34L);
         plan.setNodeId(701L);
         plan.setContextVersion(version);
+        plan.setContextSnapshotJson(objectMapper.writeValueAsString(context));
+        return plan;
+    }
+
+    private AiPlanDO projectPlan(AiWorkflowContextDTO context, long nodeVersion, String componentKey)
+            throws Exception {
+        AiPlanDO plan = new AiPlanDO();
+        plan.setResourceType("project");
+        plan.setResourceId(42L);
+        plan.setNodeId(301L);
+        plan.setNodeVersion(nodeVersion);
+        plan.setComponentKey(componentKey);
+        plan.setContextVersion(3L);
         plan.setContextSnapshotJson(objectMapper.writeValueAsString(context));
         return plan;
     }
@@ -200,6 +268,13 @@ class AiOrchestratorVerificationServiceTest {
                 List.of(), List.of(), List.of(), List.of(), patch));
     }
 
+    private AgentDraft resourceDraft(Map<String, Object> patch) {
+        return new AgentDraft("resource-node/v1", new AgentDraft.DraftPayload(
+                List.of(), List.of(), List.of(), List.of(), patch, false,
+                Map.of("evidence", Map.of("sourceType", "pms_context", "sourceRefs", List.of(
+                        "project-node:301#component:solution-design"), "confidence", "high"))));
+    }
+
     private AiWorkflowContextDTO requirementContext(Map<String, Object> content,
                                                     int contextVersion, int nodeVersion) {
         var component = new AiWorkflowContextDTO.Component(
@@ -213,5 +288,34 @@ class AiOrchestratorVerificationServiceTest {
                 new AiWorkflowContextDTO.Workflow(1L, 1, List.of(node)),
                 List.of("requirement.analysis.save"), 5,
                 Map.of("title", "需求", "status", "OPEN"), List.of(), null);
+    }
+
+    private AiWorkflowContextDTO projectContext(Map<String, Object> selectedContent,
+                                                Map<String, Object> resourceDetails,
+                                                int nodeVersion) {
+        return projectContext(selectedContent, resourceDetails, nodeVersion, Map.of());
+    }
+
+    private AiWorkflowContextDTO projectContext(Map<String, Object> selectedContent,
+                                                Map<String, Object> resourceDetails,
+                                                int nodeVersion,
+                                                Map<String, Object> otherContent) {
+        var selected = new AiWorkflowContextDTO.Component(
+                "solution-design", "方案", List.of(), List.of(), null,
+                objectMapper.valueToTree(selectedContent), "LOADED", Map.of("content", nodeVersion),
+                Map.of("nodeVersion", 6, "componentKey", "solution-design",
+                        "writableFields", List.of("evidence"), "protectedFields", List.of("status")));
+        var other = new AiWorkflowContextDTO.Component(
+                "other", "其他", List.of(), List.of(), null,
+                objectMapper.valueToTree(otherContent), "LOADED", Map.of("content", nodeVersion),
+                Map.of("nodeVersion", 6, "componentKey", "other",
+                        "writableFields", List.of("evidence"), "protectedFields", List.of("status")));
+        var node = new AiWorkflowContextDTO.Node(301L, "solution", "方案", 0, 1,
+                List.of(selected, other), List.of(), Map.of(), nodeVersion, null, null, null, null,
+                null, null, null, "LOADED", null, null);
+        return new AiWorkflowContextDTO("project", 42L, 3,
+                new AiWorkflowContextDTO.CurrentNode(301L, "solution", "方案"),
+                new AiWorkflowContextDTO.Workflow(1L, 1, List.of(node)),
+                List.of("node.field.update"), 4, resourceDetails, List.of(), null);
     }
 }

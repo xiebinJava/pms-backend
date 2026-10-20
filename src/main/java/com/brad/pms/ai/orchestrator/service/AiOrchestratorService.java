@@ -28,6 +28,7 @@ import com.brad.pms.ai.orchestrator.persistence.AiOperationEventDO;
 import com.brad.pms.ai.orchestrator.persistence.AiOperationEventMapper;
 import com.brad.pms.ai.orchestrator.persistence.AiPlanDO;
 import com.brad.pms.ai.orchestrator.persistence.AiPlanMapper;
+import com.brad.pms.ai.orchestrator.provenance.DraftProvenanceDigestService;
 import com.brad.pms.common.exception.BusinessException;
 import com.brad.pms.entity.AiOperationDO;
 import com.brad.pms.integration.ai.api.AiOperationPreviewDTO;
@@ -79,6 +80,7 @@ public class AiOrchestratorService {
     private final ObjectMapper objectMapper;
     private final StoryNodeContractResolver storyNodeContractResolver;
     private final ResourceOrchestratorAdapterRegistry resourceAdapterRegistry;
+    private final DraftProvenanceDigestService provenanceDigestService;
 
     @Autowired
     public AiOrchestratorService(AiConversationMapper conversationMapper,
@@ -93,7 +95,7 @@ public class AiOrchestratorService {
                                  ResourceOrchestratorAdapterRegistry resourceAdapterRegistry) {
         this(conversationMapper, turnMapper, planMapper, eventMapper, operationMapper, connectorPort,
                 draftValidator, verificationService, objectMapper, new StoryNodeContractResolver(),
-                resourceAdapterRegistry);
+                resourceAdapterRegistry, new DraftProvenanceDigestService(objectMapper));
     }
 
     public AiOrchestratorService(AiConversationMapper conversationMapper,
@@ -106,7 +108,8 @@ public class AiOrchestratorService {
                                  AiOrchestratorVerificationService verificationService,
                                  ObjectMapper objectMapper,
                                  StoryNodeContractResolver storyNodeContractResolver,
-                                 ResourceOrchestratorAdapterRegistry resourceAdapterRegistry) {
+                                 ResourceOrchestratorAdapterRegistry resourceAdapterRegistry,
+                                 DraftProvenanceDigestService provenanceDigestService) {
         this.conversationMapper = conversationMapper;
         this.turnMapper = turnMapper;
         this.planMapper = planMapper;
@@ -118,6 +121,7 @@ public class AiOrchestratorService {
         this.objectMapper = objectMapper;
         this.storyNodeContractResolver = storyNodeContractResolver;
         this.resourceAdapterRegistry = resourceAdapterRegistry;
+        this.provenanceDigestService = provenanceDigestService;
     }
 
     /** Requirement/story-only constructor kept for existing tests; project/topic routing is empty. */
@@ -132,7 +136,7 @@ public class AiOrchestratorService {
                           ObjectMapper objectMapper) {
         this(conversationMapper, turnMapper, planMapper, eventMapper, operationMapper, connectorPort,
                 draftValidator, verificationService, objectMapper, new StoryNodeContractResolver(),
-                new ResourceOrchestratorAdapterRegistry(List.of()));
+                new ResourceOrchestratorAdapterRegistry(List.of()), new DraftProvenanceDigestService(objectMapper));
     }
 
     @Transactional
@@ -523,6 +527,10 @@ public class AiOrchestratorService {
         AgentDraft draft = readDraft(plan);
         CommandPreviewRequest request = commandRequest(plan, draft);
         AiOperationPreviewDTO preview = connectorPort.preview(request);
+        if (isResourceNodeIntent(plan.getIntent())) {
+            provenanceDigestService.verifyPreviewBinding(
+                    preview == null ? null : preview.operationId(), preview, request.provenance());
+        }
 
         AiOrchestratorState state = state(plan).transition(AiOrchestratorEventType.PREVIEW_CREATED)
                 .transition(AiOrchestratorEventType.WAITING_CONFIRMATION);
@@ -810,6 +818,30 @@ public class AiOrchestratorService {
 
     private CommandPreviewRequest commandRequest(AiPlanDO plan, AgentDraft draft) {
         Map<String, Object> arguments = new LinkedHashMap<>();
+        if (isResourceNodeIntent(plan.getIntent())) {
+            Map<String, Object> provenance = resourceProvenance(plan, draft);
+            boolean completion = RESOURCE_NODE_COMPLETE_INTENT.equals(plan.getIntent());
+            if ("project".equals(plan.getResourceType())) {
+                arguments.put("projectId", plan.getResourceId());
+                arguments.put("nodeId", plan.getNodeId());
+                arguments.put("workbench", plan.getComponentKey());
+                arguments.put("fields", draft.draft().patch());
+                return new CommandPreviewRequest(completion
+                        ? CommandName.NODE_COMPLETE_WITH_DATA : CommandName.NODE_FIELD_UPDATE,
+                        arguments, contextId(plan), String.valueOf(plan.getContextVersion()),
+                        null, null, provenance);
+            }
+            arguments.put("itemType", "TOPIC");
+            arguments.put("itemId", plan.getResourceId());
+            arguments.put("nodeId", plan.getNodeId());
+            arguments.put("version", plan.getNodeVersion());
+            arguments.put("fieldValues", draft.draft().patch());
+            return new CommandPreviewRequest(completion
+                    ? CommandName.DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA
+                    : CommandName.DEVELOPMENT_ITEM_NODE_FIELD_UPDATE,
+                    arguments, contextId(plan), String.valueOf(plan.getContextVersion()),
+                    null, null, provenance);
+        }
         if (STORY_INTENT.equals(plan.getIntent())) {
             arguments.put("itemType", "STORY");
             arguments.put("itemId", plan.getResourceId());
@@ -826,6 +858,33 @@ public class AiOrchestratorService {
         arguments.put("patch", draft.draft().patch());
         return new CommandPreviewRequest(CommandName.REQUIREMENT_ANALYSIS_SAVE, arguments,
                 contextId(plan), String.valueOf(plan.getContextVersion()));
+    }
+
+    private Map<String, Object> resourceProvenance(AiPlanDO plan, AgentDraft draft) {
+        if (draft == null || draft.draft() == null || draft.draft().fieldSources() == null) {
+            throw BusinessException.error("PROVENANCE_INVALID: 资源节点草稿缺少 fieldSources");
+        }
+        AiWorkflowContextDTO context = readContext(plan);
+        ResourceOrchestratorAdapter adapter = resourceAdapterRegistry.require(plan.getResourceType());
+        ResourceNodeBinding binding = adapter.resolveBinding(
+                context, plan.getNodeId(), plan.getComponentKey(), plan.getNodeVersion());
+        AgentDraft.DraftPayload payload = draft.draft();
+        DraftProvenanceDigestService.DigestInput input = new DraftProvenanceDigestService.DigestInput(
+                DraftProvenanceDigestService.CONTRACT_VERSION,
+                plan.getResourceType(), plan.getResourceId(), binding.nodeId(), binding.componentKey(),
+                plan.getIntent(), Boolean.TRUE.equals(payload.requestedCompletion()),
+                DraftProvenanceDigestService.versionSnapshot(binding),
+                DraftProvenanceDigestService.items(payload.facts()),
+                DraftProvenanceDigestService.items(payload.inferences()),
+                DraftProvenanceDigestService.items(payload.assumptions()),
+                DraftProvenanceDigestService.items(payload.unresolvedDecisions()),
+                payload.patch(), payload.fieldSources());
+        return provenanceDigestService.buildProvenance(input);
+    }
+
+    private boolean isResourceNodeIntent(String intent) {
+        return RESOURCE_NODE_FIELD_UPDATE_INTENT.equals(intent)
+                || RESOURCE_NODE_COMPLETE_INTENT.equals(intent);
     }
 
     private String contextId(AiPlanDO plan) {
@@ -879,6 +938,9 @@ public class AiOrchestratorService {
                                                            List<DraftValidationResult.ValidationError> validationErrors) {
         AiWorkflowContextDTO context = readContext(plan);
         if (!STORY_INTENT.equals(plan.getIntent())) {
+            if (isResourceNodeIntent(plan.getIntent())) {
+                return resourcePlanView(plan, context, draft, preview, operation, verification, validationErrors);
+            }
             return planView(plan, context, draft, preview, operation, verification, validationErrors);
         }
         try {
@@ -887,6 +949,28 @@ public class AiOrchestratorService {
                     draft == null || draft.draft() == null ? Map.of() : draft.draft().patch());
             return planView(plan, context, draft, preview, operation, verification, validationErrors,
                     ResourceNodeContract.from(resolution.contract()), missing, questions(missing));
+        } catch (RuntimeException exception) {
+            return planView(plan, context, draft, preview, operation, verification, validationErrors);
+        }
+    }
+
+    private AiOrchestratorResponse.PlanView resourcePlanView(
+            AiPlanDO plan,
+            AiWorkflowContextDTO context,
+            AgentDraft draft,
+            AiOperationPreviewDTO preview,
+            AiOperationResultDTO operation,
+            AiOrchestratorResponse.VerificationView verification,
+            List<DraftValidationResult.ValidationError> validationErrors) {
+        try {
+            ResourceOrchestratorAdapter adapter = resourceAdapterRegistry.require(plan.getResourceType());
+            ResourceNodeBinding binding = adapter.resolveBinding(
+                    context, plan.getNodeId(), plan.getComponentKey(), plan.getNodeVersion());
+            Map<String, Object> patch = draft == null || draft.draft() == null
+                    ? Map.of() : draft.draft().patch();
+            List<String> missingFields = resourceNodeMissingFields(binding, patch);
+            return planView(plan, context, draft, preview, operation, verification, validationErrors,
+                    adapter.nodeContract(binding), missingFields, resourceNodeQuestions(missingFields));
         } catch (RuntimeException exception) {
             return planView(plan, context, draft, preview, operation, verification, validationErrors);
         }
