@@ -164,6 +164,13 @@ GET /conversations/{conversationId}/events?afterSequence=0
 Session/latestPlan 同时返回 `idempotencyKey`、`confirmedAt` 和 `executedAt`，用于独立
 CLI 进程恢复已持久化的确认事实；这些字段不替代 Connector 的回读验证。
 
+Connector 的 `resource-orchestrator resume` 命令只读取上述会话和事件接口，
+并在 CLI 侧投影 `nextAction`。它不新增后端状态，也不创建 turn、preview、
+operation 或幂等键。`NEEDS_INPUT`、`WAITING_CONFIRMATION`、
+`WRITE_RESULT_UNKNOWN`、执行中状态和成功/取消终态分别映射为
+`PROVIDE_INPUT`、`CONFIRM`、`RETRY_SAME_IDEMPOTENCY`、`READ_RESULT` 和
+`NO_ACTION`；该投影不替代后端状态机或 preview 前置条件，也不单独授权写入。
+
 ## 持久化
 
 沿用现有 `pms_ai_operation`，新增四张表：
