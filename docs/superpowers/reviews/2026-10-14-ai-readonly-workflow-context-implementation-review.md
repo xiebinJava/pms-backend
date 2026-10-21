@@ -297,7 +297,7 @@ C 提交：b36e5e2 test/docs: record readonly context delivery evidence；B 提�
 
 ### 遗留清单（用户侧动作即可解锁）
 
-1. 重启 Spring（用最新 target/classes），env：DOCKER_HOST=unix:///Users/fs/.colima/fsclaw/docker.sock、
+1. 重启 Spring（用最新 target/classes），env：DOCKER_HOST=unix://$HOME/.colima/<profile>/docker.sock、
    TESTCONTAINERS_* 参照 Task 6（本地 MySQL 用 docker compose 起的桥接不需要容器）。
 2. `PMS_E2E_READONLY=true PMS_E2E_TOKEN=... PROJECT_SR_ID=... REQUIREMENT_SR_ID=... TOPIC_SR_ID=... STORY_SR_ID=...
    pnpm run verify:real-pms:readonly` 逐项核验显式 fixture。

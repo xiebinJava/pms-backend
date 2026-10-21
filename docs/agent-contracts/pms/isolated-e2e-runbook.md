@@ -25,7 +25,7 @@ export PMS_E2E_API_PORT=18080
 ## 2. 启动隔离服务
 
 ```bash
-cd /Users/fs/Desktop/Project/pms-backend
+cd pms-backend
 ./scripts/start-ai-e2e.sh
 ```
 
@@ -54,7 +54,7 @@ curl -sS "$PMS_E2E_BASE_URL/auth/me"
 然后在 Connector 仓库运行：
 
 ```bash
-cd /Users/fs/Desktop/Project/pms-ai-connector
+cd pms-cli
 PMS_E2E_CREATE_FIXTURE=true pnpm run verify:real-pms:analysis-save
 ```
 
@@ -65,7 +65,7 @@ PMS_E2E_CREATE_FIXTURE=true pnpm run verify:real-pms:analysis-save
 无论测试成功还是失败，都执行：
 
 ```bash
-cd /Users/fs/Desktop/Project/pms-backend
+cd pms-backend
 ./scripts/stop-ai-e2e.sh
 ```
 

@@ -35,7 +35,7 @@ export PMS_E2E_DB_URL='mysql://readonly_user:password@127.0.0.1:13306/pms_ai_e2e
 ## 运行
 
 ```bash
-cd /Users/fs/Desktop/Project/pms-ai-connector
+cd pms-cli
 pnpm run verify:real-pms:story-orchestrator --maxWorkers=1 --minWorkers=1
 ```
 

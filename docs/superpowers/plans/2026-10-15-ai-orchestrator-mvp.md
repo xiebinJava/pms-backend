@@ -31,9 +31,9 @@
 ### Task 1: 固化场景编排契约
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/scenario.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/index.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/requirement-analysis-contract.test.ts`
+- Create: `pms-cli/packages/pms-contracts/src/scenario.ts`
+- Modify: `pms-cli/packages/pms-contracts/src/index.ts`
+- Create: `pms-cli/tests/contract/requirement-analysis-contract.test.ts`
 
 **Interfaces:**
 - Consumes: 现有 `WorkflowContext`、`OperationPreview`、`OperationResult` 和 `ResourceDetail` 契约；草稿由外部 AI 工作台传入。
@@ -71,15 +71,15 @@
 ### Task 2: 将 AI 上下文改成稳定的快照读取边界
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextDataPort.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextReference.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/ReadAuthorizationSnapshot.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiWorkflowContextReadService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiProjectContextReader.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiDevelopmentContextReader.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextReadPolicy.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextReferenceProjector.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/connector/context/AiContextSnapshotContractTest.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextDataPort.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextReference.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/ReadAuthorizationSnapshot.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiWorkflowContextReadService.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiProjectContextReader.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiDevelopmentContextReader.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextReadPolicy.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiContextReferenceProjector.java`
+- Create: `pms-backend/src/test/java/com/brad/pms/ai/connector/context/AiContextSnapshotContractTest.java`
 
 **Interfaces:**
 - Consumes: 当前用户身份、`resourceType`、`resourceId`、现有 `ContextReadOptions`、项目/需求/专题/故事的只读查询。
@@ -120,9 +120,9 @@
 ### Task 3: 收敛现有需求分析场景，避免再造一套流程
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/AnalysisDraftValidator.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/requirementAnalysis.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/requirement-analysis-orchestrator.test.ts`
+- Create: `pms-cli/apps/pms-cli/src/commands/scenarios/AnalysisDraftValidator.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/requirementAnalysis.ts`
+- Create: `pms-cli/tests/unit/requirement-analysis-orchestrator.test.ts`
 
 **Interfaces:**
 - Consumes: Task 1 的 `RequirementAnalysisInput`、现有 `planRequirementAnalysisScenario`、`executeRequirementAnalysisScenario`、`PmsClient.get/context/preview/execute`。
@@ -166,10 +166,10 @@
 ### Task 4: 真实环境验收与是否扩展的决策门
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/docs/agent-contracts/pms/requirement-analysis-orchestration-e2e.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/e2e-requirement-analysis-report.md`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/docs/roadmaps/2026-10-14-ai-collaboration-roadmap.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/fixtures/requirement-analysis-cases.json`
+- Create: `pms-backend/docs/agent-contracts/pms/requirement-analysis-orchestration-e2e.md`
+- Create: `pms-cli/docs/e2e-requirement-analysis-report.md`
+- Modify: `pms-backend/docs/roadmaps/2026-10-14-ai-collaboration-roadmap.md`
+- Create: `pms-cli/tests/fixtures/requirement-analysis-cases.json`
 
 **Interfaces:**
 - Consumes: Task 2 的真实 context、Task 3 的场景编排和现有 operation result。

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 17、当前 Spring Boot/MyBatis-Plus/Jackson、MySQL 8、JUnit/Mockito/Testcontainers；TypeScript、Node.js 22+、Zod 4、pnpm 10.18.2。
 
-**Spec:** /Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
+**Spec:** pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md
 
 状态：Task 1 已提交（2692fc6）；Task 2 已提交（064e8dc），29 项合同测试与 AiConnectorQuery/Controller 回归全绿。Task 3 已提交（90d2dc1，快照测试 18 项全绿）。Task 4 已提交，AiContextReadPolicyTest(12)+AiContextReferenceProjectorTest(8) 全绿，RequirementExecutionTargetReadServiceTest 等回归通过。Task 5 已提交，纵向切片 58 项测试全绿、openapi 校验通过。Task 6 已提交：隔离 MySQL 8.4 证明 3 项全绿（gate 开=0 skip，gate 关=3 skip），证据在 docs/agent-contracts/pms/readonly-context-e2e-record.md。Task 7 已提交（C 仓库 44c0fb2）：93 项 unit/contract 全绿、typecheck/build:cli 通过；真实试读（旧后端）：legacy 兼容 ✓、显式参数无 meta 核验失败 ✓、非法 view CLI_USAGE ✓。focused 试读与新后端验证待 Task 9。全量套件中 67 个 Docker 集成用例因 testcontainers 无法连接 Docker 失败，基线提交同样失败，与改动无关。Task 7（C 44c0fb2）与 Task 8 已提交：9 项组件、研发 JSON/执行绑定/故事列表分流就绪；安全测试 227 项全绿；隔离集成重跑 3 项全绿。Task 9 部分完成：Step 4 最终回归（B 227 项安全集合 + C 94 项 unit/contract + typecheck/build）与 Step 6 交付证据提交已完成（C b36e5e2）；Step 1 安全helper/gate测试已提交，Step 2 真实只读 API 验收、Step 3 页面/模型核验、Step 5 feature 启用未运行（缺真实 token/模型环境，两个 feature 保持 false，交付记录说明尚未具备发布门槛）。配套评审记录：docs/superpowers/reviews/2026-10-14-ai-readonly-workflow-context-review.md。
 
@@ -35,7 +35,7 @@
 
 ## 仓库、依赖与交付顺序
 
-B=/Users/fs/Desktop/Project/pms-backend；C=/Users/fs/Desktop/Project/pms-ai-connector；F=/Users/fs/Desktop/Project/pms-front（仅页面核验）。
+B=pms-backend；C=pms-cli；F=pms-front（仅页面核验）。
 
 开始实施核对各仓库 AGENTS.md、分支、工作区和可写权限。C 当前不在显式可写根中；进入 Task 7 前通过宿主支持的方式获得授权，不复制到别处绕过权限。当前请求只授权修订文档和 review。
 

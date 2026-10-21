@@ -66,7 +66,7 @@ mvn -Dtest=StoryNodeWorkbenchPolicyTest,AiDevelopmentComponentReaderTest test
 
 ```bash
 mvn -Dtest=AiAgentDraftValidatorTest,StoryNodeContractResolverTest,AiOrchestratorControllerTest test
-cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/contract/story-orchestrator-contract.test.ts tests/unit/story-orchestrator-cli.test.ts && pnpm typecheck
+cd pms-cli && pnpm test -- tests/contract/story-orchestrator-contract.test.ts tests/unit/story-orchestrator-cli.test.ts && pnpm typecheck
 ```
 
 **完成条件**：只读路径可演示；NEEDS_INPUT 没有 preview operation；invalid field/ref/target 都有结构化错误；review 通过。
@@ -95,7 +95,7 @@ cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/contract/sto
 
 ```bash
 mvn -Dtest=AiOrchestratorServiceTest,AiOrchestratorControllerTest test
-cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/contract/orchestrator-client.test.ts tests/contract/story-orchestrator-client.test.ts && pnpm typecheck
+cd pms-cli && pnpm test -- tests/contract/orchestrator-client.test.ts tests/contract/story-orchestrator-client.test.ts && pnpm typecheck
 ```
 
 **完成条件**：完整草稿可以得到可审阅 preview；任何 preview 都绑定当前 node/version；review 通过。
@@ -124,7 +124,7 @@ cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/contract/orc
 
 ```bash
 mvn -Dtest=AiOrchestratorStateTest,AiOrchestratorVerificationServiceTest,AiOrchestratorServiceTest test
-cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/unit/story-orchestrator-cli.test.ts tests/contract/story-orchestrator-client.test.ts && pnpm typecheck
+cd pms-cli && pnpm test -- tests/unit/story-orchestrator-cli.test.ts tests/contract/story-orchestrator-client.test.ts && pnpm typecheck
 ```
 
 **完成条件**：正常写入闭环可演示；没有 preview、旧版本和受保护字段都无法写入；成功结果包含 verification 和事件；review 通过。
@@ -153,7 +153,7 @@ cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/unit/story-o
 
 ```bash
 mvn -Dtest=AiOrchestratorServiceTest,AiOrchestratorControllerTest test
-cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/contract/orchestrator-session.test.ts tests/unit/orchestrator-session.test.ts && pnpm typecheck
+cd pms-cli && pnpm test -- tests/contract/orchestrator-session.test.ts tests/unit/orchestrator-session.test.ts && pnpm typecheck
 ```
 
 **完成条件**：两个独立 CLI 进程可以继续同一会话；幂等和未知结果行为可观测且不会重复写入；review 通过。
@@ -186,7 +186,7 @@ cd /Users/fs/Desktop/Project/pms-ai-connector && pnpm test -- tests/contract/orc
 **验收命令**：
 
 ```bash
-cd /Users/fs/Desktop/Project/pms-ai-connector
+cd pms-cli
 pnpm run verify:real-pms:story-orchestrator --maxWorkers=1 --minWorkers=1
 ```
 

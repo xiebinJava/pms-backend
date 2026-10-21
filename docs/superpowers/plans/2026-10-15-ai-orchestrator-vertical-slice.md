@@ -34,13 +34,13 @@
 ### Task 1: 固化协议、状态机和跨仓库契约样例
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-backend/docs/agent-contracts/orchestrator/ai-orchestrator-v1.md`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/domain/AiOrchestratorState.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/domain/AiOrchestratorEventType.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/domain/AiOrchestratorIntent.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorStateTest.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/resources/ai/orchestrator/requirement-analysis-v1-valid.json`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/resources/ai/orchestrator/requirement-analysis-v1-invalid.json`
+- Modify: `pms-backend/docs/agent-contracts/orchestrator/ai-orchestrator-v1.md`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/domain/AiOrchestratorState.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/domain/AiOrchestratorEventType.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/domain/AiOrchestratorIntent.java`
+- Create: `pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorStateTest.java`
+- Create: `pms-backend/src/test/resources/ai/orchestrator/requirement-analysis-v1-valid.json`
+- Create: `pms-backend/src/test/resources/ai/orchestrator/requirement-analysis-v1-invalid.json`
 
 **Interfaces:**
 - Produces enums `AiOrchestratorState`, `AiOrchestratorEventType`, `AiOrchestratorIntent.REQUIREMENT_ANALYSIS_SAVE` for Tasks 2–5.
@@ -72,17 +72,17 @@
 ### Task 2: 建立会话、计划和事件持久化
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/resources/db/migration/V70__ai_orchestrator.sql`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/HealthController.java:28`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationDO.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationTurnDO.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiPlanDO.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiOperationEventDO.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationMapper.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationTurnMapper.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiPlanMapper.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiOperationEventMapper.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorPersistenceTest.java`
+- Create: `pms-backend/src/main/resources/db/migration/V70__ai_orchestrator.sql`
+- Modify: `pms-backend/src/main/java/com/brad/pms/controller/HealthController.java:28`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationDO.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationTurnDO.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiPlanDO.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiOperationEventDO.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationMapper.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiConversationTurnMapper.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiPlanMapper.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/persistence/AiOperationEventMapper.java`
+- Create: `pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorPersistenceTest.java`
 
 **Interfaces:**
 - `AiConversationMapper` exposes `insert`, `selectByIdAndUserId`, and `updateStatus`.
@@ -116,14 +116,14 @@
 ### Task 3: 接入 Connector 边界并实现 Draft 校验
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/connector/AiConnectorPort.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/connector/DefaultAiConnectorPort.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/AgentDraft.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/AgentDraftItem.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/AiAgentDraftValidator.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/DraftValidationResult.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiAgentDraftValidatorTest.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/orchestrator/DefaultAiConnectorPortTest.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/connector/AiConnectorPort.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/connector/DefaultAiConnectorPort.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/AgentDraft.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/AgentDraftItem.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/AiAgentDraftValidator.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/contract/DraftValidationResult.java`
+- Create: `pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiAgentDraftValidatorTest.java`
+- Create: `pms-backend/src/test/java/com/brad/pms/ai/orchestrator/DefaultAiConnectorPortTest.java`
 
 **Interfaces:**
 - `AiConnectorPort.readContext(String resourceType, Long resourceId, ContextReadOptions options): AiWorkflowContextDTO`.
@@ -158,13 +158,13 @@
 ### Task 4: 实现 Orchestrator 应用服务和 HTTP API
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/api/AiOrchestratorController.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/api/AiOrchestratorRequest.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/api/AiOrchestratorResponse.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/service/AiOrchestratorService.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/orchestrator/service/AiOrchestratorVerificationService.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorServiceTest.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/controller/AiOrchestratorControllerTest.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/api/AiOrchestratorController.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/api/AiOrchestratorRequest.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/api/AiOrchestratorResponse.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/service/AiOrchestratorService.java`
+- Create: `pms-backend/src/main/java/com/brad/pms/ai/orchestrator/service/AiOrchestratorVerificationService.java`
+- Create: `pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorServiceTest.java`
+- Create: `pms-backend/src/test/java/com/brad/pms/controller/AiOrchestratorControllerTest.java`
 
 **Interfaces:**
 - `createConversation(Long userId, CreateConversationCommand): ConversationView`.
@@ -210,15 +210,15 @@
 ### Task 5: 让 Connector Client 和外部 Agent 可调用编排器
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/PmsClient.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/OrchestratorClientTypes.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/orchestrator.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/index.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/index.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/orchestrator-client.test.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/orchestrator-client.test.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/requirementAnalysis.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/cli/parseArguments.ts`
+- Modify: `pms-cli/packages/pms-client/src/PmsClient.ts`
+- Create: `pms-cli/packages/pms-client/src/OrchestratorClientTypes.ts`
+- Create: `pms-cli/packages/pms-client/src/orchestrator.ts`
+- Modify: `pms-cli/packages/pms-client/src/index.ts`
+- Modify: `pms-cli/packages/pms-contracts/src/index.ts`
+- Create: `pms-cli/tests/contract/orchestrator-client.test.ts`
+- Create: `pms-cli/tests/unit/orchestrator-client.test.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/requirementAnalysis.ts`
+- Modify: `pms-cli/apps/pms-cli/src/cli/parseArguments.ts`
 
 **Interfaces:**
 - Extend `PmsClient` with `createConversation`, `appendTurn`, `previewPlan`, `confirmPlan`, `getConversation`, `listConversationEvents`.
@@ -253,11 +253,11 @@
 ### Task 6: 做隔离环境端到端验收并形成下一阶段门槛
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorIsolatedAcceptanceTest.java`
-- Create: `/Users/fs/Desktop/Project/pms-backend/docs/agent-contracts/orchestrator/ai-orchestrator-v1-acceptance-report.md`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/docs/roadmaps/2026-10-14-ai-collaboration-roadmap.md`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/requirement-analysis.e2e.test.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/orchestrator-requirement-analysis.e2e.test.ts`
+- Create: `pms-backend/src/test/java/com/brad/pms/ai/orchestrator/AiOrchestratorIsolatedAcceptanceTest.java`
+- Create: `pms-backend/docs/agent-contracts/orchestrator/ai-orchestrator-v1-acceptance-report.md`
+- Modify: `pms-backend/docs/roadmaps/2026-10-14-ai-collaboration-roadmap.md`
+- Modify: `pms-cli/tests/e2e/requirement-analysis.e2e.test.ts`
+- Create: `pms-cli/tests/e2e/orchestrator-requirement-analysis.e2e.test.ts`
 
 **Interfaces:**
 - Consumes the HTTP endpoints and `AgentDraft` fixture from Tasks 1–5.

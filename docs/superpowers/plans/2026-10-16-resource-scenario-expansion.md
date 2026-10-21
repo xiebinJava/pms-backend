@@ -33,13 +33,13 @@
 ### Task 0: 建立统一资源场景协议和适配器注册表
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/resourceScenario.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/resourceScenarioExecutor.ts`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/index.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/cli/runCli.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/resource-scenario-contract.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/resource-scenario-dispatch.test.ts`
+- Create: `pms-cli/packages/pms-contracts/src/resourceScenario.ts`
+- Create: `pms-cli/apps/pms-cli/src/commands/scenarios/resourceScenarioExecutor.ts`
+- Create: `pms-cli/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
+- Modify: `pms-cli/packages/pms-contracts/src/index.ts`
+- Modify: `pms-cli/apps/pms-cli/src/cli/runCli.ts`
+- Test: `pms-cli/tests/contract/resource-scenario-contract.test.ts`
+- Test: `pms-cli/tests/unit/resource-scenario-dispatch.test.ts`
 
 **Interfaces:**
 - Consumes: `PmsClient.context`, `PmsClient.get`, `operationPreview`, `operationExecutePreview`, `CapabilityResolver`。
@@ -105,11 +105,11 @@ export function executeResourceScenario(
 **Blocked by:** Task 0
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/requirementScenarioAdapter.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/PmsClient.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/requirement-resource-scenario.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/connector/context/AiWorkflowContextReadServiceTest.java`（仅在发现 context 契约缺口时修改）
+- Create: `pms-cli/apps/pms-cli/src/commands/scenarios/requirementScenarioAdapter.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
+- Modify: `pms-cli/packages/pms-client/src/PmsClient.ts`
+- Test: `pms-cli/tests/contract/requirement-resource-scenario.test.ts`
+- Test: `pms-backend/src/test/java/com/brad/pms/ai/connector/context/AiWorkflowContextReadServiceTest.java`（仅在发现 context 契约缺口时修改）
 
 **Interfaces:**
 - Consumes: Task 0 的 `ResourceScenarioAdapter` 和 `resource-scenario/v1`。
@@ -140,10 +140,10 @@ export function executeResourceScenario(
 **Blocked by:** Task 0
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/topicScenarioAdapter.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/topic-resource-scenario.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/service/TopicStoryNodeAssociationTest.java`（仅补 AI 场景所需的挂载/权限回归断言）
+- Create: `pms-cli/apps/pms-cli/src/commands/scenarios/topicScenarioAdapter.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
+- Test: `pms-cli/tests/contract/topic-resource-scenario.test.ts`
+- Test: `pms-backend/src/test/java/com/brad/pms/service/TopicStoryNodeAssociationTest.java`（仅补 AI 场景所需的挂载/权限回归断言）
 
 **Interfaces:**
 - Consumes: Task 0 的共用执行器和 Task 1 验证约定。
@@ -173,11 +173,11 @@ export function executeResourceScenario(
 **Blocked by:** Task 0
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/projectScenarioAdapter.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/projectCreate.ts`（将已有逻辑接入统一结果 envelope，保留兼容导出）
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/project-resource-scenario.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/project-create-readback.test.ts`
+- Create: `pms-cli/apps/pms-cli/src/commands/scenarios/projectScenarioAdapter.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/resourceScenarioRegistry.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/projectCreate.ts`（将已有逻辑接入统一结果 envelope，保留兼容导出）
+- Test: `pms-cli/tests/contract/project-resource-scenario.test.ts`
+- Test: `pms-cli/tests/contract/project-create-readback.test.ts`
 
 **Interfaces:**
 - Consumes: Task 0 的共用执行器、Task 1/2 的 verification 结构。
@@ -207,11 +207,11 @@ export function executeResourceScenario(
 **Blocked by:** Tasks 1, 2, 3
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/cli/runCli.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/resourceScenarioExecutor.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/error.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/resource-scenario-error-matrix.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/cli-runner.test.ts`
+- Modify: `pms-cli/apps/pms-cli/src/cli/runCli.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/resourceScenarioExecutor.ts`
+- Modify: `pms-cli/packages/pms-contracts/src/error.ts`
+- Test: `pms-cli/tests/contract/resource-scenario-error-matrix.test.ts`
+- Test: `pms-cli/tests/unit/cli-runner.test.ts`
 
 **Interfaces:**
 - Consumes: 三个资源 adapter 和统一 result envelope。
@@ -240,10 +240,10 @@ export function executeResourceScenario(
 **Blocked by:** Task 4
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/resource-scenario-real-pms.test.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/scripts/e2e-mysql-client.sh`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/docs/resource-scenario-runbook.md`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/docs/e2e-report.md`
+- Create: `pms-cli/tests/e2e/resource-scenario-real-pms.test.ts`
+- Modify: `pms-cli/scripts/e2e-mysql-client.sh`
+- Create: `pms-cli/docs/resource-scenario-runbook.md`
+- Modify: `pms-cli/docs/e2e-report.md`
 
 **Interfaces:**
 - Consumes: `resource-scenario/v1` CLI contract and existing isolated PMS/Testcontainers setup。

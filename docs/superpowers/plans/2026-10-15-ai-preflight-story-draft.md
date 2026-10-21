@@ -50,10 +50,10 @@
 **Files:**
 - Modify: `src/main/java/com/brad/pms/ai/connector/context/AiDevelopmentComponentReader.java`
 - Modify: `src/main/java/com/brad/pms/ai/connector/context/AiWorkflowContextReadService.java` (only if contract data needs projection wiring)
-- Modify: `packages/pms-contracts/src/operation.ts` in `/Users/fs/Desktop/Project/pms-ai-connector`
-- Modify: `packages/pms-client/src/PmsClient.ts` in `/Users/fs/Desktop/Project/pms-ai-connector` (only if type mapping requires it)
+- Modify: `packages/pms-contracts/src/operation.ts` in `pms-cli`
+- Modify: `packages/pms-client/src/PmsClient.ts` in `pms-cli` (only if type mapping requires it)
 - Test: `src/test/java/com/brad/pms/ai/connector/context/AiDevelopmentComponentReaderTest.java`
-- Test: `tests/contract/schema.test.ts` in `/Users/fs/Desktop/Project/pms-ai-connector`
+- Test: `tests/contract/schema.test.ts` in `pms-cli`
 
 **Interfaces:**
 - Produces a component `saveContract` object with `command`, `itemType`, `itemId`, `nodeId`, `version`, `componentKey`, `variant`, and `writableFields`.

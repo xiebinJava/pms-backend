@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 17、Spring Boot、MyBatis-Plus、JUnit 5/Mockito；Node.js >=22、TypeScript、pnpm 10.18.2、Vitest、Zod、keytar；现有 Vue 页面仅作验收。
 
-**Spec:** `/Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-10-pms-cli-context-and-analysis-design.md`，以包含第 9 节自审修订和本次用户评审补充的版本为准。本次仅修订计划与设计，所有实现任务仍未执行。
+**Spec:** `pms-backend/docs/superpowers/specs/2026-10-10-pms-cli-context-and-analysis-design.md`，以包含第 9 节自审修订和本次用户评审补充的版本为准。本次仅修订计划与设计，所有实现任务仍未执行。
 
 ## Global Constraints
 
@@ -33,7 +33,7 @@
 
 ## 工作目录、文件职责及实施约定
 
-本文路径前缀：`B` = `/Users/fs/Desktop/Project/pms-backend`；`C` = `/Users/fs/Desktop/Project/pms-ai-connector`；`F` = `/Users/fs/Desktop/Project/pms-front`。下文 `B/src/...` 等表示这些绝对目录，不是新目录。Maven 命令在 B、pnpm 命令在 C 执行。
+本文路径前缀：`B` = `pms-backend`；`C` = `pms-cli`；`F` = `pms-front`。下文 `B/src/...` 等表示这些绝对目录，不是新目录。Maven 命令在 B、pnpm 命令在 C 执行。
 
 核心职责：
 

@@ -2,8 +2,8 @@
 
 日期：2026-10-14。评审对象为第二版设计及实施计划；评审方式为逐项对照源码、追踪读取依赖、模拟协议组合与验收失败场景，并检查修订后任务依赖。没有独立子代理评审，也没有运行未来实施测试。
 
-- [修订方案](/Users/fs/Desktop/Project/pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md)
-- [修订计划](/Users/fs/Desktop/Project/pms-backend/docs/superpowers/plans/2026-10-14-ai-readonly-workflow-context.md)
+- [修订方案](pms-backend/docs/superpowers/specs/2026-10-14-ai-readonly-workflow-context-design.md)
+- [修订计划](pms-backend/docs/superpowers/plans/2026-10-14-ai-readonly-workflow-context.md)
 
 ## 评审结论
 
@@ -31,18 +31,18 @@
 
 关键证据位置：
 
-- R01：[不可读执行目标仍保留 targetId](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/RequirementExecutionTargetReadService.java:172)、[旧 AI get 直接复制 executionTarget](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/AiConnectorQueryService.java:283)。
-- R02：[领域故事列表从故事表读取](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/DevelopmentStoryManagementService.java:133)、[页面按实际挂载节点筛选](/Users/fs/Desktop/Project/pms-front/src/views/development/detail/DevelopmentStoryListComponent.vue:36)、[执行组件使用独立 target](/Users/fs/Desktop/Project/pms-front/src/views/development/detail/RequirementExecutionComponent.vue:24)。
-- R03：[评审默认版本0](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/NodeSolutionDesignService.java:465)、[评审 DTO 缺少记录 ID](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/dto/response/NodeSolutionReviewDTO.java:8)。
-- R04：[管控同时查询专题/故事与可空基线](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/NodeDevelopmentControlService.java:407)。
-- R05：[旧节点字段映射保留原 JSON](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/AiConnectorQueryService.java:349)。
-- R06：[无绑定时解析默认挂载](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/WorkflowComponentBindingService.java:90)、[组件校验再次执行 overlay](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/ProjectPermissionService.java:150)。
-- R07：[需求摘要先解析默认模板](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/RequirementManagementService.java:206)。
-- R08：[旧 CLI 手工映射响应字段](/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-client/src/PmsClient.ts:124)、[旧节点 schema 接受 unknown 数组](/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/query.ts:105)。
-- R09：[实际节点状态枚举](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/common/enums/NodeStatus.java:6)、[任务列表仅顶层](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/TaskService.java:79)。
-- R10：[原测试驱动](/Users/fs/Desktop/Project/pms-backend/src/test/resources/application-test.yml:6)。
-- R11：[当前委托路由](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/security/AiDelegationRoutePolicy.java:70)。
-- R12：[原 E2E 选择列表首条兜底](/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/pms-cli.e2e.test.ts:33)、[页面节点读取有写入](/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/service/NodeService.java:193)。
+- R01：[不可读执行目标仍保留 targetId](pms-backend/src/main/java/com/brad/pms/service/RequirementExecutionTargetReadService.java:172)、[旧 AI get 直接复制 executionTarget](pms-backend/src/main/java/com/brad/pms/ai/connector/AiConnectorQueryService.java:283)。
+- R02：[领域故事列表从故事表读取](pms-backend/src/main/java/com/brad/pms/service/DevelopmentStoryManagementService.java:133)、[页面按实际挂载节点筛选](pms-front/src/views/development/detail/DevelopmentStoryListComponent.vue:36)、[执行组件使用独立 target](pms-front/src/views/development/detail/RequirementExecutionComponent.vue:24)。
+- R03：[评审默认版本0](pms-backend/src/main/java/com/brad/pms/service/NodeSolutionDesignService.java:465)、[评审 DTO 缺少记录 ID](pms-backend/src/main/java/com/brad/pms/dto/response/NodeSolutionReviewDTO.java:8)。
+- R04：[管控同时查询专题/故事与可空基线](pms-backend/src/main/java/com/brad/pms/service/NodeDevelopmentControlService.java:407)。
+- R05：[旧节点字段映射保留原 JSON](pms-backend/src/main/java/com/brad/pms/ai/connector/AiConnectorQueryService.java:349)。
+- R06：[无绑定时解析默认挂载](pms-backend/src/main/java/com/brad/pms/service/WorkflowComponentBindingService.java:90)、[组件校验再次执行 overlay](pms-backend/src/main/java/com/brad/pms/service/ProjectPermissionService.java:150)。
+- R07：[需求摘要先解析默认模板](pms-backend/src/main/java/com/brad/pms/service/RequirementManagementService.java:206)。
+- R08：[旧 CLI 手工映射响应字段](pms-cli/packages/pms-client/src/PmsClient.ts:124)、[旧节点 schema 接受 unknown 数组](pms-cli/packages/pms-contracts/src/query.ts:105)。
+- R09：[实际节点状态枚举](pms-backend/src/main/java/com/brad/pms/common/enums/NodeStatus.java:6)、[任务列表仅顶层](pms-backend/src/main/java/com/brad/pms/service/TaskService.java:79)。
+- R10：[原测试驱动](pms-backend/src/test/resources/application-test.yml:6)。
+- R11：[当前委托路由](pms-backend/src/main/java/com/brad/pms/security/AiDelegationRoutePolicy.java:70)。
+- R12：[原 E2E 选择列表首条兜底](pms-cli/tests/e2e/pms-cli.e2e.test.ts:33)、[页面节点读取有写入](pms-backend/src/main/java/com/brad/pms/service/NodeService.java:193)。
 - R13 是本轮接口设计检查发现的潜在编译问题，现有源码仅有两参 context，不属于已经发生的运行故障。
 
 ## 保留的取舍与实施前提

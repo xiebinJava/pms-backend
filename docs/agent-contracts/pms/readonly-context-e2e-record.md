@@ -6,7 +6,7 @@
 
 ~~~bash
 PMS_CONTEXT_READ_ISOLATED=true \
-DOCKER_HOST=unix:///Users/fs/.colima/fsclaw/docker.sock \
+DOCKER_HOST=unix://$HOME/.colima/<profile>/docker.sock \
 TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1 \
 TESTCONTAINERS_RYUK_DISABLED=true \
 mvn -Dtest=AiWorkflowContextReadOnlyIntegrationTest test

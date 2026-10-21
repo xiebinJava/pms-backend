@@ -42,10 +42,10 @@ Task 2 maps the Connector output from the PMS backend, so Task 5 must publish an
 ### Task 1: 建立 Connector 共享 Agent Contract 类型
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/agent.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/index.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/agent-contract.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/agent-work-session.test.ts`
+- Create: `pms-cli/packages/pms-contracts/src/agent.ts`
+- Modify: `pms-cli/packages/pms-contracts/src/index.ts`
+- Test: `pms-cli/tests/contract/agent-contract.test.ts`
+- Test: `pms-cli/tests/contract/agent-work-session.test.ts`
 
 **Interfaces:**
 - Produces `agentContractVersion = "agent-contract/v1"`.
@@ -81,11 +81,11 @@ Task 2 maps the Connector output from the PMS backend, so Task 5 must publish an
 ### Task 2: 将现有 PMS 上下文映射为 Node Contract
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/core/agentContext.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/core/context.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/cli/runCli.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/agent-context.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/agent-context-cli.test.ts`
+- Create: `pms-cli/apps/pms-cli/src/commands/core/agentContext.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/core/context.ts`
+- Modify: `pms-cli/apps/pms-cli/src/cli/runCli.ts`
+- Test: `pms-cli/tests/unit/agent-context.test.ts`
+- Test: `pms-cli/tests/contract/agent-context-cli.test.ts`
 
 **Interfaces:**
 - Produces `buildAgentContext(context: WorkflowContext): AgentWorkSession` for read/draft mode.
@@ -122,12 +122,12 @@ Task 2 maps the Connector output from the PMS backend, so Task 5 must publish an
 ### Task 3: 统一现有场景到 AgentWorkSession
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/agentWorkSession.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/requirementAnalysis.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/storyWorkbench.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/cli/runCli.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/agent-work-session-adapter.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/agent-work-session-scenarios.test.ts`
+- Create: `pms-cli/apps/pms-cli/src/commands/scenarios/agentWorkSession.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/requirementAnalysis.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/storyWorkbench.ts`
+- Modify: `pms-cli/apps/pms-cli/src/cli/runCli.ts`
+- Test: `pms-cli/tests/unit/agent-work-session-adapter.test.ts`
+- Test: `pms-cli/tests/contract/agent-work-session-scenarios.test.ts`
 
 **Interfaces:**
 - Produces `toRequirementAnalysisWorkSession(input: { sessionId: string; taskId: string; context: WorkflowContext; draft: AnalysisDraft | null; plan?: RequirementAnalysisPlan; result?: RequirementAnalysisResult }): AgentWorkSession`.
@@ -162,10 +162,10 @@ Task 2 maps the Connector output from the PMS backend, so Task 5 must publish an
 ### Task 4: 固化主 Agent/子 Agent 的凭据边界
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/packages/pms-contracts/src/agent.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/apps/pms-cli/src/commands/scenarios/AgentDraftContract.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/agent-task-boundary.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/agent-draft-contract.test.ts`
+- Modify: `pms-cli/packages/pms-contracts/src/agent.ts`
+- Modify: `pms-cli/apps/pms-cli/src/commands/scenarios/AgentDraftContract.ts`
+- Test: `pms-cli/tests/unit/agent-task-boundary.test.ts`
+- Test: `pms-cli/tests/unit/agent-draft-contract.test.ts`
 
 **Interfaces:**
 - `AgentTask.permissionMode` remains metadata for parent/child coordination, but is not treated as an authorization mechanism.
@@ -200,13 +200,13 @@ Task 2 maps the Connector output from the PMS backend, so Task 5 must publish an
 ### Task 5: 对照真实能力目录补齐 PMS 后端契约输出
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/AiConnectorCapabilityService.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/controller/AiConnectorController.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/ai/api/AiCapabilityDTO.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/integration/ai/api/AiWorkflowContextDTO.java`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiWorkflowContextReadService.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/ai/connector/AiConnectorCapabilityServiceTest.java`
-- Test: `/Users/fs/Desktop/Project/pms-backend/src/test/java/com/brad/pms/controller/AiConnectorControllerTest.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/ai/connector/AiConnectorCapabilityService.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/controller/AiConnectorController.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/integration/ai/api/AiCapabilityDTO.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/integration/ai/api/AiWorkflowContextDTO.java`
+- Modify: `pms-backend/src/main/java/com/brad/pms/ai/connector/context/AiWorkflowContextReadService.java`
+- Test: `pms-backend/src/test/java/com/brad/pms/ai/connector/AiConnectorCapabilityServiceTest.java`
+- Test: `pms-backend/src/test/java/com/brad/pms/controller/AiConnectorControllerTest.java`
 
 **Interfaces:**
 - Capabilities must publish the supported external-agent contract version and the actual availability of `readonlyWorkflowContext` and `focusedWorkflowContext`.
@@ -241,8 +241,8 @@ Task 2 maps the Connector output from the PMS backend, so Task 5 must publish an
 ### Task 6: 更新 Claude/Codex 的 PMS Skill 使用协议
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/skills/pms-project-management/SKILL.md`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/tests/contract/skill-analysis-contract.test.ts`
+- Modify: `pms-cli/skills/pms-project-management/SKILL.md`
+- Modify: `pms-cli/tests/contract/skill-analysis-contract.test.ts`
 
 **Interfaces:**
 - The installed Skill must teach external Agents to call `pms capabilities --format json` before `pms context --format agent`.
@@ -277,10 +277,10 @@ Task 2 maps the Connector output from the PMS backend, so Task 5 must publish an
 ### Task 7: 建立外部 Agent 真实验收集
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/fixtures/external-agent-cases.json`
-- Create: `/Users/fs/Desktop/Project/pms-backend/docs/agent-contracts/pms/external-agent-e2e-runbook.md`
-- Create: `/Users/fs/Desktop/Project/pms-backend/docs/agent-contracts/pms/external-agent-e2e-record.md`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/external-agent-contract.e2e.test.ts`
+- Create: `pms-cli/tests/fixtures/external-agent-cases.json`
+- Create: `pms-backend/docs/agent-contracts/pms/external-agent-e2e-runbook.md`
+- Create: `pms-backend/docs/agent-contracts/pms/external-agent-e2e-record.md`
+- Test: `pms-cli/tests/e2e/external-agent-contract.e2e.test.ts`
 
 **Interfaces:**
 - Fixtures cover at least one read-only analysis, one missing-input clarification, one draft-only story update, one confirmed write, one version conflict and one unknown readback result.

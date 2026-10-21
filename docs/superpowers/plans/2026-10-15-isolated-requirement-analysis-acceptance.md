@@ -30,11 +30,11 @@
 ### Task 1: 建立一次性真实验收环境
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/scripts/start-ai-e2e.sh`
-- Create: `/Users/fs/Desktop/Project/pms-backend/scripts/stop-ai-e2e.sh`
-- Create: `/Users/fs/Desktop/Project/pms-backend/docs/agent-contracts/pms/isolated-e2e-runbook.md`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/support/isolatedSession.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/e2e-safety.test.ts`
+- Create: `pms-backend/scripts/start-ai-e2e.sh`
+- Create: `pms-backend/scripts/stop-ai-e2e.sh`
+- Create: `pms-backend/docs/agent-contracts/pms/isolated-e2e-runbook.md`
+- Modify: `pms-cli/tests/e2e/support/isolatedSession.ts`
+- Test: `pms-cli/tests/unit/e2e-safety.test.ts`
 
 **Interfaces:**
 - Produces an API base URL and auth origin for a disposable PMS instance, plus a documented `PMS_E2E_*` environment block.
@@ -61,10 +61,10 @@
 ### Task 2: 创建可追踪的需求测试夹具
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/support/requirementFixture.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/support/isolatedSession.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/requirement-analysis.e2e.test.ts`
-- Test: `/Users/fs/Desktop/Project/pms-ai-connector/tests/unit/requirement-fixture.test.ts`
+- Create: `pms-cli/tests/e2e/support/requirementFixture.ts`
+- Modify: `pms-cli/tests/e2e/support/isolatedSession.ts`
+- Modify: `pms-cli/tests/e2e/requirement-analysis.e2e.test.ts`
+- Test: `pms-cli/tests/unit/requirement-fixture.test.ts`
 
 **Interfaces:**
 - `createRequirementFixture(client, runId): Promise<{ requirementId: number; nodeId: number; version: number; title: string }>`
@@ -92,10 +92,10 @@
 ### Task 3: 完成真实保存、冲突和幂等验收
 
 **Files:**
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/requirement-analysis.e2e.test.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/support/requirementFixture.ts`
-- Modify: `/Users/fs/Desktop/Project/pms-ai-connector/docs/e2e-requirement-analysis-report.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/e2e/requirement-analysis-conflict.e2e.test.ts`
+- Modify: `pms-cli/tests/e2e/requirement-analysis.e2e.test.ts`
+- Modify: `pms-cli/tests/e2e/support/requirementFixture.ts`
+- Modify: `pms-cli/docs/e2e-requirement-analysis-report.md`
+- Create: `pms-cli/tests/e2e/requirement-analysis-conflict.e2e.test.ts`
 
 **Interfaces:**
 - Consumes the existing `planRequirementAnalysisScenario`, `executeRequirementAnalysisScenario`, and `runRequirementAnalysisScenario` APIs.
@@ -122,9 +122,9 @@
 ### Task 4: 评估自然语言入口，再决定是否做聊天 UI
 
 **Files:**
-- Create: `/Users/fs/Desktop/Project/pms-backend/docs/agent-contracts/pms/requirement-analysis-acceptance-report.md`
-- Modify: `/Users/fs/Desktop/Project/pms-backend/docs/roadmaps/2026-10-14-ai-collaboration-roadmap.md`
-- Create: `/Users/fs/Desktop/Project/pms-ai-connector/tests/fixtures/requirement-analysis-shadow-cases.json`
+- Create: `pms-backend/docs/agent-contracts/pms/requirement-analysis-acceptance-report.md`
+- Modify: `pms-backend/docs/roadmaps/2026-10-14-ai-collaboration-roadmap.md`
+- Create: `pms-cli/tests/fixtures/requirement-analysis-shadow-cases.json`
 
 **Interfaces:**
 - Consumes the verified deterministic save flow from Task 3.
