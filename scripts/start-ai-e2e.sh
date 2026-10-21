@@ -37,7 +37,7 @@ JAR_PATH="${PMS_JAR_PATH:-}"
 if [[ -z "$JAR_PATH" ]]; then
   JAR_PATH="$(ls -1t "$PROJECT_DIR"/target/pms-backend-*.jar 2>/dev/null | head -n 1 || true)"
 fi
-JAR_PATH="${JAR_PATH:-$PROJECT_DIR/target/pms-backend-1.1.0.jar}"
+JAR_PATH="${JAR_PATH:-$PROJECT_DIR/target/pms-backend-1.2.0.jar}"
 PID_FILE="$RUN_DIR/pms-backend.pid"
 LOG_FILE="$RUN_DIR/pms-backend.log"
 FOREGROUND="${PMS_E2E_FOREGROUND:-false}"

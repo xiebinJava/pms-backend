@@ -5,9 +5,9 @@
 
 PMS 是一个面向单个企业、本地部署的项目管理系统。一个部署实例只服务一家企业，不使用 `tenant_id`，也不拆分成微服务。运行时和测试都只使用 MySQL 8。
 
-当前源码发行基线：`1.1.0`。最终用户请使用下方发行仓库中的预构建镜像。
+当前源码发行基线：`1.2.0`。最终用户请使用下方发行仓库中的预构建镜像。
 
-`1.1.0` 打通需求、项目、专题和故事流程，新增系统与系统版本管理、独立迭代计划和系统版本关联。功能需求在需求澄清节点选择所属系统，相关交付对象关联迭代时继承系统；系统版本只在迭代中维护。项目运营交接保存交接人 ID 和交接说明，完成节点时两项必填。
+`1.2.0` 完成 AI 协作闭环：外部 AI 工作台通过 `pms-cli` 读取能力与上下文、生成结构化草稿、预览、确认、幂等执行并回读验证；统一推进入口覆盖需求、项目、专题和故事节点，项目与专题支持持久化 Orchestrator 会话恢复。数据库迁移推进至 V73。
 
 如果你只是想安装并使用 PMS，请走独立发行仓库 [`pms-distribution`](https://github.com/xiebinJava/pms-distribution)：它使用预构建镜像，不需要本机安装 Java、Maven、Node.js 或 pnpm。本仓库面向后端开发和从源码构建。
 
@@ -63,10 +63,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V69）和前端：
+首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V73）和前端：
 
 ```text
-MySQL → uploads-init → backend（Flyway V1–V69）→ frontend
+MySQL → uploads-init → backend（Flyway V1–V73）→ frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -145,7 +145,7 @@ set +a
 ./scripts/verify-enterprise-migration.sh
 ```
 
-当前基线为 V1–V69。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+当前基线为 V1–V73。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
 ## 本地直接启动后端（已有 MySQL 时）
 
@@ -203,6 +203,11 @@ PMS 页面只向 Work Helper 提供页面类型、路由、项目/节点 ID 和�
 再次执行项目数据范围校验后返回带 `authoritative`、`dataScope`、`asOfDate` 和分页元数据的结果。
 Work Helper 不接触 PMS 数据库，也不能执行任意 Shell。写操作仍只生成预览并等待用户确认。
 
+外部 AI 工作台还可以通过 `pms-cli` 参与需求、项目、专题和故事节点：先读取能力目录与当前资源上下文，
+再生成带来源的结构化草稿，由 PMS 校验、预览、确认、幂等执行并回读验证。PMS 不保存模型密钥，
+也不直接调用模型；AI 草稿不能修改受保护字段。需要跨进程恢复时，使用持久化的 Orchestrator
+会话、计划、预览和事件记录。写入无法回读证明时返回 `WRITE_RESULT_UNKNOWN`，只能使用原幂等键重新核验。
+
 不要把密码、JWT、SMTP、对象存储密钥或导入文件放进仓库。提交前可执行隐私扫描：
 
 ```bash
@@ -224,7 +229,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V69 MySQL / Flyway 迁移脚本
+├── db/migration/  V1–V73 MySQL / Flyway 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/
