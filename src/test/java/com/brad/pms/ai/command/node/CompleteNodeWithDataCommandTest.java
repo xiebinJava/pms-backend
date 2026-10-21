@@ -106,6 +106,36 @@ class CompleteNodeWithDataCommandTest {
         order.verify(nodeService).complete(22L, 7L);
     }
 
+    @Test
+    void previewsRequirementScopeDomainBlockersBeforeExecute() {
+        ProjectDO project = project(3);
+        ProjectNodeDO node = node(7L, 4);
+        when(permissionService.requireProjectManageable(22L, "编辑节点内容")).thenReturn(project);
+        when(permissionService.requireCompletableNode(22L, 7L)).thenReturn(node);
+        when(workbenchRegistry.require("requirement-scope")).thenReturn(workbench);
+        when(workbench.key()).thenReturn("requirement-scope");
+        when(workbench.label()).thenReturn("需求范围");
+        when(workbench.dynamicFields()).thenReturn(false);
+        when(workbench.read(22L, 7L)).thenReturn(new WorkbenchSnapshot(
+                Map.of("scopeItems", List.of(Map.of("direction", "IN", "title", "范围")),
+                        "requirements", List.of()),
+                Map.of("scopeItems", "范围项", "requirements", "需求清单"),
+                1, Map.of()));
+        when(workflowTemplateService.getNodeDefinition(3L, "node-key"))
+                .thenReturn(definition("requirement-scope"));
+
+        CommandPreview preview = command().preview(new CommandPreviewRequest(
+                CommandName.NODE_COMPLETE_WITH_DATA,
+                Map.of("projectId", 22L, "nodeId", 7L, "workbench", "requirement-scope",
+                        "fields", Map.of("scopeItems", List.of(Map.of("direction", "IN", "title", "范围"))),
+                        "ownerId", 1L, "startDate", "2026-10-10", "endDate", "2026-10-20"),
+                "project:22:node:7", "v1"));
+
+        assertThat(preview.preconditions())
+                .extracting(CommandPreview.Precondition::code)
+                .contains("REQUIREMENT_SCOPE_REQUIREMENTS_REQUIRED");
+    }
+
     private CompleteNodeWithDataCommand command() {
         return new CompleteNodeWithDataCommand(nodeService, permissionService, workbenchRegistry,
                 workflowTemplateService, new ObjectMapper());

@@ -117,6 +117,7 @@ public class CompleteNodeWithDataCommand implements PmsCommand {
             preconditions.add(new CommandPreview.Precondition("NODE_SCHEDULE_INVALID", "节点排期开始日期不能晚于结束日期", true,
                     "node.schedule.update", Map.of("projectId", projectId, "nodeId", nodeId)));
         }
+        preconditions.addAll(workbenchPreconditions(workbench, snapshot, fields, projectId, nodeId));
         return new CommandPreview(null, name(), Instant.now().plusSeconds(600), request.contextVersion(),
                 List.of("节点字段、负责人、排期和流程推进会在同一事务中提交"),
                 List.of(change), REFRESH_SCOPES, preconditions);
@@ -223,6 +224,54 @@ public class CompleteNodeWithDataCommand implements PmsCommand {
             if (snapshot.fieldVersions().containsKey(field)) versions.put(field, snapshot.fieldVersions().get(field));
         });
         return versions;
+    }
+
+    /**
+     * Domain confirmations must be visible in preview before execute. The
+     * requirement-scope workbench otherwise reports these checks only from
+     * confirmForCompletion after the write transaction has started.
+     */
+    private List<CommandPreview.Precondition> workbenchPreconditions(
+            NodeWorkbench workbench,
+            WorkbenchSnapshot snapshot,
+            Map<String, Object> fields,
+            Long projectId,
+            Long nodeId) {
+        if (!"requirement-scope".equals(workbench.key())) return List.of();
+        Map<String, Object> values = new LinkedHashMap<>(snapshot.values());
+        values.putAll(fields);
+        List<CommandPreview.Precondition> result = new ArrayList<>();
+        Object rawScopeItems = values.get("scopeItems");
+        boolean hasInScope = rawScopeItems instanceof List<?> items && items.stream()
+                .filter(item -> item instanceof Map<?, ?>)
+                .map(item -> ((Map<?, ?>) item).get("direction"))
+                .anyMatch(direction -> direction != null && "IN".equalsIgnoreCase(String.valueOf(direction)));
+        if (!hasInScope) {
+            result.add(new CommandPreview.Precondition(
+                    "REQUIREMENT_SCOPE_IN_REQUIRED", "至少保留一条纳入范围项", true,
+                    "node.field.update", Map.of("projectId", projectId, "nodeId", nodeId,
+                    "workbench", workbench.key())));
+        }
+
+        Object rawRequirements = values.get("requirements");
+        if (!(rawRequirements instanceof List<?> requirements) || requirements.isEmpty()) {
+            result.add(new CommandPreview.Precondition(
+                    "REQUIREMENT_SCOPE_REQUIREMENTS_REQUIRED", "至少添加一条需求", true,
+                    "node.field.update", Map.of("projectId", projectId, "nodeId", nodeId,
+                    "workbench", workbench.key())));
+        } else if (requirements.stream().anyMatch(item -> !confirmedRequirement(item))) {
+            result.add(new CommandPreview.Precondition(
+                    "REQUIREMENT_SCOPE_REQUIREMENTS_UNCONFIRMED", "请先确认需求清单中的全部需求", true,
+                    "node.field.update", Map.of("projectId", projectId, "nodeId", nodeId,
+                    "workbench", workbench.key())));
+        }
+        return result;
+    }
+
+    private boolean confirmedRequirement(Object value) {
+        if (!(value instanceof Map<?, ?> map)) return false;
+        Object status = map.get("status");
+        return status instanceof Number number && number.intValue() == 1;
     }
 
     @SuppressWarnings("unchecked")

@@ -835,7 +835,13 @@ public class AiOrchestratorService {
             arguments.put("itemId", plan.getResourceId());
             arguments.put("nodeId", plan.getNodeId());
             arguments.put("version", plan.getNodeVersion());
-            arguments.put("fieldValues", draft.draft().patch());
+            // Development-item node updates persist component state under the
+            // shared __components envelope. The Orchestrator draft is scoped
+            // to one component, so wrap the patch before it reaches the PMS
+            // workflow service; sending the flat patch would be accepted but
+            // silently produce an empty persisted field-values object.
+            arguments.put("fieldValues", Map.of("__components",
+                    Map.of(plan.getComponentKey(), draft.draft().patch())));
             return new CommandPreviewRequest(completion
                     ? CommandName.DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA
                     : CommandName.DEVELOPMENT_ITEM_NODE_FIELD_UPDATE,

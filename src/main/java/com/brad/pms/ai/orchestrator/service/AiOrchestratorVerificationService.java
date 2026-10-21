@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.math.BigDecimal;
+import java.time.temporal.TemporalAccessor;
 
 @Service
 @RequiredArgsConstructor
@@ -147,7 +149,12 @@ public class AiOrchestratorVerificationService {
                 "topicId", "baseTopicId", "ownerId", "status", "developmentStatus", "startDate",
                 "endDate", "dueDate"}) {
             if (allowedMutations.contains(key)) continue;
-            if (!Objects.equals(before.get(key), after.get(key))) return false;
+            // A focused project/topic projection can materialize fields that
+            // were absent (or null) in the plan snapshot after the first
+            // workbench write. Only compare values that were observable
+            // before execution.
+            if (!before.containsKey(key) || before.get(key) == null) continue;
+            if (!valuesEquivalent(before.get(key), after.get(key))) return false;
         }
         return true;
     }
@@ -216,9 +223,20 @@ public class AiOrchestratorVerificationService {
             if (allowedMutations.contains(key)) continue;
             JsonNode beforeValue = value(beforeComponent.content(), key);
             JsonNode afterValue = value(afterComponent.content(), key);
-            if (!Objects.equals(beforeValue, afterValue)) return false;
+            if (!valuesEquivalent(beforeValue, afterValue)) return false;
         }
         return true;
+    }
+
+    private boolean valuesEquivalent(Object before, Object after) {
+        if (before instanceof Number left && after instanceof Number right) {
+            return new BigDecimal(left.toString()).compareTo(new BigDecimal(right.toString())) == 0;
+        }
+        if ((before instanceof CharSequence || before instanceof TemporalAccessor)
+                && (after instanceof CharSequence || after instanceof TemporalAccessor)) {
+            return String.valueOf(before).contentEquals(String.valueOf(after));
+        }
+        return Objects.equals(before, after);
     }
 
     private boolean resourceProtectedFieldsUnchanged(AiPlanDO plan,
@@ -229,12 +247,17 @@ public class AiOrchestratorVerificationService {
         AiWorkflowContextDTO.Component beforeComponent = resourceComponent(before, plan);
         AiWorkflowContextDTO.Component afterComponent = resourceComponent(after, plan);
         if (beforeComponent == null || afterComponent == null) return false;
-        List<String> protectedFields = resourceProtectedFields(beforeComponent, afterComponent);
+        // Only compare protected values that were observable in the plan's
+        // before snapshot. Project/topic focused projections may materialize
+        // identifiers (projectId/nodeId/workbench) after the first write;
+        // treating those after-only values as a mutation would turn a valid
+        // write into WRITE_RESULT_UNKNOWN.
+        List<String> protectedFields = resourceProtectedFields(beforeComponent, beforeComponent);
         for (String field : protectedFields) {
             if (allowedMutations.contains(field)) continue;
             Object beforeValue = resourceField(before, beforeComponent, plan.getNodeId(), field);
             Object afterValue = resourceField(after, afterComponent, plan.getNodeId(), field);
-            if (beforeValue == null && afterValue == null) continue;
+            if (beforeValue == null) continue;
             if (!Objects.equals(beforeValue, afterValue)) return false;
         }
         return true;
@@ -376,25 +399,43 @@ public class AiOrchestratorVerificationService {
 
     private boolean containsPatch(JsonNode container, JsonNode patch) {
         if (container == null || patch == null) return false;
-        if (container.isObject() && patch.isObject()) {
-            boolean allMatch = true;
-            Iterator<Map.Entry<String, JsonNode>> fields = patch.fields();
-            while (fields.hasNext()) {
-                Map.Entry<String, JsonNode> field = fields.next();
-                JsonNode actual = container.get(field.getKey());
-                if (actual == null || !(actual.equals(field.getValue())
-                        || containsPatch(actual, field.getValue()))) {
-                    allMatch = false;
-                    break;
-                }
-            }
-            if (allMatch) return true;
-        }
+        if (containsExpectedShape(container, patch)) return true;
         if (container.isContainerNode()) {
             for (JsonNode child : container) {
                 if (containsPatch(child, patch)) return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Compare the agent's expected patch with the persisted projection while
+     * allowing PMS to add server-owned metadata to structured values (for
+     * example ids on scope items). Object fields are a subset match; arrays
+     * retain their length and order so a partial or reordered write cannot be
+     * reported as verified.
+     */
+    private boolean containsExpectedShape(JsonNode actual, JsonNode expected) {
+        if (actual == null || expected == null) return false;
+        if (expected.isObject()) {
+            if (!actual.isObject()) return false;
+            Iterator<Map.Entry<String, JsonNode>> fields = expected.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                JsonNode actualValue = actual.get(field.getKey());
+                if (actualValue == null || !containsExpectedShape(actualValue, field.getValue())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (expected.isArray()) {
+            if (!actual.isArray() || actual.size() != expected.size()) return false;
+            for (int index = 0; index < expected.size(); index++) {
+                if (!containsExpectedShape(actual.get(index), expected.get(index))) return false;
+            }
+            return true;
+        }
+        return actual.equals(expected);
     }
 }

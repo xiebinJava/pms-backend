@@ -111,7 +111,8 @@ class ProjectTopicOrchestratorRecoveryTest {
                 .containsEntry("itemId", 43L)
                 .containsEntry("nodeId", 511L)
                 .containsEntry("version", 4L)
-                .containsEntry("fieldValues", Map.of("result", "通过"));
+                .containsEntry("fieldValues", Map.of("__components",
+                        Map.of("topic-design-review", Map.of("result", "通过"))));
     }
 
     @Test

@@ -182,6 +182,26 @@ class AiOrchestratorVerificationServiceTest {
     }
 
     @Test
+    void verifiesAProjectStructuredPatchWithServerOwnedItemMetadata() throws Exception {
+        AiWorkflowContextDTO before = projectContext(Map.of(), Map.of("status", "OPEN"), 6);
+        AiWorkflowContextDTO after = projectContext(
+                Map.of("evidence", List.of(Map.of("id", 9L, "title", "已完成", "sort", 0))),
+                Map.of("status", "OPEN"), 7);
+        AiPlanDO plan = projectPlan(before, 6L, "solution-design");
+        AgentDraft draft = resourceDraft(Map.of(
+                "evidence", List.of(Map.of("title", "已完成", "sort", 0))));
+        when(connectorPort.readResource("project", 42L)).thenReturn(
+                new AiResourceDetailDTO("project", 42L, 4, Map.of("title", "项目", "status", "OPEN")));
+        when(connectorPort.readContext(any(), any(), any())).thenReturn(after);
+
+        var result = service.verify(plan, draft, new AiOperationResultDTO(
+                "op-project", "SUCCEEDED", "已保存", Map.of(), List.of()));
+
+        assertThat(result.status()).isEqualTo("SUCCEEDED");
+        assertThat(result.patchApplied()).isTrue();
+    }
+
+    @Test
     void rejectsAProjectPatchReadbackFromAnotherComponent() throws Exception {
         AiWorkflowContextDTO before = projectContext(Map.of(), Map.of("status", "OPEN"), 6);
         AiWorkflowContextDTO after = projectContext(Map.of(), Map.of("status", "OPEN"), 7,
