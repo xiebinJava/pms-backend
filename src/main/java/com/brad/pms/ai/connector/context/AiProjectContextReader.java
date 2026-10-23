@@ -83,6 +83,8 @@ public class AiProjectContextReader {
             List<AiWorkflowContextDTO.Component> components = isSelected
                     ? readSelectedComponents(project, node, options.componentKey(), unknownComponents, projector)
                     : placeholderComponents(node);
+            Map<String, Object> saveContract = isSelected
+                    ? ProjectProfileSaveContract.create(project, node, allowedActionsRegistry.projectActions()) : null;
             Map<String, Object> fieldValues;
             Map<String, Integer> fieldValueVersions;
             String fieldValuesState;
@@ -95,10 +97,11 @@ public class AiProjectContextReader {
                 fieldValueVersions = null;
                 fieldValuesState = "UNAVAILABLE";
             } else {
-                Map<String, Object> original = node.getFieldValues() == null ? Map.of()
+                Map<String, Object> original = node.getFieldValues() == null ? new LinkedHashMap<>()
                         : new LinkedHashMap<>(node.getFieldValues());
                 // 项目 focused 也不携带组件原始 JSON（去重，正文仅来自 selected component 内容）。
                 if (focused) original.remove("__components");
+                original.putAll(ProjectProfileSaveContract.values(project, saveContract));
                 fieldValues = projector.projectFieldValues("project", projectId, original);
                 fieldValueVersions = node.getFieldValueVersions();
                 fieldValuesState = "LOADED";
@@ -110,7 +113,7 @@ public class AiProjectContextReader {
                     node.getVersion(), node.getDescription(), node.getDeliverable(),
                     node.getOwnerId(), node.getOwnerName(), node.getStartDate(), node.getEndDate(),
                     fieldValueVersions, fieldValuesState, node.getPermissions(),
-                    isSelected ? taskService.summarizeByNode(projectId, node.getId()) : null));
+                    isSelected ? taskService.summarizeByNode(projectId, node.getId()) : null, null, saveContract));
         }
         if (unresolvedNodeConfig) {
             warnings.add(new AiWorkflowContextDTO.Warning("UNRESOLVED_NODE_CONFIG",
@@ -245,6 +248,7 @@ public class AiProjectContextReader {
         put(details, "description", project.getDescription());
         put(details, "status", project.getStatus());
         put(details, "priority", project.getPriority());
+        put(details, "projectLevel", project.getProjectLevel());
         put(details, "ownerId", project.getOwnerId());
         put(details, "ownerName", project.getOwnerName());
         put(details, "projectManagerId", project.getProjectManagerId());

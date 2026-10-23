@@ -45,7 +45,7 @@ class CompleteDevelopmentItemNodeCommandTest {
 
         CommandPreview preview = command.preview(new CommandPreviewRequest(
                 CommandName.DEVELOPMENT_ITEM_NODE_COMPLETE,
-                Map.of("itemType", "STORY", "itemId", 34L, "nodeId", 383L),
+                Map.of("itemType", "STORY", "itemId", 34L, "nodeId", 383L, "version", 4),
                 "story:34", "4"));
 
         assertThat(preview.preconditions())
@@ -83,7 +83,7 @@ class CompleteDevelopmentItemNodeCommandTest {
 
         CommandPreview preview = command.preview(new CommandPreviewRequest(
                 CommandName.DEVELOPMENT_ITEM_NODE_COMPLETE,
-                Map.of("itemType", "STORY", "itemId", 34L, "nodeId", 383L),
+                Map.of("itemType", "STORY", "itemId", 34L, "nodeId", 383L, "version", 4),
                 "story:34", "4"));
 
         assertThat(preview.preconditions()).isEmpty();
@@ -112,7 +112,7 @@ class CompleteDevelopmentItemNodeCommandTest {
 
         CommandPreview preview = command.preview(new CommandPreviewRequest(
                 CommandName.DEVELOPMENT_ITEM_NODE_COMPLETE,
-                Map.of("itemType", "STORY", "itemId", 34L, "nodeId", 383L),
+                Map.of("itemType", "STORY", "itemId", 34L, "nodeId", 383L, "version", 4),
                 "story:34", "4"));
 
         assertThat(preview.preconditions()).extracting(CommandPreview.Precondition::code)

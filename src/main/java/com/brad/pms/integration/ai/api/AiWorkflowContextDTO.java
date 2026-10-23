@@ -70,11 +70,39 @@ public record AiWorkflowContextDTO(
             Map<String, Integer> fieldValueVersions,
             String fieldValuesState,
             NodePermissionsDTO permissions,
-            NodeTaskSummaryDTO taskSummary) {
+            NodeTaskSummaryDTO taskSummary,
+            Map<String, Object> completionContract,
+            Map<String, Object> saveContract) {
         public Node {
             components = components == null ? List.of() : List.copyOf(components);
             fields = fields == null ? List.of() : List.copyOf(fields);
             fieldValues = fieldValues == null ? Map.of() : new LinkedHashMap<>(fieldValues);
+            completionContract = completionContract == null ? null : new LinkedHashMap<>(completionContract);
+            saveContract = saveContract == null ? null : new LinkedHashMap<>(saveContract);
+        }
+
+        public Node(
+                Long id, String key, String label, int position, Integer status,
+                List<Component> components, List<Field> fields, Map<String, Object> fieldValues,
+                Integer version, String description, String deliverable, Long ownerId, String ownerName,
+                LocalDate startDate, LocalDate endDate, Map<String, Integer> fieldValueVersions,
+                String fieldValuesState, NodePermissionsDTO permissions, NodeTaskSummaryDTO taskSummary,
+                Map<String, Object> completionContract) {
+            this(id, key, label, position, status, components, fields, fieldValues, version, description,
+                    deliverable, ownerId, ownerName, startDate, endDate, fieldValueVersions,
+                    fieldValuesState, permissions, taskSummary, completionContract, null);
+        }
+
+        /** Source-compatible constructor retained for context readers without node completion metadata. */
+        public Node(
+                Long id, String key, String label, int position, Integer status,
+                List<Component> components, List<Field> fields, Map<String, Object> fieldValues,
+                Integer version, String description, String deliverable, Long ownerId, String ownerName,
+                LocalDate startDate, LocalDate endDate, Map<String, Integer> fieldValueVersions,
+                String fieldValuesState, NodePermissionsDTO permissions, NodeTaskSummaryDTO taskSummary) {
+            this(id, key, label, position, status, components, fields, fieldValues, version, description,
+                    deliverable, ownerId, ownerName, startDate, endDate, fieldValueVersions,
+                    fieldValuesState, permissions, taskSummary, null);
         }
 
         /** Legacy constructor retained for older context readers; new node facts stay null. */

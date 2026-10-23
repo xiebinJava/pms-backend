@@ -23,7 +23,7 @@ import java.util.Set;
 @Component
 @RequiredArgsConstructor
 public class CompleteDevelopmentItemNodeCommand implements PmsCommand {
-    private static final Set<String> ALLOWED = Set.of("itemType", "itemId", "nodeId");
+    private static final Set<String> ALLOWED = Set.of("itemType", "itemId", "nodeId", "version");
     private static final List<String> REFRESH = List.of("development-detail", "project-detail", "topic-detail", "story-detail");
     private final DevelopmentItemWorkflowService workflowService;
     private final DevelopmentItemCommandSupport itemSupport;
@@ -35,6 +35,7 @@ public class CompleteDevelopmentItemNodeCommand implements PmsCommand {
     public CommandPreview preview(CommandPreviewRequest request) {
         Map<String, Object> args = request.arguments(); support.rejectUnknown(args, ALLOWED, name().code());
         var node = itemSupport.node(args);
+        itemSupport.requireCurrentVersion(node, itemSupport.requiredVersion(args));
         List<CommandPreview.Precondition> preconditions = preconditions(args, node);
         return support.preview(request, name(), "完成研发事项流程节点", itemSupport.change("complete", args, node),
                 List.of("兼容旧入口：该操作不会填写节点详情；需要同时保存负责人、排期或字段时请使用 development-item.node.complete-with-data",
@@ -45,6 +46,8 @@ public class CompleteDevelopmentItemNodeCommand implements PmsCommand {
     public CommandResult execute(AiOperationDO operation) {
         Map<String, Object> args = support.readArguments(operation, name().code());
         support.rejectUnknown(args, ALLOWED, name().code());
+        var node = itemSupport.node(args);
+        itemSupport.requireCurrentVersion(node, itemSupport.requiredVersion(args));
         DevelopmentItemWorkflowDetailDTO detail = workflowService.completeNode(itemSupport.itemType(args),
                 itemSupport.itemId(args), itemSupport.nodeId(args));
         return support.result(operation, "研发事项流程节点已完成", Map.of("workflow", detail), REFRESH);

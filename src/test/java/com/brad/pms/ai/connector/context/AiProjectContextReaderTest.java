@@ -84,6 +84,27 @@ class AiProjectContextReaderTest {
     }
 
     @Test
+    void componentlessKickoffPublishesSaveContractAndProjectFactsWithNullStoredFields() {
+        var project = project(); project.setDescription("当前项目描述");
+        var selected = node(301L, "kickoff", 0, 1);
+        selected.setComponents(List.of()); selected.setFieldValues(null);
+        selected.setContentOrder(List.of("fields"));
+        selected.setFields(List.of(new com.brad.pms.workflow.WorkflowFieldDefinition("project-description", "项目描述",
+                com.brad.pms.workflow.WorkflowFieldType.TEXTAREA, true, List.of(), true, "project.description")));
+        when(projectService.detail(7L)).thenReturn(project);
+        when(nodeService.listReadOnly(7L)).thenReturn(List.of(selected));
+        when(workflowTemplateService.getVersionNo(88L)).thenReturn(4);
+        when(componentReader.read(any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(allowedActionsRegistry.projectActions()).thenReturn(List.of("project.update"));
+        when(referenceProjector.projectFieldValues(any(), any(), any())).thenAnswer(i -> i.getArgument(2));
+        when(referenceProjector.projectResourceDetails(any(), any(), any())).thenAnswer(i -> i.getArgument(2));
+        var context = reader().read(7L, new ContextReadOptions("focused", 301L, null));
+        assertThat(context.workflow().nodes().get(0).saveContract()).containsEntry("command", "project.update");
+        assertThat(context.workflow().nodes().get(0).fieldValues()).containsEntry("description", "当前项目描述");
+        assertThat(context.meta().pureRead()).isTrue();
+    }
+
+    @Test
     void actualNodesDrivePositionCurrentAndSelectedFacts() {
         lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(2));

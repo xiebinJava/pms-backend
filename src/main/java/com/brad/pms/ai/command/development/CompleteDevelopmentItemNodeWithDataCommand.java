@@ -58,7 +58,7 @@ public class CompleteDevelopmentItemNodeWithDataCommand implements PmsCommand {
         change.put("ownerId", ownerId);
         change.put("startDate", startDate);
         change.put("endDate", endDate);
-        change.put("allowedMutations", CompletionContract.allowedMutations());
+        change.put("allowedMutations", allowedMutations(node, incoming));
         if (incoming != null) change.put("fieldValues", incoming);
         return support.preview(request, name(), "保存节点详情并完成研发事项流程节点", change,
                 List.of("负责人、排期和动态字段会与节点推进在同一事务中提交"), REFRESH,
@@ -97,7 +97,14 @@ public class CompleteDevelopmentItemNodeWithDataCommand implements PmsCommand {
                 type, itemSupport.itemId(args), itemSupport.nodeId(args));
         return support.result(operation, "研发事项节点详情已保存并完成", Map.of(
                 "workflow", detail,
-                "allowedMutations", CompletionContract.allowedMutations()), REFRESH);
+                "allowedMutations", allowedMutations(node, args.containsKey("fieldValues")
+                        ? support.fieldValues(args, "fieldValues") : null)), REFRESH);
+    }
+
+    private List<String> allowedMutations(DevelopmentItemWorkflowNodeDTO node, Map<String, JsonNode> incoming) {
+        var mutations = new java.util.LinkedHashSet<>(CompletionContract.allowedMutations());
+        mutations.addAll(DevelopmentItemCommandSupport.boundMutations(node, incoming));
+        return List.copyOf(mutations);
     }
 
     private Map<String, JsonNode> mergeFieldValues(DevelopmentItemWorkflowNodeDTO node,
@@ -132,7 +139,8 @@ public class CompleteDevelopmentItemNodeWithDataCommand implements PmsCommand {
         if (node.getFields() != null) {
             for (var field : node.getFields()) {
                 if (!field.required() || Boolean.FALSE.equals(field.visible()) || field.binding() == null) continue;
-                var value = node.getBoundFieldValues() == null ? null : node.getBoundFieldValues().get(field.binding());
+                var value = values.containsKey(field.key()) ? values.get(field.key())
+                        : node.getBoundFieldValues() == null ? null : node.getBoundFieldValues().get(field.key());
                 if (value == null || value.isNull() || (value.isTextual() && value.asText().isBlank())) missing.add(field.label());
             }
         }

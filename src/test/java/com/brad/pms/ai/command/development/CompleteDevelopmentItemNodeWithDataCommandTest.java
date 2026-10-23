@@ -27,6 +27,34 @@ import static org.mockito.Mockito.doThrow;
 class CompleteDevelopmentItemNodeWithDataCommandTest {
 
     @Test
+    void previewUsesIncomingBoundFieldsAndSavedFieldKeys() {
+        var service = mock(DevelopmentItemWorkflowService.class);
+        var mapper = new ObjectMapper().findAndRegisterModules();
+        var support = new PmsCommandSupport(mapper);
+        var command = new CompleteDevelopmentItemNodeWithDataCommand(service,
+                new DevelopmentItemCommandSupport(service, support), support);
+        var node = new DevelopmentItemWorkflowNodeDTO();
+        node.setId(383L); node.setVersion(4); node.setOwnerId(1L);
+        node.setStartDate(LocalDate.of(2026, 10, 1)); node.setEndDate(LocalDate.of(2026, 10, 9));
+        node.setFields(List.of(
+                new com.brad.pms.workflow.WorkflowFieldDefinition("name", "名称",
+                        com.brad.pms.workflow.WorkflowFieldType.TEXT, true, List.of(), true, "requirement.title"),
+                new com.brad.pms.workflow.WorkflowFieldDefinition("description", "描述",
+                        com.brad.pms.workflow.WorkflowFieldType.TEXTAREA, true, List.of(), true, "requirement.description")));
+        node.setBoundFieldValues(Map.of("name", mapper.valueToTree("现有名称")));
+        var detail = new DevelopmentItemWorkflowDetailDTO(); detail.setNodes(List.of(node));
+        when(service.detail(DevelopmentItemType.REQUIREMENT, 34L)).thenReturn(detail);
+        var preview = command.preview(new CommandPreviewRequest(CommandName.DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA,
+                Map.of("itemType", "REQUIREMENT", "itemId", 34L, "nodeId", 383L, "version", 4,
+                        "fieldValues", Map.of("description", "新增描述")), "requirement:34", "4"));
+        assertThat(preview.preconditions()).isEmpty();
+        var cleared = command.preview(new CommandPreviewRequest(CommandName.DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA,
+                Map.of("itemType", "REQUIREMENT", "itemId", 34L, "nodeId", 383L, "version", 4,
+                        "fieldValues", Map.of("description", "")), "requirement:34", "4"));
+        assertThat(cleared.preconditions()).extracting(CommandPreview.Precondition::code).contains("REQUIRED_FIELDS");
+    }
+
+    @Test
     void previewsTheEffectiveDetailsThatWillBeSavedBeforeCompletion() {
         DevelopmentItemWorkflowService workflowService = mock(DevelopmentItemWorkflowService.class);
         PmsCommandSupport support = new PmsCommandSupport(new ObjectMapper().findAndRegisterModules());

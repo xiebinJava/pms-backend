@@ -57,6 +57,7 @@ public class UpdateDevelopmentItemNodeFieldCommand implements PmsCommand {
         values.putAll(incoming); command.setFieldValues(values);
         DevelopmentItemWorkflowDetailDTO detail = workflowService.updateNode(type, itemSupport.itemId(args),
                 itemSupport.nodeId(args), command);
-        return support.result(operation, "研发事项节点字段已更新", Map.of("workflow", detail), REFRESH);
+        return support.result(operation, "研发事项节点字段已更新", Map.of("workflow", detail,
+                        "allowedMutations", DevelopmentItemCommandSupport.boundMutations(node, incoming)), REFRESH);
     }
 }
