@@ -15,6 +15,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -213,6 +215,91 @@ class AiDevelopmentContextReaderTest {
                     assertThat(thrown.getCode()).isEqualTo(422);
                     assertThat(thrown.getMessage()).startsWith("NO_SELECTED_NODE:");
                 });
+    }
+
+    @Test
+    void emptyNodePublishesDirectCompletionContract() {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
+        DevelopmentItemWorkflowDetailDTO detail = configured();
+        DevelopmentItemWorkflowNodeDTO empty = new DevelopmentItemWorkflowNodeDTO();
+        empty.setId(109L);
+        empty.setNodeKey("release");
+        empty.setName("需求上线");
+        empty.setSort(0);
+        empty.setStatus(1);
+        empty.setVersion(2);
+        empty.setRuntimeComponents(null);
+        empty.setFields(null);
+        detail.setNodes(List.of(empty));
+        when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
+                .thenReturn(detail);
+        lenient().when(componentReader.read(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+        lenient().when(allowedActionsRegistry.developmentActions("requirement"))
+                .thenReturn(List.of("development-item.node.complete-with-data"));
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+
+        AiWorkflowContextDTO context = reader().read(
+                com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L,
+                new ContextReadOptions("focused", 109L, null));
+
+        var json = JsonMapper.builder().addModule(new JavaTimeModule()).build().valueToTree(context);
+        assertThat(json.at("/workflow/nodes/0/completionContract/command").asText())
+                .isEqualTo("development-item.node.complete-with-data");
+        assertThat(json.at("/workflow/nodes/0/completionContract/completionSupported").asBoolean())
+                .isTrue();
+        assertThat(json.at("/workflow/nodes/0/completionContract/writableFields").isArray())
+                .isTrue();
+    }
+
+    @Test
+    void requirementEntryPublishesRootSaveContractAndFocusedBoundFacts() {
+        var field = new com.brad.pms.workflow.WorkflowFieldDefinition("description", "需求描述",
+                com.brad.pms.workflow.WorkflowFieldType.TEXTAREA, true, List.of(), true, "requirement.description");
+        var selected = node(109L, 0, 1, 2);
+        selected.setRuntimeComponents(List.of());
+        selected.setFields(List.of(field));
+        selected.setBoundFieldValues(Map.of("description", JsonMapper.builder().build().valueToTree("已有描述")));
+        var context = readSingleRequirementNode(selected);
+        var json = JsonMapper.builder().addModule(new JavaTimeModule()).build().valueToTree(context);
+        assertThat(json.at("/workflow/nodes/0/saveContract/fieldValuesPath").asText()).isEqualTo("$");
+        assertThat(json.at("/workflow/nodes/0/saveContract/writableFields/0").asText()).isEqualTo("description");
+        assertThat(json.at("/workflow/nodes/0/fieldValues/description").asText()).isEqualTo("已有描述");
+    }
+
+    @Test
+    void requirementExecutionPublishesCompletionWithoutMakingTargetWritable() {
+        var selected = node(109L, 0, 1, 2);
+        selected.setRuntimeComponents(List.of("requirement-execution"));
+        selected.setFields(List.of());
+        var json = JsonMapper.builder().addModule(new JavaTimeModule()).build()
+                .valueToTree(readSingleRequirementNode(selected));
+        assertThat(json.at("/workflow/nodes/0/completionContract/command").asText())
+                .isEqualTo("development-item.node.complete-with-data");
+        assertThat(json.at("/workflow/nodes/0/completionContract/effectiveWritableFields").size()).isZero();
+        assertThat(json.at("/workflow/nodes/0/completionContract/completionRequiredMetadata/0").asText())
+                .isEqualTo("ownerId");
+    }
+
+    private AiWorkflowContextDTO readSingleRequirementNode(DevelopmentItemWorkflowNodeDTO selected) {
+        lenient().when(referenceProjector.projectFieldValues(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        when(requirementManagementService.detailForContext(23L)).thenReturn(requirementDetail());
+        var detail = configured();
+        detail.setNodes(List.of(selected));
+        when(workflowService.detailIfInitialized(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L))
+                .thenReturn(detail);
+        lenient().when(componentReader.read(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+        when(allowedActionsRegistry.developmentActions("requirement"))
+                .thenReturn(List.of("development-item.node.field.update", "development-item.node.complete-with-data"));
+        lenient().when(referenceProjector.projectResourceDetails(any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        return reader().read(com.brad.pms.workflow.DevelopmentItemType.REQUIREMENT, 23L,
+                new ContextReadOptions("focused", selected.getId(), null));
     }
 
     @Test

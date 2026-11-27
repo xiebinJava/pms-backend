@@ -321,7 +321,8 @@ public final class PmsCommandMetadata {
             case DEVELOPMENT_ITEM_NODE_COMPLETE -> descriptor(name, "完成研发事项流程节点并推进流程（兼容旧入口；不会填写节点详情）", "high", List.of(
                     Map.entry("itemType", Map.of("type", "string", "required", true)),
                     Map.entry("itemId", Map.of("type", "integer", "required", true)),
-                    Map.entry("nodeId", Map.of("type", "integer", "required", true))));
+                    Map.entry("nodeId", Map.of("type", "integer", "required", true)),
+                    Map.entry("version", Map.of("type", "integer", "required", true))));
             case DEVELOPMENT_ITEM_NODE_COMPLETE_WITH_DATA -> descriptor(name,
                     "保存研发事项流程节点详情并完成节点，字段、负责人和排期在一次原子操作中提交",
                     "medium", List.of(

@@ -81,6 +81,8 @@ public class AiDevelopmentContextReader {
 
             Map<String, Object> fieldValues = fieldsFor(node, isSelected, focused, resourceType, itemId, projector);
             String fieldValuesState = !isSelected ? (focused ? "NOT_REQUESTED" : "LOADED") : "LOADED";
+            Map<String, Object> completionContract = isSelected
+                    ? nodeCompletionContract(itemType, itemId, node) : null;
 
             contractNodes.add(new AiWorkflowContextDTO.Node(
                     node.getId(), node.getNodeKey(), node.getName(), position, node.getStatus(),
@@ -88,7 +90,8 @@ public class AiDevelopmentContextReader {
                     node.getVersion(), node.getDescription(), node.getDeliverable(),
                     node.getOwnerId(), node.getOwnerName(), node.getStartDate(), node.getEndDate(),
                     null, fieldValuesState, null,
-                    isSelected ? taskSummary(detail, node) : null));
+                    isSelected ? taskSummary(detail, node) : null, completionContract,
+                    isSelected ? nodeSaveContract(itemType, itemId, node) : null));
         }
         for (String flag : unknownComponents) {
             if (flag.startsWith("UNKNOWN_VERSION:")) {
@@ -139,6 +142,8 @@ public class AiDevelopmentContextReader {
 
             Map<String, Object> fieldValues = fieldsFor(node, isSelected, focused, resourceType, itemId, projector);
             String fieldValuesState = !isSelected ? (focused ? "NOT_REQUESTED" : "LOADED") : "LOADED";
+            Map<String, Object> completionContract = isSelected
+                    ? nodeCompletionContract(DevelopmentItemType.REQUIREMENT, itemId, node) : null;
 
             contractNodes.add(new AiWorkflowContextDTO.Node(
                     node.getId(), node.getNodeKey(), node.getName(), position, node.getStatus(),
@@ -146,7 +151,8 @@ public class AiDevelopmentContextReader {
                     node.getVersion(), node.getDescription(), node.getDeliverable(),
                     node.getOwnerId(), node.getOwnerName(), node.getStartDate(), node.getEndDate(),
                     null, fieldValuesState, null,
-                    isSelected ? taskSummary(workflow, node) : null));
+                    isSelected ? taskSummary(workflow, node) : null, completionContract,
+                    isSelected ? nodeSaveContract(DevelopmentItemType.REQUIREMENT, itemId, node) : null));
         }
         for (String flag : unknownComponents) {
             if (flag.startsWith("UNKNOWN_VERSION:")) {
@@ -218,6 +224,74 @@ public class AiDevelopmentContextReader {
         return components;
     }
 
+    /** Componentless nodes save real template fields at the root of fieldValues. */
+    private Map<String, Object> nodeSaveContract(DevelopmentItemType itemType, Long itemId,
+                                                 DevelopmentItemWorkflowNodeDTO node) {
+        if (itemType != DevelopmentItemType.REQUIREMENT || node.getId() == null || node.getVersion() == null
+                || (node.getRuntimeComponents() != null && !node.getRuntimeComponents().isEmpty())
+                || !allowedActionsRegistry.developmentActions("requirement")
+                        .contains("development-item.node.field.update")) return null;
+        var definitions = node.getFields() == null
+                ? List.<com.brad.pms.workflow.WorkflowFieldDefinition>of() : node.getFields();
+        var writable = definitions.stream().filter(field -> !Boolean.FALSE.equals(field.visible()))
+                .filter(field -> field.binding() == null || List.of("requirement.title", "requirement.description",
+                        "requirement.priority", "requirement.owner", "requirement.businessLine").contains(field.binding()))
+                .map(com.brad.pms.workflow.WorkflowFieldDefinition::key).toList();
+        if (writable.isEmpty()) return null;
+        Map<String, Object> contract = baseNodeContract(itemId, node);
+        contract.put("contractVersion", "node-detail/v1");
+        contract.put("command", "development-item.node.field.update");
+        contract.put("fieldValuesPath", "$");
+        contract.put("writableFields", writable);
+        contract.put("effectiveWritableFields", writable);
+        contract.put("requiredFields", definitions.stream().filter(field -> field.required()
+                && !Boolean.FALSE.equals(field.visible())).map(com.brad.pms.workflow.WorkflowFieldDefinition::key).toList());
+        contract.put("protectedFields", definitions.stream().map(com.brad.pms.workflow.WorkflowFieldDefinition::key)
+                .filter(key -> !writable.contains(key)).toList());
+        contract.put("fieldContracts", definitions.stream().filter(field -> writable.contains(field.key()))
+                .map(field -> {
+                    Map<String, Object> value = new LinkedHashMap<>();
+                    value.put("key", field.key()); value.put("label", field.label());
+                    value.put("type", field.type()); value.put("required", field.required());
+                    value.put("binding", field.binding()); value.put("options", field.options());
+                    return value;
+                }).toList());
+        return contract;
+    }
+
+    /** Execution facts remain read-only; completion may update only node metadata. */
+    private Map<String, Object> nodeCompletionContract(DevelopmentItemType itemType, Long itemId,
+                                                        DevelopmentItemWorkflowNodeDTO node) {
+        var attached = node.getRuntimeComponents() == null ? List.<String>of() : node.getRuntimeComponents();
+        var fields = node.getFields() == null ? List.of() : node.getFields();
+        if (itemType != DevelopmentItemType.REQUIREMENT || node.getId() == null || node.getVersion() == null
+                || !fields.isEmpty()
+                || !(attached.isEmpty() || attached.equals(List.of("requirement-execution")))
+                || !allowedActionsRegistry.developmentActions("requirement")
+                        .contains("development-item.node.complete-with-data")) return null;
+        Map<String, Object> contract = baseNodeContract(itemId, node);
+        contract.put("contractVersion", "node-completion/v1");
+        contract.put("command", "development-item.node.complete-with-data");
+        contract.put("writableFields", List.of());
+        contract.put("effectiveWritableFields", List.of());
+        contract.put("requiredFields", List.of());
+        contract.put("protectedFields", List.of("status", "targetType", "targetId", "systemId"));
+        return contract;
+    }
+
+    private Map<String, Object> baseNodeContract(Long itemId, DevelopmentItemWorkflowNodeDTO node) {
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("itemType", "REQUIREMENT"); contract.put("itemId", itemId);
+        contract.put("nodeId", node.getId()); contract.put("version", node.getVersion());
+        boolean completion = allowedActionsRegistry.developmentActions("requirement")
+                .contains("development-item.node.complete-with-data");
+        contract.put("completionSupported", completion);
+        if (completion) contract.put("completionCommand", "development-item.node.complete-with-data");
+        contract.put("completionRequiredMetadata", List.of("ownerId", "startDate", "endDate"));
+        CompletionContract.addTo(contract, CompletionContract.Mode.AUTO_CONFIRM, null);
+        return contract;
+    }
+
     private Map<String, Object> fieldsFor(DevelopmentItemWorkflowNodeDTO node, boolean isSelected,
                                           boolean focused, String resourceType, Long resourceId,
                                           AiContextReferenceProjector projector) {
@@ -228,6 +302,7 @@ public class AiDevelopmentContextReader {
             Map<String, Object> selectedValues = new LinkedHashMap<>();
             selectedValues.putAll(node.getFieldValues() == null ? Map.of() : node.getFieldValues());
             selectedValues.remove("__components");
+            selectedValues.putAll(node.getBoundFieldValues() == null ? Map.of() : node.getBoundFieldValues());
             fieldValues = projector.projectFieldValues(resourceType, resourceId, selectedValues);
         } else {
             Map<String, Object> merged = new LinkedHashMap<>();

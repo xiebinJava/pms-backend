@@ -78,6 +78,26 @@ public class DevelopmentItemCommandSupport {
         return change;
     }
 
+    /** Only template-declared entity bindings submitted in this patch may change resource facts. */
+    public static java.util.List<String> boundMutations(DevelopmentItemWorkflowNodeDTO node,
+                                                        Map<String, com.fasterxml.jackson.databind.JsonNode> incoming) {
+        if (node.getFields() == null || incoming == null) return java.util.List.of();
+        java.util.Set<String> result = new java.util.LinkedHashSet<>();
+        for (var field : node.getFields()) {
+            if (!incoming.containsKey(field.key()) || field.binding() == null) continue;
+            String mutation = switch (field.binding()) {
+                case "requirement.title" -> "title";
+                case "requirement.description" -> "description";
+                case "requirement.priority" -> "priority";
+                case "requirement.owner" -> "ownerId";
+                case "requirement.businessLine" -> "orgUnitId";
+                default -> null;
+            };
+            if (mutation != null) result.add(mutation);
+        }
+        return java.util.List.copyOf(result);
+    }
+
     public PmsCommandSupport commandSupport() {
         return commandSupport;
     }
