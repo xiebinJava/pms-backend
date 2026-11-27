@@ -83,7 +83,7 @@ public class CliAuthController {
             return ResponseResult.success(exchangeAuthorizationCode(request));
         }
         if ("refresh_token".equals(request.grantType())) {
-            return ResponseResult.success(toTokenResponse(authService.refresh(request.refreshToken())));
+            return ResponseResult.success(toTokenResponse(authService.refreshCliSession(request.refreshToken())));
         }
         throw BusinessException.error("不支持的 CLI 授权类型");
     }

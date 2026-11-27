@@ -23,20 +23,22 @@ latest_migration="$({ find "$BACKEND_DIR/src/main/resources/db/migration" -maxde
   | sed -nE 's/^V([0-9]+)__.*\.sql$/\1/p' \
   | sort -n \
   | tail -n 1)"
-[[ "$latest_migration" == "73" ]] || fail "expected current migration baseline V1–V73, found V${latest_migration:-unknown}"
+[[ "$latest_migration" == "74" ]] || fail "expected current migration baseline V1–V74, found V${latest_migration:-unknown}"
 
 integration_workflow="$BACKEND_DIR/.github/workflows/integration.yml"
 [[ -f "$integration_workflow" ]] || fail "integration workflow does not exist: $integration_workflow"
-grep -F -- "default: release" "$integration_workflow" >/dev/null \
-  || fail "integration workflow must default to the frontend release branch"
-grep -F -- 'ref: ${{ inputs.frontend_ref || '\''release'\'' }}' "$integration_workflow" >/dev/null \
-  || fail "integration workflow must check out the frontend release branch by default"
+grep -Eq -- '^[[:space:]]+ref: [$][{][{] inputs[.]frontend_ref [|][|] [[:punct:]][0-9a-f]{40}[[:punct:]] [}][}]$' "$integration_workflow" \
+  || fail "integration workflow must pin an immutable frontend commit by default"
 grep -E -- '^[[:space:]]+E2E_BASE_URL: http://127\.0\.0\.1:5173$' "$integration_workflow" >/dev/null \
   || fail "integration workflow must pass the live E2E base URL variable expected by browser smoke tests"
 grep -F -- 'PMS_E2E_BASE_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \
   || fail "integration workflow must pass the frontend base URL variable expected by Playwright"
 grep -F -- 'PMS_PROJECT_LIST_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \
   || fail "integration workflow must pass the frontend base URL variable expected by project-list and task browser tests"
+first_login="$(grep -nF -- 'pnpm exec playwright test tests/e2e/bootstrap-password.spec.cjs' "$integration_workflow" | cut -d: -f1)"
+api_smoke="$(grep -nF -- 'run: ./scripts/smoke-test.sh' "$integration_workflow" | cut -d: -f1)"
+[[ -n "$first_login" && -n "$api_smoke" && "$first_login" -lt "$api_smoke" ]] \
+  || fail "the first-login browser test must rotate the initial password before authenticated smoke tests"
 for browser_command in \
   'pnpm exec playwright test tests/e2e/auth-and-project.spec.ts tests/e2e/manual-record.spec.ts tests/e2e/task-overdue-reschedule.spec.ts' \
   'pnpm exec playwright test --config tests/e2e/playwright.enterprise-board.config.mjs' \
@@ -73,4 +75,4 @@ for route in \
   grep -F -- "$route" "$openapi" >/dev/null || fail "feedback route missing from OpenAPI contract: $route"
 done
 
-echo "Release consistency checks passed: migration=V1–V73, readiness=aligned, READMEs=current, feedback routes=documented"
+echo "Release consistency checks passed: migration=V1–V74, readiness=aligned, READMEs=current, feedback routes=documented"

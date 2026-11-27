@@ -205,6 +205,7 @@ class AuthServiceTest {
         request.setCurrentPassword("CorrectPassword1!");
         request.setNewPassword("NewCorrectPassword2!");
 
+        when(userMapper.selectForUpdate(7L)).thenReturn(user);
         authService.changePassword(request);
 
         assertThat(new BCryptPasswordEncoder().matches("NewCorrectPassword2!", user.getPassword())).isTrue();

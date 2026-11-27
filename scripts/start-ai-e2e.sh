@@ -54,6 +54,14 @@ fi
 mkdir -p "$RUN_DIR"
 chmod 700 "$RUN_DIR"
 umask 077
+initial_file="$RUN_DIR/initial-admin-password"
+if [[ ! -f "$initial_file" ]]; then
+  candidate="$(mktemp "$RUN_DIR/initial.XXXXXX")"
+  openssl rand -hex 24 >"$candidate"
+  ln "$candidate" "$initial_file" 2>/dev/null || [[ -f "$initial_file" ]]
+  rm -f "$candidate"
+fi
+initial_password="$(<"$initial_file")"
 cat >"$COMPOSE_FILE" <<'YAML'
 services:
   mysql:
@@ -130,7 +138,7 @@ if [[ "$FOREGROUND" == "true" ]]; then
   MYSQL_PASSWORD="$PMS_E2E_MYSQL_PASSWORD" \
   PMS_JWT_SECRET="$PMS_E2E_JWT_SECRET" \
   PMS_BOOTSTRAP_ADMIN_EMAIL="$PMS_E2E_ADMIN_EMAIL" \
-  PMS_BOOTSTRAP_ADMIN_PASSWORD="$PMS_E2E_ADMIN_PASSWORD" \
+  PMS_BOOTSTRAP_ADMIN_PASSWORD="$initial_password" \
   PMS_BOOTSTRAP_ADMIN_USERNAME="${PMS_E2E_ADMIN_USERNAME:-admin}" \
   PMS_BOOTSTRAP_ADMIN_NAME_ZH="${PMS_E2E_ADMIN_NAME_ZH:-AI E2E 管理员}" \
   PMS_CORS_ALLOWED_ORIGINS="${PMS_E2E_AUTH_ORIGIN:-http://127.0.0.1:$API_PORT}" \
@@ -150,7 +158,7 @@ else
   MYSQL_PASSWORD="$PMS_E2E_MYSQL_PASSWORD" \
   PMS_JWT_SECRET="$PMS_E2E_JWT_SECRET" \
   PMS_BOOTSTRAP_ADMIN_EMAIL="$PMS_E2E_ADMIN_EMAIL" \
-  PMS_BOOTSTRAP_ADMIN_PASSWORD="$PMS_E2E_ADMIN_PASSWORD" \
+  PMS_BOOTSTRAP_ADMIN_PASSWORD="$initial_password" \
   PMS_BOOTSTRAP_ADMIN_USERNAME="${PMS_E2E_ADMIN_USERNAME:-admin}" \
   PMS_BOOTSTRAP_ADMIN_NAME_ZH="${PMS_E2E_ADMIN_NAME_ZH:-AI E2E 管理员}" \
   PMS_CORS_ALLOWED_ORIGINS="${PMS_E2E_AUTH_ORIGIN:-http://127.0.0.1:$API_PORT}" \
@@ -174,6 +182,7 @@ for _ in $(seq 1 90); do
   status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 \
     "http://127.0.0.1:${API_PORT}/api/auth/me" 2>/dev/null || true)"
   if [[ "$status" == "200" || "$status" == "401" ]]; then
+    PMS_BOOTSTRAP_ADMIN_PASSWORD="$initial_password" python3 "$SCRIPT_DIR/complete-e2e-bootstrap.py" "http://127.0.0.1:${API_PORT}/api"
     echo "PMS_E2E_BASE_URL=http://127.0.0.1:${API_PORT}/api"
     echo "PMS_E2E_AUTH_ORIGIN=http://127.0.0.1:${API_PORT}"
     echo "PMS_E2E_DATABASE_NAME=$DATABASE_NAME"

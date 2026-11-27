@@ -91,12 +91,13 @@ persistence:
 
 # Production should set existingSecret and leave these placeholders unused.
 # Required keys: jwtSecret, mysqlPassword, bootstrapAdminEmail,
-# bootstrapAdminPassword, bootstrapAdminNameZh, bootstrapAdminUsername
+# bootstrapAdminNameZh, bootstrapAdminUsername. Supply bootstrapAdminPassword only to initialize an empty database.
 existingSecret: ""
 secret:
   jwtSecret: replace_with_a_random_secret_at_least_32_bytes
   mysqlPassword: replace_with_pms_app_password
   bootstrapAdminEmail: admin@example.com
-  bootstrapAdminPassword: PmsAdmin123!
+  # Required by the application only when initializing an empty database.
+  bootstrapAdminPassword: ""
   bootstrapAdminNameZh: 系统管理员
   bootstrapAdminUsername: admin

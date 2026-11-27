@@ -10,6 +10,10 @@ import java.util.List;
 
 public interface UserMapper extends BaseMapper<UserDO> {
 
+    /** Historical installations may contain only disabled or soft-deleted accounts. */
+    @Select("SELECT EXISTS(SELECT 1 FROM sys_user)")
+    boolean hasAnyAccount();
+
     @Select("SELECT * FROM sys_user WHERE username = #{username} AND deleted = FALSE")
     UserDO findByUsername(@Param("username") String username);
 

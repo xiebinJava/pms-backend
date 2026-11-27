@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.brad.pms.mapper.DevelopmentPageMapper">
+    <select id="deletedTopicProjects" resultType="long">
+        SELECT DISTINCT project_id FROM project_node_development_topic
+        WHERE deleted = TRUE AND project_id IS NOT NULL
+        <if test="projectId != null">AND project_id = #{projectId}</if>
+    </select>
+    <sql id="projects">
+        <choose>
+            <when test="!projects.isEmpty()">
+                <foreach collection="projects" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </when>
+            <otherwise>(NULL)</otherwise>
+        </choose>
+    </sql>
+    <sql id="ids">
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </sql>
+    <!-- Convertors.trimToNull uses String.isBlank and String.trim (U+0000..0020). -->
+    <sql id="trimLabel">
+        CASE WHEN REGEXP_LIKE(${column},
+                '^[\\x{0009}-\\x{000D}\\x{001C}-\\x{0020}\\x{1680}\\x{2000}-\\x{2006}\\x{2008}-\\x{200A}\\x{2028}\\x{2029}\\x{205F}\\x{3000}]*$')
+             THEN NULL ELSE REGEXP_REPLACE(${column}, '^[\\x{0000}-\\x{0020}]+|[\\x{0000}-\\x{0020}]+$','') END
+    </sql>
+    <sql id="context">
+        LEFT JOIN project p ON p.id = i.project_id AND p.id IN <include refid="projects"/>
+        LEFT JOIN project_node n ON n.id = i.node_id AND n.deleted = FALSE AND n.project_id IN <include refid="projects"/>
+        LEFT JOIN (
+            SELECT id, COALESCE(<include refid="trimLabel"><property name="column" value="name_zh"/></include>,
+                                <include refid="trimLabel"><property name="column" value="nickname"/></include>) AS label,
+                   <include refid="trimLabel"><property name="column" value="username"/></include> AS account,
+                   <include refid="trimLabel"><property name="column" value="email"/></include> AS email
+            FROM sys_user
+        ) u ON u.id = i.owner_id
+    </sql>
+    <sql id="owner">
+        CASE WHEN u.account IS NOT NULL AND NOT REGEXP_LIKE(u.account,'^user-[a-fA-F0-9]{16}$','c')
+             THEN IF(u.label IS NULL, u.account, CONCAT(u.label,'（',u.account,'）'))
+             ELSE COALESCE(u.label,u.email,u.account) END
+    </sql>
+    <sql id="commonFilters">
+        <if test="query.projectId != null">AND i.project_id = #{query.projectId}</if>
+        <if test="query.nodeId != null">AND i.node_id = #{query.nodeId}</if>
+        <if test="query.ownerId != null">AND i.owner_id = #{query.ownerId}</if>
+    </sql>
+    <sql id="unicodePattern">
+        '(?=\\p{Cased})[^\\x{0000}-\\x{007f}]'
+    </sql>
+    <sql id="hasUnicodeCase">
+        REGEXP_LIKE(
+            CONVERT(CONCAT_WS(' ', i.title, p.name, p.code, n.name, <include refid="owner"/>
+                <if test="story">, t.title</if>) USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+            <include refid="unicodePattern"/>)
+    </sql>
+    <sql id="sqlKeywordMatch">
+        (LOCATE(BINARY #{keyword}, BINARY LOWER(i.title)) > 0
+         OR LOCATE(BINARY #{keyword}, BINARY LOWER(p.name)) > 0
+         OR LOCATE(BINARY #{keyword}, BINARY LOWER(p.code)) > 0
+         OR LOCATE(BINARY #{keyword}, BINARY LOWER(n.name)) > 0
+         OR LOCATE(BINARY #{keyword}, BINARY LOWER(<include refid="owner"/>)) > 0
+         <if test="story">OR LOCATE(BINARY #{keyword}, BINARY LOWER(t.title)) > 0</if>)
+    </sql>
+    <sql id="keywordFilter">
+        <if test="keyword != null">
+            AND (<include refid="sqlKeywordMatch"/>
+                 <if test='additionalMatches != "[]"'>
+                     OR i.id IN (SELECT matched.id FROM JSON_TABLE(#{additionalMatches}, '$[*]'
+                                                COLUMNS(id BIGINT PATH '$')) AS matched)
+                 </if>)
+            <if test='excludedMatches != "[]"'>
+                AND i.id NOT IN (SELECT matched.id FROM JSON_TABLE(#{excludedMatches}, '$[*]'
+                                               COLUMNS(id BIGINT PATH '$')) AS matched)
+            </if>
+        </if>
+    </sql>
+    <sql id="topicFrom">
+        FROM project_node_development_topic i
+        <include refid="context"/>
+        WHERE i.deleted = COALESCE(#{query.deleted}, FALSE)
+        AND (i.project_id IN <include refid="projects"/>
+             <if test="query.projectId == null">OR i.project_id IS NULL</if>)
+        <include refid="commonFilters"/>
+        <if test="@org.springframework.util.StringUtils@hasText(query.status)">
+            AND BINARY UPPER(#{query.status}) = BINARY (
+                SELECT CASE WHEN COUNT(*) = 0 OR SUM(BINARY s.status = 'NOT_STARTED') = COUNT(*) THEN 'NOT_STARTED'
+                            WHEN SUM(BINARY s.status = 'DONE') = COUNT(*) THEN 'DONE' ELSE 'IN_PROGRESS' END
+                FROM project_node_development_story s WHERE s.topic_id = i.id)
+        </if>
+    </sql>
+    <sql id="storyFrom">
+        FROM project_node_development_story i
+        LEFT JOIN project_node_development_topic t ON t.id = i.topic_id
+        <include refid="context"/>
+        WHERE ((t.deleted = FALSE AND (t.project_id IN <include refid="projects"/>
+                 <if test="query.projectId == null">OR t.project_id IS NULL</if>))
+                 <if test="query.projectId == null">OR i.topic_id IS NULL</if>)
+        AND (i.project_id IS NULL OR i.project_id IN <include refid="projects"/>)
+        <include refid="commonFilters"/>
+        <if test="@org.springframework.util.StringUtils@hasText(query.status)">
+            AND BINARY UPPER(i.status) = BINARY UPPER(#{query.status})
+        </if>
+    </sql>
+    <sql id="projectOrder">
+        CAST(CONVERT(COALESCE(p.name,'') USING utf16) AS BINARY), COALESCE(n.sort,2147483647),
+    </sql>
+    <sql id="pageEnd">
+        CAST(CONVERT(COALESCE(i.title,'') USING utf16) AS BINARY), i.id
+        LIMIT #{query.pageSize} OFFSET #{offset}
+    </sql>
+    <sql id="searchColumns">
+        i.id, i.title, p.name AS project_name, p.code AS project_code, n.name AS node_name,
+        <include refid="owner"/> AS owner_name
+    </sql>
+    <resultMap id="searchText" type="com.brad.pms.mapper.DevelopmentPageMapper$SearchText">
+        <constructor>
+            <idArg column="id" javaType="_long"/>
+            <arg column="title" javaType="string"/>
+            <arg column="project_name" javaType="string"/>
+            <arg column="project_code" javaType="string"/>
+            <arg column="node_name" javaType="string"/>
+            <arg column="owner_name" javaType="string"/>
+            <arg column="topic_title" javaType="string"/>
+            <arg column="sql_match" javaType="_boolean"/>
+        </constructor>
+    </resultMap>
+    <select id="unicodeTopicSearchText" resultMap="searchText" fetchSize="-2147483648">
+        <bind name="story" value="false"/>
+        SELECT <include refid="searchColumns"/>, NULL AS topic_title,
+               COALESCE(<include refid="sqlKeywordMatch"/>, FALSE) AS sql_match
+        <include refid="topicFrom"/> AND <include refid="hasUnicodeCase"/>
+    </select>
+    <select id="unicodeStorySearchText" resultMap="searchText" fetchSize="-2147483648">
+        <bind name="story" value="true"/>
+        SELECT <include refid="searchColumns"/>, t.title AS topic_title,
+               COALESCE(<include refid="sqlKeywordMatch"/>, FALSE) AS sql_match
+        <include refid="storyFrom"/> AND <include refid="hasUnicodeCase"/>
+    </select>
+    <select id="countTopics" resultType="long">
+        <bind name="story" value="false"/>
+        SELECT COUNT(*) <include refid="topicFrom"/><include refid="keywordFilter"/>
+    </select>
+    <select id="topicIds" resultType="long">
+        <bind name="story" value="false"/>
+        SELECT i.id <include refid="topicFrom"/><include refid="keywordFilter"/>
+        ORDER BY <include refid="projectOrder"/><include refid="pageEnd"/>
+    </select>
+    <select id="countStories" resultType="long">
+        <bind name="story" value="true"/>
+        SELECT COUNT(*) <include refid="storyFrom"/><include refid="keywordFilter"/>
+    </select>
+    <select id="storyIds" resultType="long">
+        <bind name="story" value="true"/>
+        SELECT i.id <include refid="storyFrom"/><include refid="keywordFilter"/>
+        ORDER BY <include refid="projectOrder"/>
+        CAST(CONVERT(COALESCE(t.title,'') USING utf16) AS BINARY), <include refid="pageEnd"/>
+    </select>
+    <sql id="columns">
+        i.id, i.title, i.project_id, p.code AS project_code, p.name AS project_name,
+        i.node_id, n.node_key, n.name AS node_name, i.owner_id, <include refid="owner"/> AS owner_name
+    </sql>
+    <select id="topics" resultType="com.brad.pms.dto.response.DevelopmentTopicListDTO">
+        SELECT <include refid="columns"/>, i.latest_build_version, i.test_status
+        FROM project_node_development_topic i <include refid="context"/>
+        WHERE i.id IN <include refid="ids"/>
+    </select>
+    <select id="stories" resultType="com.brad.pms.dto.response.DevelopmentStoryListDTO">
+        SELECT <include refid="columns"/>, i.topic_id, t.title AS topic_title, i.topic_workflow_node_id,
+               w.name AS topic_workflow_node_name, ip.name AS iteration_plan_name, i.status,
+               CASE BINARY i.status WHEN 'DONE' THEN 100 WHEN 'NOT_STARTED' THEN 0
+                    ELSE LEAST(100,GREATEST(0,COALESCE(i.progress,0))) END AS development_progress,
+               i.story_points, i.start_date, i.due_date, i.blocker
+        FROM project_node_development_story i <include refid="context"/>
+        LEFT JOIN project_node_development_topic t ON t.id = i.topic_id
+        LEFT JOIN pms_development_item_workflow_node w ON w.id = i.topic_workflow_node_id
+        LEFT JOIN project_node_iteration_plan ip ON ip.id = i.iteration_plan_id AND ip.project_id IN <include refid="projects"/>
+        WHERE i.id IN <include refid="ids"/>
+    </select>
+</mapper>

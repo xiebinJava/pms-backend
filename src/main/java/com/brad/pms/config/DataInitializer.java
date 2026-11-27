@@ -18,11 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Local demo seed data. Persistent (mysql/prod) empty databases create one
- * administrator from PMS_BOOTSTRAP_* env vars, falling back to the documented
- * OSS defaults (admin@example.com / PmsAdmin123!). Production must override.
- */
+/** Seeds test fixtures or creates the first administrator for a new installation. */
 @Slf4j
 @Component
 @Order(1)
@@ -45,14 +41,12 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        Long userCount = userMapper.selectCount(null);
-        if (userCount != null && userCount > 0) {
+        if (userMapper.hasAnyAccount()) {
             enterpriseDataMigration.backfillUsersAndProjects();
             return;
         }
 
-        if (isPersistentProfile()) {
-            // Documented OSS first-login defaults (must match distribution README / .env.example).
+        if (!environment.matchesProfiles("test & !mysql & !prod & !production & !oceanbase")) {
             String email = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_EMAIL", "admin@example.com");
             String normalizedEmail = EnterpriseDataMigration.normalizeEmail(email);
             if (normalizedEmail == null || !normalizedEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
@@ -60,16 +54,14 @@ public class DataInitializer implements CommandLineRunner {
             }
             String username = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_USERNAME", "admin");
             String nameZh = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_NAME_ZH", "系统管理员");
-            String password = bootstrapOrDefault("PMS_BOOTSTRAP_ADMIN_PASSWORD", "PmsAdmin123!");
-            if (password.length() < 12) {
-                throw new IllegalStateException("PMS_BOOTSTRAP_ADMIN_PASSWORD 至少需要 12 位");
-            }
-            if ("production".equalsIgnoreCase(System.getenv("PMS_DEPLOYMENT_ENV"))
-                    && "PmsAdmin123!".equals(password)) {
-                throw new IllegalStateException(
-                        "生产环境禁止使用公开默认管理员密码 PmsAdmin123!，请设置 PMS_BOOTSTRAP_ADMIN_PASSWORD");
+            String password = environment.getProperty("PMS_BOOTSTRAP_ADMIN_PASSWORD");
+            if (password == null || password.isBlank() || password.length() < 12
+                    || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72
+                    || password.startsWith("change-me-") || "PmsAdmin123!".equals(password)) {
+                throw new IllegalStateException("空数据库需要专属 PMS_BOOTSTRAP_ADMIN_PASSWORD（至少 12 字符，最多 72 UTF-8 字节）");
             }
             UserDO bootstrap = user(username, password, nameZh, email);
+            bootstrap.setMustChangePassword(true);
             bootstrap.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
             userMapper.updateById(bootstrap);
             enterpriseDataMigration.backfillUsersAndProjects();
@@ -77,7 +69,7 @@ public class DataInitializer implements CommandLineRunner {
             return;
         }
 
-        log.info("初始化测试演示数据（登录名：admin，密码：admin123，仅限测试配置）");
+        log.info("初始化测试演示数据");
 
         UserDO admin = user("admin", "admin123", "管理员", "admin@pms.com");
         admin.setSystemRole(SystemRole.ADMINISTRATOR.getCode());
@@ -193,15 +185,8 @@ public class DataInitializer implements CommandLineRunner {
                 .toList();
     }
 
-    private boolean isPersistentProfile() {
-        return java.util.Arrays.stream(environment.getActiveProfiles())
-                .anyMatch(profile -> "mysql".equalsIgnoreCase(profile)
-                        || "prod".equalsIgnoreCase(profile)
-                        || "production".equalsIgnoreCase(profile));
-    }
-
     private String optionalBootstrap(String key) {
-        String value = System.getenv(key);
+        String value = environment.getProperty(key);
         return value == null || value.isBlank() ? null : value.trim();
     }
 

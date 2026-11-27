@@ -55,6 +55,22 @@ class ProjectPermissionServiceTest {
     }
 
     @Test
+    void resolvesRecycleBinManagementScopeOncePerBatch() {
+        var reader = new LoginUser(9L, "reader", "成员", 0);
+        UserContext.set(reader);
+        when(authorizationService.has(PermissionCode.PROJECT_MANAGE)).thenReturn(true);
+        when(dataScopeResolver.resolveOrgUnitIds(reader, PermissionCode.PROJECT_MANAGE)).thenReturn(List.of(42L));
+        var projects = java.util.stream.LongStream.range(1, 101).mapToObj(id -> {
+            var project = project(ProjectStatus.DELETED.getCode(), 42L, 7L, 8L);
+            project.setId(id);
+            return project;
+        }).toList();
+        assertThat(service().manageableProjectIds(projects)).hasSize(100);
+        org.mockito.Mockito.verify(dataScopeResolver).resolveOrgUnitIds(reader, PermissionCode.PROJECT_MANAGE);
+        org.mockito.Mockito.verify(authorizationService).has(PermissionCode.PROJECT_MANAGE);
+    }
+
+    @Test
     void ordinaryReaderCannotDiscoverDeletedProject() {
         UserContext.set(new LoginUser(7L, "member", "成员", 0));
         ProjectDO deleted = project(ProjectStatus.DELETED.getCode(), 42L, 10L, 20L);

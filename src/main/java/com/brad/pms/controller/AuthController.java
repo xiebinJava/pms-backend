@@ -15,6 +15,7 @@ import com.brad.pms.dto.response.OidcStartDTO;
 import com.brad.pms.dto.response.UserDTO;
 import com.brad.pms.security.IgnoreAuth;
 import com.brad.pms.security.UserContext;
+import com.brad.pms.security.AllowInitialPasswordChange;
 import com.brad.pms.service.AuthService;
 import com.brad.pms.service.InvitationService;
 import com.brad.pms.service.PasswordResetService;
@@ -101,6 +102,7 @@ public class AuthController {
         return ResponseResult.success(response);
     }
 
+    @AllowInitialPasswordChange
     @PostMapping("/logout")
     public ResponseResult<Void> logout() {
         var current = UserContext.get();
@@ -108,12 +110,14 @@ public class AuthController {
         return ResponseResult.success();
     }
 
+    @AllowInitialPasswordChange
     @PostMapping("/password/change")
     public ResponseResult<Void> changePassword(@Validated @RequestBody PasswordChangeRequest request) {
         authService.changePassword(request);
         return ResponseResult.success();
     }
 
+    @AllowInitialPasswordChange
     @GetMapping("/me")
     public ResponseResult<UserDTO> me() {
         return ResponseResult.success(authService.me());

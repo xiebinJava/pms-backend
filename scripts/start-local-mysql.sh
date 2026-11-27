@@ -66,11 +66,7 @@ if ! [[ "$secret_bytes" =~ ^[0-9]+$ ]] || (( secret_bytes < 32 )); then
   exit 2
 fi
 
-if [[ -z "${PMS_BOOTSTRAP_ADMIN_EMAIL:-}" ]]; then
-  echo "PMS_BOOTSTRAP_ADMIN_EMAIL is required for the first empty-database start" >&2
-  exit 2
-fi
-if [[ -z "${PMS_BOOTSTRAP_ADMIN_PASSWORD:-}" || "${#PMS_BOOTSTRAP_ADMIN_PASSWORD}" -lt 12 ]]; then
+if [[ -n "${PMS_BOOTSTRAP_ADMIN_PASSWORD:-}" && "${#PMS_BOOTSTRAP_ADMIN_PASSWORD}" -lt 12 ]]; then
   echo "PMS_BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters" >&2
   exit 2
 fi
@@ -176,8 +172,8 @@ nohup env \
   PMS_OIDC_CLIENT_SECRET="${PMS_OIDC_CLIENT_SECRET:-}" \
   PMS_OIDC_REDIRECT_URI="${PMS_OIDC_REDIRECT_URI:-http://localhost:5173/login/oidc/callback}" \
   PMS_OIDC_SCOPES="${PMS_OIDC_SCOPES:-openid email profile}" \
-  PMS_BOOTSTRAP_ADMIN_EMAIL="$PMS_BOOTSTRAP_ADMIN_EMAIL" \
-  PMS_BOOTSTRAP_ADMIN_PASSWORD="$PMS_BOOTSTRAP_ADMIN_PASSWORD" \
+  PMS_BOOTSTRAP_ADMIN_EMAIL="${PMS_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}" \
+  PMS_BOOTSTRAP_ADMIN_PASSWORD="${PMS_BOOTSTRAP_ADMIN_PASSWORD:-}" \
   PMS_BOOTSTRAP_ADMIN_USERNAME="${PMS_BOOTSTRAP_ADMIN_USERNAME:-}" \
   PMS_BOOTSTRAP_ADMIN_NAME_ZH="${PMS_BOOTSTRAP_ADMIN_NAME_ZH:-}" \
   PMS_UPLOAD_DIR="$upload_dir" \
