@@ -140,7 +140,6 @@ JavaMailSender 把就绪状态误判为 DOWN。启用正式 SMTP 后，可将该
 工作流会在检出前给出明确错误并停止，不会误报为 MySQL 或应用故障。
 
 设置完成后，在后端仓库进入 Actions → `integration-and-e2e`，点击 **Run workflow**，
-选择 `main`（或输入已经审核过的前端分支、标签或提交 SHA）后运行。普通 push/PR 会自动使用
-前端远程 `main`，手动发布验收可以通过 `frontend_ref` 固定不可变提交。工作流成功后，重点查看
+选择候选后端所在的分支。普通 push 和 PR 使用工作流中固定的前端提交。验证另一组候选时，通过 `frontend_ref` 指定经过评审的前端提交号。工作流成功后，重点查看
 `mysql-and-browser` 作业中的 API 冒烟、登录代理和桌面/移动端 Playwright 步骤；
 不要仅凭“工作流已启动”判断通过。

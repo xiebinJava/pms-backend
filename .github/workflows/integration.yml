@@ -6,14 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       frontend_ref:
-        description: 'Reviewed pms-front branch, tag, or commit SHA (defaults to release)'
+        description: 'Reviewed pms-front branch, tag, or commit SHA (defaults to the pinned commit)'
         required: false
         type: string
-        default: release
 
 jobs:
   mysql-and-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -32,10 +31,8 @@ jobs:
           repository: ${{ github.repository_owner }}/pms-front
           path: pms-front
           token: ${{ secrets.PMS_FRONT_REPO_READ_TOKEN }}
-          # Release validation must exercise the matching frontend release
-          # branch. A manual dispatch may pin a reviewed branch, tag, or
-          # immutable commit SHA for a deliberate cross-branch check.
-          ref: ${{ inputs.frontend_ref || 'release' }}
+          # Keep automated runs on the same frontend source as release acceptance.
+          ref: ${{ inputs.frontend_ref || 'a00e894bf8cea91cb6adb7bdd009148b0ab16249' }}
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9

@@ -27,10 +27,8 @@ latest_migration="$({ find "$BACKEND_DIR/src/main/resources/db/migration" -maxde
 
 integration_workflow="$BACKEND_DIR/.github/workflows/integration.yml"
 [[ -f "$integration_workflow" ]] || fail "integration workflow does not exist: $integration_workflow"
-grep -F -- "default: release" "$integration_workflow" >/dev/null \
-  || fail "integration workflow must default to the frontend release branch"
-grep -F -- 'ref: ${{ inputs.frontend_ref || '\''release'\'' }}' "$integration_workflow" >/dev/null \
-  || fail "integration workflow must check out the frontend release branch by default"
+grep -Eq -- '^[[:space:]]+ref: [$][{][{] inputs[.]frontend_ref [|][|] [[:punct:]][0-9a-f]{40}[[:punct:]] [}][}]$' "$integration_workflow" \
+  || fail "integration workflow must pin an immutable frontend commit by default"
 grep -E -- '^[[:space:]]+E2E_BASE_URL: http://127\.0\.0\.1:5173$' "$integration_workflow" >/dev/null \
   || fail "integration workflow must pass the live E2E base URL variable expected by browser smoke tests"
 grep -F -- 'PMS_E2E_BASE_URL: http://127.0.0.1:5173' "$integration_workflow" >/dev/null \

@@ -5,7 +5,6 @@ import com.atlassian.oai.validator.mockmvc.MockMvcResponse;
 import com.atlassian.oai.validator.model.Request;
 import com.brad.pms.security.UserContext;
 import com.brad.pms.dto.request.LoginRequest;
-import com.brad.pms.mapper.UserMapper;
 import com.brad.pms.service.AuthService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +43,6 @@ class DevelopmentPageContractTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate db;
     @Autowired AuthService auth;
-    @Autowired UserMapper users;
     @Autowired ObjectMapper json;
 
     @AfterEach
@@ -77,10 +75,14 @@ class DevelopmentPageContractTest {
 
     @Test
     void deniedAccountReceivesDocumentedErrors() throws Exception {
-        String name = "Alex.Zhang";
-        String token = login(name);
-        db.update("UPDATE sys_user_role SET status='ENDED' WHERE user_id=?",
-                users.findByUsernameNormalized("alex.zhang").getId());
+        int created = db.update("""
+                INSERT INTO sys_user (username, username_normalized, email, email_normalized, password, status, system_role)
+                SELECT 'contract-denied', 'contract-denied', 'contract-denied@example.com',
+                       'contract-denied@example.com', password, 'ACTIVE', 0
+                FROM sys_user WHERE username_normalized = 'admin'
+                """);
+        assertThat(created).isOne();
+        String token = login("contract-denied");
         for (var request : List.of(post("/api/development/topics/page"), post("/api/development/stories/page"),
                 post("/api/development/requirements/page"), get("/api/development/requirements/page"))) {
             mvc.perform(request.contextPath("/api").header("Authorization", token))
