@@ -19,7 +19,7 @@ cd pms-distribution
 ./scripts/bootstrap.sh
 ```
 
-打开 <http://localhost:5173>。首次空库初始管理员：`admin@example.com` / `PmsAdmin123!`（登录后请立刻改密）。MySQL 与 JWT 密钥仍写入本地、未跟踪的 `.pms-bootstrap-secrets`。生产配置、升级和备份见发行仓库文档。
+打开 <http://localhost:5173>。首次空库管理员邮箱为 `admin@example.com`，从安装脚本提示的私有文件领取初始密码，登录后按提示设置新密码。MySQL 与 JWT 密钥仍写入本地、未跟踪的 `.pms-bootstrap-secrets`。生产配置、升级和备份见发行仓库文档。
 
 ## 从源码启动（开发者）
 
@@ -54,7 +54,7 @@ openssl rand -hex 32
 | `PMS_JWT_SECRET` | JWT 签名密钥，至少 32 字节随机值 |
 | `PMS_BOOTSTRAP_ADMIN_PASSWORD` | 首次创建管理员的密码，至少 12 位 |
 
-本地示例的管理员由 `PMS_BOOTSTRAP_*` 指定，默认是 `admin@example.com` / `PmsAdmin123!`（与发行包一致）。登录时使用邮箱，不区分大小写；中文名和英文名只是展示信息。
+本地示例的管理员由 `PMS_BOOTSTRAP_*` 指定，默认邮箱为 `admin@example.com`。本地空库启动前请在私有配置中设置独立初始密码。登录时使用邮箱，不区分大小写；中文名和英文名只是展示信息。
 
 ### 3. 启动完整系统
 
@@ -63,10 +63,10 @@ docker compose -f docker-compose.example.yml up -d --build
 docker compose -f docker-compose.example.yml ps
 ```
 
-首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V73）和前端：
+首次启动会按以下顺序完成 MySQL、附件目录、后端 Flyway 迁移（V1–V74）和前端：
 
 ```text
-MySQL → uploads-init → backend（Flyway V1–V73）→ frontend
+MySQL → uploads-init → backend（Flyway V1–V74）→ frontend
 ```
 
 打开 <http://localhost:5173>。后端健康检查地址：
@@ -145,7 +145,7 @@ set +a
 ./scripts/verify-enterprise-migration.sh
 ```
 
-当前基线为 V1–V73。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
+当前基线为 V1–V74。详细步骤见 [升级手册](docs/operations/enterprise-upgrade-runbook.md)。
 
 ## 本地直接启动后端（已有 MySQL 时）
 
@@ -229,7 +229,7 @@ src/main/java/com/brad/pms/
 └── webhook/     可选签名出站事件
 
 src/main/resources/
-├── db/migration/  V1–V73 MySQL / Flyway 迁移脚本
+├── db/migration/  V1–V74 MySQL / Flyway 迁移脚本
 └── openapi/       pms-api.yaml 接口合同
 
 docs/

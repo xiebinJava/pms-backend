@@ -71,6 +71,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "pms.secretName" . }}
                   key: bootstrapAdminPassword
+                  optional: true
             - name: PMS_BOOTSTRAP_ADMIN_NAME_ZH
               valueFrom:
                 secretKeyRef:

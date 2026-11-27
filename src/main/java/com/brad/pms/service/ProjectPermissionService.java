@@ -386,6 +386,14 @@ public class ProjectPermissionService {
                 || dataScopeResolver.resolveOrgUnitIds(current, PermissionCode.PROJECT_WRITE).contains(orgUnitId));
     }
 
+    List<Long> manageableProjectIds(Collection<ProjectDO> projects) {
+        var scope = scopedPermissionPredicate(PermissionCode.PROJECT_MANAGE);
+        Long userId = UserContext.userIdOrNull();
+        boolean admin = UserContext.isAdministrator();
+        return projects.stream().filter(p -> ProjectPermissionPolicy.hasProjectControl(p, userId, admin)
+                        || scope.test(p)).map(ProjectDO::getId).toList();
+    }
+
     public boolean canManageProject(ProjectDO project) {
         return project != null && (ProjectPermissionPolicy.hasProjectControl(project, UserContext.userIdOrNull(), UserContext.isAdministrator())
                 || hasScopedPermission(project, PermissionCode.PROJECT_MANAGE));

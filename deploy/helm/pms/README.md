@@ -15,7 +15,7 @@ docker build -t pms-front:1.0.8 ../pms-front
 
 ## 安装
 
-先创建包含 `jwtSecret`、`mysqlPassword`、`bootstrapAdminEmail`、`bootstrapAdminPassword`、`bootstrapAdminNameZh`、`bootstrapAdminUsername` 的 Secret，然后：
+先创建包含 `jwtSecret`、`mysqlPassword`、`bootstrapAdminEmail`、`bootstrapAdminNameZh`、`bootstrapAdminUsername` 的 Secret。首次空库安装时另加入独立的 `bootstrapAdminPassword`，管理员完成改密并重新登录后可移除此键。然后运行以下命令。
 
 ```bash
 helm upgrade --install pms deploy/helm/pms \

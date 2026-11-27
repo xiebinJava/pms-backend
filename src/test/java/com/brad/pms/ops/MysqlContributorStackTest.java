@@ -54,7 +54,7 @@ class MysqlContributorStackTest {
         assertThat(env).contains("MYSQL_DB=pms");
         assertThat(env).contains("PMS_BOOTSTRAP_ADMIN_EMAIL=admin@example.com");
         assertThat(env).contains("PMS_BOOTSTRAP_ADMIN_NAME_ZH=系统管理员");
-        assertThat(env).contains("PMS_BOOTSTRAP_ADMIN_PASSWORD=PmsAdmin123!");
+        assertThat(env).contains("PMS_BOOTSTRAP_ADMIN_PASSWORD=\n");
         assertThat(env).contains("replace_with_a_random_secret_at_least_32_bytes");
         assertThat(env).contains("PMS_NOTIFICATION_STARTUP_CHECK=false");
         assertThat(env).contains("http://localhost:5173");

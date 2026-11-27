@@ -18,6 +18,90 @@ tags:
   - name: 研发管理
   - name: 健康检查
 paths:
+  /development/topics/page:
+    post:
+      tags: [研发管理]
+      summary: 专题分页查询
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DevelopmentItemPageQuery' }
+      responses:
+        '200':
+          description: 专题分页结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DevelopmentTopicPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /development/stories/page:
+    post:
+      tags: [研发管理]
+      summary: 故事分页查询
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DevelopmentItemPageQuery' }
+      responses:
+        '200':
+          description: 故事分页结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DevelopmentStoryPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /development/requirements/page:
+    post:
+      tags: [研发管理]
+      summary: 需求分页查询
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequirementPageQuery' }
+      responses:
+        '200':
+          description: 需求分页结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequirementPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [研发管理]
+      summary: 需求分页查询（兼容入口）
+      parameters:
+        - name: currPage
+          in: query
+          schema: { type: integer, default: 1, description: 小于 1 时取 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 10, description: 小于 1 时取 10，超过 100 时取 100 }
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: ownerId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: deleted
+          in: query
+          schema: { type: boolean }
+        - name: targetType
+          in: query
+          schema: { type: string, enum: [PROJECT, TOPIC, STORY] }
+      responses:
+        '200':
+          description: 需求分页结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequirementPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /integration/ai/v1/context/{resourceType}/{resourceId}:
     get:
       tags: [研发管理]
@@ -97,7 +181,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                $ref: '#/components/schemas/LoginSessionResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /auth/ldap/login:
@@ -117,7 +201,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                $ref: '#/components/schemas/LoginSessionResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
@@ -139,7 +223,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                $ref: '#/components/schemas/LoginSessionResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -155,7 +239,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                $ref: '#/components/schemas/LoginSessionResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /auth/logout:
@@ -183,7 +267,16 @@ paths:
       summary: 当前用户
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: 当前账号及首次改密状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    additionalProperties: true
+                    properties:
+                      data: { $ref: '#/components/schemas/SessionUser' }
         '401':
           $ref: '#/components/responses/Unauthorized'
   /auth/activate:
@@ -1770,13 +1863,198 @@ components:
       required: true
       schema: { type: integer, format: int64 }
   schemas:
+    DevelopmentItemPageQuery:
+      type: object
+      properties:
+        currPage: { type: integer, default: 1, description: 小于 1 时取 1 }
+        pageSize: { type: integer, default: 10, description: 小于 1 时取 10，超过 100 时取 100 }
+        keyword: { type: string }
+        ownerId: { type: integer, format: int64 }
+        status: { type: string }
+        deleted: { type: boolean, description: 仅专题列表使用 }
+        projectId: { type: integer, format: int64 }
+        nodeId: { type: integer, format: int64 }
+    RequirementPageQuery:
+      type: object
+      properties:
+        currPage: { type: integer, default: 1, description: 小于 1 时取 1 }
+        pageSize: { type: integer, default: 10, description: 小于 1 时取 10，超过 100 时取 100 }
+        keyword: { type: string }
+        ownerId: { type: integer, format: int64 }
+        status: { type: string }
+        deleted: { type: boolean }
+        targetType: { type: string, enum: [PROJECT, TOPIC, STORY] }
+    DevelopmentTopicPageResponse:
+      allOf:
+        - { $ref: '#/components/schemas/ApiResponse' }
+        - type: object
+          additionalProperties: true
+          required: [code, msg, data, requestId]
+          properties:
+            data:
+              allOf:
+                - { $ref: '#/components/schemas/PageMetadata' }
+                - type: object
+                  additionalProperties: true
+                  required: [list]
+                  properties:
+                    list:
+                      type: array
+                      items: { $ref: '#/components/schemas/DevelopmentTopicListDTO' }
+    DevelopmentStoryPageResponse:
+      allOf:
+        - { $ref: '#/components/schemas/ApiResponse' }
+        - type: object
+          additionalProperties: true
+          required: [code, msg, data, requestId]
+          properties:
+            data:
+              allOf:
+                - { $ref: '#/components/schemas/PageMetadata' }
+                - type: object
+                  additionalProperties: true
+                  required: [list]
+                  properties:
+                    list:
+                      type: array
+                      items: { $ref: '#/components/schemas/DevelopmentStoryListDTO' }
+    RequirementPageResponse:
+      allOf:
+        - { $ref: '#/components/schemas/ApiResponse' }
+        - type: object
+          additionalProperties: true
+          required: [code, msg, data, requestId]
+          properties:
+            data:
+              allOf:
+                - { $ref: '#/components/schemas/PageMetadata' }
+                - type: object
+                  additionalProperties: true
+                  required: [list]
+                  properties:
+                    list:
+                      type: array
+                      items: { $ref: '#/components/schemas/RequirementListDTO' }
+    PageMetadata:
+      type: object
+      additionalProperties: true
+      required: [total, currPage, pageSize, totalPage]
+      properties:
+        total: { type: integer, format: int64 }
+        currPage: { type: integer, format: int64 }
+        pageSize: { type: integer, format: int64 }
+        totalPage: { type: integer, format: int64 }
+    DevelopmentTopicListDTO:
+      type: object
+      required: [id, title, projectId, nodeId, status, progress, developmentProgress, workflowConfigured, workflowStatus, storyCount, completedStoryCount, blockedStoryCount]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        projectId: { type: integer, format: int64, nullable: true }
+        projectCode: { type: string, nullable: true }
+        projectName: { type: string, nullable: true }
+        nodeId: { type: integer, format: int64, nullable: true }
+        nodeKey: { type: string, nullable: true }
+        nodeName: { type: string, nullable: true }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        status: { type: string }
+        progress: { type: integer, format: int32 }
+        developmentProgress: { type: integer, format: int32 }
+        workflowConfigured: { type: boolean }
+        workflowStatus: { type: string }
+        storyCount: { type: integer, format: int32 }
+        completedStoryCount: { type: integer, format: int32 }
+        blockedStoryCount: { type: integer, format: int32 }
+        latestBuildVersion: { type: string, nullable: true }
+        testStatus: { type: string, nullable: true }
+        blocker: { type: string, nullable: true }
+        sourceRequirements: { type: array, items: { $ref: '#/components/schemas/SourceRequirementSummaryDTO' } }
+        sourceRequirement: { $ref: '#/components/schemas/SourceRequirementSummaryDTO' }
+    DevelopmentStoryListDTO:
+      type: object
+      required: [id, title, projectId, nodeId, status, progress, developmentProgress, workflowConfigured, workflowStatus, topicId]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        projectId: { type: integer, format: int64, nullable: true }
+        projectCode: { type: string, nullable: true }
+        projectName: { type: string, nullable: true }
+        nodeId: { type: integer, format: int64, nullable: true }
+        nodeKey: { type: string, nullable: true }
+        nodeName: { type: string, nullable: true }
+        topicId: { type: integer, format: int64, nullable: true }
+        topicTitle: { type: string, nullable: true }
+        topicWorkflowNodeId: { type: integer, format: int64, nullable: true }
+        topicWorkflowNodeName: { type: string, nullable: true }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        iterationPlanName: { type: string, nullable: true }
+        status: { type: string }
+        progress: { type: integer, format: int32 }
+        developmentProgress: { type: integer, format: int32 }
+        workflowConfigured: { type: boolean }
+        workflowStatus: { type: string }
+        storyPoints: { type: integer, format: int32, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        blocker: { type: string, nullable: true }
+        sourceRequirements: { type: array, items: { $ref: '#/components/schemas/SourceRequirementSummaryDTO' } }
+        sourceRequirement: { $ref: '#/components/schemas/SourceRequirementSummaryDTO' }
+    RequirementListDTO:
+      type: object
+      required: [id, title, status, version]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        priority: { type: integer, format: int32, nullable: true }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        orgUnitId: { type: integer, format: int64, nullable: true }
+        systemId: { type: integer, format: int64, nullable: true }
+        status: { type: string }
+        deleted: { type: boolean, nullable: true }
+        version: { type: integer, format: int32 }
+        workflowConfigured: { type: boolean }
+        workflowStatus: { type: string }
+        workflowProgress: { type: integer, format: int32 }
+        terminalStatus: { type: string, nullable: true }
+        executionTarget: { $ref: '#/components/schemas/RequirementExecutionTargetDTO' }
+    SourceRequirementSummaryDTO:
+      type: object
+      nullable: true
+      required: [id, title]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        status: { type: string }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        targetType: { type: string, enum: [PROJECT, TOPIC, STORY] }
+        targetId: { type: integer, format: int64 }
+    RequirementExecutionTargetDTO:
+      type: object
+      nullable: true
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [PROJECT, TOPIC, STORY] }
+        targetId: { type: integer, format: int64 }
+        title: { type: string, nullable: true }
+        code: { type: string, nullable: true }
+        status: { type: string }
+        ownerId: { type: integer, format: int64, nullable: true }
+        ownerName: { type: string, nullable: true }
+        progress: { type: integer, format: int32, nullable: true }
+        navigationType: { type: string, nullable: true }
+        navigationId: { type: integer, format: int64, nullable: true }
     ProjectBoardResponse:
       type: object
       required: [asOfDate, generatedAt, allCompanyScope, projects]
       properties:
         asOfDate: { type: string, format: date }
         generatedAt: { type: string, format: date-time }
-        allCompanyScope: { type: boolean, description: Whether the caller has company-wide project read scope, independent of the selected organization. }
+        allCompanyScope: { type: boolean, description: "Whether the caller has company-wide project read scope, independent of the selected organization." }
         projects:
           type: array
           items: { $ref: '#/components/schemas/ProjectBoardRow' }
@@ -1785,7 +2063,7 @@ components:
       required: [project, phase, health, expectedProgress, progressVariance, overdueDays, overdueNodeCount, openRiskCount, highRiskCount, mediumRiskCount, riskDataState, nodeDataState, dataIssues, nextNode, storySummary, acceptanceSummary]
       properties:
         project: { $ref: '#/components/schemas/ProjectDTO' }
-        phase: { type: string, enum: [NOT_STARTED, IN_PROGRESS, COMPLETED, TERMINATED, UNKNOWN], description: Completed/terminated lifecycle takes precedence; active phase uses node states, never legacy project status 0. }
+        phase: { type: string, enum: [NOT_STARTED, IN_PROGRESS, COMPLETED, TERMINATED, UNKNOWN], description: "Completed/terminated lifecycle takes precedence; active phase uses node states, never legacy project status 0." }
         health: { type: string, enum: [HEALTHY, WATCH, CRITICAL, UNKNOWN, COMPLETED, TERMINATED], description: 'Active projects: CRITICAL for overdue project/node, OPEN HIGH risk or variance <= -15; WATCH for OPEN MEDIUM or variance <= -8. Otherwise HEALTHY needs valid project dates, an unfinished node deadline and configured risks; else UNKNOWN.' }
         expectedProgress: { type: integer, minimum: 0, maximum: 100, nullable: true, description: Rounded linear progress between project dates with end > start. Null for invalid dates or terminal lifecycle. }
         progressVariance: { type: integer, nullable: true, description: Enriched project progress minus expected progress. }
@@ -1924,6 +2202,28 @@ components:
         tasks:
           type: array
           items: { $ref: '#/components/schemas/WorkbenchTaskDTO' }
+    SessionUser:
+      type: object
+      additionalProperties: true
+      required: [id, mustChangePassword]
+      properties:
+        id: { type: integer, format: int64 }
+        mustChangePassword: { type: boolean, description: 为 true 时只能识别、续期或退出会话及修改初始密码 }
+    LoginSessionResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          additionalProperties: true
+          required: [data]
+          properties:
+            data:
+              type: object
+              additionalProperties: true
+              required: [accessToken, user]
+              properties:
+                accessToken: { type: string }
+                refreshToken: { type: string, nullable: true }
+                user: { $ref: '#/components/schemas/SessionUser' }
     LoginRequest:
       type: object
       required: [email, password]
@@ -1964,8 +2264,8 @@ components:
       type: object
       properties:
         version: { type: integer, minimum: 0, nullable: true, description: 已读取的基线版本；版本冲突返回 409 }
-        scopeItems: { type: array, description: 纳入/不纳入范围项 }
-        requirements: { type: array, description: 需求清单；新增或修改的条目需重新确认；每条需求返回 taskCount 和 completedTaskCount }
+        scopeItems: { type: array, items: {}, description: 纳入/不纳入范围项 }
+        requirements: { type: array, items: {}, description: 需求清单；新增或修改的条目需重新确认；每条需求返回 taskCount 和 completedTaskCount }
     NodeRequirementScopeResponse:
       type: object
       properties:
@@ -1976,8 +2276,8 @@ components:
         confirmedBy: { type: integer, format: int64, nullable: true }
         confirmedAt: { type: string, format: date-time, nullable: true }
         canEdit: { type: boolean }
-        scopeItems: { type: array }
-        requirements: { type: array }
+        scopeItems: { type: array, items: {} }
+        requirements: { type: array, items: {} }
     NodeSolutionPackageUpdateRequest:
       type: object
       properties:
@@ -2017,7 +2317,7 @@ components:
         nodeId: { type: integer, format: int64 }
         upstreamBaseline: { type: object, description: 需求范围基线只读摘要 }
         solutionPackage: { type: object, description: 单个方案包 }
-        reviews: { type: array, description: 固定三类必要评审 }
+        reviews: { type: array, items: {}, description: 固定三类必要评审 }
         decision: { type: object, description: 方案决策及锁定状态 }
     NodeAcceptanceUpdateRequest:
       type: object
@@ -2025,7 +2325,7 @@ components:
         version: { type: integer, minimum: 0, nullable: true, description: 已读取的验收版本；版本冲突返回 409 }
         result: { type: string, enum: [PENDING, PASS, CONDITIONAL_PASS] }
         residualItems: { type: string, maxLength: 2000 }
-        items: { type: array, description: 来自已确认需求的验收项结果和验证摘要 }
+        items: { type: array, items: {}, description: 来自已确认需求的验收项结果和验证摘要 }
     NodeAcceptanceResponse:
       type: object
       properties:
@@ -2040,8 +2340,8 @@ components:
         confirmedBy: { type: integer, format: int64, nullable: true }
         confirmedAt: { type: string, format: date-time, nullable: true }
         canEdit: { type: boolean }
-        items: { type: array }
-        defects: { type: array, description: 只读的关联缺陷摘要 }
+        items: { type: array, items: {} }
+        defects: { type: array, items: {}, description: 只读的关联缺陷摘要 }
     NodeDevelopmentControlUpdateRequest:
       type: object
       properties:
@@ -2123,8 +2423,8 @@ components:
         iterationPlans:
           type: array
           items: { $ref: '#/components/schemas/NodeIterationPlanInput' }
-        resources: { type: array }
-        risks: { type: array }
+        resources: { type: array, items: {} }
+        risks: { type: array, items: {} }
     NodePlanResourceRiskResponse:
       type: object
       properties:
@@ -2137,8 +2437,8 @@ components:
         iterationPlans:
           type: array
           items: { $ref: '#/components/schemas/NodeIterationPlan' }
-        resources: { type: array }
-        risks: { type: array }
+        resources: { type: array, items: {} }
+        risks: { type: array, items: {} }
     IterationPlanPageRequest:
       type: object
       properties:

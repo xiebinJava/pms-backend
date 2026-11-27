@@ -46,6 +46,8 @@ public class UserDO {
 
     private LocalDateTime passwordChangedAt;
 
+    private Boolean mustChangePassword;
+
     @TableLogic(value = "false", delval = "true")
     private Boolean deleted;
 

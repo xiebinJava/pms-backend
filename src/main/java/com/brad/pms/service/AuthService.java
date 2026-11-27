@@ -80,6 +80,10 @@ public class AuthService {
         UserDO user = emailLogin
                 ? userMapper.findByEmailNormalized(normalized)
                 : userMapper.findByUsernameNormalized(normalized);
+        // Serialize first login with replacement of the bootstrap password and session revocation.
+        if (user != null && Boolean.TRUE.equals(user.getMustChangePassword())) {
+            user = userMapper.selectForUpdate(user.getId());
+        }
         if (user == null) {
             recordLoginAttempt(null, normalized, "FAILURE", "INVALID_CREDENTIALS", ip, userAgent);
             throw BusinessException.unauthorized("邮箱或密码错误");
@@ -245,7 +249,15 @@ public class AuthService {
         if (user == null || !UserStatus.ACTIVE.name().equals(user.getStatus())) {
             throw BusinessException.unauthorized("账号不可用");
         }
+        if (Boolean.TRUE.equals(user.getMustChangePassword())) throw BusinessException.forbidden("请先修改初始密码");
         return establishSession(user, user.getUsername(), "CLI_LOGIN_SUCCESS", null, "pms-cli", false);
+    }
+
+    @Transactional
+    public LoginResponse refreshCliSession(String refreshToken) {
+        LoginResponse response = refresh(refreshToken, null, "pms-cli");
+        if (response.getUser().isMustChangePassword()) throw BusinessException.forbidden("请先修改初始密码");
+        return response;
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
@@ -296,7 +308,7 @@ public class AuthService {
     @Transactional
     public void changePassword(PasswordChangeRequest request) {
         Long userId = UserContext.userId();
-        UserDO user = userMapper.selectById(userId);
+        UserDO user = userMapper.selectForUpdate(userId);
         if (user == null || !UserStatus.ACTIVE.name().equals(user.getStatus())) {
             throw BusinessException.unauthorized("账号不可用");
         }
@@ -306,12 +318,16 @@ public class AuthService {
         if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
             throw BusinessException.error("新密码不能与当前密码相同");
         }
+        if (request.getNewPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+            throw BusinessException.error("新密码最多 72 UTF-8 字节");
+        }
+        user.setMustChangePassword(false);
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         user.setPasswordChangedAt(LocalDateTime.now());
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
         user.setStatus(UserStatus.ACTIVE.name());
-        userMapper.updateById(user);
+        if (userMapper.updateById(user) != 1) throw BusinessException.error("账号已更新，请重试");
         revokeAllSessions(userId, "PASSWORD_CHANGED");
     }
 

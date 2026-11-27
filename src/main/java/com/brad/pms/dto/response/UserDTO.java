@@ -17,6 +17,7 @@ public class UserDTO {
     private String avatar;
     private Integer systemRole;
     private String status;
+    private boolean mustChangePassword;
     private java.util.List<String> permissionCodes;
     private LocalDateTime createdAt;
 }

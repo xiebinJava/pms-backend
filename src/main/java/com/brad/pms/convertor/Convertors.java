@@ -23,6 +23,7 @@ public final class Convertors {
         dto.setUsername(do_.getUsername());
         dto.setNameZh(do_.getNameZh());
         dto.setDisplayName(userDisplayName(do_));
+        dto.setMustChangePassword(Boolean.TRUE.equals(do_.getMustChangePassword()));
         dto.setNickname(userDisplayName(do_));
         dto.setEmail(do_.getEmail());
         dto.setPhone(do_.getPhone());

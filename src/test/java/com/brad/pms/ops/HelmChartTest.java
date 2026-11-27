@@ -27,7 +27,9 @@ class HelmChartTest {
         assertThat(values).contains("corsAllowedOrigins: https://pms.example.com");
         assertThat(values).contains("bootstrapAdminEmail: admin@example.com");
         assertThat(values).contains("bootstrapAdminNameZh: 系统管理员");
-        assertThat(values).contains("bootstrapAdminPassword: PmsAdmin123!");
+        assertThat(Files.readString(Path.of("deploy/helm/pms/templates/backend-deployment.yaml")))
+                .contains("key: bootstrapAdminPassword\n                  optional: true");
+        assertThat(values).contains("bootstrapAdminPassword: \"\"");
         assertThat(values).contains("jwtSecret: replace_with_a_random_secret_at_least_32_bytes");
         assertThat(values).contains("serviceMonitor:\n  enabled: false");
         assertThat(values).contains("ingress:\n  enabled: false");

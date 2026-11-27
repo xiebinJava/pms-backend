@@ -39,6 +39,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pms-front/pnpm-lock.yaml
       - name: Prepare ephemeral integration environment
         shell: bash
         run: |
@@ -47,7 +52,8 @@ jobs:
           app_password="$(openssl rand -hex 24)"
           jwt_secret="$(openssl rand -hex 32)"
           admin_password="$(openssl rand -hex 16)"
-          for secret in "$root_password" "$app_password" "$jwt_secret" "$admin_password"; do
+          login_password="$(openssl rand -hex 24)"
+          for secret in "$login_password" "$root_password" "$app_password" "$jwt_secret" "$admin_password"; do
             echo "::add-mask::$secret"
           done
           {
@@ -69,8 +75,9 @@ jobs:
             echo "PMS_INVITATION_EXPOSE_TOKEN=true"
           } > .env
           {
-            echo "E2E_PASSWORD=$admin_password"
-            echo "PMS_SMOKE_PASSWORD=$admin_password"
+            echo "PMS_TEST_INITIAL=$admin_password"
+            echo "E2E_PASSWORD=$login_password"
+            echo "PMS_SMOKE_PASSWORD=$login_password"
             echo "PMS_SMOKE_USERNAME=alex.zhang"
           } >> "$GITHUB_ENV"
       - name: Start MySQL, backend and frontend
@@ -83,6 +90,19 @@ jobs:
         run: bash scripts/validate-production-config.test.sh
       - name: Check shell scripts
         run: bash -n scripts/*.sh docker/*.sh
+      - name: Install Playwright browser
+        working-directory: pms-front
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Verify first administrator login in Chromium
+        working-directory: pms-front
+        env:
+          PMS_BOOTSTRAP_E2E_BASE_URL: http://127.0.0.1:5173
+          PMS_BOOTSTRAP_E2E_EMAIL: alex.zhang@example.com
+          PMS_BOOTSTRAP_E2E_PASSWORD: ${{ env.PMS_TEST_INITIAL }}
+          PMS_BOOTSTRAP_E2E_NEW_PASSWORD: ${{ env.E2E_PASSWORD }}
+        run: pnpm exec playwright test tests/e2e/bootstrap-password.spec.cjs
       - name: Run API smoke test
         run: ./scripts/smoke-test.sh
       - name: Create browser acceptance project fixture
@@ -164,11 +184,6 @@ jobs:
             sed -E 's/(accessToken|refreshToken|token|password)[^,}]*/\1=REDACTED/g' "$response_file"
             exit 1
           fi
-      - name: Install Playwright browser
-        working-directory: pms-front
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
       - name: Run live browser smoke tests
         working-directory: pms-front
         env:

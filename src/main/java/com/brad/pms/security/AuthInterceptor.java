@@ -98,6 +98,11 @@ public class AuthInterceptor implements HandlerInterceptor {
                     writeUnauthorized(response, "登录会话已失效，请重新登录");
                     return false;
                 }
+                if (Boolean.TRUE.equals(persistedUser.getMustChangePassword())
+                        && (aiDelegation || !method.hasMethodAnnotation(AllowInitialPasswordChange.class))) {
+                    writeError(response, HttpServletResponse.SC_FORBIDDEN, "请先修改初始密码");
+                    return false;
+                }
                 // 每次请求从数据库刷新系统角色，确保管理员权限变更即时生效，兼容旧令牌。
                 loginUser.setUsername(persistedUser.getUsername());
                 loginUser.setNickname(persistedUser.getNickname());
